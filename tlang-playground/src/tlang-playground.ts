@@ -235,7 +235,7 @@ export class TlangPlayground extends LitElement {
 
   @state() optimizationOptions: JsOptimizationOptions = {
     constantFolding: true,
-    anfTransform: true,
+    anfTransform: false,
   };
 
   private tlang = new TlangController(this.source, this.runner);
@@ -442,13 +442,14 @@ export class TlangPlayground extends LitElement {
               >
                 Constant folding
               </t-menuitem-checkbox>
-              <t-menuitem-checkbox
-                .disabled=${this.runner !== 'JavaScript'}
-                @change=${() => this.toggleOptimization('anfTransform')}
-                .checked=${this.optimizationOptions.anfTransform}
-              >
-                ANF transform
-              </t-menuitem-checkbox>
+              ${this.runner === 'Interpreter'
+                ? html`<t-menuitem-checkbox
+                    @change=${() => this.toggleOptimization('anfTransform')}
+                    .checked=${this.optimizationOptions.anfTransform}
+                  >
+                    ANF transform
+                  </t-menuitem-checkbox>`
+                : null}
             </t-menu>
             <t-button @click=${this.share}>Share</t-button>
             <select

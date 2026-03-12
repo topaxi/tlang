@@ -151,7 +151,7 @@ impl Tlang {
             runner: runner_kind,
             optimization_options: JsOptimizationOptions {
                 constant_folding: Some(true),
-                anf_transform: Some(true),
+                anf_transform: Some(false),
             },
             build: BuildArtifacts::default(),
             analyzer,
@@ -259,11 +259,11 @@ impl Tlang {
 
             match self.runner {
                 RunnerKind::JavaScript => {
-                    let mut passes: Vec<Box<dyn HirPass>> = Vec::new();
-
-                    if self.optimization_options.anf_transform.unwrap_or(true) {
-                        passes.push(Box::new(JsAnfTransform::default()));
-                    }
+                    // JsAnfTransform is always required for correct JS codegen —
+                    // it lifts non-JS-expressible expressions (for-loops, match
+                    // expressions, etc.) that cannot be emitted as JS expressions.
+                    let mut passes: Vec<Box<dyn HirPass>> =
+                        vec![Box::new(JsAnfTransform::default())];
 
                     passes.push(Box::new(
                         tlang_hir_opt::symbol_resolution::SymbolResolution::default(),
@@ -280,6 +280,12 @@ impl Tlang {
                 }
                 RunnerKind::Interpreter => {
                     let mut passes: Vec<Box<dyn HirPass>> = Vec::new();
+
+                    // Optional general ANF transform — off by default; reserved for
+                    // future bytecode compilation work.
+                    if self.optimization_options.anf_transform.unwrap_or(false) {
+                        // No generic ANF pass exists yet; this is a placeholder.
+                    }
 
                     passes.push(Box::new(
                         tlang_hir_opt::symbol_resolution::SymbolResolution::default(),
