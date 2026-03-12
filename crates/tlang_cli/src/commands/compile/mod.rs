@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 
-use output::{CompileTarget, ast::AstTarget, hir::HirTarget, js::JsTarget};
+use output::{CompileTarget, ast::AstTarget, hir::HirTarget, hir_raw::HirRawTarget, js::JsTarget};
 use tlang_ast_lowering::lower_to_hir;
 use tlang_codegen_js::{generator::CodegenJS, js_hir_opt::JsHirOptimizer};
 use tlang_hir_opt::{HirOptimizer, HirPass};
@@ -22,8 +22,9 @@ pub enum CompileTargetArg {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum OutputFormat {
     Source,
-    Hir,
     Ast,
+    HirRaw,
+    Hir,
 }
 
 pub enum CompileTargetHirOptimizer {
@@ -139,6 +140,7 @@ pub fn handle_compile(options: CompileOptions) {
                         (CompileTargetArg::Js, OutputFormat::Source) => {
                             JsTarget.compile(&source, &mut module)
                         }
+                        (_, OutputFormat::HirRaw) => HirRawTarget.compile(&source, &mut module),
                         (_, OutputFormat::Hir) => HirTarget.compile(&source, &mut module),
                         // Invalid combinations should be caught by argument parsing, but as a fallback:
                         _ => panic!("Unsupported target/format combination"),

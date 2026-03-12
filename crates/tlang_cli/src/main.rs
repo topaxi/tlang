@@ -24,17 +24,18 @@ fn validate_compile_args(matches: &ArgMatches) -> Command {
     };
 
     if !output_stdlib && input_file.is_none() {
-        eprintln!("Error: input_file is required unless output_stdlib is true.");
+        eprintln!("Error: input_file is required unless output-stdlib is true.");
         std::process::exit(1);
     }
 
     let output_type = matches.get_one::<String>("output_type").cloned();
     let output_format = match output_type.as_deref() {
         Some("ast") => OutputFormat::Ast,
+        Some("hir-raw") => OutputFormat::HirRaw,
         Some("hir") => OutputFormat::Hir,
         Some("js") | None => OutputFormat::Source,
         _ => {
-            eprintln!("Error: output_type must be one of 'ast', 'hir', or 'js'.");
+            eprintln!("Error: output_type must be one of 'ast', 'hir-raw', 'hir', or 'js'.");
             std::process::exit(1);
         }
     };

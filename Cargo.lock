@@ -1219,6 +1219,7 @@ dependencies = [
  "tlang_codegen_js",
  "tlang_hir",
  "tlang_hir_opt",
+ "tlang_hir_pretty",
  "tlang_parser",
  "tlang_runtime",
  "tlang_semantics",

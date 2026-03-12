@@ -1,5 +1,6 @@
 pub mod ast;
 pub mod hir;
+pub mod hir_raw;
 pub mod js;
 
 use crate::error::ParserError;

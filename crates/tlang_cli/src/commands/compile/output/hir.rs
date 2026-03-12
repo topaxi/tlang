@@ -1,3 +1,5 @@
+use tlang_hir_pretty::HirPretty;
+
 use super::CompileTarget;
 use crate::error::ParserError;
 
@@ -9,6 +11,8 @@ impl CompileTarget for HirTarget {
         _source: &str,
         module: &mut tlang_hir::Module,
     ) -> Result<String, ParserError> {
-        Ok(ron::ser::to_string_pretty(module, ron::ser::PrettyConfig::default()).unwrap())
+        let mut printer = HirPretty::default();
+        printer.print_module(module);
+        Ok(printer.output().to_string())
     }
 }
