@@ -74,4 +74,20 @@ test.describe('Tlang Playground', () => {
     const consoleMessages = page.locator('t-console-message');
     await expect(consoleMessages.first()).toBeVisible();
   });
+
+  test('can toggle constant folding optimization', async ({ page }) => {
+    await page.getByLabel('Optimization Settings').click();
+
+    const constantFolding = page.getByRole('menuitemcheckbox', {
+      name: 'Constant folding',
+    });
+    await expect(constantFolding).toBeVisible();
+    await expect(constantFolding).toHaveJSProperty('checked', true);
+
+    await constantFolding.click();
+    await expect(constantFolding).toHaveJSProperty('checked', false);
+
+    await constantFolding.click();
+    await expect(constantFolding).toHaveJSProperty('checked', true);
+  });
 });
