@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{pattern_match_generator::MatchContextStack, scope::Scope};
 use tlang_ast::token::{Token, TokenKind};
 use tlang_hir as hir;
@@ -46,6 +48,10 @@ pub struct CodegenJS {
     statement_buffer: Vec<String>,
     completion_variables: Vec<Option<Box<str>>>,
     render_ternary: bool,
+    /// Protocol names declared in the current compilation unit.
+    /// Protocol objects are emitted with a `$` prefix in JS to avoid
+    /// collisions with native globals (e.g. `Iterator` is a JS built-in).
+    protocol_names: HashSet<String>,
 }
 
 impl Default for CodegenJS {
@@ -56,6 +62,13 @@ impl Default for CodegenJS {
 
 impl CodegenJS {
     pub fn new() -> Self {
+        // Pre-populate with builtin protocol names from the standard library.
+        let protocol_names = Self::get_standard_library_symbols()
+            .iter()
+            .filter(|(_, ty)| matches!(ty, SymbolType::Protocol))
+            .map(|(name, _)| (*name).to_string())
+            .collect();
+
         Self {
             output: String::new(),
             indent_level: 0,
@@ -66,6 +79,7 @@ impl CodegenJS {
             statement_buffer: vec![String::with_capacity(STATEMENT_BUFFER_CAPACITY)],
             completion_variables: vec![None],
             render_ternary: true,
+            protocol_names,
         }
     }
 
@@ -75,6 +89,23 @@ impl CodegenJS {
 
     pub(crate) fn get_render_ternary(&self) -> bool {
         self.render_ternary
+    }
+
+    /// Returns the JS identifier for a protocol name, adding a `$` prefix
+    /// to avoid collision with native JS globals (e.g. `Iterator`, `Iterable`).
+    pub(crate) fn protocol_js_name(name: &str) -> String {
+        format!("${name}")
+    }
+
+    /// Registers a user-defined protocol name so that path expressions
+    /// referencing it are emitted with the `$` prefix.
+    pub(crate) fn register_protocol(&mut self, name: &str) {
+        self.protocol_names.insert(name.to_string());
+    }
+
+    /// Returns true if `name` is a known protocol identifier.
+    pub(crate) fn is_protocol(&self, name: &str) -> bool {
+        self.protocol_names.contains(name)
     }
 
     pub fn get_standard_library_source() -> String {
