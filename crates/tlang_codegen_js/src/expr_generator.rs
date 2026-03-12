@@ -124,7 +124,7 @@ impl CodegenJS {
         self.push_scope();
 
         self.generate_statements(&block.stmts);
-        self.generate_optional_expr(block.expr.as_ref(), None);
+        // In statement context the completion value is discarded — omit it.
 
         self.pop_scope();
     }
@@ -156,12 +156,8 @@ impl CodegenJS {
                     self.flush_statement_buffer();
                 }
 
-                if block.has_completion() {
-                    self.push_indent();
-                    self.generate_expr(block.expr.as_ref().unwrap(), None);
-                    self.push_char(';');
-                    self.push_newline();
-                }
+                // Loop body completions are always noops — loops produce values
+                // only via break(value), never from the body's completion expr.
 
                 self.dec_indent();
                 self.push_indent();

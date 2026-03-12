@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
+use tlang_codegen_js::js_hir_opt::JsHirOptimizer;
 use tlang_hir as hir;
-use tlang_hir_opt::HirOptimizer;
 use tlang_hir_pretty::{HirPretty, HirPrettyOptions};
 use tlang_parser::Parser;
 use tlang_parser::error::{ParseError, ParseIssue};
@@ -221,7 +221,7 @@ impl Tlang {
                 self.analyzer.root_symbol_table(),
                 self.analyzer.symbol_tables().clone(),
             );
-            let mut optimizer = HirOptimizer::default();
+            let mut optimizer = JsHirOptimizer::default();
             let mut ctx = meta.into();
             optimizer.optimize_hir(&mut module, &mut ctx);
             self.build.hir = Some(module);
