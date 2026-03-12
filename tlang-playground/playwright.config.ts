@@ -8,7 +8,7 @@ export default defineConfig({
   workers: process.env['CI'] ? 1 : undefined,
   reporter: process.env['CI'] ? 'github' : 'html',
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: 'http://localhost:4173/tlang',
     trace: 'on-first-retry',
   },
   projects: [
@@ -18,7 +18,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run preview -- --base=/tlang',
+    command: 'node e2e/serve.js',
     url: 'http://localhost:4173/tlang',
     reuseExistingServer: !process.env['CI'],
   },
