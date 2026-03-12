@@ -11,7 +11,16 @@ impl CodegenJS {
                 // Self-referencing TailCall handles its own indentation and
                 // line breaks (it renders param reassignment + continue rec).
                 // Mutual TailCall is a regular call — rendered normally.
-                if self.is_self_referencing_tail_call(expr) {
+                //
+                // Naked block in stmt position (e.g. synthesized by the ANF
+                // transform for break-value rewrites): inline its stmts
+                // without an extra push_indent(), since inner stmts manage
+                // their own indentation.
+                if let hir::ExprKind::Block(block) = &expr.kind {
+                    self.push_context(BlockContext::Statement);
+                    self.generate_block(block);
+                    self.pop_context();
+                } else if self.is_self_referencing_tail_call(expr) {
                     self.push_context(BlockContext::Statement);
                     self.generate_expr(expr, None);
                     self.pop_context();

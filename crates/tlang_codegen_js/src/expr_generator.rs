@@ -120,13 +120,33 @@ impl CodegenJS {
         self.push_str(&format!("\"{escaped_value}\""));
     }
 
-    fn generate_block(&mut self, block: &hir::Block) {
+    pub(crate) fn generate_block(&mut self, block: &hir::Block) {
         self.push_scope();
 
         self.generate_statements(&block.stmts);
-        // In statement context the completion value is discarded — omit it.
+        self.generate_block_completion_as_stmt(block.expr.as_ref());
 
         self.pop_scope();
+    }
+
+    /// Emit a block completion as a statement, but only if it has side effects.
+    /// Pure expressions (Path, Literal) are ANF-introduced noops and are discarded.
+    fn generate_block_completion_as_stmt(&mut self, completion: Option<&hir::Expr>) {
+        if let Some(expr) = completion
+            && !matches!(
+                expr.kind,
+                hir::ExprKind::Path(_) | hir::ExprKind::Literal(_)
+            )
+        {
+            self.push_indent();
+            self.push_context(BlockContext::Statement);
+            self.generate_expr(expr, None);
+            self.pop_context();
+            if self.needs_semicolon(Some(expr)) {
+                self.push_char(';');
+            }
+            self.push_newline();
+        }
     }
 
     #[inline(always)]
@@ -156,8 +176,10 @@ impl CodegenJS {
                     self.flush_statement_buffer();
                 }
 
-                // Loop body completions are always noops — loops produce values
-                // only via break(value), never from the body's completion expr.
+                // Emit the loop body's completion as a statement if it has
+                // side effects (e.g. `accumulator$$ = __anf_0` for accumulator
+                // for-loops). Pure Path/Literal completions are ANF noops.
+                self.generate_block_completion_as_stmt(block.expr.as_ref());
 
                 self.dec_indent();
                 self.push_indent();

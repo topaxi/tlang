@@ -42,6 +42,14 @@ impl Functor for Result {
   fn map(Result::Err(e), _) { Result::Err(e) }
 }
 
+protocol Iterable {
+  fn iter(self)
+}
+
+protocol Iterator {
+  fn next(self)
+}
+
 // len(a[]) -> usize
 fn len(list) { list.length }
 
