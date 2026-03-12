@@ -258,8 +258,16 @@ impl CodegenJS {
         }
 
         let first_segment = path.segments.first().unwrap();
+        let first_name = first_segment.ident.as_str();
 
-        self.generate_identifier(&first_segment.ident);
+        // Protocol objects are emitted with a `$` prefix to avoid collisions with
+        // native JS globals (e.g. `Iterator` is already a built-in in modern JS).
+        if self.is_protocol(first_name) {
+            self.push_str(&Self::protocol_js_name(first_name));
+        } else {
+            self.generate_identifier(&first_segment.ident);
+        }
+
         self.push_str(
             &path.segments[1..]
                 .iter()

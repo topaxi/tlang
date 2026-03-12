@@ -152,16 +152,19 @@ impl CodegenJS {
 
     pub(crate) fn generate_protocol_declaration(&mut self, decl: &hir::ProtocolDeclaration) {
         let name = decl.name.as_str();
+        self.register_protocol(name);
+        let js_name = Self::protocol_js_name(name);
+
         self.push_indent();
         self.push_str("const ");
-        self.push_str(name);
+        self.push_str(&js_name);
         self.push_str(" = {};\n");
 
         // Generate dispatch function for each protocol method
         for method in &decl.methods {
             let method_name = method.name.as_str();
             self.push_indent();
-            self.push_str(name);
+            self.push_str(&js_name);
             self.push_char('.');
             self.push_str(method_name);
             self.push_str(" = function(self, ...args) {\n");
@@ -170,7 +173,7 @@ impl CodegenJS {
             self.push_str("const __type = Array.isArray(self) ? \"List\" : self?.constructor?.name ?? typeof self;\n");
             self.push_indent();
             self.push_str("return ");
-            self.push_str(name);
+            self.push_str(&js_name);
             self.push_str("[__type].");
             self.push_str(method_name);
             self.push_str("(self, ...args);\n");
@@ -183,10 +186,11 @@ impl CodegenJS {
     pub(crate) fn generate_impl_block(&mut self, impl_block: &hir::ImplBlock) {
         let protocol_name = impl_block.protocol_name.to_string();
         let target_type = impl_block.target_type.to_string();
+        let js_protocol_name = Self::protocol_js_name(&protocol_name);
 
         // Ensure protocol has a namespace for this type
         self.push_indent();
-        self.push_str(&protocol_name);
+        self.push_str(&js_protocol_name);
         self.push_char('.');
         self.push_str(&target_type);
         self.push_str(" = {};\n");
@@ -199,7 +203,7 @@ impl CodegenJS {
             };
 
             self.push_indent();
-            self.push_str(&protocol_name);
+            self.push_str(&js_protocol_name);
             self.push_char('.');
             self.push_str(&target_type);
             self.push_char('.');
@@ -223,7 +227,7 @@ impl CodegenJS {
             self.push_str(", \"");
             self.push_str(method_name);
             self.push_str("\", ");
-            self.push_str(&protocol_name);
+            self.push_str(&js_protocol_name);
             self.push_char('.');
             self.push_str(method_name);
             self.push_str(");\n");

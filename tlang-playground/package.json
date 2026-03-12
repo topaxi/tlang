@@ -8,7 +8,8 @@
     "prebuild": "tsc",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test"
   },
   "sideEffects": [
     "src/components/**/*"
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "@jackolope/ts-lit-plugin": "^3.1.6",
+    "@playwright/test": "^1.58.2",
     "vite": "^7.3.1",
     "vite-plugin-wasm": "^3.5.0"
   }

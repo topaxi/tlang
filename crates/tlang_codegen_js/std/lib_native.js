@@ -13,9 +13,9 @@ function $installMethod(proto, methodName, dispatch) {
   };
 }
 
-Functor ??= {};
-Functor.List ??= {};
-Functor.List.map ??= function (self, f) {
+$Functor ??= {};
+$Functor.List ??= {};
+$Functor.List.map ??= function (self, f) {
   const result = new Array(self.length);
   for (let i = 0; i < self.length; i++) result[i] = f(self[i]);
   return result;
@@ -28,15 +28,15 @@ class ArrayIterator {
   }
 }
 
-Iterable ??= {};
-Iterable.List ??= {};
-Iterable.List.iter ??= function (self) {
+$Iterable ??= {};
+$Iterable.List ??= {};
+$Iterable.List.iter ??= function (self) {
   return new ArrayIterator(self);
 };
 
-Iterator ??= {};
-Iterator.ArrayIterator ??= {};
-Iterator.ArrayIterator.next ??= function (self) {
+$Iterator ??= {};
+$Iterator.ArrayIterator ??= {};
+$Iterator.ArrayIterator.next ??= function (self) {
   if (self.index < self.list.length) {
     return Option.Some(self.list[self.index++]);
   }

@@ -9,6 +9,7 @@ export default defineConfig([
   {
     ignores: [
       '**/dist/',
+      '**/target/',
       '.benchmark-main-worktree/',
       'crates/tlang_bindings_js/pkg/',
       'packages/codemirror-lang-tlang/src/parser.js',
