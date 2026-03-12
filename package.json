@@ -14,7 +14,8 @@
     "preview": "npx serve tlang-playground/dist",
     "lint": "eslint && stylelint \"**/*.css\" \"**/components/**/*.ts\"",
     "lint:fix": "eslint --fix && stylelint \"**/*.css\" \"**/components/**/*.ts\" --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "npm run test:e2e -w tlang-playground"
   },
   "workspaces": [
     "packages/*",

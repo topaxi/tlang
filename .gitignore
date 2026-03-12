@@ -15,6 +15,10 @@ tsconfig.tsbuildinfo
 benchmark_report.md
 .benchmark-main-worktree/
 
+# Playwright test artifacts
+/playwright-report
+/test-results
+
 # Binaryen downloaded files
 binaryen-version_*
 binaryen-version_*.tar.gz

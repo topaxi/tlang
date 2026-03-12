@@ -148,6 +148,41 @@ jobs:
         with:
           path: tlang-playground/dist/
 
+  test-e2e:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    needs: [lint-js]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-cargo
+
+      - name: Install binaryen
+        run: |
+          wget -q https://github.com/WebAssembly/binaryen/releases/download/version_119/binaryen-version_119-x86_64-linux.tar.gz
+          tar xzf binaryen-version_119-x86_64-linux.tar.gz
+          echo "$(pwd)/binaryen-version_119/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.0.2"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build playground
+        run: npm run build -w tlang-playground
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: ./tlang-playground
+
+      - name: Run E2E tests
+        run: npm run test:e2e -w tlang-playground
+
   test-tree-sitter:
     permissions:
       contents: read
