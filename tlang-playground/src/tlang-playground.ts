@@ -8,6 +8,7 @@ import './components/t-codemirror';
 import './components/t-console';
 import './components/t-hir-pretty';
 import './components/t-live';
+import './components/t-menu';
 import './components/t-shortcuts';
 import './components/t-split';
 import './components/t-tabs';
@@ -16,11 +17,16 @@ import { ConsoleElement, ConsoleMessage } from './components/t-console';
 import { FlashElement } from './components/t-flash';
 import { SplitElement, SplitEvent } from './components/t-split';
 import { compressSource, decompressSource } from './utils/lz';
-import { type Runner, type JsHirPrettyOptions } from './tlang';
+import {
+  type Runner,
+  type JsHirPrettyOptions,
+  type JsOptimizationOptions,
+} from './tlang';
 import { keyed } from 'lit/directives/keyed.js';
 import { live } from 'lit/directives/live.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { mediaQuery } from './decorators/media-query';
+import { floating } from './directives/floating';
 
 type OutputDisplay = 'ast' | 'hir' | 'hir' | 'javascript';
 
@@ -227,6 +233,11 @@ export class TlangPlayground extends LitElement {
 
   @state() runner: Runner = defaultRunner();
 
+  @state() optimizationOptions: JsOptimizationOptions = {
+    constantFolding: true,
+    anfTransform: true,
+  };
+
   private tlang = new TlangController(this.source, this.runner);
 
   // The editor which the user can use to write code, as it's always rendered,
@@ -335,6 +346,14 @@ export class TlangPlayground extends LitElement {
     updateDisplayHashparam(this.display);
   }
 
+  private toggleOptimization(key: keyof JsOptimizationOptions) {
+    this.optimizationOptions = {
+      ...this.optimizationOptions,
+      [key]: !this.optimizationOptions[key],
+    };
+    this.tlang.setOptimizations(this.optimizationOptions);
+  }
+
   private handleConsoleCollapse(event: CustomEvent<{ collapsed: boolean }>) {
     this.outputSplit.disabled = event.detail.collapsed ? 'resize-only' : false;
 
@@ -410,6 +429,27 @@ export class TlangPlayground extends LitElement {
               <option value="Interpreter">Interpreter</option>
               <option value="JavaScript">Compiler (JS)</option>
             </select>
+            <t-button
+              popovertarget="optimization-options"
+              aria-label="Optimization Settings"
+            >
+              ⚙️
+            </t-button>
+            <t-menu id="optimization-options" popover=${floating()}>
+              <t-menuitem-checkbox
+                @change=${() => this.toggleOptimization('constantFolding')}
+                .checked=${this.optimizationOptions.constantFolding}
+              >
+                Constant folding
+              </t-menuitem-checkbox>
+              <t-menuitem-checkbox
+                .disabled=${this.runner !== 'JavaScript'}
+                @change=${() => this.toggleOptimization('anfTransform')}
+                .checked=${this.optimizationOptions.anfTransform}
+              >
+                ANF transform
+              </t-menuitem-checkbox>
+            </t-menu>
             <t-button @click=${this.share}>Share</t-button>
             <select
               class="toolbar__example"

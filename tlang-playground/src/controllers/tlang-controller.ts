@@ -3,6 +3,7 @@ import {
   getStandardLibraryCompiled,
   Tlang,
   type JsHirPrettyOptions,
+  type JsOptimizationOptions,
   type Runner,
 } from '../tlang';
 import { ConsoleMessage, createConsoleMessage } from '../components/t-console';
@@ -30,6 +31,10 @@ export class TlangController {
   private cachedAST: string | null = null;
   private cachedHIR: string | null = null;
   private cachedJS: string | null = null;
+  private optimizationOptions: JsOptimizationOptions = {
+    constantFolding: true,
+    anfTransform: true,
+  };
 
   constructor(initialSource: string, initialRunner: Runner) {
     this.tlang = this.createTlang(initialSource, initialRunner);
@@ -163,5 +168,16 @@ export class TlangController {
 
   getHIRPretty(options?: JsHirPrettyOptions) {
     return this.tlang.getHIRPretty(options);
+  }
+
+  setOptimizations(options: JsOptimizationOptions) {
+    this.optimizationOptions = options;
+    this.cachedHIR = null;
+    this.cachedJS = null;
+    this.tlang.setOptimizations(options);
+  }
+
+  getOptimizations(): JsOptimizationOptions {
+    return this.optimizationOptions;
   }
 }
