@@ -17,7 +17,15 @@ fn test_simple_self_recursive_tail_call_converted_to_loop() {
     let expected_output = indoc! {"
         function factorial(n, acc) {
             rec: while (true) {
-                return n === 0 ? acc : factorial(n - 1, n * acc);
+                if (n === 0) {
+                    return acc;
+                } else {
+                    let $tmp$0 = n - 1;
+                    let $tmp$1 = n * acc;
+                    n = $tmp$0;
+                    acc = $tmp$1;
+                    continue rec;
+                }
             }
         }
     "};
@@ -43,7 +51,15 @@ fn test_fn_expression_explicit_tail_recursive_call_converted_to_loop() {
         function factorial(n) {
             let factorial_rec = function rec_helper(n, acc) {
                 rec: while (true) {
-                    return n === 0 ? acc : rec_helper(n - 1, n * acc);
+                    if (n === 0) {
+                        return acc;
+                    } else {
+                        let $tmp$0 = n - 1;
+                        let $tmp$1 = n * acc;
+                        n = $tmp$0;
+                        acc = $tmp$1;
+                        continue rec;
+                    }
                 }
             };
             return factorial_rec(n, 1);

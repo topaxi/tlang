@@ -290,7 +290,11 @@ impl<'a> InnerCodegen<'a> {
         }
 
         let node_start = self.next_node_start();
-        stmt.span_mut().start = node_start;
+        let span = stmt.span_mut();
+        span.start = node_start;
+        if span.end < node_start {
+            span.end = node_start;
+        }
 
         for comment_token in comments {
             let kind = &comment_token.kind;

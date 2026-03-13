@@ -278,8 +278,12 @@ impl<'a> InnerCodegen<'a> {
         }
 
         for param in iter {
-            let name = param.name.as_str();
-            result.push(self.formal_param(name));
+            if !param.name.is_wildcard() {
+                let var_name = self
+                    .current_scope()
+                    .declare_local_variable(param.name.as_str());
+                result.push(self.formal_param(&var_name));
+            }
         }
 
         result
@@ -321,16 +325,108 @@ impl<'a> InnerCodegen<'a> {
     }
 
     pub fn generate_return_stmt(&mut self, expr: Option<&hir::Expr>) -> Vec<Statement<'a>> {
-        // Check for self-referencing tail call — emit parameter reassignment + continue
-        if let Some(e) = expr
-            && let hir::ExprKind::TailCall(call_expr) = &e.kind
-            && self.is_self_referencing_tail_call(e)
-        {
-            return self.generate_recursive_call_stmts(call_expr);
+        if let Some(e) = expr {
+            // Self-referencing tail call — emit parameter reassignment + continue
+            if let hir::ExprKind::TailCall(call_expr) = &e.kind
+                && self.is_self_referencing_tail_call(e)
+            {
+                return self.generate_recursive_call_stmts(call_expr);
+            }
+
+            // IfElse containing tail calls in branches — emit if-else statement form
+            if let hir::ExprKind::IfElse(cond, then_branch, else_branches) = &e.kind
+                && self.if_else_has_self_referencing_tail_call(then_branch, else_branches)
+            {
+                return self.generate_if_else_return_stmts(cond, then_branch, else_branches);
+            }
         }
 
         let argument = expr.map(|e| self.generate_expr(e));
         vec![self.ast.statement_return(SPAN, argument)]
+    }
+
+    /// Returns `true` if any branch of an if-else contains a self-referencing tail call
+    /// at completion position (possibly nested in further if-else expressions).
+    fn if_else_has_self_referencing_tail_call(
+        &self,
+        then_branch: &hir::Block,
+        else_branches: &[hir::ElseClause],
+    ) -> bool {
+        self.block_completion_has_self_referencing_tail_call(then_branch)
+            || else_branches
+                .iter()
+                .any(|eb| self.block_completion_has_self_referencing_tail_call(&eb.consequence))
+    }
+
+    fn block_completion_has_self_referencing_tail_call(&self, block: &hir::Block) -> bool {
+        if let Some(expr) = &block.expr {
+            self.expr_has_self_referencing_tail_call(expr)
+        } else {
+            false
+        }
+    }
+
+    fn expr_has_self_referencing_tail_call(&self, expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            hir::ExprKind::TailCall(_) => self.is_self_referencing_tail_call(expr),
+            hir::ExprKind::IfElse(_, then_branch, else_branches) => {
+                self.if_else_has_self_referencing_tail_call(then_branch, else_branches)
+            }
+            _ => false,
+        }
+    }
+
+    /// Generate an if-else chain as statements where each branch completion is emitted
+    /// via `generate_return_stmt` (enabling TCO inside branches).
+    fn generate_if_else_return_stmts(
+        &mut self,
+        cond: &hir::Expr,
+        then_branch: &hir::Block,
+        else_branches: &[hir::ElseClause],
+    ) -> Vec<Statement<'a>> {
+        let test = self.generate_expr(cond);
+
+        self.push_scope();
+        let mut then_stmts = self.generate_stmts(&then_branch.stmts);
+        let then_return = self.generate_return_stmt(then_branch.expr.as_ref());
+        then_stmts.extend(then_return);
+        self.pop_scope();
+        let consequent = self.block_stmt(then_stmts);
+
+        let alternate = if else_branches.is_empty() {
+            None
+        } else {
+            Some(self.generate_else_return_chain(else_branches))
+        };
+
+        vec![self.ast.statement_if(SPAN, test, consequent, alternate)]
+    }
+
+    fn generate_else_return_chain(&mut self, else_branches: &[hir::ElseClause]) -> Statement<'a> {
+        if else_branches.is_empty() {
+            return self.block_stmt(vec![]);
+        }
+
+        let branch = &else_branches[0];
+
+        self.push_scope();
+        let mut body_stmts = self.generate_stmts(&branch.consequence.stmts);
+        let return_stmts = self.generate_return_stmt(branch.consequence.expr.as_ref());
+        body_stmts.extend(return_stmts);
+        self.pop_scope();
+        let body = self.block_stmt(body_stmts);
+
+        if let Some(ref condition) = branch.condition {
+            let test = self.generate_expr(condition);
+            let alternate = if else_branches.len() > 1 {
+                Some(self.generate_else_return_chain(&else_branches[1..]))
+            } else {
+                None
+            };
+            self.ast.statement_if(SPAN, test, body, alternate)
+        } else {
+            body
+        }
     }
 
     pub fn is_self_referencing_tail_call(&self, expr: &hir::Expr) -> bool {
