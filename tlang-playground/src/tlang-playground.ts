@@ -302,9 +302,9 @@ export class TlangPlayground extends LitElement {
 
   private get availableDisplayOptions(): OutputDisplay[] {
     if (this.runner === 'Interpreter') {
-      return ['hir', 'ast'];
+      return ['ast', 'hir'];
     } else {
-      return ['javascript', 'hir', 'ast'];
+      return ['ast', 'hir', 'javascript'];
     }
   }
 
