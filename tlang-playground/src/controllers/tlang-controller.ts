@@ -36,8 +36,16 @@ export class TlangController {
     anfTransform: undefined,
   };
 
-  constructor(initialSource: string, initialRunner: Runner) {
+  constructor(
+    initialSource: string,
+    initialRunner: Runner,
+    initialOptimizationOptions?: JsOptimizationOptions,
+  ) {
     this.tlang = this.createTlang(initialSource, initialRunner);
+    if (initialOptimizationOptions) {
+      this.optimizationOptions = initialOptimizationOptions;
+      this.tlang.setOptimizations(initialOptimizationOptions);
+    }
     this.analyze();
   }
 
@@ -65,6 +73,7 @@ export class TlangController {
     this.cachedJS = null;
 
     this.tlang = this.createTlang(source, runner);
+    this.tlang.setOptimizations(this.optimizationOptions);
     this.analyze();
   }
 

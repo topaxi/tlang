@@ -311,7 +311,11 @@ export class TlangPlayground extends LitElement {
   @state() optimizationOptions: JsOptimizationOptions =
     defaultOptimizationOptions();
 
-  private tlang = new TlangController(this.source, this.runner);
+  private tlang = new TlangController(
+    this.source,
+    this.runner,
+    this.optimizationOptions,
+  );
 
   // The editor which the user can use to write code, as it's always rendered,
   // we cache the query selector.

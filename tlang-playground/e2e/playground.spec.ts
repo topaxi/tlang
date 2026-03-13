@@ -95,3 +95,116 @@ test.describe('Tlang Playground', () => {
     await expect(constantFolding).toHaveJSProperty('checked', true);
   });
 });
+
+test.describe('Optimization options URL persistence', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/tlang');
+    // Ensure the WASM-backed editor is ready before interacting.
+    await expect(page.locator('.cm-content').first()).toBeVisible();
+  });
+
+  test('disabling constant folding adds opt=cf:false to hash', async ({
+    page,
+  }) => {
+    await page.getByLabel('Optimization Settings').click();
+    await page
+      .getByRole('menuitemcheckbox', { name: 'Constant folding' })
+      .click();
+
+    await expect(page).toHaveURL(/opt=cf%3Afalse/);
+  });
+
+  test('enabling ANF transform in interpreter mode adds opt=anf:full to hash', async ({
+    page,
+  }) => {
+    await page.getByLabel('Optimization Settings').click();
+    await page.getByRole('menuitemcheckbox', { name: 'ANF transform' }).click();
+
+    await expect(page).toHaveURL(/opt=anf%3Afull/);
+  });
+
+  test('removing non-default optimizations removes opt from hash', async ({
+    page,
+  }) => {
+    await page.getByLabel('Optimization Settings').click();
+
+    const anfCheckbox = page.getByRole('menuitemcheckbox', {
+      name: 'ANF transform',
+    });
+
+    await anfCheckbox.click();
+    await expect(page).toHaveURL(/opt=/);
+
+    // Toggle back to default — opt should be removed.
+    await anfCheckbox.click();
+    await expect(page).not.toHaveURL(/opt=/);
+  });
+
+  test('selecting ANF Full mode in compiler mode adds opt=anf:full to hash', async ({
+    page,
+  }) => {
+    await page.locator('.toolbar__runner').selectOption('JavaScript');
+    await page.getByLabel('Optimization Settings').click();
+    await page.getByRole('menuitemradio', { name: 'Full' }).click();
+
+    await expect(page).toHaveURL(/opt=anf%3Afull/);
+  });
+
+  test('constant folding off is restored from URL hash on load', async ({
+    page,
+  }) => {
+    await page.goto('/tlang#opt=cf%3Afalse');
+    await expect(page.locator('.cm-content').first()).toBeVisible();
+
+    await page.getByLabel('Optimization Settings').click();
+
+    await expect(
+      page.getByRole('menuitemcheckbox', { name: 'Constant folding' }),
+    ).toHaveJSProperty('checked', false);
+  });
+
+  test('ANF full mode in interpreter is restored from URL hash on load', async ({
+    page,
+  }) => {
+    await page.goto('/tlang#opt=anf%3Afull');
+    await expect(page.locator('.cm-content').first()).toBeVisible();
+
+    await page.getByLabel('Optimization Settings').click();
+
+    await expect(
+      page.getByRole('menuitemcheckbox', { name: 'ANF transform' }),
+    ).toHaveJSProperty('checked', true);
+  });
+
+  test('ANF full mode in compiler is restored from URL hash on load', async ({
+    page,
+  }) => {
+    await page.goto('/tlang#runner=JavaScript&opt=anf%3Afull');
+    await expect(page.locator('.cm-content').first()).toBeVisible();
+
+    await page.getByLabel('Optimization Settings').click();
+
+    await expect(
+      page.getByRole('menuitemradio', { name: 'Full' }),
+    ).toHaveJSProperty('checked', true);
+    await expect(
+      page.getByRole('menuitemradio', { name: 'Minimal' }),
+    ).toHaveJSProperty('checked', false);
+  });
+
+  test('combined options are restored from URL hash on load', async ({
+    page,
+  }) => {
+    await page.goto('/tlang#opt=cf%3Afalse%2Canf%3Afull');
+    await expect(page.locator('.cm-content').first()).toBeVisible();
+
+    await page.getByLabel('Optimization Settings').click();
+
+    await expect(
+      page.getByRole('menuitemcheckbox', { name: 'Constant folding' }),
+    ).toHaveJSProperty('checked', false);
+    await expect(
+      page.getByRole('menuitemcheckbox', { name: 'ANF transform' }),
+    ).toHaveJSProperty('checked', true);
+  });
+});
