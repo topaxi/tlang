@@ -8,8 +8,8 @@ struct Point {
 }
 
 fn make_point() -> unknown {
-    let __anf_0: unknown = {x: 1, y: 2};
-    Point(__anf_0)
+    let $anf$0: unknown = {x: 1, y: 2};
+    Point($anf$0)
 }
-let __anf_1: unknown = make_point();
-let x: unknown = __anf_1.x;
+let $anf$1: unknown = make_point();
+let x: unknown = $anf$1.x;

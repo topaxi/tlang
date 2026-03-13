@@ -31,13 +31,13 @@ fn if_else_in_let() {
     "#;
     let hir = common::compile_and_optimize(source, &mut optimizer());
     assert_snapshot!(common::pretty_print(&hir), @"
-    let __anf_0: unknown = nil;
+    let $anf$0: unknown = nil;
     if true {
-        (__anf_0 = 1);
+        ($anf$0 = 1);
     } else {
-        (__anf_0 = 2);
+        ($anf$0 = 2);
     };
-    let x: unknown = __anf_0;
+    let x: unknown = $anf$0;
     ");
 }
 
@@ -53,16 +53,16 @@ fn match_in_let() {
     let hir = common::compile_and_optimize(source, &mut optimizer());
     assert_snapshot!(common::pretty_print(&hir), @"
     let y: unknown = 1;
-    let __anf_0: unknown = nil;
+    let $anf$0: unknown = nil;
     match y {
         1 => {
-            (__anf_0 = 10);
+            ($anf$0 = 10);
         },
         _ => {
-            (__anf_0 = 20);
+            ($anf$0 = 20);
         },
     };
-    let x: unknown = __anf_0;
+    let x: unknown = $anf$0;
     ");
 }
 
@@ -77,9 +77,9 @@ fn nested_call_arguments() {
     fn add(a: unknown, b: unknown) -> unknown {
         (a + b)
     }
-    let __anf_0: unknown = (1 + 2);
-    let __anf_1: unknown = (3 + 4);
-    add(__anf_0, __anf_1);
+    let $anf$0: unknown = (1 + 2);
+    let $anf$1: unknown = (3 + 4);
+    add($anf$0, $anf$1);
     ");
 }
 
@@ -94,9 +94,9 @@ fn binary_with_call() {
     fn foo() -> unknown {
         1
     }
-    let __anf_0: unknown = foo();
-    let __anf_1: unknown = foo();
-    let x: unknown = (__anf_0 + __anf_1);
+    let $anf$0: unknown = foo();
+    let $anf$1: unknown = foo();
+    let x: unknown = ($anf$0 + $anf$1);
     ");
 }
 
@@ -143,13 +143,13 @@ fn if_else_in_call_argument() {
     fn foo(x: unknown) -> unknown {
         x
     }
-    let __anf_0: unknown = nil;
+    let $anf$0: unknown = nil;
     if true {
-        (__anf_0 = 1);
+        ($anf$0 = 1);
     } else {
-        (__anf_0 = 2);
+        ($anf$0 = 2);
     };
-    foo(__anf_0);
+    foo($anf$0);
     ");
 }
 
@@ -164,19 +164,19 @@ fn nested_if_else_completions() {
     "#;
     let hir = common::compile_and_optimize(source, &mut optimizer());
     assert_snapshot!(common::pretty_print(&hir), @"
-    let __anf_1: unknown = nil;
+    let $anf$1: unknown = nil;
     if true {
-        let __anf_0: unknown = nil;
+        let $anf$0: unknown = nil;
         if false {
-            (__anf_0 = 1);
+            ($anf$0 = 1);
         } else {
-            (__anf_0 = 2);
+            ($anf$0 = 2);
         };
-        (__anf_1 = __anf_0);
+        ($anf$1 = $anf$0);
     } else {
-        (__anf_1 = 3);
+        ($anf$1 = 3);
     };
-    let x: unknown = __anf_1;
+    let x: unknown = $anf$1;
     ");
 }
 
@@ -191,9 +191,9 @@ fn list_with_compound_elements() {
     fn foo() -> unknown {
         1
     }
-    let __anf_0: unknown = foo();
-    let __anf_1: unknown = foo();
-    let xs: unknown = [__anf_0, __anf_1];
+    let $anf$0: unknown = foo();
+    let $anf$1: unknown = foo();
+    let xs: unknown = [$anf$0, $anf$1];
     ");
 }
 

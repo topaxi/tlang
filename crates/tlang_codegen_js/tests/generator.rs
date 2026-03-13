@@ -92,9 +92,9 @@ fn test_codegen_operator_precedence() {
 fn test_block_expression() {
     let output = compile!("let one = { 1 };");
     let expected_output = indoc! {"
-        let __anf_0;
-        __anf_0 = 1;
-        let one = __anf_0;
+        let $anf$0;
+        $anf$0 = 1;
+        let one = $anf$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -198,7 +198,7 @@ fn test_if_else_as_expression_nested() {
     );
     let expected_output = indoc! {"
         function main() {
-            let __anf_0;
+            let $anf$0;
             if (true) {
                 let $tmp$0;if (true) {
                     $tmp$0 = 1;
@@ -207,14 +207,14 @@ fn test_if_else_as_expression_nested() {
                 }
                 let x = $tmp$0;
                 if (x === 1) {
-                    __anf_0 = 3;
+                    $anf$0 = 3;
                 } else {
-                    __anf_0 = 4;
+                    $anf$0 = 4;
                 }
             } else {
-                __anf_0 = 5;
+                $anf$0 = 5;
             }
-            let result = __anf_0;
+            let result = $anf$0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -226,15 +226,15 @@ fn test_if_else_if_as_expression() {
         compile!("fn main() { let result = if true { 1 } else if true { 2 } else { 3 }; }");
     let expected_output = indoc! {"
         function main() {
-            let __anf_0;
+            let $anf$0;
             if (true) {
-                __anf_0 = 1;
+                $anf$0 = 1;
             } else if (true) {
-                __anf_0 = 2;
+                $anf$0 = 2;
             } else {
-                __anf_0 = 3;
+                $anf$0 = 3;
             }
-            let result = __anf_0;
+            let result = $anf$0;
         }
     "};
     assert_eq!(output, expected_output);

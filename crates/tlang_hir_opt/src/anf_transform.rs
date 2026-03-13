@@ -45,7 +45,7 @@ impl AnfFilter for FullAnfFilter {
 /// Configurable ANF pass. Walks the HIR and lifts expressions that the
 /// provided `AnfFilter` marks as needing lifting out of value positions
 /// (let initialisers, call arguments, binary operands, etc.) into
-/// temporary `let __anf_N = ...;` bindings.
+/// temporary `let $anf$N = ...;` bindings.
 pub struct AnfTransform<F: AnfFilter> {
     counter: usize,
     changed: bool,
@@ -92,7 +92,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
     pub(crate) fn fresh_anf_var(&mut self) -> (String, tlang_span::HirId) {
         let n = *self.counter;
         *self.counter += 1;
-        let name = format!("__anf_{n}");
+        let name = format!("$anf${n}");
         let pat_hir_id = self.alloc_hir_id();
         (name, pat_hir_id)
     }
@@ -357,7 +357,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                 );
                 self.pending.push(loop_stmt);
             }
-            // Non-control-flow: emit a direct `let __anf_N = expr;`
+            // Non-control-flow: emit a direct `let $anf$N = expr;`
             _ => {
                 let let_stmt = self.make_let_stmt(&temp_name, pat_hir_id, expr);
                 self.pending.push(let_stmt);

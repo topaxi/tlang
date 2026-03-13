@@ -84,11 +84,11 @@ fn test_codegen_if_let() {
     let output = compile!("fn main() { if let Some(x) = Some(42) { x } }");
     let expected_output = indoc! {"
         function main() {
-            let __anf_0;
+            let $anf$0;
             let $tmp$0 = Option.Some(42),x;if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
-                __anf_0 = x;
+                $anf$0 = x;
             }
-            return __anf_0;
+            return $anf$0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -96,13 +96,13 @@ fn test_codegen_if_let() {
     let output = compile!("fn main() { if let Some(x) = Some(42) { x } else { 0 } }");
     let expected_output = indoc! {"
         function main() {
-            let __anf_0;
+            let $anf$0;
             let $tmp$0 = Option.Some(42),x;if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
-                __anf_0 = x;
+                $anf$0 = x;
             } else {
-                __anf_0 = 0;
+                $anf$0 = 0;
             }
-            return __anf_0;
+            return $anf$0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -125,17 +125,17 @@ fn test_codegen_if_let() {
     let expected_output = indoc! {"
         function main() {
             let value = Option.Some(42);
-            let __anf_1;
+            let $anf$1;
             if (value.tag === Option.Some && value[0] === 42) {
-                __anf_1 = 9000;
-            } else if (__anf_0) {
-                __anf_1 = x;
+                $anf$1 = 9000;
+            } else if ($anf$0) {
+                $anf$1 = x;
             } else if (value === Option.Some(100)) {
-                __anf_1 = 100;
+                $anf$1 = 100;
             } else {
-                __anf_1 = 5;
+                $anf$1 = 5;
             }
-            return __anf_1;
+            return $anf$1;
         }
     "};
     assert_eq!(output, expected_output);

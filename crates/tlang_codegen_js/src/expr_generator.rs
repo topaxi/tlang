@@ -186,7 +186,7 @@ impl CodegenJS {
                 }
 
                 // Emit the loop body's completion as a statement if it has
-                // side effects (e.g. `accumulator$$ = __anf_0` for accumulator
+                // side effects (e.g. `accumulator$$ = $anf$0` for accumulator
                 // for-loops). Pure Path/Literal completions are ANF noops.
                 self.generate_block_completion_as_stmt(block.expr.as_ref());
 
