@@ -16,13 +16,6 @@ fn analyze_for_warnings(source: &str) -> Vec<String> {
         .collect()
 }
 
-fn analyze_has_error(source: &str) -> bool {
-    let mut parser = Parser::from_source(source);
-    let mut ast = parser.parse().unwrap();
-    let mut analyzer = SemanticAnalyzer::default();
-    analyzer.analyze(&mut ast).is_err()
-}
-
 // ── Valid escape sequences (should produce no warnings) ─────────────────────
 
 #[test]
