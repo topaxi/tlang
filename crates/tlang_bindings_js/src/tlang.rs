@@ -284,7 +284,9 @@ impl Tlang {
                     // Optional general ANF transform — off by default; reserved for
                     // future bytecode compilation work.
                     if self.optimization_options.anf_transform.unwrap_or(false) {
-                        // No generic ANF pass exists yet; this is a placeholder.
+                        passes.push(Box::new(tlang_hir_opt::anf_transform::AnfTransform::<
+                            tlang_hir_opt::anf_transform::FullAnfFilter,
+                        >::default()));
                     }
 
                     passes.push(Box::new(
