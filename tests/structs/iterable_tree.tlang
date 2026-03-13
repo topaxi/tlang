@@ -46,7 +46,7 @@ let tree = Tree::Empty
 // Iterate: in-order traversal yields sorted values
 log("Sorted values:");
 for x in tree {
-    log(x);
+    x |> log();
 };
 
 // Sum all values using for-loop accumulator
@@ -54,16 +54,16 @@ let total = for x in tree; with sum = 0 {
     sum + x
 };
 log("Sum:");
-log(total);
+total |> log();
 
 // Collect even values
 let evens = for x in tree; with acc = [] {
     if x % 2 == 0 { [...acc, x] } else { acc }
 };
 log("Even values:");
-log(evens);
+evens |> log();
 
 // Spread tree directly into a list
 let sorted = [...tree];
 log("Spread into list:");
-log(sorted);
+sorted |> log();
