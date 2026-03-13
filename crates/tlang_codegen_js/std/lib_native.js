@@ -30,6 +30,10 @@ $Iterable.List = class ListIterable {
   #list;
   #index = 0;
 
+  /**
+   * @generic T
+   * @param {Array<T>} list
+   */
   constructor(list) {
     this.#list = list;
   }
