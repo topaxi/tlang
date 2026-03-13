@@ -42,3 +42,18 @@ $Iterator.ArrayIterator.next ??= function (self) {
   }
   return Option.None;
 };
+
+function $collect_iterable(value) {
+  if (Array.isArray(value)) return value;
+  const iter = $Iterable.iter(value);
+  const result = [];
+  for (;;) {
+    const next = $Iterator.next(iter);
+    if (next.tag === Option.Some) {
+      result.push(next[0]);
+    } else {
+      break;
+    }
+  }
+  return result;
+}

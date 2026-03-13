@@ -1442,7 +1442,12 @@ impl Interpreter {
                             field_values.reserve(list_struct.len());
                             field_values.extend(list_struct.values());
                         }
-                        obj => state.panic(format!("Expected list, got {obj:?}")),
+                        _ => {
+                            let list = self.collect_iterable(state, value);
+                            let list_struct = state.get_struct(list).unwrap();
+                            field_values.reserve(list_struct.len());
+                            field_values.extend(list_struct.values());
+                        }
                     }
 
                     // In case we used all the capacity due to spreading the values above,
@@ -1457,6 +1462,53 @@ impl Interpreter {
         }
 
         EvalResult::Value(state.new_list(field_values))
+    }
+
+    /// Collects an iterable value into a list by calling `Iterable::iter` then
+    /// draining `Iterator::next` until `Option::None`.
+    fn collect_iterable(&self, state: &mut VMState, value: TlangValue) -> TlangValue {
+        let type_name = state.type_name_of(value).to_string();
+        let iter_fn = state
+            .get_protocol_impl("Iterable", &type_name, "iter")
+            .unwrap_or_else(|| {
+                state.panic(format!(
+                    "Type `{type_name}` is not iterable (no `Iterable::iter` implementation)"
+                ))
+            });
+        let iterator = self.eval_call_object(state, iter_fn, &[value]);
+        state.push_temp_root(iterator);
+
+        let iter_type_name = state.type_name_of(iterator).to_string();
+        let next_fn = state
+            .get_protocol_impl("Iterator", &iter_type_name, "next")
+            .unwrap_or_else(|| {
+                state.panic(format!(
+                    "Iterator type `{iter_type_name}` has no `Iterator::next` implementation"
+                ))
+            });
+
+        let option_shape = state.heap.builtin_shapes.option;
+        let mut items = Vec::new();
+
+        loop {
+            let result = self.eval_call_object(state, next_fn, &[iterator]);
+            let tlang_enum = state
+                .get_enum(result)
+                .unwrap_or_else(|| state.panic("Iterator::next must return an Option".to_string()));
+
+            if tlang_enum.shape() != option_shape {
+                state.panic("Iterator::next must return an Option".to_string());
+            }
+
+            // Option::Some = variant 0, Option::None = variant 1
+            if tlang_enum.variant == 1 {
+                break;
+            }
+
+            items.push(tlang_enum.field_values[0]);
+        }
+
+        state.new_list(items)
     }
 
     fn eval_dict_expr(
@@ -1784,7 +1836,10 @@ impl Interpreter {
 
                 true
             }
-            _ => todo!("eval_pat: {:?}", value),
+            _ => {
+                let list = self.collect_iterable(state, value);
+                self.eval_pat_list(state, patterns, list)
+            }
         }
     }
 }

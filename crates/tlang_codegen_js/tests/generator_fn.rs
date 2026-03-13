@@ -162,7 +162,7 @@ fn test_recursive_map() {
             let x,xs;if (arg0.length === 0) {
                 $anf$0 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
-                $anf$0 = [f(x), ...map(xs, f)];
+                $anf$0 = [f(x), ...$collect_iterable(map(xs, f))];
             }
             return $anf$0;
         }
@@ -183,7 +183,7 @@ fn test_function_declarations_with_guard() {
             let x,xs;if (arg0.length === 0) {
                 $anf$0 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && f(x)) {
-                $anf$0 = [x, ...filter(xs, f)];
+                $anf$0 = [x, ...$collect_iterable(filter(xs, f))];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
                 $anf$0 = filter(xs, f);
             }
@@ -206,7 +206,7 @@ fn test_function_declarations_with_if_let_guard() {
             let x,xs;if (arg0.length === 0) {
                 $anf$1 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && $anf$0) {
-                $anf$1 = [y, ...filter_map(xs, f)];
+                $anf$1 = [y, ...$collect_iterable(filter_map(xs, f))];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
                 $anf$1 = filter_map(xs, f);
             }
@@ -229,7 +229,7 @@ fn test_function_declarations_with_if_let_guard_enum() {
             let x,xs;if (arg0.length === 0) {
                 $anf$1 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && $anf$0) {
-                $anf$1 = [y, ...filter_map(xs, f)];
+                $anf$1 = [y, ...$collect_iterable(filter_map(xs, f))];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
                 $anf$1 = filter_map(xs, f);
             }
@@ -252,7 +252,7 @@ fn test_function_declarations_with_if_let_guard_named_fields_enum() {
             let x,xs;if (arg0.length === 0) {
                 $anf$1 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && $anf$0) {
-                $anf$1 = [value, ...filter_map(xs, f)];
+                $anf$1 = [value, ...$collect_iterable(filter_map(xs, f))];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
                 $anf$1 = filter_map(xs, f);
             }
@@ -283,7 +283,7 @@ fn test_function_declarations_with_comments_inbetween() {
                 $anf$1 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && $anf$0) {
                 // Comment 2
-                $anf$1 = [value, ...filter_map(xs, f)];
+                $anf$1 = [value, ...$collect_iterable(filter_map(xs, f))];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
                 // Comment 3
                 $anf$1 = filter_map(xs, f);
@@ -359,10 +359,10 @@ fn test_function_reuse_param_name_with_pattern() {
             } else {
                 let pivotIndex = random_int(len(list));
                 let pivot = list[pivotIndex];
-                let list$0 = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex + 1)];
+                let list$0 = [...$collect_iterable(list.slice(0, pivotIndex)), ...$collect_iterable(list.slice(pivotIndex + 1))];
                 let smaller = filter(list$0, (y) => y <= pivot);
                 let greater = filter(list$0, (y) => y > pivot);
-                $anf$0 = [...quicksort(smaller), pivot, ...quicksort(greater)];
+                $anf$0 = [...$collect_iterable(quicksort(smaller)), pivot, ...$collect_iterable(quicksort(greater))];
             }
             return $anf$0;
         }

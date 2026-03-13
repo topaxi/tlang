@@ -238,7 +238,12 @@ impl CodegenJS {
         match op {
             ast::UnaryOp::Not => self.push_char('!'),
             ast::UnaryOp::Minus => self.push_char('-'),
-            ast::UnaryOp::Spread => self.push_str("..."),
+            ast::UnaryOp::Spread => {
+                self.push_str("...$collect_iterable(");
+                self.generate_expr(expr, None);
+                self.push_char(')');
+                return;
+            }
             ast::UnaryOp::Rest => unreachable!("Rest operator is not an operator but a pattern"),
         }
 

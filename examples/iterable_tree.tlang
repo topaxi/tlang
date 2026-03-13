@@ -62,3 +62,8 @@ let evens = for x in tree; with acc = [] {
 };
 log("Even values:");
 log(evens);
+
+// Spread tree directly into a list
+let sorted = [...tree];
+log("Spread into list:");
+log(sorted);

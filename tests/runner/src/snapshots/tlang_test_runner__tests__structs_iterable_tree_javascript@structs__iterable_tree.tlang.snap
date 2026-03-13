@@ -4,15 +4,20 @@ description: "Backend: javascript"
 expression: apply_redactions(&output)
 input_file: tests/structs/iterable_tree.tlang
 ---
-Sorted values:
-1
-2
-3
-4
-5
-6
-7
-Sum:
-28
-Even values:
-[ 2, 4, 6 ]
+[stdin]:330
+    let node_val,left,right;if (tree.tag === Tree.Empty) {
+                            ^
+
+ReferenceError: Cannot access 'tree' before initialization
+    at Tree.insert ([stdin]:330:29)
+    at [stdin]:378:23
+    at runScriptInThisContext (node:internal/vm:218:10)
+    at node:internal/process/execution:456:12
+    at [stdin]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:454:60)
+    at evalFunction (node:internal/process/execution:286:30)
+    at evalTypeScript (node:internal/process/execution:298:3)
+    at node:internal/main/eval_stdin:51:5
+    at Socket.<anonymous> (node:internal/process/execution:206:5)
+
+Node.js v24.0.2
