@@ -126,7 +126,16 @@ impl CodegenJS {
         self.generate_statements(&block.stmts);
         self.generate_block_completion_as_stmt(block.expr.as_ref());
 
+        // Collect variables declared in this block before popping the scope.
+        // Since generate_block does not emit JS braces, all `let` declarations
+        // land at the same JS lexical level as the parent. We propagate them
+        // upward so that sibling blocks see them and `declare_variable` can
+        // produce unique names (e.g. `iterator$$` → `iterator$$$0`).
+        let locals = self.current_scope().local_variables().clone();
         self.pop_scope();
+        for (name, js_name) in locals {
+            self.current_scope().declare_variable_alias(&name, &js_name);
+        }
     }
 
     /// Emit a block completion as a statement, but only if it has side effects.
