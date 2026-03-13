@@ -7,41 +7,41 @@ enum Tree {
     Node { value: isize, left: Tree, right: Tree },
 }
 
-fn insert(Tree::Empty, value) {
+fn Tree.insert(Tree::Empty, value) {
     Tree::Node { value: value, left: Tree::Empty, right: Tree::Empty }
 }
-fn insert(Tree::Node { value: node_val, left, right }, value) {
+fn Tree.insert(Tree::Node { value: node_val, left, right }, value) {
     if value < node_val {
-        Tree::Node { value: node_val, left: insert(left, value), right }
+        Tree::Node { value: node_val, left: left.insert(value), right }
     } else if value > node_val {
-        Tree::Node { value: node_val, left, right: insert(right, value) }
+        Tree::Node { value: node_val, left, right: right.insert(value) }
     } else {
         Tree::Node { value: node_val, left, right }
     }
 }
 
 // In-order traversal: left subtree, root, right subtree
-fn to_list(Tree::Empty) { [] }
-fn to_list(Tree::Node { value, left, right }) {
-    [...to_list(left), value, ...to_list(right)]
+fn Tree.to_list(Tree::Empty) { [] }
+fn Tree.to_list(Tree::Node { value, left, right }) {
+    [...left.to_list(), value, ...right.to_list()]
 }
 
 // Make Tree iterable by delegating to the built-in List iterator
 impl Iterable for Tree {
     fn iter(tree) {
-        Iterable::iter(to_list(tree))
+        Iterable::iter(tree.to_list())
     }
 }
 
 // Build a BST
 let tree = Tree::Empty
-    |> insert(5)
-    |> insert(3)
-    |> insert(7)
-    |> insert(1)
-    |> insert(4)
-    |> insert(6)
-    |> insert(2);
+    .insert(5)
+    .insert(3)
+    .insert(7)
+    .insert(1)
+    .insert(4)
+    .insert(6)
+    .insert(2);
 
 // Iterate: in-order traversal yields sorted values
 log("Sorted values:");
