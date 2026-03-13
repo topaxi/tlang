@@ -6,6 +6,7 @@ use oxc_span::SPAN;
 use tlang_hir as hir;
 
 use crate::generator::InnerCodegen;
+use tlang_ast::node::Ident;
 
 /// Represents an access path into a match subject value.
 /// Used to build OXC expressions for nested pattern access without cloning expressions.
@@ -87,57 +88,13 @@ impl<'a> InnerCodegen<'a> {
             }
         };
 
-        // 2. Let guard variable
-        let let_guard_var = if arms.iter().any(|arm| arm.has_let_guard()) {
-            let var = self.current_scope().declare_tmp_variable();
-            declarators.push(self.ast.variable_declarator(
-                SPAN,
-                VariableDeclarationKind::Let,
-                self.binding_pattern_ident(&var),
-                NONE,
-                None,
-                false,
-            ));
-            var
-        } else {
-            String::new()
-        };
-
-        // 3. Collect and declare all pattern identifiers
-        let mut seen = HashSet::new();
-        let all_pat_idents: Vec<String> = arms
-            .iter()
-            .flat_map(|arm| {
-                let mut idents = get_pat_identifiers(&arm.pat);
-                if let Some(guard) = &arm.guard
-                    && let hir::ExprKind::Let(pat, _) = &guard.kind
-                {
-                    idents.extend(get_pat_identifiers(pat));
-                }
-                idents
-            })
-            .collect();
-
-        let filtered: Vec<String> = all_pat_idents
-            .into_iter()
-            .filter(|ident| match &fixed_list_idents {
-                Some(idents) => !idents.contains(ident),
-                None => ident != &match_value_name,
-            })
-            .filter(|ident| seen.insert(ident.clone()))
-            .collect();
-
-        for ident in &filtered {
-            let binding = self.current_scope().declare_variable(ident);
-            declarators.push(self.ast.variable_declarator(
-                SPAN,
-                VariableDeclarationKind::Let,
-                self.binding_pattern_ident(&binding),
-                NONE,
-                None,
-                false,
-            ));
-        }
+        // 2 & 3. Declare let guard variable and all pattern identifiers
+        let let_guard_var = self.declare_match_variables(
+            arms,
+            &match_value_name,
+            &fixed_list_idents,
+            &mut declarators,
+        );
 
         // Emit combined let declaration
         if !declarators.is_empty() {
@@ -160,6 +117,62 @@ impl<'a> InnerCodegen<'a> {
         }
 
         result
+    }
+
+    fn declare_match_variables(
+        &mut self,
+        arms: &[hir::MatchArm],
+        match_value_name: &str,
+        fixed_list_idents: &Option<Vec<String>>,
+        declarators: &mut Vec<VariableDeclarator<'a>>,
+    ) -> String {
+        let let_guard_var = if arms.iter().any(|arm| arm.has_let_guard()) {
+            let var = self.current_scope().declare_tmp_variable();
+            declarators.push(self.ast.variable_declarator(
+                SPAN,
+                VariableDeclarationKind::Let,
+                self.binding_pattern_ident(&var),
+                NONE,
+                None,
+                false,
+            ));
+            var
+        } else {
+            String::new()
+        };
+
+        let mut seen = HashSet::new();
+        let filtered: Vec<String> = arms
+            .iter()
+            .flat_map(|arm| {
+                let mut idents = get_pat_identifiers(&arm.pat);
+                if let Some(guard) = &arm.guard
+                    && let hir::ExprKind::Let(pat, _) = &guard.kind
+                {
+                    idents.extend(get_pat_identifiers(pat));
+                }
+                idents
+            })
+            .filter(|ident| match fixed_list_idents {
+                Some(idents) => !idents.contains(ident),
+                None => ident != match_value_name,
+            })
+            .filter(|ident| seen.insert(ident.clone()))
+            .collect();
+
+        for ident in &filtered {
+            let binding = self.current_scope().declare_variable(ident);
+            declarators.push(self.ast.variable_declarator(
+                SPAN,
+                VariableDeclarationKind::Let,
+                self.binding_pattern_ident(&binding),
+                NONE,
+                None,
+                false,
+            ));
+        }
+
+        let_guard_var
     }
 
     fn generate_match_arms_chain(
@@ -255,38 +268,7 @@ impl<'a> InnerCodegen<'a> {
             }
 
             hir::PatKind::Enum(path, patterns) => {
-                let parent_expr = self.access_path_to_expr(access);
-                let tag_access = self.static_member_expr(parent_expr, "tag");
-                let resolved = self
-                    .current_scope()
-                    .resolve_variable(&path.to_string())
-                    .unwrap_or_else(|| path.join("."));
-
-                let mut cond = self.ast.expression_binary(
-                    SPAN,
-                    tag_access,
-                    BinaryOperator::StrictEquality,
-                    self.ident_expr(&resolved),
-                );
-
-                for (ident, pattern) in patterns.iter().filter(|(_, pat)| !pat.is_wildcard()) {
-                    let sub_access = if ident.as_str().chars().all(char::is_numeric) {
-                        let idx = ident.as_str().parse::<usize>().unwrap();
-                        AccessPath::Index(Box::new(access.clone()), idx)
-                    } else {
-                        AccessPath::Field(Box::new(access.clone()), ident.to_string())
-                    };
-
-                    if let Some(sub_cond) =
-                        self.generate_pat_condition(pattern, false, &sub_access, fixed_list_idents)
-                    {
-                        cond =
-                            self.ast
-                                .expression_logical(SPAN, cond, LogicalOperator::And, sub_cond);
-                    }
-                }
-
-                Some(cond)
+                self.generate_enum_pat_condition(path, patterns, access, fixed_list_idents)
             }
 
             hir::PatKind::Literal(literal) => {
@@ -312,74 +294,7 @@ impl<'a> InnerCodegen<'a> {
             }
 
             hir::PatKind::List(patterns) => {
-                // Optimization: when matching against a list of identifiers,
-                // use the identifiers directly
-                if root_pat && fixed_list_idents.is_some() {
-                    let idents = fixed_list_idents.as_ref().unwrap();
-                    let mut cond: Option<Expression<'a>> = None;
-
-                    for (i, pattern) in patterns.iter().enumerate() {
-                        if pattern.is_wildcard() || pattern.is_ident() {
-                            continue;
-                        }
-
-                        let sub_access = AccessPath::Ident(idents[i].clone());
-                        if let Some(sub_cond) = self.generate_pat_condition(
-                            pattern,
-                            false,
-                            &sub_access,
-                            fixed_list_idents,
-                        ) {
-                            cond = Some(match cond {
-                                Some(c) => self.ast.expression_logical(
-                                    SPAN,
-                                    c,
-                                    LogicalOperator::And,
-                                    sub_cond,
-                                ),
-                                None => sub_cond,
-                            });
-                        }
-                    }
-
-                    return cond;
-                }
-
-                let parent_expr = self.access_path_to_expr(access);
-                let length = self.static_member_expr(parent_expr, "length");
-                let min_len = patterns
-                    .iter()
-                    .filter(|p| !matches!(p.kind, hir::PatKind::Rest(_)))
-                    .count();
-
-                let mut cond = self.ast.expression_binary(
-                    SPAN,
-                    length,
-                    BinaryOperator::GreaterEqualThan,
-                    self.num_expr(min_len as f64),
-                );
-
-                for (i, pattern) in patterns.iter().enumerate() {
-                    if pattern.is_wildcard() {
-                        continue;
-                    }
-
-                    let sub_access = if matches!(pattern.kind, hir::PatKind::Rest(_)) {
-                        AccessPath::Slice(Box::new(access.clone()), i)
-                    } else {
-                        AccessPath::Index(Box::new(access.clone()), i)
-                    };
-
-                    if let Some(sub_cond) =
-                        self.generate_pat_condition(pattern, false, &sub_access, fixed_list_idents)
-                    {
-                        cond =
-                            self.ast
-                                .expression_logical(SPAN, cond, LogicalOperator::And, sub_cond);
-                    }
-                }
-
-                Some(cond)
+                self.generate_list_pat_condition(patterns, root_pat, access, fixed_list_idents)
             }
 
             hir::PatKind::Rest(pattern) => {
@@ -388,6 +303,115 @@ impl<'a> InnerCodegen<'a> {
 
             hir::PatKind::Wildcard => None,
         }
+    }
+
+    fn generate_enum_pat_condition(
+        &mut self,
+        path: &hir::Path,
+        patterns: &[(Ident, hir::Pat)],
+        access: &AccessPath,
+        fixed_list_idents: &Option<Vec<String>>,
+    ) -> Option<Expression<'a>> {
+        let parent_expr = self.access_path_to_expr(access);
+        let tag_access = self.static_member_expr(parent_expr, "tag");
+        let resolved = self
+            .current_scope()
+            .resolve_variable(&path.to_string())
+            .unwrap_or_else(|| path.join("."));
+
+        let mut cond = self.ast.expression_binary(
+            SPAN,
+            tag_access,
+            BinaryOperator::StrictEquality,
+            self.ident_expr(&resolved),
+        );
+
+        for (ident, pattern) in patterns.iter().filter(|(_, pat)| !pat.is_wildcard()) {
+            let sub_access = if ident.as_str().chars().all(char::is_numeric) {
+                let idx = ident.as_str().parse::<usize>().unwrap();
+                AccessPath::Index(Box::new(access.clone()), idx)
+            } else {
+                AccessPath::Field(Box::new(access.clone()), ident.to_string())
+            };
+
+            if let Some(sub_cond) =
+                self.generate_pat_condition(pattern, false, &sub_access, fixed_list_idents)
+            {
+                cond = self
+                    .ast
+                    .expression_logical(SPAN, cond, LogicalOperator::And, sub_cond);
+            }
+        }
+
+        Some(cond)
+    }
+
+    fn generate_list_pat_condition(
+        &mut self,
+        patterns: &[hir::Pat],
+        root_pat: bool,
+        access: &AccessPath,
+        fixed_list_idents: &Option<Vec<String>>,
+    ) -> Option<Expression<'a>> {
+        // Optimization: when matching against a list of identifiers, use them directly
+        if root_pat && let Some(idents) = fixed_list_idents {
+            return patterns
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| !p.is_wildcard() && !p.is_ident())
+                .fold(None, |cond, (i, pattern)| {
+                    let sub_access = AccessPath::Ident(idents[i].clone());
+                    let sub_cond = self.generate_pat_condition(
+                        pattern,
+                        false,
+                        &sub_access,
+                        fixed_list_idents,
+                    )?;
+                    Some(match cond {
+                        Some(c) => {
+                            self.ast
+                                .expression_logical(SPAN, c, LogicalOperator::And, sub_cond)
+                        }
+                        None => sub_cond,
+                    })
+                });
+        }
+
+        let parent_expr = self.access_path_to_expr(access);
+        let length = self.static_member_expr(parent_expr, "length");
+        let min_len = patterns
+            .iter()
+            .filter(|p| !matches!(p.kind, hir::PatKind::Rest(_)))
+            .count();
+
+        let mut cond = self.ast.expression_binary(
+            SPAN,
+            length,
+            BinaryOperator::GreaterEqualThan,
+            self.num_expr(min_len as f64),
+        );
+
+        for (i, pattern) in patterns.iter().enumerate() {
+            if pattern.is_wildcard() {
+                continue;
+            }
+
+            let sub_access = if matches!(pattern.kind, hir::PatKind::Rest(_)) {
+                AccessPath::Slice(Box::new(access.clone()), i)
+            } else {
+                AccessPath::Index(Box::new(access.clone()), i)
+            };
+
+            if let Some(sub_cond) =
+                self.generate_pat_condition(pattern, false, &sub_access, fixed_list_idents)
+            {
+                cond = self
+                    .ast
+                    .expression_logical(SPAN, cond, LogicalOperator::And, sub_cond);
+            }
+        }
+
+        Some(cond)
     }
 
     fn generate_match_arm_guard_expr(

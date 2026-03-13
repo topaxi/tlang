@@ -152,7 +152,6 @@ impl<'a> InnerCodegen<'a> {
             .iter()
             .any(|param| !param.name.as_str().chars().all(char::is_numeric));
 
-        // Allocate parameter names into the arena so they outlive this function
         let parameter_names: Vec<&'a str> = if named_fields {
             parameters
                 .iter()
@@ -168,7 +167,27 @@ impl<'a> InnerCodegen<'a> {
                 .collect()
         };
 
-        // Build Object.assign(new this, { tag: this.Variant, ...fields })
+        let obj = self.build_enum_variant_object(variant_name, parameters, &parameter_names);
+        let new_this = self
+            .ast
+            .expression_new(SPAN, self.this_expr(), NONE, self.ast.vec());
+        let assign_call = self.call_expr(
+            self.static_member_expr(self.ident_expr("Object"), "assign"),
+            vec![Argument::from(new_this), Argument::from(obj)],
+        );
+
+        let formal_params = self.build_enum_variant_params(named_fields, &parameter_names);
+        let body = self.fn_body(self.ast.vec1(self.expr_stmt(assign_call)));
+        self.ast
+            .expression_arrow_function(SPAN, true, false, NONE, formal_params, NONE, body)
+    }
+
+    fn build_enum_variant_object(
+        &mut self,
+        variant_name: &str,
+        parameters: &[hir::StructField],
+        parameter_names: &[&'a str],
+    ) -> Expression<'a> {
         let mut obj_props = Vec::new();
 
         // tag: this.Variant
@@ -184,7 +203,6 @@ impl<'a> InnerCodegen<'a> {
             ),
         ));
 
-        // field: value pairs
         for (i, param) in parameters.iter().enumerate() {
             let param_field_name = self.alloc_str(param.name.as_str());
             let parameter_name = parameter_names[i];
@@ -210,7 +228,6 @@ impl<'a> InnerCodegen<'a> {
             };
 
             let shorthand = parameter_name == param_field_name;
-
             obj_props.push(ObjectPropertyKind::ObjectProperty(
                 self.ast.alloc_object_property(
                     SPAN,
@@ -224,20 +241,16 @@ impl<'a> InnerCodegen<'a> {
             ));
         }
 
-        let obj = self
-            .ast
-            .expression_object(SPAN, self.ast.vec_from_iter(obj_props));
-        let new_this = self
-            .ast
-            .expression_new(SPAN, self.this_expr(), NONE, self.ast.vec());
-        let assign_call = self.call_expr(
-            self.static_member_expr(self.ident_expr("Object"), "assign"),
-            vec![Argument::from(new_this), Argument::from(obj)],
-        );
+        self.ast
+            .expression_object(SPAN, self.ast.vec_from_iter(obj_props))
+    }
 
-        // Build arrow function
-        let formal_params = if named_fields {
-            // Object destructuring: ({ a, b }) => ...
+    fn build_enum_variant_params(
+        &mut self,
+        named_fields: bool,
+        parameter_names: &[&'a str],
+    ) -> FormalParameters<'a> {
+        if named_fields {
             let props: Vec<_> = parameter_names
                 .iter()
                 .map(|n| {
@@ -279,13 +292,7 @@ impl<'a> InnerCodegen<'a> {
                 .map(|n| self.formal_param(n))
                 .collect();
             self.formal_params(self.ast.vec_from_iter(params))
-        };
-
-        let body_stmt = self.expr_stmt(assign_call);
-        let body = self.fn_body(self.ast.vec1(body_stmt));
-
-        self.ast
-            .expression_arrow_function(SPAN, true, false, NONE, formal_params, NONE, body)
+        }
     }
 
     fn infer_parameter_name_from_type(&mut self, ty: &hir::Ty) -> String {
