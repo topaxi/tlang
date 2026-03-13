@@ -479,6 +479,14 @@ export class TlangPlayground extends LitElement {
     }
   }
 
+  private hasOptimizationsEnabled(): boolean {
+    return (
+      this.optimizationOptions.constantFolding ||
+      (this.optimizationOptions.anfTransform != null &&
+        this.optimizationOptions.anfTransform !== 'off')
+    );
+  }
+
   protected override render() {
     return html`
       <t-shortcuts>
@@ -503,7 +511,7 @@ export class TlangPlayground extends LitElement {
               popovertarget="optimization-options"
               aria-label="Optimization Settings"
             >
-              
+              ${this.hasOptimizationsEnabled() ? '󰉁' : '󰛕'}
             </t-button>
             <t-menu id="optimization-options" popover=${floating()}>
               <t-menuitem-checkbox
