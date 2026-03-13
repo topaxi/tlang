@@ -85,7 +85,8 @@ fn test_codegen_if_let() {
     let expected_output = indoc! {"
         function main() {
             let $anf$0;
-            let $tmp$0 = Option.Some(42),x;if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
+            let $tmp$0 = Option.Some(42), x;
+            if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
                 $anf$0 = x;
             }
             return $anf$0;
@@ -97,7 +98,8 @@ fn test_codegen_if_let() {
     let expected_output = indoc! {"
         function main() {
             let $anf$0;
-            let $tmp$0 = Option.Some(42),x;if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
+            let $tmp$0 = Option.Some(42), x;
+            if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
                 $anf$0 = x;
             } else {
                 $anf$0 = 0;
@@ -126,8 +128,9 @@ fn test_codegen_if_let() {
         function main() {
             let value = Option.Some(42);
             let $anf$0;
-            let $tmp$0,x;if (value.tag === Option.Some && value[0] === 42) {
-                $anf$0 = 9000;
+            let $tmp$0, x;
+            if (value.tag === Option.Some && value[0] === 42) {
+                $anf$0 = 9e3;
             } else if (($tmp$0 = value, true) && $tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
                 $anf$0 = x;
             } else if (value === Option.Some(100)) {

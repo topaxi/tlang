@@ -19,8 +19,11 @@ fn test_enums() {
         class Option {
             tag = this;
             [0];
-            static Some = (x) => Object.assign(new this, { tag: this.Some, [0]: x });
-            static None = new this;
+            static Some = (x) => Object.assign(new this(), {
+                tag: this.Some,
+                0: x
+            });
+            static None = new this();
         }
         function main() {
             let x = Option.Some(42);
@@ -54,13 +57,18 @@ fn test_enums_with_fields() {
             operator;
             left;
             right;
-            static BinaryOperation = ({ operator, left, right }) => Object.assign(new this, { tag: this.BinaryOperation, operator, left, right });
+            static BinaryOperation = ({ operator, left, right }) => Object.assign(new this(), {
+                tag: this.BinaryOperation,
+                operator,
+                left,
+                right
+            });
         }
         function main() {
             let x = Node.BinaryOperation({
                 operator: \"+\",
                 left: 1,
-                right: 2,
+                right: 2
             });
         }
     "};
@@ -91,13 +99,20 @@ fn test_enums_tree_implementation() {
             [0];
             left;
             right;
-            static Leaf = (x) => Object.assign(new this, { tag: this.Leaf, [0]: x });
-            static Node = ({ left, right }) => Object.assign(new this, { tag: this.Node, left, right });
+            static Leaf = (x) => Object.assign(new this(), {
+                tag: this.Leaf,
+                0: x
+            });
+            static Node = ({ left, right }) => Object.assign(new this(), {
+                tag: this.Node,
+                left,
+                right
+            });
         }
         function main() {
             let x = Tree.Node({
                 left: Tree.Leaf(1),
-                right: Tree.Leaf(2),
+                right: Tree.Leaf(2)
             });
         }
     "};
@@ -134,12 +149,20 @@ fn test_maximum_depth_tree() {
             [0];
             left;
             right;
-            static Leaf = (x) => Object.assign(new this, { tag: this.Leaf, [0]: x });
-            static Node = ({ left, right }) => Object.assign(new this, { tag: this.Node, left, right });
+            static Leaf = (x) => Object.assign(new this(), {
+                tag: this.Leaf,
+                0: x
+            });
+            static Node = ({ left, right }) => Object.assign(new this(), {
+                tag: this.Node,
+                left,
+                right
+            });
         }
         function maximum_depth(tree) {
             let $anf$0;
-            let left,right;if (tree.tag === Tree.Leaf) {
+            let left, right;
+            if (tree.tag === Tree.Leaf) {
                 $anf$0 = 1;
             } else if (tree.tag === Tree.Node && (left = tree.left, true) && (right = tree.right, true)) {
                 $anf$0 = 1 + Math.max(maximum_depth(left), maximum_depth(right));
@@ -151,8 +174,8 @@ fn test_maximum_depth_tree() {
                 left: Tree.Leaf(1),
                 right: Tree.Node({
                     left: Tree.Leaf(2),
-                    right: Tree.Leaf(3),
-                }),
+                    right: Tree.Leaf(3)
+                })
             });
         }
     "};
@@ -175,12 +198,20 @@ fn test_maximum_depth_tree_positional() {
             tag = this;
             [0];
             [1];
-            static Leaf = (x) => Object.assign(new this, { tag: this.Leaf, [0]: x });
-            static Node = (left, right) => Object.assign(new this, { tag: this.Node, [0]: left, [1]: right });
+            static Leaf = (x) => Object.assign(new this(), {
+                tag: this.Leaf,
+                0: x
+            });
+            static Node = (left, right) => Object.assign(new this(), {
+                tag: this.Node,
+                0: left,
+                1: right
+            });
         }
         function maximum_depth(tree) {
             let $anf$0;
-            let left,right;if (tree.tag === Tree.Leaf) {
+            let left, right;
+            if (tree.tag === Tree.Leaf) {
                 $anf$0 = 1;
             } else if (tree.tag === Tree.Node && (left = tree[0], true) && (right = tree[1], true)) {
                 $anf$0 = 1 + Math.max(maximum_depth(left), maximum_depth(right));

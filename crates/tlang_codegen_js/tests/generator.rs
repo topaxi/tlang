@@ -20,7 +20,7 @@ fn test_codegen_not_expression() {
 #[test]
 fn test_codegen_function_declaration() {
     let output = compile!("fn main() {}");
-    let expected_output = "function main() {\n}\n";
+    let expected_output = "function main() {}\n";
     assert_eq!(output, expected_output);
 }
 
@@ -30,11 +30,7 @@ fn test_codegen_function_call() {
         fn main() {}
         main();
     "});
-    let expected_output = indoc! {"
-        function main() {
-        }
-        main();
-    "};
+    let expected_output = "function main() {}\nmain();\n";
     assert_eq!(output, expected_output);
 }
 
@@ -106,11 +102,10 @@ fn test_block_expression_with_statements() {
         CodegenOptions::default().optimize(false)
     );
     let expected_output = indoc! {"
-        let $tmp$0;{
-            let x = 1;
-            $tmp$0 = x;
-        };
-        let one = $tmp$0;
+        let $anf$0;
+        let x = 1;
+        $anf$0 = x;
+        let one = $anf$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -145,17 +140,10 @@ fn test_if_else_if() {
 
 #[test]
 fn test_if_else_as_expression_as_fn_completion() {
-    let output = compile!(
-        "fn main() { if true { 1 } else { 2 } }",
-        CodegenOptions::default().render_ternary(false)
-    );
+    let output = compile!("fn main() { if true { 1 } else { 2 } }");
     let expected_output = indoc! {"
         function main() {
-            if (true) {
-                return 1;
-            } else {
-                return 2;
-            }
+            return true ? 1 : 2;
         }
     "};
     assert_eq!(output, expected_output);
@@ -163,18 +151,10 @@ fn test_if_else_as_expression_as_fn_completion() {
 
 #[test]
 fn test_if_else_as_expression() {
-    let output = compile!(
-        "fn main() { let result = if true { 1 } else { 2 }; }",
-        CodegenOptions::default().render_ternary(false)
-    );
+    let output = compile!("fn main() { let result = if true { 1 } else { 2 }; }");
     let expected_output = indoc! {"
         function main() {
-            let $tmp$0;if (true) {
-                $tmp$0 = 1;
-            } else {
-                $tmp$0 = 2;
-            }
-            let result = $tmp$0;
+            let result = true ? 1 : 2;
         }
     "};
     assert_eq!(output, expected_output);
@@ -182,8 +162,7 @@ fn test_if_else_as_expression() {
 
 #[test]
 fn test_if_else_as_expression_nested() {
-    let output = compile!(
-        indoc! {"
+    let output = compile!(indoc! {"
         fn main() {
             let result = if true {
                 let x = if true { 1 } else { 2 };
@@ -193,19 +172,12 @@ fn test_if_else_as_expression_nested() {
                 5
             };
         }
-    "},
-        CodegenOptions::default().render_ternary(false)
-    );
+    "});
     let expected_output = indoc! {"
         function main() {
             let $anf$0;
             if (true) {
-                let $tmp$0;if (true) {
-                    $tmp$0 = 1;
-                } else {
-                    $tmp$0 = 2;
-                }
-                let x = $tmp$0;
+                let x = true ? 1 : 2;
                 if (x === 1) {
                     $anf$0 = 3;
                 } else {
@@ -267,7 +239,11 @@ fn test_list_literal() {
     let output = compile!("fn main() { [1, 2, 3] }");
     let expected_output = indoc! {"
         function main() {
-            return [1, 2, 3];
+            return [
+                1,
+                2,
+                3
+            ];
         }
     "};
     assert_eq!(output, expected_output);
@@ -495,7 +471,7 @@ fn test_dict_literal() {
         function main() {
             let x = {
                 a: 1,
-                b: 2,
+                b: 2
             };
         }
     "};
@@ -519,8 +495,8 @@ fn test_dict_literal_shorthand() {
             let a = 1;
             let b = 2;
             let x = {
-                a,
-                b,
+                a: a,
+                b: b
             };
         }
     "};

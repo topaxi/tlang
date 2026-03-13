@@ -83,7 +83,11 @@ fn test_pipeline_operator_long_chaining() {
         |> log();
     "});
     let expected_output = indoc! {"
-        console.log(foldl(filter(map([1, 2, 3], (x) => x ** 2), (x) => x % 2 === 0), (acc, x) => acc + x, 0));
+        console.log(foldl(filter(map([
+            1,
+            2,
+            3
+        ], (x) => x ** 2), (x) => x % 2 === 0), (acc, x) => acc + x, 0));
     "};
     assert_eq!(output, expected_output);
 }

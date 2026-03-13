@@ -13,6 +13,7 @@ fn test_integer_literal() {
 }
 
 #[test]
+#[allow(clippy::approx_constant)]
 fn test_float_literal() {
     let value = common::eval("3.14");
     assert!(matches!(value, TlangValue::F64(f) if (f - 3.14).abs() < 1e-10));

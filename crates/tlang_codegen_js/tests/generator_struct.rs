@@ -13,8 +13,7 @@ fn test_struct_definition() {
     "});
     let expected_output = indoc! {"
         function Point() {
-            if (new.target == null) return Object.assign(new Point, arguments[0]);
-
+            if (new.target == null) return Object.assign(new Point(), arguments[0]);
             this.x = undefined;
             this.y = undefined;
         }

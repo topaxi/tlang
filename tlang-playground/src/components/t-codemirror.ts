@@ -5,11 +5,12 @@ import { Diagnostic, linter, lintGutter } from '@codemirror/lint';
 import { catppuccin } from 'codemirror-theme-catppuccin';
 import { tlangLanguageSupport } from 'codemirror-lang-tlang';
 import { javascript } from '@codemirror/lang-javascript';
+import { json } from '@codemirror/lang-json';
 import { LitElement, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { hostListener } from '../decorators/host-listener';
 
-export type Language = 'tlang' | 'javascript';
+export type Language = 'tlang' | 'javascript' | 'json';
 
 @customElement('t-codemirror')
 export class TCodeMirror extends LitElement {
@@ -76,6 +77,10 @@ export class TCodeMirror extends LitElement {
 
       case 'javascript':
         extensions.push(javascript());
+        break;
+
+      case 'json':
+        extensions.push(json());
         break;
     }
 

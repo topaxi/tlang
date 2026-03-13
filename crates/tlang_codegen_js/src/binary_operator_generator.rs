@@ -1,119 +1,41 @@
+use oxc_ast::ast::{BinaryOperator, LogicalOperator, UnaryOperator};
+use tlang_ast::node as ast;
 use tlang_hir as hir;
 
-use crate::generator::CodegenJS;
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum JSAssociativity {
-    Left,
-    Right,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct JSOperatorInfo {
-    pub precedence: u8,
-    pub associativity: JSAssociativity,
-}
-
-impl CodegenJS {
-    pub(crate) fn generate_binary_op(
-        &mut self,
-        op: hir::BinaryOpKind,
-        lhs: &hir::Expr,
-        rhs: &hir::Expr,
-        parent_op: Option<hir::BinaryOpKind>,
-    ) {
-        let needs_parentheses = parent_op.is_some_and(|parent| {
-            should_wrap_with_parentheses(map_operator_info(parent), map_operator_info(op))
-        });
-
-        if needs_parentheses {
-            self.push_char('(');
-        }
-
-        self.generate_expr(lhs, Some(op));
-        self.generate_binary_operator_token(op);
-        self.generate_expr(rhs, Some(op));
-
-        if needs_parentheses {
-            self.push_char(')');
-        }
-    }
-
-    fn generate_binary_operator_token(self: &mut CodegenJS, op: hir::BinaryOpKind) {
-        match op {
-            hir::BinaryOpKind::Assign => self.push_str(" = "),
-            hir::BinaryOpKind::Add => self.push_str(" + "),
-            hir::BinaryOpKind::Sub => self.push_str(" - "),
-            hir::BinaryOpKind::Mul => self.push_str(" * "),
-            hir::BinaryOpKind::Div => self.push_str(" / "),
-            hir::BinaryOpKind::Mod => self.push_str(" % "),
-            hir::BinaryOpKind::Exp => self.push_str(" ** "),
-            hir::BinaryOpKind::Eq => self.push_str(" === "),
-            hir::BinaryOpKind::NotEq => self.push_str(" !== "),
-            hir::BinaryOpKind::Less => self.push_str(" < "),
-            hir::BinaryOpKind::LessEq => self.push_str(" <= "),
-            hir::BinaryOpKind::Greater => self.push_str(" > "),
-            hir::BinaryOpKind::GreaterEq => self.push_str(" >= "),
-            hir::BinaryOpKind::And => self.push_str(" && "),
-            hir::BinaryOpKind::Or => self.push_str(" || "),
-            hir::BinaryOpKind::BitwiseOr => self.push_str(" | "),
-            hir::BinaryOpKind::BitwiseAnd => self.push_str(" & "),
-            hir::BinaryOpKind::BitwiseXor => self.push_str(" ^ "),
-        }
-    }
-}
-
-pub(crate) fn should_wrap_with_parentheses(
-    parent_op_info: JSOperatorInfo,
-    op_info: JSOperatorInfo,
-) -> bool {
-    op_info.precedence < parent_op_info.precedence
-        || (op_info.precedence == parent_op_info.precedence
-            && op_info.associativity == JSAssociativity::Right)
-}
-
-pub(crate) fn map_operator_info(op: hir::BinaryOpKind) -> JSOperatorInfo {
+/// Map a HIR binary op to either a JS binary or logical operator.
+/// Returns `Err(LogicalOperator)` for `&&`/`||`, `Ok(BinaryOperator)` for everything else.
+pub(crate) fn map_binary_op(op: hir::BinaryOpKind) -> Result<BinaryOperator, LogicalOperator> {
     match op {
-        hir::BinaryOpKind::Assign => JSOperatorInfo {
-            precedence: 1,
-            associativity: JSAssociativity::Right,
-        },
-        hir::BinaryOpKind::Add | hir::BinaryOpKind::Sub => JSOperatorInfo {
-            precedence: 7,
-            associativity: JSAssociativity::Left,
-        },
-        hir::BinaryOpKind::Mul | hir::BinaryOpKind::Div | hir::BinaryOpKind::Mod => {
-            JSOperatorInfo {
-                precedence: 8,
-                associativity: JSAssociativity::Left,
-            }
+        hir::BinaryOpKind::Add => Ok(BinaryOperator::Addition),
+        hir::BinaryOpKind::Sub => Ok(BinaryOperator::Subtraction),
+        hir::BinaryOpKind::Mul => Ok(BinaryOperator::Multiplication),
+        hir::BinaryOpKind::Div => Ok(BinaryOperator::Division),
+        hir::BinaryOpKind::Mod => Ok(BinaryOperator::Remainder),
+        hir::BinaryOpKind::Exp => Ok(BinaryOperator::Exponential),
+        hir::BinaryOpKind::Eq => Ok(BinaryOperator::StrictEquality),
+        hir::BinaryOpKind::NotEq => Ok(BinaryOperator::StrictInequality),
+        hir::BinaryOpKind::Less => Ok(BinaryOperator::LessThan),
+        hir::BinaryOpKind::LessEq => Ok(BinaryOperator::LessEqualThan),
+        hir::BinaryOpKind::Greater => Ok(BinaryOperator::GreaterThan),
+        hir::BinaryOpKind::GreaterEq => Ok(BinaryOperator::GreaterEqualThan),
+        hir::BinaryOpKind::BitwiseOr => Ok(BinaryOperator::BitwiseOR),
+        hir::BinaryOpKind::BitwiseAnd => Ok(BinaryOperator::BitwiseAnd),
+        hir::BinaryOpKind::BitwiseXor => Ok(BinaryOperator::BitwiseXOR),
+        hir::BinaryOpKind::And => Err(LogicalOperator::And),
+        hir::BinaryOpKind::Or => Err(LogicalOperator::Or),
+        // Assign is handled separately by the caller.
+        hir::BinaryOpKind::Assign => {
+            unreachable!("Assign should be handled as AssignmentExpression")
         }
-        hir::BinaryOpKind::Eq
-        | hir::BinaryOpKind::NotEq
-        | hir::BinaryOpKind::Less
-        | hir::BinaryOpKind::LessEq
-        | hir::BinaryOpKind::Greater
-        | hir::BinaryOpKind::GreaterEq => JSOperatorInfo {
-            precedence: 6,
-            associativity: JSAssociativity::Left,
-        },
-        hir::BinaryOpKind::And => JSOperatorInfo {
-            precedence: 4,
-            associativity: JSAssociativity::Left,
-        },
-        hir::BinaryOpKind::Or => JSOperatorInfo {
-            precedence: 3,
-            associativity: JSAssociativity::Left,
-        },
-        hir::BinaryOpKind::BitwiseAnd
-        | hir::BinaryOpKind::BitwiseOr
-        | hir::BinaryOpKind::BitwiseXor => JSOperatorInfo {
-            precedence: 9,
-            associativity: JSAssociativity::Left,
-        },
-        hir::BinaryOpKind::Exp => JSOperatorInfo {
-            precedence: 10,
-            associativity: JSAssociativity::Right,
-        },
+    }
+}
+
+pub(crate) fn map_unary_op(op: &ast::UnaryOp) -> UnaryOperator {
+    match op {
+        ast::UnaryOp::Not => UnaryOperator::LogicalNot,
+        ast::UnaryOp::Minus => UnaryOperator::UnaryNegation,
+        ast::UnaryOp::Spread | ast::UnaryOp::Rest => {
+            unreachable!("Spread/Rest are not unary operators")
+        }
     }
 }
