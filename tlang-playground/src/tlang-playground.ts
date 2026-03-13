@@ -150,7 +150,7 @@ function deserializeOptimizations(
   if (!raw) return null;
 
   const options: JsOptimizationOptions = {
-    constantFolding: undefined,
+    constantFolding: true,
     anfTransform: undefined,
   };
 

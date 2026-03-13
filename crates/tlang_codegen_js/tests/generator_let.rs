@@ -125,17 +125,17 @@ fn test_codegen_if_let() {
     let expected_output = indoc! {"
         function main() {
             let value = Option.Some(42);
-            let $anf$1;
-            if (value.tag === Option.Some && value[0] === 42) {
-                $anf$1 = 9000;
-            } else if ($anf$0) {
-                $anf$1 = x;
+            let $anf$0;
+            let $tmp$0,x;if (value.tag === Option.Some && value[0] === 42) {
+                $anf$0 = 9000;
+            } else if (($tmp$0 = value, true) && $tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
+                $anf$0 = x;
             } else if (value === Option.Some(100)) {
-                $anf$1 = 100;
+                $anf$0 = 100;
             } else {
-                $anf$1 = 5;
+                $anf$0 = 5;
             }
-            return $anf$1;
+            return $anf$0;
         }
     "};
     assert_eq!(output, expected_output);

@@ -1467,6 +1467,7 @@ impl Interpreter {
     /// Collects an iterable value into a list by calling `Iterable::iter` then
     /// draining `Iterator::next` until `Option::None`.
     fn collect_iterable(&self, state: &mut VMState, value: TlangValue) -> TlangValue {
+        let mark = state.temp_roots_mark();
         let type_name = state.type_name_of(value).to_string();
         let iter_fn = state
             .get_protocol_impl("Iterable", &type_name, "iter")
@@ -1508,7 +1509,9 @@ impl Interpreter {
             items.push(tlang_enum.field_values[0]);
         }
 
-        state.new_list(items)
+        let result = state.new_list(items);
+        state.temp_roots_restore(mark);
+        result
     }
 
     fn eval_dict_expr(

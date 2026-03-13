@@ -202,15 +202,15 @@ fn test_function_declarations_with_if_let_guard() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let $anf$1;
-            let x,xs;if (arg0.length === 0) {
-                $anf$1 = [];
-            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && $anf$0) {
-                $anf$1 = [y, ...$spread(filter_map(xs, f))];
+            let $anf$0;
+            let $tmp$0,x,xs,y;if (arg0.length === 0) {
+                $anf$0 = [];
+            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && (y = $tmp$0, true)) {
+                $anf$0 = [y, ...$spread(filter_map(xs, f))];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
-                $anf$1 = filter_map(xs, f);
+                $anf$0 = filter_map(xs, f);
             }
-            return $anf$1;
+            return $anf$0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -225,15 +225,15 @@ fn test_function_declarations_with_if_let_guard_enum() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let $anf$1;
-            let x,xs;if (arg0.length === 0) {
-                $anf$1 = [];
-            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && $anf$0) {
-                $anf$1 = [y, ...$spread(filter_map(xs, f))];
+            let $anf$0;
+            let $tmp$0,x,xs,y;if (arg0.length === 0) {
+                $anf$0 = [];
+            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && $tmp$0.tag === Option.Some && (y = $tmp$0[0], true)) {
+                $anf$0 = [y, ...$spread(filter_map(xs, f))];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
-                $anf$1 = filter_map(xs, f);
+                $anf$0 = filter_map(xs, f);
             }
-            return $anf$1;
+            return $anf$0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -248,15 +248,15 @@ fn test_function_declarations_with_if_let_guard_named_fields_enum() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let $anf$1;
-            let x,xs;if (arg0.length === 0) {
-                $anf$1 = [];
-            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && $anf$0) {
-                $anf$1 = [value, ...$spread(filter_map(xs, f))];
+            let $anf$0;
+            let $tmp$0,x,xs,value;if (arg0.length === 0) {
+                $anf$0 = [];
+            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && $tmp$0.tag === Option.Some && (value = $tmp$0.value, true)) {
+                $anf$0 = [value, ...$spread(filter_map(xs, f))];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
-                $anf$1 = filter_map(xs, f);
+                $anf$0 = filter_map(xs, f);
             }
-            return $anf$1;
+            return $anf$0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -277,18 +277,18 @@ fn test_function_declarations_with_comments_inbetween() {
         // Comment 2
         // Comment 3
         function filter_map(arg0, f) {
-            let $anf$1;
-            let x,xs;if (arg0.length === 0) {
+            let $anf$0;
+            let $tmp$0,x,xs,value;if (arg0.length === 0) {
                 // Comment 1
-                $anf$1 = [];
-            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && $anf$0) {
+                $anf$0 = [];
+            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && $tmp$0.tag === Option.Some && (value = $tmp$0.value, true)) {
                 // Comment 2
-                $anf$1 = [value, ...$spread(filter_map(xs, f))];
+                $anf$0 = [value, ...$spread(filter_map(xs, f))];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
                 // Comment 3
-                $anf$1 = filter_map(xs, f);
+                $anf$0 = filter_map(xs, f);
             }
-            return $anf$1;
+            return $anf$0;
         }
     "};
     assert_eq!(output, expected_output);
