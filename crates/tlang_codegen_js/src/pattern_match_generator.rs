@@ -239,13 +239,17 @@ impl CodegenJS {
             hir::ExprKind::List(exprs)
                 if !exprs.is_empty() && exprs.iter().all(|expr| expr.is_path()) =>
             {
+                let identifiers: Vec<String> = exprs
+                    .iter()
+                    .map(|expr| {
+                        let ident = expr.path().unwrap().first_ident();
+                        self.current_scope()
+                            .resolve_variable(ident.as_str())
+                            .unwrap_or_else(|| ident.to_string())
+                    })
+                    .collect();
                 self.match_context_stack
-                    .push(MatchContext::ListOfIdentifiers(
-                        exprs
-                            .iter()
-                            .map(|expr| expr.path().unwrap().first_ident().to_string())
-                            .collect(),
-                    ));
+                    .push(MatchContext::ListOfIdentifiers(identifiers));
             }
             _ => {
                 self.match_context_stack.push(MatchContext::Dynamic);
