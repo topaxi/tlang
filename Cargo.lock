@@ -1240,6 +1240,7 @@ dependencies = [
  "tlang_hir_opt",
  "tlang_parser",
  "tlang_semantics",
+ "tlang_span",
  "tlang_symbols",
 ]
 
@@ -1421,9 +1422,11 @@ dependencies = [
 name = "tlang_vm"
 version = "0.1.0"
 dependencies = [
+ "ctor",
  "env_logger",
  "inventory",
  "log",
+ "pretty_assertions",
  "tlang_ast_lowering",
  "tlang_hir",
  "tlang_hir_opt",

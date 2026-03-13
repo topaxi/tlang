@@ -92,10 +92,9 @@ fn test_codegen_operator_precedence() {
 fn test_block_expression() {
     let output = compile!("let one = { 1 };");
     let expected_output = indoc! {"
-        let $tmp$0;{
-            $tmp$0 = 1;
-        };
-        let one = $tmp$0;
+        let $anf$0;
+        $anf$0 = 1;
+        let one = $anf$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -199,23 +198,23 @@ fn test_if_else_as_expression_nested() {
     );
     let expected_output = indoc! {"
         function main() {
-            let $tmp$0;if (true) {
-                let $tmp$1;if (true) {
-                    $tmp$1 = 1;
+            let $anf$0;
+            if (true) {
+                let $tmp$0;if (true) {
+                    $tmp$0 = 1;
                 } else {
-                    $tmp$1 = 2;
+                    $tmp$0 = 2;
                 }
-                let x = $tmp$1;
-                let $tmp$2;if (x === 1) {
-                    $tmp$2 = 3;
+                let x = $tmp$0;
+                if (x === 1) {
+                    $anf$0 = 3;
                 } else {
-                    $tmp$2 = 4;
+                    $anf$0 = 4;
                 }
-                $tmp$0 = $tmp$2;
             } else {
-                $tmp$0 = 5;
+                $anf$0 = 5;
             }
-            let result = $tmp$0;
+            let result = $anf$0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -227,14 +226,15 @@ fn test_if_else_if_as_expression() {
         compile!("fn main() { let result = if true { 1 } else if true { 2 } else { 3 }; }");
     let expected_output = indoc! {"
         function main() {
-            let $tmp$0;if (true) {
-                $tmp$0 = 1;
+            let $anf$0;
+            if (true) {
+                $anf$0 = 1;
             } else if (true) {
-                $tmp$0 = 2;
+                $anf$0 = 2;
             } else {
-                $tmp$0 = 3;
+                $anf$0 = 3;
             }
-            let result = $tmp$0;
+            let result = $anf$0;
         }
     "};
     assert_eq!(output, expected_output);

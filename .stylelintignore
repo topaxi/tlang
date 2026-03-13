@@ -1,2 +1,3 @@
 tlang-playground/dist
+target/
 *.js

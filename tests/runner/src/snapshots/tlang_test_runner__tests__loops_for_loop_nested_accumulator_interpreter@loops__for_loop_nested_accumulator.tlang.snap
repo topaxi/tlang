@@ -1,0 +1,7 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: apply_redactions(&output)
+input_file: tests/loops/for_loop_nested_accumulator.tlang
+---
+[1, 2, 3, 4, 5, 6, 7, 8, 9]

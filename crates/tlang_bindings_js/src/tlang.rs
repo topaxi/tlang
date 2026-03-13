@@ -1,13 +1,21 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
+
 use serde::{Deserialize, Serialize};
 use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
+use tlang_codegen_js::js_anf_transform::JsAnfTransform;
+use tlang_codegen_js::js_hir_opt::JsHirOptimizer;
 use tlang_hir as hir;
-use tlang_hir_opt::HirOptimizer;
+use tlang_hir_opt::HirPass;
+use tlang_hir_opt::hir_opt::HirOptimizer;
 use tlang_hir_pretty::{HirPretty, HirPrettyOptions};
 use tlang_parser::Parser;
 use tlang_parser::error::{ParseError, ParseIssue};
 use tlang_semantics::SemanticAnalyzer;
-use tlang_symbols::SymbolType;
+use tlang_span::NodeId;
+use tlang_symbols::{SymbolTable, SymbolType};
 use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
@@ -78,6 +86,31 @@ impl JsHirPrettyOptions {
     }
 }
 
+#[derive(Deserialize, Serialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+#[serde(rename_all = "camelCase")]
+pub struct JsOptimizationOptions {
+    pub constant_folding: Option<bool>,
+    /// ANF transform mode: `"off"`, `"minimal"` (JS-only lifting), or `"full"`.
+    pub anf_transform: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RunnerKind {
+    JavaScript,
+    Interpreter,
+}
+
+impl From<Runner> for RunnerKind {
+    fn from(runner: Runner) -> Self {
+        match runner {
+            Runner::JavaScript => RunnerKind::JavaScript,
+            Runner::Interpreter => RunnerKind::Interpreter,
+            _ => RunnerKind::Interpreter,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct BuildArtifacts {
     parse_result: Option<Result<ast::Module, ParseError>>,
@@ -94,6 +127,8 @@ pub enum Runner {
 #[wasm_bindgen]
 pub struct Tlang {
     source: String,
+    runner: RunnerKind,
+    optimization_options: JsOptimizationOptions,
     build: BuildArtifacts,
     analyzer: SemanticAnalyzer,
     js: CodegenJS,
@@ -106,19 +141,24 @@ impl Tlang {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(source: String, runner: Runner) -> Self {
         let mut analyzer = SemanticAnalyzer::default();
+        let runner_kind = RunnerKind::from(runner);
 
-        match runner {
-            Runner::JavaScript => {
+        match runner_kind {
+            RunnerKind::JavaScript => {
                 analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
             }
-            Runner::Interpreter => {
+            RunnerKind::Interpreter => {
                 analyzer.add_builtin_symbols_with_slots(&tlang_runtime::vm::VM::builtin_symbols());
             }
-            _ => {}
         }
 
         Self {
             source,
+            runner: runner_kind,
+            optimization_options: JsOptimizationOptions {
+                constant_folding: Some(true),
+                anf_transform: None,
+            },
             build: BuildArtifacts::default(),
             analyzer,
             js: CodegenJS::default(),
@@ -215,17 +255,103 @@ impl Tlang {
         }
 
         if let Some(ast) = self.ast() {
+            // Deep-clone the symbol tables so the lowering pass can mutate them
+            // (e.g. via `SymbolTable::shift()`) without corrupting the analyzer's
+            // state across multiple lowering invocations (e.g. when toggling
+            // optimisation options).
+            let symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>> = self
+                .analyzer
+                .symbol_tables()
+                .iter()
+                .map(|(&k, v)| (k, Rc::new(RefCell::new(v.borrow().clone()))))
+                .collect();
+            let root_symbol_table = symbol_tables
+                .get(&NodeId::new(1))
+                .cloned()
+                .unwrap_or_default();
+
             let (mut module, meta) = tlang_ast_lowering::lower_to_hir(
                 ast,
                 self.analyzer.symbol_id_allocator(),
-                self.analyzer.root_symbol_table(),
-                self.analyzer.symbol_tables().clone(),
+                root_symbol_table,
+                symbol_tables,
             );
-            let mut optimizer = HirOptimizer::default();
             let mut ctx = meta.into();
-            optimizer.optimize_hir(&mut module, &mut ctx);
+
+            match self.runner {
+                RunnerKind::JavaScript => {
+                    let anf_mode = self
+                        .optimization_options
+                        .anf_transform
+                        .as_deref()
+                        .unwrap_or("minimal");
+
+                    let mut passes: Vec<Box<dyn HirPass>> = match anf_mode {
+                        "full" => vec![Box::new(tlang_hir_opt::anf_transform::AnfTransform::<
+                            tlang_hir_opt::anf_transform::FullAnfFilter,
+                        >::default())],
+                        // "minimal" or any other value: use JS-specific filter
+                        _ => vec![Box::new(JsAnfTransform::default())],
+                    };
+
+                    passes.push(Box::new(
+                        tlang_hir_opt::symbol_resolution::SymbolResolution::default(),
+                    ));
+
+                    if self.optimization_options.constant_folding.unwrap_or(true) {
+                        passes.push(Box::new(
+                            tlang_hir_opt::constant_folding::ConstantFolding::default(),
+                        ));
+                    }
+
+                    let mut optimizer = JsHirOptimizer::new(passes);
+                    optimizer.optimize_hir(&mut module, &mut ctx);
+                }
+                RunnerKind::Interpreter => {
+                    let mut passes: Vec<Box<dyn HirPass>> = Vec::new();
+
+                    // Optional general ANF transform — off by default; reserved for
+                    // future bytecode compilation work.
+                    if self
+                        .optimization_options
+                        .anf_transform
+                        .as_deref()
+                        .unwrap_or("off")
+                        == "full"
+                    {
+                        passes.push(Box::new(tlang_hir_opt::anf_transform::AnfTransform::<
+                            tlang_hir_opt::anf_transform::FullAnfFilter,
+                        >::default()));
+                    }
+
+                    passes.push(Box::new(
+                        tlang_hir_opt::symbol_resolution::SymbolResolution::default(),
+                    ));
+
+                    if self.optimization_options.constant_folding.unwrap_or(true) {
+                        passes.push(Box::new(
+                            tlang_hir_opt::constant_folding::ConstantFolding::default(),
+                        ));
+                    }
+
+                    passes.push(Box::new(
+                        tlang_hir_opt::slot_allocation::SlotAllocation::default(),
+                    ));
+
+                    let mut optimizer = HirOptimizer::new(passes);
+                    optimizer.optimize_hir(&mut module, &mut ctx);
+                }
+            }
+
             self.build.hir = Some(module);
         }
+    }
+
+    #[wasm_bindgen(js_name = "setOptimizations")]
+    pub fn set_optimizations(&mut self, options: JsOptimizationOptions) {
+        self.optimization_options = options;
+        self.build.hir = None;
+        self.js = CodegenJS::default();
     }
 
     #[wasm_bindgen(js_name = "compileToJS")]

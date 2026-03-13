@@ -1,0 +1,15 @@
+---
+source: crates/tlang_hir_opt/tests/anf_transform.rs
+expression: "common::pretty_print(&hir)"
+---
+struct Point {
+    x: int,
+    y: int,
+}
+
+fn make_point() -> unknown {
+    let $anf$0: unknown = {x: 1, y: 2};
+    Point($anf$0)
+}
+let $anf$1: unknown = make_point();
+let x: unknown = $anf$1.x;

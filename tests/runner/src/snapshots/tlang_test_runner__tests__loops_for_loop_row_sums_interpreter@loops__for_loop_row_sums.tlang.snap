@@ -1,0 +1,9 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: apply_redactions(&output)
+input_file: tests/loops/for_loop_row_sums.tlang
+---
+6
+15
+24

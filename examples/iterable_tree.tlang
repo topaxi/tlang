@@ -1,0 +1,69 @@
+// Iterable Binary Search Tree
+// Demonstrates implementing the Iterable protocol for a custom data structure.
+// In-order traversal yields BST values in sorted order.
+
+enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+fn Tree.insert(Tree::Empty, value) {
+    Tree::Node { value: value, left: Tree::Empty, right: Tree::Empty }
+}
+fn Tree.insert(Tree::Node { value: node_val, left, right }, value) {
+    if value < node_val {
+        Tree::Node { value: node_val, left: left.insert(value), right }
+    } else if value > node_val {
+        Tree::Node { value: node_val, left, right: right.insert(value) }
+    } else {
+        Tree::Node { value: node_val, left, right }
+    }
+}
+
+// In-order traversal: left subtree, root, right subtree
+fn Tree.to_list(Tree::Empty) { [] }
+fn Tree.to_list(Tree::Node { value, left, right }) {
+    [...left, value, ...right]
+}
+
+// Make Tree iterable by delegating to the built-in List iterator
+impl Iterable for Tree {
+    fn iter(tree) {
+        Iterable::iter(tree.to_list())
+    }
+}
+
+// Build a BST
+let tree = Tree::Empty
+    .insert(5)
+    .insert(3)
+    .insert(7)
+    .insert(1)
+    .insert(4)
+    .insert(6)
+    .insert(2);
+
+// Iterate: in-order traversal yields sorted values
+log("Sorted values:");
+for x in tree {
+    x |> log();
+};
+
+// Sum all values using for-loop accumulator
+let total = for x in tree; with sum = 0 {
+    sum + x
+};
+log("Sum:");
+total |> log();
+
+// Collect even values
+let evens = for x in tree; with acc = [] {
+    if x % 2 == 0 { [...acc, x] } else { acc }
+};
+log("Even values:");
+evens |> log();
+
+// Spread tree directly into a list
+let sorted = [...tree];
+log("Spread into list:");
+sorted |> log();

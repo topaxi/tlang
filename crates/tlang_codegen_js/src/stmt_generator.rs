@@ -1,3 +1,4 @@
+use tlang_ast::token::Literal;
 use tlang_hir as hir;
 
 use crate::generator::{BlockContext, CodegenJS};
@@ -8,15 +9,33 @@ impl CodegenJS {
 
         match &statement.kind {
             hir::StmtKind::Expr(expr) => {
-                self.push_indent();
-                self.push_context(BlockContext::Statement);
-                self.generate_expr(expr, None);
-                self.pop_context();
+                // Self-referencing TailCall handles its own indentation and
+                // line breaks (it renders param reassignment + continue rec).
+                // Mutual TailCall is a regular call — rendered normally.
+                //
+                // Naked block in stmt position (e.g. synthesized by the ANF
+                // transform for break-value rewrites): inline its stmts
+                // without an extra push_indent(), since inner stmts manage
+                // their own indentation.
+                if let hir::ExprKind::Block(block) = &expr.kind {
+                    self.push_context(BlockContext::Statement);
+                    self.generate_block(block);
+                    self.pop_context();
+                } else if self.is_self_referencing_tail_call(expr) {
+                    self.push_context(BlockContext::Statement);
+                    self.generate_expr(expr, None);
+                    self.pop_context();
+                } else {
+                    self.push_indent();
+                    self.push_context(BlockContext::Statement);
+                    self.generate_expr(expr, None);
+                    self.pop_context();
 
-                if self.needs_semicolon(Some(expr)) {
-                    self.push_char(';');
+                    if self.needs_semicolon(Some(expr)) {
+                        self.push_char(';');
+                    }
+                    self.push_newline();
                 }
-                self.push_newline();
             }
             hir::StmtKind::Let(pattern, expression, _ty) => {
                 self.generate_variable_declaration(pattern, expression);
@@ -67,8 +86,16 @@ impl CodegenJS {
             self.current_scope()
                 .declare_variable_alias(name, &shadowed_name);
         }
-        self.push_let_declaration_to_expr(&var_name, value);
-        self.push_str(";\n");
+        // Emit `let foo;` for None-initialised ANF temporaries rather than
+        // `let foo = undefined;` — the JS engine implicitly initialises to
+        // `undefined` and the shorter form is cleaner output.
+        if matches!(&value.kind, hir::ExprKind::Literal(l) if **l == Literal::None) {
+            self.push_let_declaration(&var_name);
+            self.push_newline();
+        } else {
+            self.push_let_declaration_to_expr(&var_name, value);
+            self.push_str(";\n");
+        }
         self.current_scope().declare_variable_alias(name, &var_name);
         self.pop_context();
     }
@@ -125,16 +152,19 @@ impl CodegenJS {
 
     pub(crate) fn generate_protocol_declaration(&mut self, decl: &hir::ProtocolDeclaration) {
         let name = decl.name.as_str();
+        self.register_protocol(name);
+        let js_name = Self::protocol_js_name(name);
+
         self.push_indent();
         self.push_str("const ");
-        self.push_str(name);
+        self.push_str(&js_name);
         self.push_str(" = {};\n");
 
         // Generate dispatch function for each protocol method
         for method in &decl.methods {
             let method_name = method.name.as_str();
             self.push_indent();
-            self.push_str(name);
+            self.push_str(&js_name);
             self.push_char('.');
             self.push_str(method_name);
             self.push_str(" = function(self, ...args) {\n");
@@ -143,7 +173,7 @@ impl CodegenJS {
             self.push_str("const __type = Array.isArray(self) ? \"List\" : self?.constructor?.name ?? typeof self;\n");
             self.push_indent();
             self.push_str("return ");
-            self.push_str(name);
+            self.push_str(&js_name);
             self.push_str("[__type].");
             self.push_str(method_name);
             self.push_str("(self, ...args);\n");
@@ -156,10 +186,11 @@ impl CodegenJS {
     pub(crate) fn generate_impl_block(&mut self, impl_block: &hir::ImplBlock) {
         let protocol_name = impl_block.protocol_name.to_string();
         let target_type = impl_block.target_type.to_string();
+        let js_protocol_name = Self::protocol_js_name(&protocol_name);
 
         // Ensure protocol has a namespace for this type
         self.push_indent();
-        self.push_str(&protocol_name);
+        self.push_str(&js_protocol_name);
         self.push_char('.');
         self.push_str(&target_type);
         self.push_str(" = {};\n");
@@ -172,7 +203,7 @@ impl CodegenJS {
             };
 
             self.push_indent();
-            self.push_str(&protocol_name);
+            self.push_str(&js_protocol_name);
             self.push_char('.');
             self.push_str(&target_type);
             self.push_char('.');
@@ -196,7 +227,7 @@ impl CodegenJS {
             self.push_str(", \"");
             self.push_str(method_name);
             self.push_str("\", ");
-            self.push_str(&protocol_name);
+            self.push_str(&js_protocol_name);
             self.push_char('.');
             self.push_str(method_name);
             self.push_str(");\n");

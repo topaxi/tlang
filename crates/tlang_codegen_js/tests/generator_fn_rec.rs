@@ -77,8 +77,9 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_simple() {
     let expected_output = indoc! {"
         function factorial(n, acc) {
             rec:while (true) {
+                let $anf$0;
                 if (n === 0) {
-                    return acc;
+                    $anf$0 = acc;
                 } else {
                     let $tmp$0 = n - 1;
                     let $tmp$1 = n * acc;
@@ -86,6 +87,7 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_simple() {
                     acc = $tmp$1;
                     continue rec;
                 }
+                return $anf$0;
             }
         }
     "};
@@ -105,8 +107,9 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_convenient() {
         }
         function factorial$$2(n, acc) {
             rec:while (true) {
+                let $anf$0;
                 if (n === 0) {
-                    return acc;
+                    $anf$0 = acc;
                 } else {
                     let $tmp$0 = n - 1;
                     let $tmp$1 = n * acc;
@@ -114,6 +117,7 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_convenient() {
                     acc = $tmp$1;
                     continue rec;
                 }
+                return $anf$0;
             }
         }
         function factorial() {
@@ -141,10 +145,11 @@ fn test_tail_recursive_fibonacci() {
         }
         function fibonacci$$3(n, a, b) {
             rec:while (true) {
+                let $anf$0;
                 if (n === 0) {
-                    return a;
+                    $anf$0 = a;
                 } else if (n === 1) {
-                    return b;
+                    $anf$0 = b;
                 } else {
                     let $tmp$0 = n - 1;
                     let $tmp$1 = b;
@@ -154,6 +159,7 @@ fn test_tail_recursive_fibonacci() {
                     b = $tmp$2;
                     continue rec;
                 }
+                return $anf$0;
             }
         }
         function fibonacci() {
@@ -176,8 +182,9 @@ fn test_foldl_impl() {
     let expected_output = indoc! {"
         function foldl(arg0, acc, f) {
             rec:while (true) {
+                let $anf$0;
                 let x,xs;if (arg0.length === 0) {
-                    return acc;
+                    $anf$0 = acc;
                 } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
                     let $tmp$0 = xs;
                     let $tmp$1 = f(acc, x);
@@ -187,6 +194,7 @@ fn test_foldl_impl() {
                     f = $tmp$2;
                     continue rec;
                 }
+                return $anf$0;
             }
         }
     "};
@@ -211,22 +219,25 @@ fn test_partition_impl() {
     let expected_output = indoc! {"
         // partition(a[], fn(a) -> bool) -> (a[], a[])
         function partition$$2(list, predicate) {
+            let $anf$0;
             if (list.length === 0) {
                 // partition(a[], fn(a) -> bool) -> (a[], a[])
-                return [[], []];
+                $anf$0 = [[], []];
             } else {
-                return partition$$4(list, predicate, [], []);
+                $anf$0 = partition$$4(list, predicate, [], []);
             }
+            return $anf$0;
         }
         // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
         function partition$$4(list, predicate, satisfies, doesNotSatisfy) {
             rec:while (true) {
+                let $anf$1;
                 let x,xs;if (list.length === 0) {
                     // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
-                    return [satisfies, doesNotSatisfy];
+                    $anf$1 = [satisfies, doesNotSatisfy];
                 } else if (list.length >= 1 && (x = list[0], true) && (xs = list.slice(1), true)) {
-                    let partitionedSatisfies = predicate(x) ? [...satisfies, x] : satisfies;
-                    let partitionedDoesNotSatisfy = predicate(x) ? doesNotSatisfy : [...doesNotSatisfy, x];
+                    let partitionedSatisfies = predicate(x) ? [...$spread(satisfies), x] : satisfies;
+                    let partitionedDoesNotSatisfy = predicate(x) ? doesNotSatisfy : [...$spread(doesNotSatisfy), x];
                     let $tmp$0 = xs;
                     let $tmp$1 = predicate;
                     let $tmp$2 = partitionedSatisfies;
@@ -237,6 +248,7 @@ fn test_partition_impl() {
                     doesNotSatisfy = $tmp$3;
                     continue rec;
                 }
+                return $anf$1;
             }
         }
         function partition() {
@@ -268,11 +280,12 @@ fn test_all_impl() {
         // all(a[], fn(a) -> bool, bool) -> bool
         function all$$3(list, predicate, acc) {
             rec:while (true) {
+                let $anf$0;
                 let x,xs;if (list.length === 0) {
                     // all(a[], fn(a) -> bool, bool) -> bool
-                    return acc;
+                    $anf$0 = acc;
                 } else if (list.length >= 1 && (x = list[0], true) && !predicate(x)) {
-                    return false;
+                    $anf$0 = false;
                 } else if (list.length >= 1 && (xs = list.slice(1), true)) {
                     let $tmp$0 = xs;
                     let $tmp$1 = predicate;
@@ -282,6 +295,7 @@ fn test_all_impl() {
                     acc = $tmp$2;
                     continue rec;
                 }
+                return $anf$0;
             }
         }
         function all() {

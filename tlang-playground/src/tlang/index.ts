@@ -11,6 +11,7 @@ export {
   type CodemirrorDiagnostic,
   type Runner,
   type JsHirPrettyOptions,
+  type JsOptimizationOptions,
   type JsDiagnostic,
   type JsParseIssue,
   type JsSpan,

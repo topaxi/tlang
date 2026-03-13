@@ -138,11 +138,13 @@ fn test_maximum_depth_tree() {
             static Node = ({ left, right }) => Object.assign(new this, { tag: this.Node, left, right });
         }
         function maximum_depth(tree) {
+            let $anf$0;
             let left,right;if (tree.tag === Tree.Leaf) {
-                return 1;
+                $anf$0 = 1;
             } else if (tree.tag === Tree.Node && (left = tree.left, true) && (right = tree.right, true)) {
-                return 1 + Math.max(maximum_depth(left), maximum_depth(right));
+                $anf$0 = 1 + Math.max(maximum_depth(left), maximum_depth(right));
             }
+            return $anf$0;
         }
         function main() {
             let x = Tree.Node({
@@ -177,11 +179,13 @@ fn test_maximum_depth_tree_positional() {
             static Node = (left, right) => Object.assign(new this, { tag: this.Node, [0]: left, [1]: right });
         }
         function maximum_depth(tree) {
+            let $anf$0;
             let left,right;if (tree.tag === Tree.Leaf) {
-                return 1;
+                $anf$0 = 1;
             } else if (tree.tag === Tree.Node && (left = tree[0], true) && (right = tree[1], true)) {
-                return 1 + Math.max(maximum_depth(left), maximum_depth(right));
+                $anf$0 = 1 + Math.max(maximum_depth(left), maximum_depth(right));
             }
+            return $anf$0;
         }
     "};
     assert_eq!(output, expected_output);

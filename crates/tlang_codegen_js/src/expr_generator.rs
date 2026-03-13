@@ -105,7 +105,7 @@ impl CodegenJS {
             Literal::String(value) | Literal::Char(value) => {
                 self.generate_string_literal(value);
             }
-            Literal::None => unreachable!(),
+            Literal::None => self.push_str("undefined"),
         }
     }
 
@@ -120,13 +120,42 @@ impl CodegenJS {
         self.push_str(&format!("\"{escaped_value}\""));
     }
 
-    fn generate_block(&mut self, block: &hir::Block) {
+    pub(crate) fn generate_block(&mut self, block: &hir::Block) {
         self.push_scope();
 
         self.generate_statements(&block.stmts);
-        self.generate_optional_expr(block.expr.as_ref(), None);
+        self.generate_block_completion_as_stmt(block.expr.as_ref());
 
+        // Collect variables declared in this block before popping the scope.
+        // Since generate_block does not emit JS braces, all `let` declarations
+        // land at the same JS lexical level as the parent. We propagate them
+        // upward so that sibling blocks see them and `declare_variable` can
+        // produce unique names (e.g. `iterator$$` → `iterator$$$0`).
+        let locals = self.current_scope().local_variables().clone();
         self.pop_scope();
+        for (name, js_name) in locals {
+            self.current_scope().declare_variable_alias(&name, &js_name);
+        }
+    }
+
+    /// Emit a block completion as a statement, but only if it has side effects.
+    /// Pure expressions (Path, Literal) are ANF-introduced noops and are discarded.
+    fn generate_block_completion_as_stmt(&mut self, completion: Option<&hir::Expr>) {
+        if let Some(expr) = completion
+            && !matches!(
+                expr.kind,
+                hir::ExprKind::Path(_) | hir::ExprKind::Literal(_)
+            )
+        {
+            self.push_indent();
+            self.push_context(BlockContext::Statement);
+            self.generate_expr(expr, None);
+            self.pop_context();
+            if self.needs_semicolon(Some(expr)) {
+                self.push_char(';');
+            }
+            self.push_newline();
+        }
     }
 
     #[inline(always)]
@@ -147,44 +176,32 @@ impl CodegenJS {
             }
             hir::ExprKind::Block(block) => self.generate_block(block),
             hir::ExprKind::Loop(block) => {
-                self.push_str("(() => {");
-                self.push_newline();
-                self.inc_indent();
-                self.push_indent();
-
-                self.push_indent();
                 self.push_str("for (;;) {");
                 self.push_newline();
                 self.inc_indent();
 
                 for stmt in &block.stmts {
                     self.generate_stmt(stmt);
+                    self.flush_statement_buffer();
                 }
 
-                if block.has_completion() {
-                    self.generate_expr(block.expr.as_ref().unwrap(), None);
-                    self.push_char(';');
-                    self.push_newline();
-                }
+                // Emit the loop body's completion as a statement if it has
+                // side effects (e.g. `accumulator$$ = $anf$0` for accumulator
+                // for-loops). Pure Path/Literal completions are ANF noops.
+                self.generate_block_completion_as_stmt(block.expr.as_ref());
 
                 self.dec_indent();
                 self.push_indent();
                 self.push_char('}');
-                self.push_newline();
-
-                self.dec_indent();
-                self.push_indent();
-                self.push_str("})()");
             }
-            hir::ExprKind::Break(expr) => {
-                self.push_str("return");
-
-                if let Some(expr) = expr {
-                    self.push_char(' ');
-                    self.generate_expr(expr, parent_op);
+            hir::ExprKind::Break(value) => {
+                if let Some(value) = value {
+                    self.generate_expr(value, parent_op);
+                    self.push_char(';');
+                    self.push_newline();
+                    self.push_indent();
                 }
-
-                self.push_char(';');
+                self.push_str("break");
             }
             hir::ExprKind::Continue => self.push_str("continue"),
             hir::ExprKind::Call(expr) => self.generate_call_expression(expr),
@@ -221,7 +238,12 @@ impl CodegenJS {
         match op {
             ast::UnaryOp::Not => self.push_char('!'),
             ast::UnaryOp::Minus => self.push_char('-'),
-            ast::UnaryOp::Spread => self.push_str("..."),
+            ast::UnaryOp::Spread => {
+                self.push_str("...$spread(");
+                self.generate_expr(expr, None);
+                self.push_char(')');
+                return;
+            }
             ast::UnaryOp::Rest => unreachable!("Rest operator is not an operator but a pattern"),
         }
 
@@ -250,8 +272,16 @@ impl CodegenJS {
         }
 
         let first_segment = path.segments.first().unwrap();
+        let first_name = first_segment.ident.as_str();
 
-        self.generate_identifier(&first_segment.ident);
+        // Protocol objects are emitted with a `$` prefix to avoid collisions with
+        // native JS globals (e.g. `Iterator` is already a built-in in modern JS).
+        if self.is_protocol(first_name) {
+            self.push_str(&Self::protocol_js_name(first_name));
+        } else {
+            self.generate_identifier(&first_segment.ident);
+        }
+
         self.push_str(
             &path.segments[1..]
                 .iter()

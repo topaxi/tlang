@@ -1,0 +1,20 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: apply_redactions(&output)
+input_file: tests/structs/iterable_tree.tlang
+---
+Sorted values:
+1
+2
+3
+4
+5
+6
+7
+Sum:
+28
+Even values:
+[2, 4, 6]
+Spread into list:
+[1, 2, 3, 4, 5, 6, 7]

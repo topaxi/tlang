@@ -91,6 +91,11 @@ impl Scope {
         tmp_var_name
     }
 
+    /// Returns local variables declared in this scope (not inherited from parents).
+    pub(crate) fn local_variables(&self) -> &HashMap<String, String> {
+        &self.variables
+    }
+
     #[inline(always)]
     pub(crate) fn has_local_variable(&self, name: &str) -> bool {
         self.variables.contains_key(name)

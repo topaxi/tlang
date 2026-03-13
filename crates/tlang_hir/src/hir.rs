@@ -428,7 +428,7 @@ pub struct Block {
     pub hir_id: HirId,
     pub stmts: Vec<Stmt>,
     pub expr: Option<Expr>,
-    scope: HirScopeData,
+    pub scope: HirScopeData,
     pub span: Span,
 }
 

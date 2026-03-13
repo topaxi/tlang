@@ -1,0 +1,6 @@
+// Find the maximum value in a list using a for-loop accumulator
+let max_val = for x in [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]; with m = 0 {
+  if x > m { x } else { m }
+};
+
+max_val |> log();

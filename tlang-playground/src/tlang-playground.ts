@@ -8,19 +8,27 @@ import './components/t-codemirror';
 import './components/t-console';
 import './components/t-hir-pretty';
 import './components/t-live';
+import './components/t-menu';
+import './components/t-select';
 import './components/t-shortcuts';
 import './components/t-split';
 import './components/t-tabs';
 import { type TCodeMirror } from './components/t-codemirror';
 import { ConsoleElement, ConsoleMessage } from './components/t-console';
 import { FlashElement } from './components/t-flash';
+import { SelectElement } from './components/t-select';
 import { SplitElement, SplitEvent } from './components/t-split';
 import { compressSource, decompressSource } from './utils/lz';
-import { type Runner, type JsHirPrettyOptions } from './tlang';
+import {
+  type Runner,
+  type JsHirPrettyOptions,
+  type JsOptimizationOptions,
+} from './tlang';
 import { keyed } from 'lit/directives/keyed.js';
 import { live } from 'lit/directives/live.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { mediaQuery } from './decorators/media-query';
+import { floating } from './directives/floating';
 
 type OutputDisplay = 'ast' | 'hir' | 'hir' | 'javascript';
 
@@ -120,6 +128,68 @@ async function updateDisplayHashparam(display: string) {
   updateHashParam('display', display);
 }
 
+// Optimization options are serialized as comma-separated `key:value` pairs in
+// the `opt` hash param.  Only non-default values are stored to keep URLs clean.
+// Short keys:  cf → constantFolding,  anf → anfTransform
+function serializeOptimizations(options: JsOptimizationOptions): string {
+  let parts: string[] = [];
+
+  if (options.constantFolding === false) {
+    parts.push('cf:false');
+  }
+  if (options.anfTransform === 'full') {
+    parts.push('anf:full');
+  }
+
+  return parts.join(',');
+}
+
+function deserializeOptimizations(
+  raw: string | null,
+): JsOptimizationOptions | null {
+  if (!raw) return null;
+
+  const options: JsOptimizationOptions = {
+    constantFolding: true,
+    anfTransform: undefined,
+  };
+
+  for (const part of raw.split(',')) {
+    const [key, value] = part.split(':');
+
+    if (key === 'cf') {
+      options.constantFolding = value !== 'false';
+    } else if (key === 'anf') {
+      options.anfTransform = value;
+    }
+  }
+
+  return options;
+}
+
+function defaultOptimizationOptions(): JsOptimizationOptions {
+  const params = getHashParams();
+  return (
+    deserializeOptimizations(params.get('opt')) ?? {
+      constantFolding: true,
+      anfTransform: undefined,
+    }
+  );
+}
+
+function updateOptimizationsHashParam(options: JsOptimizationOptions) {
+  const params = getHashParams();
+  const serialized = serializeOptimizations(options);
+
+  if (serialized) {
+    params.set('opt', serialized);
+  } else {
+    params.delete('opt');
+  }
+
+  window.location.hash = params.toString();
+}
+
 @customElement('tlang-playground')
 export class TlangPlayground extends LitElement {
   static override styles = css`
@@ -156,6 +226,19 @@ export class TlangPlayground extends LitElement {
 
     .repo-link a:hover {
       text-decoration: underline;
+    }
+
+    .anf-mode {
+      display: flex;
+      align-items: center;
+    }
+
+    .anf-mode::before {
+      content: '\\00a0\\00a0';
+    }
+
+    .anf-mode > label {
+      margin-right: 0.25em;
     }
 
     .editor-split {
@@ -219,15 +302,22 @@ export class TlangPlayground extends LitElement {
 
   private get availableDisplayOptions(): OutputDisplay[] {
     if (this.runner === 'Interpreter') {
-      return ['hir', 'ast'];
+      return ['ast', 'hir'];
     } else {
-      return ['javascript', 'hir', 'ast'];
+      return ['ast', 'hir', 'javascript'];
     }
   }
 
   @state() runner: Runner = defaultRunner();
 
-  private tlang = new TlangController(this.source, this.runner);
+  @state() optimizationOptions: JsOptimizationOptions =
+    defaultOptimizationOptions();
+
+  private tlang = new TlangController(
+    this.source,
+    this.runner,
+    this.optimizationOptions,
+  );
 
   // The editor which the user can use to write code, as it's always rendered,
   // we cache the query selector.
@@ -279,31 +369,9 @@ export class TlangPlayground extends LitElement {
   protected override firstUpdated(
     _changedProperties: PropertyValueMap<this>,
   ): void {
-    let params = new URLSearchParams(window.location.hash.slice(1));
-
-    let exampleName = String(params.get('example'));
-
-    if (exampleName in examples) {
-      this.shadowRoot!.querySelector('select')!.value = exampleName;
-    }
-
     defaultSource().then((source) => {
       this.codemirror.source = source;
     });
-  }
-
-  protected override updated(changedProperties: PropertyValueMap<this>): void {
-    if (changedProperties.has('runner')) {
-      // TODO: This is a hack to update the select value. Lit doesn't seem to
-      //       be super happy about dynamically updated options.
-      let select =
-        this.shadowRoot?.querySelector<HTMLSelectElement>('.toolbar__display');
-
-      if (select) {
-        select.value = this.display;
-        updateDisplayHashparam(this.display);
-      }
-    }
   }
 
   private handleSourceChange(event: CustomEvent) {
@@ -311,14 +379,14 @@ export class TlangPlayground extends LitElement {
   }
 
   private handleExampleSelect(event: Event) {
-    const target = event.target as HTMLSelectElement;
+    const target = event.target as SelectElement;
     this.codemirror.source = examples[target.value];
     this.selectedExample = target.value;
     updateExampleHashparam(this.selectedExample);
   }
 
   private handleRunnerChange(event: Event) {
-    const target = event.target as HTMLSelectElement;
+    const target = event.target as SelectElement;
     this.runner = target.value as Runner;
 
     // When using the interpreter, showing the javascript output does not make
@@ -333,6 +401,27 @@ export class TlangPlayground extends LitElement {
   private handleDisplayChange(event: CustomEvent<{ id: string }>) {
     this.display = event.detail.id as OutputDisplay;
     updateDisplayHashparam(this.display);
+  }
+
+  private toggleOptimization(key: keyof JsOptimizationOptions) {
+    this.optimizationOptions = {
+      ...this.optimizationOptions,
+      [key]: !this.optimizationOptions[key],
+    };
+    this.tlang.setOptimizations(this.optimizationOptions);
+    updateOptimizationsHashParam(this.optimizationOptions);
+  }
+
+  private setOptimizationOption<K extends keyof JsOptimizationOptions>(
+    key: K,
+    value: JsOptimizationOptions[K],
+  ) {
+    this.optimizationOptions = {
+      ...this.optimizationOptions,
+      [key]: value,
+    };
+    this.tlang.setOptimizations(this.optimizationOptions);
+    updateOptimizationsHashParam(this.optimizationOptions);
   }
 
   private handleConsoleCollapse(event: CustomEvent<{ collapsed: boolean }>) {
@@ -402,16 +491,64 @@ export class TlangPlayground extends LitElement {
             >
               Run
             </t-button>
-            <select
+            <t-select
               class="toolbar__runner"
               @change=${this.handleRunnerChange}
               .value=${live(this.runner)}
             >
               <option value="Interpreter">Interpreter</option>
               <option value="JavaScript">Compiler (JS)</option>
-            </select>
+            </t-select>
+            <t-button
+              popovertarget="optimization-options"
+              aria-label="Optimization Settings"
+            >
+              
+            </t-button>
+            <t-menu id="optimization-options" popover=${floating()}>
+              <t-menuitem-checkbox
+                @change=${() => this.toggleOptimization('constantFolding')}
+                .checked=${this.optimizationOptions.constantFolding}
+              >
+                Constant folding
+              </t-menuitem-checkbox>
+              ${this.runner === 'Interpreter'
+                ? html`<t-menuitem-checkbox
+                    @change=${() =>
+                      this.setOptimizationOption(
+                        'anfTransform',
+                        this.optimizationOptions.anfTransform === 'full'
+                          ? undefined
+                          : 'full',
+                      )}
+                    .checked=${this.optimizationOptions.anfTransform === 'full'}
+                  >
+                    ANF transform
+                  </t-menuitem-checkbox>`
+                : html`<t-menuitem-group class="anf-mode">
+                    <label id="anf-mode__label">ANF</label>
+                    <t-menuitem-radio
+                      aria-labelledby="anf-mode__label"
+                      @click=${() =>
+                        this.setOptimizationOption('anfTransform', 'minimal')}
+                      .checked=${this.optimizationOptions.anfTransform !==
+                      'full'}
+                    >
+                      Minimal
+                    </t-menuitem-radio>
+                    <t-menuitem-radio
+                      aria-labelledby="anf-mode__label"
+                      @click=${() =>
+                        this.setOptimizationOption('anfTransform', 'full')}
+                      .checked=${this.optimizationOptions.anfTransform ===
+                      'full'}
+                    >
+                      Full
+                    </t-menuitem-radio>
+                  </t-menuitem-group>`}
+            </t-menu>
             <t-button @click=${this.share}>Share</t-button>
-            <select
+            <t-select
               class="toolbar__example"
               @change=${this.handleExampleSelect}
               .value=${live(this.selectedExample)}
@@ -421,7 +558,7 @@ export class TlangPlayground extends LitElement {
                 (key) => key,
                 (key) => html`<option>${key}</option>`,
               )}
-            </select>
+            </t-select>
             <t-button @click=${this.showKeyboardShortcuts} aria-label="Help">
               ?
             </t-button>
