@@ -444,7 +444,26 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                     .map(|arm| hir::MatchArm {
                         hir_id: arm.hir_id,
                         pat: arm.pat,
-                        guard: arm.guard.map(|g| self.normalize_expr(g)),
+                        guard: arm.guard.map(|g| {
+                            if let hir::ExprKind::Let(pat, inner) = g.kind {
+                                // Preserve let-guards as-is so that the codegen can handle
+                                // them via `generate_match_arm_guard`.  Lifting the Let node
+                                // would cause the pending declaration to be discarded when
+                                // the arm-block `fold_block` clears `self.pending`, leaving
+                                // an undeclared `$anf$N` reference in the condition.
+                                // Only normalise the inner RHS expression.
+                                hir::Expr {
+                                    hir_id: g.hir_id,
+                                    kind: hir::ExprKind::Let(
+                                        pat,
+                                        Box::new(self.normalize_expr(*inner)),
+                                    ),
+                                    span: g.span,
+                                }
+                            } else {
+                                self.normalize_expr(g)
+                            }
+                        }),
                         block: self.fold_block(arm.block),
                         pat_locals: arm.pat_locals,
                         leading_comments: arm.leading_comments,

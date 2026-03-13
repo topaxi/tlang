@@ -17,6 +17,7 @@ dist-ssr
 playwright-report
 test-results
 
+.vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store

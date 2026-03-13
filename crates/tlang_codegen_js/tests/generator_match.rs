@@ -262,13 +262,13 @@ fn test_codegen_pattern_match_let_guards() {
         };
     "});
     let expected_output = indoc! {"
-        let $anf$1;
-        let $tmp$0 = Option.Some(42),n;if ((n = $tmp$0, true) && $anf$0) {
-            $anf$1 = y;
+        let $anf$0;
+        let $tmp$0 = Option.Some(42),$tmp$1,n,y;if ((n = $tmp$0, true) && ($tmp$1 = n * 2, true) && $tmp$1.tag === Option.Some && (y = $tmp$1[0], true)) {
+            $anf$0 = y;
         } else {
-            $anf$1 = 0;
+            $anf$0 = 0;
         }
-        let x = $anf$1;
+        let x = $anf$0;
     "};
     assert_eq!(output, expected_output);
 }
