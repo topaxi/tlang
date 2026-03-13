@@ -7,9 +7,9 @@ use oxc_ast::ast::*;
 use oxc_codegen::{Codegen, CodegenOptions, IndentChar};
 use oxc_span::SPAN;
 
-use oxc_estree::{ESTree, PrettyJSSerializer};
 use crate::js_anf_transform::JsAnfTransform;
 use crate::scope::Scope;
+use oxc_estree::{ESTree, PrettyJSSerializer};
 use tlang_hir as hir;
 use tlang_hir_opt::hir_opt::{HirOptContext, HirPass};
 use tlang_span::{HirId, HirIdAllocator};
@@ -26,7 +26,6 @@ pub(crate) struct FunctionContext {
 pub struct CodegenJS {
     output: String,
     js_ast_json: String,
-    render_ternary: bool,
     protocol_names: HashSet<String>,
 }
 
@@ -47,13 +46,8 @@ impl CodegenJS {
         Self {
             output: String::new(),
             js_ast_json: String::new(),
-            render_ternary: true,
             protocol_names,
         }
-    }
-
-    pub fn set_render_ternary(&mut self, render_ternary: bool) {
-        self.render_ternary = render_ternary;
     }
 
     /// Returns the JS identifier for a protocol name, adding a `$` prefix
@@ -130,7 +124,7 @@ impl CodegenJS {
 
         let allocator = Allocator::default();
         let ast = AstBuilder::new(&allocator);
-        let mut inner = InnerCodegen::new(ast, self.render_ternary, self.protocol_names.clone());
+        let mut inner = InnerCodegen::new(ast, self.protocol_names.clone());
         let program = inner.generate_module(&module);
 
         let mut serializer = PrettyJSSerializer::new(false);
@@ -164,7 +158,6 @@ pub(crate) struct InnerCodegen<'a> {
     pub ast: AstBuilder<'a>,
     pub scopes: Scope,
     pub function_context_stack: Vec<FunctionContext>,
-    pub render_ternary: bool,
     pub protocol_names: HashSet<String>,
     /// Buffer of synthetic source text containing comment strings.
     /// OXC codegen reads comment content from Program.source_text using byte spans.
@@ -177,12 +170,11 @@ pub(crate) struct InnerCodegen<'a> {
 }
 
 impl<'a> InnerCodegen<'a> {
-    pub fn new(ast: AstBuilder<'a>, render_ternary: bool, protocol_names: HashSet<String>) -> Self {
+    pub fn new(ast: AstBuilder<'a>, protocol_names: HashSet<String>) -> Self {
         Self {
             ast,
             scopes: Scope::default(),
             function_context_stack: Vec::new(),
-            render_ternary,
             protocol_names,
             comment_source: String::new(),
             oxc_comments: Vec::new(),

@@ -140,10 +140,7 @@ fn test_if_else_if() {
 
 #[test]
 fn test_if_else_as_expression_as_fn_completion() {
-    let output = compile!(
-        "fn main() { if true { 1 } else { 2 } }",
-        CodegenOptions::default().render_ternary(false)
-    );
+    let output = compile!("fn main() { if true { 1 } else { 2 } }");
     let expected_output = indoc! {"
         function main() {
             return true ? 1 : 2;
@@ -154,10 +151,7 @@ fn test_if_else_as_expression_as_fn_completion() {
 
 #[test]
 fn test_if_else_as_expression() {
-    let output = compile!(
-        "fn main() { let result = if true { 1 } else { 2 }; }",
-        CodegenOptions::default().render_ternary(false)
-    );
+    let output = compile!("fn main() { let result = if true { 1 } else { 2 }; }");
     let expected_output = indoc! {"
         function main() {
             let result = true ? 1 : 2;
@@ -168,8 +162,7 @@ fn test_if_else_as_expression() {
 
 #[test]
 fn test_if_else_as_expression_nested() {
-    let output = compile!(
-        indoc! {"
+    let output = compile!(indoc! {"
         fn main() {
             let result = if true {
                 let x = if true { 1 } else { 2 };
@@ -179,9 +172,7 @@ fn test_if_else_as_expression_nested() {
                 5
             };
         }
-    "},
-        CodegenOptions::default().render_ternary(false)
-    );
+    "});
     let expected_output = indoc! {"
         function main() {
             let $anf$0;
