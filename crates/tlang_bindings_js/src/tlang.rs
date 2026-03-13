@@ -1,3 +1,7 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
+
 use serde::{Deserialize, Serialize};
 use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
@@ -10,7 +14,8 @@ use tlang_hir_pretty::{HirPretty, HirPrettyOptions};
 use tlang_parser::Parser;
 use tlang_parser::error::{ParseError, ParseIssue};
 use tlang_semantics::SemanticAnalyzer;
-use tlang_symbols::SymbolType;
+use tlang_span::NodeId;
+use tlang_symbols::{SymbolTable, SymbolType};
 use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
@@ -250,11 +255,26 @@ impl Tlang {
         }
 
         if let Some(ast) = self.ast() {
+            // Deep-clone the symbol tables so the lowering pass can mutate them
+            // (e.g. via `SymbolTable::shift()`) without corrupting the analyzer's
+            // state across multiple lowering invocations (e.g. when toggling
+            // optimisation options).
+            let symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>> = self
+                .analyzer
+                .symbol_tables()
+                .iter()
+                .map(|(&k, v)| (k, Rc::new(RefCell::new(v.borrow().clone()))))
+                .collect();
+            let root_symbol_table = symbol_tables
+                .get(&NodeId::new(1))
+                .cloned()
+                .unwrap_or_default();
+
             let (mut module, meta) = tlang_ast_lowering::lower_to_hir(
                 ast,
                 self.analyzer.symbol_id_allocator(),
-                self.analyzer.root_symbol_table(),
-                self.analyzer.symbol_tables().clone(),
+                root_symbol_table,
+                symbol_tables,
             );
             let mut ctx = meta.into();
 
