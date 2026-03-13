@@ -23,7 +23,7 @@ fn Tree.insert(Tree::Node { value: node_val, left, right }, value) {
 // In-order traversal: left subtree, root, right subtree
 fn Tree.to_list(Tree::Empty) { [] }
 fn Tree.to_list(Tree::Node { value, left, right }) {
-    [...left.to_list(), value, ...right.to_list()]
+    [...left, value, ...right]
 }
 
 // Make Tree iterable by delegating to the built-in List iterator

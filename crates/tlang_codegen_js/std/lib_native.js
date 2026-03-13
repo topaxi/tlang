@@ -43,8 +43,8 @@ $Iterator.ArrayIterator.next ??= function (self) {
   return Option.None;
 };
 
-function $collect_iterable(value) {
-  if (Array.isArray(value)) return value;
+function $spread(value) {
+  if (value[Symbol.iterator]) return value;
   const iter = $Iterable.iter(value);
   const result = [];
   for (;;) {

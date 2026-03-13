@@ -239,7 +239,7 @@ impl CodegenJS {
             ast::UnaryOp::Not => self.push_char('!'),
             ast::UnaryOp::Minus => self.push_char('-'),
             ast::UnaryOp::Spread => {
-                self.push_str("...$collect_iterable(");
+                self.push_str("...$spread(");
                 self.generate_expr(expr, None);
                 self.push_char(')');
                 return;
