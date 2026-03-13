@@ -51,12 +51,13 @@ fn test_codegen_pattern_match_expressions() {
     );
     let expected_output = indoc! {"
         let x = 42;
-        let $tmp$0;if (x === 42) {
-            $tmp$0 = 1;
+        let $anf$0;
+        if (x === 42) {
+            $anf$0 = 1;
         } else {
-            $tmp$0 = 0;
+            $anf$0 = 0;
         }
-        let y = $tmp$0;
+        let y = $anf$0;
     "};
 
     assert_eq!(output, expected_output);
@@ -76,12 +77,13 @@ fn test_codegen_pattern_match_blocks() {
     );
     let expected_output = indoc! {"
         let x = 42;
-        let $tmp$0;if (x === 42) {
-            $tmp$0 = 1;
+        let $anf$0;
+        if (x === 42) {
+            $anf$0 = 1;
         } else {
-            $tmp$0 = 0;
+            $anf$0 = 0;
         }
-        let y = $tmp$0;
+        let y = $anf$0;
     "};
 
     assert_eq!(output, expected_output);
@@ -99,7 +101,8 @@ fn test_codegen_pattern_match_list_bindings() {
     let expected_output = indoc! {"
         let x = 42;
         let $anf$0;
-        let $tmp$0 = [42, 43],x$0,y;if ($tmp$0.length >= 2 && (x$0 = $tmp$0[0], true) && (y = $tmp$0[1], true)) {
+        let $tmp$0 = [42, 43], x$0, y;
+        if ($tmp$0.length >= 2 && (x$0 = $tmp$0[0], true) && (y = $tmp$0[1], true)) {
             $anf$0 = x$0 + y;
         } else {
             $anf$0 = 0;
@@ -119,7 +122,8 @@ fn test_codegen_pattern_match_list_empty() {
     "});
     let expected_output = indoc! {"
         let $anf$0;
-        let $tmp$0 = [];if ($tmp$0.length === 0) {
+        let $tmp$0 = [];
+        if ($tmp$0.length === 0) {
             $anf$0 = 1;
         } else {
             $anf$0 = 0;
@@ -139,7 +143,14 @@ fn test_codegen_pattern_match_list_rest_elements() {
     "});
     let expected_output = indoc! {"
         let $anf$0;
-        let $tmp$0 = [1, 2, 3, 4, 5],n,rest;if ($tmp$0.length >= 1 && (n = $tmp$0[0], true) && (rest = $tmp$0.slice(1), true)) {
+        let $tmp$0 = [
+            1,
+            2,
+            3,
+            4,
+            5
+        ], n, rest;
+        if ($tmp$0.length >= 1 && (n = $tmp$0[0], true) && (rest = $tmp$0.slice(1), true)) {
             $anf$0 = n + rest.length;
         } else {
             $anf$0 = 0;
@@ -159,7 +170,8 @@ fn test_codegen_pattern_match_enum_bindings() {
     "});
     let expected_output = indoc! {"
         let $anf$0;
-        let $tmp$0 = Option.Some(42),x;if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
+        let $tmp$0 = Option.Some(42), x;
+        if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
             $anf$0 = x;
         } else {
             $anf$0 = 0;
@@ -190,12 +202,20 @@ fn test_codegen_pattern_match_positional_enum() {
             tag = this;
             [0];
             [1];
-            static Value = (int) => Object.assign(new this, { tag: this.Value, [0]: int });
-            static Add = (lhs, rhs) => Object.assign(new this, { tag: this.Add, [0]: lhs, [1]: rhs });
+            static Value = (int) => Object.assign(new this(), {
+                tag: this.Value,
+                0: int
+            });
+            static Add = (lhs, rhs) => Object.assign(new this(), {
+                tag: this.Add,
+                0: lhs,
+                1: rhs
+            });
         }
         let expr = Expr.Value(42);
         let $anf$0;
-        let x,y;if (expr.tag === Expr.Value && (x = expr[0], true)) {
+        let x, y;
+        if (expr.tag === Expr.Value && (x = expr[0], true)) {
             $anf$0 = x;
         } else if (expr.tag === Expr.Add && (x = expr[0], true) && (y = expr[1], true)) {
             $anf$0 = x + y;
@@ -221,7 +241,8 @@ fn test_codegen_pattern_match_nested_enum() {
     let expected_output = indoc! {"
         let x = 42;
         let $anf$0;
-        let $tmp$0 = Option.Some(Option.Some(42)),x$0;if ($tmp$0.tag === Option.Some && $tmp$0[0].tag === Option.Some && (x$0 = $tmp$0[0][0], true)) {
+        let $tmp$0 = Option.Some(Option.Some(42)), x$0;
+        if ($tmp$0.tag === Option.Some && $tmp$0[0].tag === Option.Some && (x$0 = $tmp$0[0][0], true)) {
             $anf$0 = x$0;
         } else if ($tmp$0.tag === Option.Some && $tmp$0[0].tag === Option.None) {
             $anf$0 = 0;
@@ -243,7 +264,8 @@ fn test_codegen_pattern_match_guards() {
     "});
     let expected_output = indoc! {"
         let $anf$0;
-        let $tmp$0 = 42,n;if ((n = $tmp$0, true) && n > 0) {
+        let $tmp$0 = 42, n;
+        if ((n = $tmp$0, true) && n > 0) {
             $anf$0 = 1;
         } else {
             $anf$0 = 0;
@@ -263,7 +285,8 @@ fn test_codegen_pattern_match_let_guards() {
     "});
     let expected_output = indoc! {"
         let $anf$0;
-        let $tmp$0 = Option.Some(42),$tmp$1,n,y;if ((n = $tmp$0, true) && ($tmp$1 = n * 2, true) && $tmp$1.tag === Option.Some && (y = $tmp$1[0], true)) {
+        let $tmp$0 = Option.Some(42), $tmp$1, n, y;
+        if ((n = $tmp$0, true) && ($tmp$1 = n * 2, true) && $tmp$1.tag === Option.Some && (y = $tmp$1[0], true)) {
             $anf$0 = y;
         } else {
             $anf$0 = 0;

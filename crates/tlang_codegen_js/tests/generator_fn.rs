@@ -139,7 +139,8 @@ fn test_recursive_sum() {
     let expected_output = indoc! {"
         function sum(arg0) {
             let $anf$0;
-            let x,xs;if (arg0.length === 0) {
+            let x, xs;
+            if (arg0.length === 0) {
                 $anf$0 = 0;
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
                 $anf$0 = x + sum(xs);
@@ -159,7 +160,8 @@ fn test_recursive_map() {
     let expected_output = indoc! {"
         function map(arg0, f) {
             let $anf$0;
-            let x,xs;if (arg0.length === 0) {
+            let x, xs;
+            if (arg0.length === 0) {
                 $anf$0 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
                 $anf$0 = [f(x), ...$spread(map(xs, f))];
@@ -180,7 +182,8 @@ fn test_function_declarations_with_guard() {
     let expected_output = indoc! {"
         function filter(arg0, f) {
             let $anf$0;
-            let x,xs;if (arg0.length === 0) {
+            let x, xs;
+            if (arg0.length === 0) {
                 $anf$0 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && f(x)) {
                 $anf$0 = [x, ...$spread(filter(xs, f))];
@@ -203,7 +206,8 @@ fn test_function_declarations_with_if_let_guard() {
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
             let $anf$0;
-            let $tmp$0,x,xs,y;if (arg0.length === 0) {
+            let $tmp$0, x, xs, y;
+            if (arg0.length === 0) {
                 $anf$0 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && (y = $tmp$0, true)) {
                 $anf$0 = [y, ...$spread(filter_map(xs, f))];
@@ -226,7 +230,8 @@ fn test_function_declarations_with_if_let_guard_enum() {
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
             let $anf$0;
-            let $tmp$0,x,xs,y;if (arg0.length === 0) {
+            let $tmp$0, x, xs, y;
+            if (arg0.length === 0) {
                 $anf$0 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && $tmp$0.tag === Option.Some && (y = $tmp$0[0], true)) {
                 $anf$0 = [y, ...$spread(filter_map(xs, f))];
@@ -249,7 +254,8 @@ fn test_function_declarations_with_if_let_guard_named_fields_enum() {
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
             let $anf$0;
-            let $tmp$0,x,xs,value;if (arg0.length === 0) {
+            let $tmp$0, x, xs, value;
+            if (arg0.length === 0) {
                 $anf$0 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && $tmp$0.tag === Option.Some && (value = $tmp$0.value, true)) {
                 $anf$0 = [value, ...$spread(filter_map(xs, f))];
@@ -278,7 +284,8 @@ fn test_function_declarations_with_comments_inbetween() {
         // Comment 3
         function filter_map(arg0, f) {
             let $anf$0;
-            let $tmp$0,x,xs,value;if (arg0.length === 0) {
+            let $tmp$0, x, xs, value;
+            if (arg0.length === 0) {
                 // Comment 1
                 $anf$0 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && $tmp$0.tag === Option.Some && (value = $tmp$0.value, true)) {
@@ -362,7 +369,11 @@ fn test_function_reuse_param_name_with_pattern() {
                 let list$0 = [...$spread(list.slice(0, pivotIndex)), ...$spread(list.slice(pivotIndex + 1))];
                 let smaller = filter(list$0, (y) => y <= pivot);
                 let greater = filter(list$0, (y) => y > pivot);
-                $anf$0 = [...$spread(quicksort(smaller)), pivot, ...$spread(quicksort(greater))];
+                $anf$0 = [
+                    ...$spread(quicksort(smaller)),
+                    pivot,
+                    ...$spread(quicksort(greater))
+                ];
             }
             return $anf$0;
         }

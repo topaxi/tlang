@@ -1,179 +1,362 @@
 use std::collections::HashSet;
 
+use oxc_ast::NONE;
+use oxc_ast::ast::*;
+use oxc_span::SPAN;
 use tlang_hir as hir;
 
-use crate::generator::{BlockContext, CodegenJS};
+use crate::generator::InnerCodegen;
 
-#[derive(Debug, Default)]
-pub(crate) struct MatchContextStack(Vec<MatchContext>);
+/// Represents an access path into a match subject value.
+/// Used to build OXC expressions for nested pattern access without cloning expressions.
+#[derive(Clone, Debug)]
+enum AccessPath {
+    Ident(String),
+    Field(Box<AccessPath>, String),
+    Index(Box<AccessPath>, usize),
+    Slice(Box<AccessPath>, usize),
+}
 
-impl MatchContextStack {
-    fn push(&mut self, context: MatchContext) {
-        self.0.push(context);
+impl<'a> InnerCodegen<'a> {
+    fn access_path_to_expr(&self, path: &AccessPath) -> Expression<'a> {
+        match path {
+            AccessPath::Ident(name) => self.ident_expr(name),
+            AccessPath::Field(base, field) => {
+                let obj = self.access_path_to_expr(base);
+                self.static_member_expr(obj, field)
+            }
+            AccessPath::Index(base, idx) => {
+                let obj = self.access_path_to_expr(base);
+                let index = self.num_expr(*idx as f64);
+                self.computed_member_expr(obj, index)
+            }
+            AccessPath::Slice(base, start) => {
+                let obj = self.access_path_to_expr(base);
+                let start_expr = self.num_expr(*start as f64);
+                self.call_expr(
+                    self.static_member_expr(obj, "slice"),
+                    vec![Argument::from(start_expr)],
+                )
+            }
+        }
     }
 
-    fn pop(&mut self) -> Option<MatchContext> {
-        self.0.pop()
+    pub fn generate_match_stmts(
+        &mut self,
+        expr: &hir::Expr,
+        arms: &[hir::MatchArm],
+    ) -> Vec<Statement<'a>> {
+        let mut result = Vec::new();
+        let mut declarators = Vec::new();
+
+        // 1. Determine match value binding and fixed list context
+        let (match_value_name, fixed_list_idents) = match &expr.kind {
+            hir::ExprKind::Path(path) => {
+                let name = self
+                    .current_scope()
+                    .resolve_variable(path.first_ident().as_str())
+                    .expect("Match expression identifier not found");
+                (name, None)
+            }
+            hir::ExprKind::List(exprs)
+                if !exprs.is_empty() && exprs.iter().all(|e| e.is_path()) =>
+            {
+                let idents: Vec<String> = exprs
+                    .iter()
+                    .map(|e| {
+                        let ident = e.path().unwrap().first_ident();
+                        self.current_scope()
+                            .resolve_variable(ident.as_str())
+                            .unwrap_or_else(|| ident.to_string())
+                    })
+                    .collect();
+                (String::new(), Some(idents))
+            }
+            _ => {
+                let tmp = self.current_scope().declare_tmp_variable();
+                let val = self.generate_expr(expr);
+                declarators.push(self.ast.variable_declarator(
+                    SPAN,
+                    VariableDeclarationKind::Let,
+                    self.binding_pattern_ident(&tmp),
+                    NONE,
+                    Some(val),
+                    false,
+                ));
+                (tmp, None)
+            }
+        };
+
+        // 2. Let guard variable
+        let let_guard_var = if arms.iter().any(|arm| arm.has_let_guard()) {
+            let var = self.current_scope().declare_tmp_variable();
+            declarators.push(self.ast.variable_declarator(
+                SPAN,
+                VariableDeclarationKind::Let,
+                self.binding_pattern_ident(&var),
+                NONE,
+                None,
+                false,
+            ));
+            var
+        } else {
+            String::new()
+        };
+
+        // 3. Collect and declare all pattern identifiers
+        let mut seen = HashSet::new();
+        let all_pat_idents: Vec<String> = arms
+            .iter()
+            .flat_map(|arm| {
+                let mut idents = get_pat_identifiers(&arm.pat);
+                if let Some(guard) = &arm.guard
+                    && let hir::ExprKind::Let(pat, _) = &guard.kind
+                {
+                    idents.extend(get_pat_identifiers(pat));
+                }
+                idents
+            })
+            .collect();
+
+        let filtered: Vec<String> = all_pat_idents
+            .into_iter()
+            .filter(|ident| match &fixed_list_idents {
+                Some(idents) => !idents.contains(ident),
+                None => ident != &match_value_name,
+            })
+            .filter(|ident| seen.insert(ident.clone()))
+            .collect();
+
+        for ident in &filtered {
+            let binding = self.current_scope().declare_variable(ident);
+            declarators.push(self.ast.variable_declarator(
+                SPAN,
+                VariableDeclarationKind::Let,
+                self.binding_pattern_ident(&binding),
+                NONE,
+                None,
+                false,
+            ));
+        }
+
+        // Emit combined let declaration
+        if !declarators.is_empty() {
+            result.push(Statement::VariableDeclaration(
+                self.ast.alloc_variable_declaration(
+                    SPAN,
+                    VariableDeclarationKind::Let,
+                    self.ast.vec_from_iter(declarators),
+                    false,
+                ),
+            ));
+        }
+
+        // 4. Generate if/else chain
+        let root = AccessPath::Ident(match_value_name);
+        if let Some(stmt) =
+            self.generate_match_arms_chain(expr, arms, &root, &fixed_list_idents, &let_guard_var)
+        {
+            result.push(stmt);
+        }
+
+        result
     }
 
-    fn last(&self) -> Option<&MatchContext> {
-        self.0.last()
-    }
+    fn generate_match_arms_chain(
+        &mut self,
+        expr: &hir::Expr,
+        arms: &[hir::MatchArm],
+        root: &AccessPath,
+        fixed_list_idents: &Option<Vec<String>>,
+        let_guard_var: &str,
+    ) -> Option<Statement<'a>> {
+        if arms.is_empty() {
+            return None;
+        }
 
-    fn fixed_list(&self) -> bool {
-        self.last()
-            .is_some_and(|context| matches!(context, MatchContext::ListOfIdentifiers(_)))
-    }
+        let arm = &arms[0];
+        let remaining = &arms[1..];
 
-    fn get_fixed_list_identifier(&self, index: usize) -> Option<&String> {
-        self.last().and_then(|context| {
-            if let MatchContext::ListOfIdentifiers(identifiers) = context {
-                identifiers.get(index)
+        let no_cond_need = arm.pat.is_wildcard() || expr_idents_match_pat_idents(expr, &arm.pat);
+        let need_cond = arm.guard.is_some() || arm.pat.is_empty_list();
+
+        let mut body_stmts = self.generate_block_stmts_scoped(&arm.block);
+        // Attach match arm comments to first body statement
+        if !arm.leading_comments.is_empty()
+            && let Some(first) = body_stmts.first_mut()
+        {
+            self.attach_leading_comments(first, &arm.leading_comments);
+        }
+        let body = self.block_stmt(body_stmts);
+
+        if !no_cond_need || need_cond {
+            let mut conditions: Vec<Expression<'a>> = Vec::new();
+
+            if let Some(pat_cond) =
+                self.generate_pat_condition(&arm.pat, true, root, fixed_list_idents)
+            {
+                conditions.push(pat_cond);
+            }
+
+            if let Some(guard) = &arm.guard {
+                let guard_cond = self.generate_match_arm_guard_expr(guard, let_guard_var);
+                conditions.push(guard_cond);
+            }
+
+            let test = if conditions.is_empty() {
+                self.bool_expr(true)
             } else {
-                None
-            }
-        })
-    }
-}
+                let mut combined = conditions.remove(0);
+                for cond in conditions {
+                    combined =
+                        self.ast
+                            .expression_logical(SPAN, combined, LogicalOperator::And, cond);
+                }
+                combined
+            };
 
-#[derive(Debug)]
-enum MatchContext {
-    Dynamic,
-    Identifier(String),
-    ListOfIdentifiers(Vec<String>),
-}
+            let alternate = self.generate_match_arms_chain(
+                expr,
+                remaining,
+                root,
+                fixed_list_idents,
+                let_guard_var,
+            );
 
-fn match_args_have_completions(arms: &[hir::MatchArm]) -> bool {
-    arms.iter().any(|arm| arm.block.has_completion())
-}
-
-impl CodegenJS {
-    fn generate_match_arm_block(&mut self, block: &hir::Block) {
-        self.flush_statement_buffer();
-        if !block.stmts.is_empty() {
-            self.generate_block_expression(block);
-        } else if self.current_completion_variable() == Some("return") {
-            if block.expr.as_ref().is_some_and(|expr| expr.is_tail_call()) {
-                self.generate_block_expression(block);
-            } else if let Some(expr) = &block.expr {
-                self.push_indent();
-                self.push_str("return ");
-                self.generate_expr(expr, None);
-                self.push_str(";\n");
-            }
-        } else if let Some(expr) = &block.expr {
-            self.push_indent();
-            self.push_current_completion_variable();
-            self.push_str(" = ");
-            self.generate_expr(expr, None);
-            self.push_str(";\n");
+            Some(self.ast.statement_if(SPAN, test, body, alternate))
+        } else {
+            // No condition needed (wildcard or matching identifiers)
+            Some(body)
         }
     }
 
-    fn get_pat_identifiers(pattern: &hir::Pat) -> Vec<String> {
-        match &pattern.kind {
-            hir::PatKind::Identifier(_, ident_pattern) => {
-                vec![ident_pattern.to_string()]
-            }
-            hir::PatKind::Enum(_path, patterns) => {
-                let mut bindings = Vec::new();
-                for (_ident, pattern) in patterns {
-                    bindings.extend(Self::get_pat_identifiers(pattern));
-                }
-                bindings
-            }
-            hir::PatKind::Literal(_) => Vec::new(),
-            hir::PatKind::List(patterns) => {
-                let mut bindings = Vec::new();
-                for pattern in patterns {
-                    bindings.extend(Self::get_pat_identifiers(pattern));
-                }
-                bindings
-            }
-            hir::PatKind::Rest(pattern) => Self::get_pat_identifiers(pattern),
-            hir::PatKind::Wildcard => Vec::new(),
-        }
-    }
-
-    fn generate_pat_condition(&mut self, pat: &hir::Pat, root_pat: bool, parent_js_expr: &str) {
+    fn generate_pat_condition(
+        &mut self,
+        pat: &hir::Pat,
+        root_pat: bool,
+        access: &AccessPath,
+        fixed_list_idents: &Option<Vec<String>>,
+    ) -> Option<Expression<'a>> {
         match &pat.kind {
             hir::PatKind::Identifier(_, ident_pattern) => {
-                // If you ended up here due to a `somevar = somevar`, we shouldn't have rendered
-                // the match arm condition in the first place.
                 let binding_name = self
                     .current_scope()
                     .resolve_variable(ident_pattern.as_str())
                     .unwrap();
 
-                self.push_char('(');
-                self.push_str(&binding_name);
-                self.push_str(" = ");
-                self.push_str(parent_js_expr);
-                self.push_str(", true)");
+                let parent_expr = self.access_path_to_expr(access);
+                let assign =
+                    self.assign_expr(self.assignment_target_ident(&binding_name), parent_expr);
+                // (binding = parent, true)
+                Some(self.ast.expression_sequence(
+                    SPAN,
+                    self.ast.vec_from_iter([assign, self.bool_expr(true)]),
+                ))
             }
+
             hir::PatKind::Enum(path, patterns) => {
-                self.push_str(parent_js_expr);
-                self.push_str(".tag === ");
+                let parent_expr = self.access_path_to_expr(access);
+                let tag_access = self.static_member_expr(parent_expr, "tag");
                 let resolved = self
                     .current_scope()
                     .resolve_variable(&path.to_string())
                     .unwrap_or_else(|| path.join("."));
-                self.push_str(&resolved);
+
+                let mut cond = self.ast.expression_binary(
+                    SPAN,
+                    tag_access,
+                    BinaryOperator::StrictEquality,
+                    self.ident_expr(&resolved),
+                );
 
                 for (ident, pattern) in patterns.iter().filter(|(_, pat)| !pat.is_wildcard()) {
-                    self.push_str(" && ");
-
-                    let parent_js_expr = if ident.as_str().chars().all(char::is_numeric) {
-                        parent_js_expr.to_string() + "[" + ident.as_str() + "]"
+                    let sub_access = if ident.as_str().chars().all(char::is_numeric) {
+                        let idx = ident.as_str().parse::<usize>().unwrap();
+                        AccessPath::Index(Box::new(access.clone()), idx)
                     } else {
-                        parent_js_expr.to_string() + "." + ident.as_str()
+                        AccessPath::Field(Box::new(access.clone()), ident.to_string())
                     };
 
-                    self.generate_pat_condition(pattern, false, &parent_js_expr);
+                    if let Some(sub_cond) =
+                        self.generate_pat_condition(pattern, false, &sub_access, fixed_list_idents)
+                    {
+                        cond =
+                            self.ast
+                                .expression_logical(SPAN, cond, LogicalOperator::And, sub_cond);
+                    }
                 }
+
+                Some(cond)
             }
+
             hir::PatKind::Literal(literal) => {
-                self.push_str(parent_js_expr);
-                self.push_str(" === ");
-                self.generate_literal(literal);
+                let parent_expr = self.access_path_to_expr(access);
+                let lit = self.generate_literal(literal);
+                Some(self.ast.expression_binary(
+                    SPAN,
+                    parent_expr,
+                    BinaryOperator::StrictEquality,
+                    lit,
+                ))
             }
+
             hir::PatKind::List(patterns) if patterns.is_empty() => {
-                self.push_str(parent_js_expr);
-                self.push_str(".length === 0");
+                let parent_expr = self.access_path_to_expr(access);
+                let length = self.static_member_expr(parent_expr, "length");
+                Some(self.ast.expression_binary(
+                    SPAN,
+                    length,
+                    BinaryOperator::StrictEquality,
+                    self.num_expr(0.0),
+                ))
             }
+
             hir::PatKind::List(patterns) => {
-                if root_pat && self.match_context_stack.fixed_list() {
-                    let mut push_and = false;
+                // Optimization: when matching against a list of identifiers,
+                // use the identifiers directly
+                if root_pat && fixed_list_idents.is_some() {
+                    let idents = fixed_list_idents.as_ref().unwrap();
+                    let mut cond: Option<Expression<'a>> = None;
+
                     for (i, pattern) in patterns.iter().enumerate() {
                         if pattern.is_wildcard() || pattern.is_ident() {
                             continue;
                         }
 
-                        if push_and {
-                            self.push_str(" && ");
-                        } else {
-                            push_and = true;
+                        let sub_access = AccessPath::Ident(idents[i].clone());
+                        if let Some(sub_cond) = self.generate_pat_condition(
+                            pattern,
+                            false,
+                            &sub_access,
+                            fixed_list_idents,
+                        ) {
+                            cond = Some(match cond {
+                                Some(c) => self.ast.expression_logical(
+                                    SPAN,
+                                    c,
+                                    LogicalOperator::And,
+                                    sub_cond,
+                                ),
+                                None => sub_cond,
+                            });
                         }
-
-                        let parent_js_expr = self
-                            .match_context_stack
-                            .get_fixed_list_identifier(i)
-                            .unwrap()
-                            .clone();
-
-                        self.generate_pat_condition(pattern, false, &parent_js_expr);
                     }
-                    return;
+
+                    return cond;
                 }
 
-                self.push_str(parent_js_expr);
-                self.push_str(".length >= ");
-                self.push_str(
-                    &patterns
-                        .iter()
-                        .filter(|pat| !matches!(pat.kind, hir::PatKind::Rest(_)))
-                        .count()
-                        .to_string(),
+                let parent_expr = self.access_path_to_expr(access);
+                let length = self.static_member_expr(parent_expr, "length");
+                let min_len = patterns
+                    .iter()
+                    .filter(|p| !matches!(p.kind, hir::PatKind::Rest(_)))
+                    .count();
+
+                let mut cond = self.ast.expression_binary(
+                    SPAN,
+                    length,
+                    BinaryOperator::GreaterEqualThan,
+                    self.num_expr(min_len as f64),
                 );
 
                 for (i, pattern) in patterns.iter().enumerate() {
@@ -181,279 +364,69 @@ impl CodegenJS {
                         continue;
                     }
 
-                    self.push_str(" && ");
-                    // This feels awkward, could this be handled when we match the Rest pattern
-                    // below?
-                    let parent_js_expr = if matches!(pattern.kind, hir::PatKind::Rest(_)) {
-                        parent_js_expr.to_string() + ".slice(" + &i.to_string() + ")"
+                    let sub_access = if matches!(pattern.kind, hir::PatKind::Rest(_)) {
+                        AccessPath::Slice(Box::new(access.clone()), i)
                     } else {
-                        parent_js_expr.to_string() + "[" + &i.to_string() + "]"
+                        AccessPath::Index(Box::new(access.clone()), i)
                     };
-                    self.generate_pat_condition(pattern, false, &parent_js_expr);
+
+                    if let Some(sub_cond) =
+                        self.generate_pat_condition(pattern, false, &sub_access, fixed_list_idents)
+                    {
+                        cond =
+                            self.ast
+                                .expression_logical(SPAN, cond, LogicalOperator::And, sub_cond);
+                    }
                 }
+
+                Some(cond)
             }
+
             hir::PatKind::Rest(pattern) => {
-                self.generate_pat_condition(pattern, false, parent_js_expr);
+                self.generate_pat_condition(pattern, false, access, fixed_list_idents)
             }
-            hir::PatKind::Wildcard => {}
+
+            hir::PatKind::Wildcard => None,
         }
     }
 
-    fn setup_match_completion_variables(&mut self, arms: &[hir::MatchArm]) -> (String, bool) {
-        let mut lhs = self.replace_statement_buffer_with_empty_string();
-        let has_block_completions =
-            self.current_context() == BlockContext::Expression && match_args_have_completions(arms);
-
-        if has_block_completions {
-            // Note: We check if we can reuse the existing completion variable ("return")
-            // instead of creating a new temporary variable each time.
-            if self.can_reuse_current_completion_variable() {
-                self.push_completion_variable(Some("return"));
-                lhs = self.replace_statement_buffer_with_empty_string();
-                (lhs, false)
-            } else {
-                let completion_tmp_var = self.current_scope().declare_tmp_variable();
-                self.push_indent();
-                self.push_str("let ");
-                self.push_str(&completion_tmp_var);
-                self.push_completion_variable(Some(&completion_tmp_var));
-                (lhs, true)
-            }
-        } else {
-            self.push_completion_variable(None);
-            (lhs, false)
-        }
-    }
-
-    fn setup_match_context(&mut self, expr: &hir::Expr) {
-        match &expr.kind {
-            hir::ExprKind::Path(path) => {
-                let match_context_identifier = self
-                    .current_scope()
-                    .resolve_variable(path.first_ident().as_str())
-                    .expect("Match expression identifier not found");
-
-                self.match_context_stack
-                    .push(MatchContext::Identifier(match_context_identifier));
-            }
-            hir::ExprKind::List(exprs)
-                if !exprs.is_empty() && exprs.iter().all(|expr| expr.is_path()) =>
-            {
-                let identifiers: Vec<String> = exprs
-                    .iter()
-                    .map(|expr| {
-                        let ident = expr.path().unwrap().first_ident();
-                        self.current_scope()
-                            .resolve_variable(ident.as_str())
-                            .unwrap_or_else(|| ident.to_string())
-                    })
-                    .collect();
-                self.match_context_stack
-                    .push(MatchContext::ListOfIdentifiers(identifiers));
-            }
-            _ => {
-                self.match_context_stack.push(MatchContext::Dynamic);
-            }
-        }
-    }
-
-    fn setup_match_value_binding(&mut self, expr: &hir::Expr, has_let: &mut bool) -> String {
-        match self.match_context_stack.last() {
-            Some(MatchContext::Identifier(identifier)) => identifier.clone(),
-            Some(MatchContext::ListOfIdentifiers(_)) => String::new(), // ohoh...
-            _ => {
-                let match_value_binding = self.current_scope().declare_tmp_variable();
-
-                if *has_let {
-                    self.push_char(',');
-                    self.push_str(&match_value_binding);
-                    self.push_str(" = ");
-                    self.generate_expr(expr, None);
-                } else {
-                    self.push_let_declaration_to_expr(&match_value_binding, expr);
-                    *has_let = true;
-                }
-
-                match_value_binding
-            }
-        }
-    }
-
-    fn setup_let_guard_variable(&mut self, arms: &[hir::MatchArm], has_let: &mut bool) -> String {
-        if arms.iter().any(|arm| arm.has_let_guard()) {
-            if *has_let {
-                self.push_char(',');
-            } else {
-                self.push_indent();
-                self.push_str("let ");
-                *has_let = true;
-            }
-            let binding = self.current_scope().declare_tmp_variable();
-            self.push_str(&binding);
-            binding
-        } else {
-            String::new()
-        }
-    }
-
-    fn setup_pattern_identifiers(&mut self, arms: &[hir::MatchArm], has_let: &mut bool) {
-        let mut unique = HashSet::new();
-        // There's optimization opportunities in case the match expression is a
-        // list of identifiers, then we can just alias the identifiers within the arms. This
-        // case should be pretty common in function overloads.
-        let mut all_pat_identifiers = arms
-            .iter()
-            .flat_map(|arm| {
-                let mut idents = Self::get_pat_identifiers(&arm.pat);
-                if let Some(guard) = &arm.guard
-                    && let hir::ExprKind::Let(pat, _) = &guard.kind
-                {
-                    idents.extend(Self::get_pat_identifiers(pat));
-                }
-                idents
-            })
-            .collect::<Vec<_>>();
-
-        match self.match_context_stack.last() {
-            Some(MatchContext::Identifier(ident)) => {
-                all_pat_identifiers.retain(|pat_ident| pat_ident != ident);
-            }
-            Some(MatchContext::ListOfIdentifiers(idents)) => {
-                all_pat_identifiers.retain(|pat_ident| !idents.contains(pat_ident));
-            }
-            _ => {}
-        }
-
-        for binding in all_pat_identifiers {
-            if unique.insert(binding.clone()) {
-                let binding = self.current_scope().declare_variable(&binding);
-                // TODO: Ugly workaround, as we always push a comma when generating pat identifiers
-                //       bindings.
-                if *has_let {
-                    self.push_char(',');
-                } else {
-                    self.push_indent();
-                    self.push_str("let ");
-                    *has_let = true;
-                }
-                self.push_str(&binding);
-            }
-        }
-    }
-
-    fn generate_match_arms(
+    fn generate_match_arm_guard_expr(
         &mut self,
-        expr: &hir::Expr,
-        arms: &[hir::MatchArm],
-        match_value_binding: &str,
+        guard: &hir::Expr,
         let_guard_var: &str,
-    ) {
-        for (
-            i,
-            hir::MatchArm {
-                pat,
-                guard,
-                block,
-                leading_comments,
-                trailing_comments,
-                ..
-            },
-        ) in arms.iter().enumerate()
-        {
-            let no_cond_need = pat.is_wildcard() || expr_idents_match_pat_idents(expr, pat);
-            let need_cond = guard.is_some() || pat.is_empty_list();
-
-            if !no_cond_need || need_cond {
-                self.push_str("if (");
-                self.generate_pat_condition(pat, true, match_value_binding);
-                if !pat.is_wildcard() && guard.is_some() && !is_fixed_list_pattern(pat) {
-                    self.push_str(" && ");
-                }
-                if let Some(guard) = guard {
-                    self.generate_match_arm_guard(guard, let_guard_var);
-                }
-                self.push_str(") ");
-            }
-
-            self.push_str("{\n");
-            self.inc_indent();
-            self.generate_comments(leading_comments);
-            self.generate_match_arm_block(block);
-            self.generate_comments(trailing_comments);
-            self.dec_indent();
-            self.push_indent();
-
-            if i == arms.len() - 1 {
-                self.push_char('}');
-            } else {
-                self.push_str("} else ");
-            }
-        }
-    }
-
-    fn finalize_match_expression(&mut self, lhs: &str, has_block_completions: bool) {
-        if has_block_completions && self.current_completion_variable() != Some("return") {
-            self.push_newline();
-            // If we have an lhs, put the completion var as the rhs of the lhs.
-            // Otherwise, we assign the completion_var to the previous completion_var.
-            if lhs.is_empty() {
-                self.push_indent();
-                let prev_completion_var = self
-                    .nth_completion_variable(self.current_completion_variable_count() - 2)
-                    .unwrap()
-                    .to_string();
-                self.push_str(&prev_completion_var);
-                self.push_str(" = ");
-                self.push_current_completion_variable();
-                self.push_char(';');
-                self.push_newline();
-            } else {
-                self.push_str(lhs);
-                self.push_current_completion_variable();
-            }
-        }
-        self.pop_completion_variable();
-        self.match_context_stack.pop();
-    }
-
-    pub(crate) fn generate_match_expression(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) {
-        // TODO: A lot here is copied from the if statement generator.
-        let (lhs, mut has_let) = self.setup_match_completion_variables(arms);
-        let has_block_completions =
-            self.current_context() == BlockContext::Expression && match_args_have_completions(arms);
-
-        self.setup_match_context(expr);
-
-        let match_value_binding = self.setup_match_value_binding(expr, &mut has_let);
-
-        let let_guard_var = self.setup_let_guard_variable(arms, &mut has_let);
-
-        self.setup_pattern_identifiers(arms, &mut has_let);
-
-        if has_let {
-            self.push_char(';');
-        } else {
-            self.push_indent();
-        }
-
-        self.generate_match_arms(expr, arms, &match_value_binding, &let_guard_var);
-
-        self.finalize_match_expression(&lhs, has_block_completions);
-    }
-
-    fn generate_match_arm_guard(&mut self, guard: &hir::Expr, let_guard_var: &str) {
-        // If the guard is a let expression, we special case this here, normal if let expressions
-        // are handled in the lowering process and will be transformed to a match expression.
+    ) -> Expression<'a> {
         if let hir::ExprKind::Let(pat, expr) = &guard.kind {
-            self.push_char('(');
-            self.push_str(let_guard_var);
-            self.push_str(" = ");
-            self.generate_expr(expr, None);
-            self.push_str(", true) && ");
-            self.generate_pat_condition(pat, false, let_guard_var);
+            let val = self.generate_expr(expr);
+            let assign = self.assign_expr(self.assignment_target_ident(let_guard_var), val);
+            // (let_guard_var = expr, true)
+            let seq = self
+                .ast
+                .expression_sequence(SPAN, self.ast.vec_from_iter([assign, self.bool_expr(true)]));
+
+            let root_access = AccessPath::Ident(let_guard_var.to_string());
+            if let Some(pat_cond) = self.generate_pat_condition(pat, false, &root_access, &None) {
+                self.ast
+                    .expression_logical(SPAN, seq, LogicalOperator::And, pat_cond)
+            } else {
+                seq
+            }
         } else {
-            self.generate_expr(guard, None);
+            self.generate_expr(guard)
         }
+    }
+}
+
+fn get_pat_identifiers(pattern: &hir::Pat) -> Vec<String> {
+    match &pattern.kind {
+        hir::PatKind::Identifier(_, ident) => vec![ident.to_string()],
+        hir::PatKind::Enum(_, patterns) => patterns
+            .iter()
+            .flat_map(|(_, p)| get_pat_identifiers(p))
+            .collect(),
+        hir::PatKind::Literal(_) => Vec::new(),
+        hir::PatKind::List(patterns) => patterns.iter().flat_map(get_pat_identifiers).collect(),
+        hir::PatKind::Rest(pattern) => get_pat_identifiers(pattern),
+        hir::PatKind::Wildcard => Vec::new(),
     }
 }
 
@@ -486,6 +459,7 @@ fn expr_idents_match_pat_idents(expr: &hir::Expr, pat: &hir::Pat) -> bool {
     false
 }
 
+#[allow(dead_code)]
 fn is_fixed_list_pattern(pat: &hir::Pat) -> bool {
     match &pat.kind {
         hir::PatKind::List(pats) => {

@@ -116,7 +116,10 @@ fn test_protocol_used_as_value() {
 #[test]
 fn test_let_list_pattern_with_rest() {
     let output = compile!("let [head, ...tail] = [1, 2, 3];");
-    assert_eq!(output, "let [head, ...tail] = [1, 2, 3];\n");
+    assert_eq!(
+        output,
+        "let [head, ...tail] = [\n    1,\n    2,\n    3\n];\n"
+    );
 }
 
 // ── Dict expressions ──────────────────────────────────────────────────────────

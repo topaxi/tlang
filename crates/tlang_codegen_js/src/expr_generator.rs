@@ -1,601 +1,432 @@
+use oxc_ast::NONE;
+use oxc_ast::ast::*;
+use oxc_span::SPAN;
 use tlang_ast::node::{self as ast, Ident};
 use tlang_ast::token::Literal;
 use tlang_hir as hir;
 
-use crate::binary_operator_generator::{
-    JSAssociativity, JSOperatorInfo, map_operator_info, should_wrap_with_parentheses,
-};
-use crate::generator::{BlockContext, CodegenJS};
+use crate::binary_operator_generator::{map_binary_op, map_unary_op};
+use crate::generator::InnerCodegen;
 use crate::js;
 
-impl CodegenJS {
-    /// Generates blocks in expression position.
-    pub(crate) fn generate_block_expression(&mut self, block: &hir::Block) {
-        let has_completion_var = self.current_completion_variable().is_some();
-        let completion_tmp_var = if block.has_completion() {
-            self.current_completion_variable()
-                .map(str::to_string)
-                .unwrap_or_else(|| self.current_scope().declare_tmp_variable())
-        } else {
-            String::new()
-        };
-
-        self.push_scope();
-
-        // In a case of `let a = { 1 }`, we want to render the expression as a statement.
-        // At this state, we should have `let a = ` in the statement buffer.
-        // We do this by temporarily swapping the statement buffer, generating the
-        // expression as an statement, and then swapping the statement buffer back.
-        let lhs = if has_completion_var {
-            String::new()
-        } else {
-            self.replace_statement_buffer_with_empty_string()
-        };
-
-        if block.has_completion() {
-            if has_completion_var {
-                // Halp I made a mess
-            } else {
-                self.push_indent();
-                self.push_let_declaration(&completion_tmp_var);
-                self.push_str("{\n");
-                self.inc_indent();
-            }
-        }
-
-        self.push_completion_variable(None);
-        self.generate_statements(&block.stmts);
-        self.pop_completion_variable();
-
-        if !block.has_completion() {
-            self.push_statement_buffer();
-            self.push_str(&lhs);
-            self.flush_statement_buffer();
-            self.pop_statement_buffer();
-            self.flush_statement_buffer();
-            self.pop_scope();
-            return;
-        }
-
-        let completion = block.expr.as_ref().unwrap();
-        if completion_tmp_var == "return" {
-            if self.is_self_referencing_tail_call(completion) {
-                self.generate_expr(completion, None);
-            } else {
-                self.push_indent();
-                self.push_str("return ");
-                self.generate_expr(completion, None);
-                self.push_char(';');
-                self.push_newline();
-            }
-        } else {
-            self.push_indent();
-            self.push_str(&completion_tmp_var);
-            self.push_str(" = ");
-            self.generate_expr(completion, None);
-            self.push_char(';');
-            self.push_newline();
-        }
-        if !has_completion_var {
-            self.dec_indent();
-            self.push_indent();
-            self.push_str("};\n");
-            self.flush_statement_buffer();
-            self.push_str(&lhs);
-            self.push_str(completion_tmp_var.as_str());
-        }
-        self.flush_statement_buffer();
-        self.pop_scope();
-    }
-
-    pub(crate) fn generate_literal(&mut self, literal: &Literal) {
-        match literal {
-            Literal::Integer(value) => {
-                self.push_str(&value.to_string());
-            }
-            Literal::UnsignedInteger(value) => {
-                self.push_str(&value.to_string());
-            }
-            Literal::Float(value) => {
-                self.push_str(&value.to_string());
-            }
-            Literal::Boolean(value) => {
-                self.push_str(&value.to_string());
-            }
-            Literal::String(value) | Literal::Char(value) => {
-                self.generate_string_literal(value);
-            }
-            Literal::None => self.push_str("undefined"),
-        }
-    }
-
-    fn generate_string_literal(&mut self, value: &str) {
-        let escaped_value = value
-            .replace('\\', "\\\\")
-            .replace('\"', "\\\"")
-            .replace('\n', "\\n")
-            .replace('\r', "\\r")
-            .replace('\t', "\\t");
-
-        self.push_str(&format!("\"{escaped_value}\""));
-    }
-
-    pub(crate) fn generate_block(&mut self, block: &hir::Block) {
-        self.push_scope();
-
-        self.generate_statements(&block.stmts);
-        self.generate_block_completion_as_stmt(block.expr.as_ref());
-
-        // Collect variables declared in this block before popping the scope.
-        // Since generate_block does not emit JS braces, all `let` declarations
-        // land at the same JS lexical level as the parent. We propagate them
-        // upward so that sibling blocks see them and `declare_variable` can
-        // produce unique names (e.g. `iterator$$` → `iterator$$$0`).
-        let locals = self.current_scope().local_variables().clone();
-        self.pop_scope();
-        for (name, js_name) in locals {
-            self.current_scope().declare_variable_alias(&name, &js_name);
-        }
-    }
-
-    /// Emit a block completion as a statement, but only if it has side effects.
-    /// Pure expressions (Path, Literal) are ANF-introduced noops and are discarded.
-    fn generate_block_completion_as_stmt(&mut self, completion: Option<&hir::Expr>) {
-        if let Some(expr) = completion
-            && !matches!(
-                expr.kind,
-                hir::ExprKind::Path(_) | hir::ExprKind::Literal(_)
-            )
-        {
-            self.push_indent();
-            self.push_context(BlockContext::Statement);
-            self.generate_expr(expr, None);
-            self.pop_context();
-            if self.needs_semicolon(Some(expr)) {
-                self.push_char(';');
-            }
-            self.push_newline();
-        }
-    }
-
-    #[inline(always)]
-    pub(crate) fn generate_optional_expr(
-        &mut self,
-        expr: Option<&hir::Expr>,
-        parent_op: Option<hir::BinaryOpKind>,
-    ) {
-        if let Some(expr) = expr {
-            self.generate_expr(expr, parent_op);
-        }
-    }
-
-    pub(crate) fn generate_expr(&mut self, expr: &hir::Expr, parent_op: Option<hir::BinaryOpKind>) {
+impl<'a> InnerCodegen<'a> {
+    pub fn generate_expr(&mut self, expr: &hir::Expr) -> Expression<'a> {
         match &expr.kind {
-            hir::ExprKind::Block(block) if self.current_context() == BlockContext::Expression => {
-                self.generate_block_expression(block);
-            }
-            hir::ExprKind::Block(block) => self.generate_block(block),
-            hir::ExprKind::Loop(block) => {
-                self.push_str("for (;;) {");
-                self.push_newline();
-                self.inc_indent();
-
-                for stmt in &block.stmts {
-                    self.generate_stmt(stmt);
-                    self.flush_statement_buffer();
-                }
-
-                // Emit the loop body's completion as a statement if it has
-                // side effects (e.g. `accumulator$$ = $anf$0` for accumulator
-                // for-loops). Pure Path/Literal completions are ANF noops.
-                self.generate_block_completion_as_stmt(block.expr.as_ref());
-
-                self.dec_indent();
-                self.push_indent();
-                self.push_char('}');
-            }
-            hir::ExprKind::Break(value) => {
-                if let Some(value) = value {
-                    self.generate_expr(value, parent_op);
-                    self.push_char(';');
-                    self.push_newline();
-                    self.push_indent();
-                }
-                self.push_str("break");
-            }
-            hir::ExprKind::Continue => self.push_str("continue"),
-            hir::ExprKind::Call(expr) => self.generate_call_expression(expr),
-            hir::ExprKind::TailCall(expr) => self.generate_recursive_call_expression(expr),
-            hir::ExprKind::Cast(expr, _) => {
-                self.generate_expr(expr, parent_op);
-            }
-            hir::ExprKind::FieldAccess(base, field) => {
-                self.generate_field_access_expression(base, field);
-            }
-            hir::ExprKind::Path(path) => self.generate_path_expression(path),
-            hir::ExprKind::IndexAccess(base, index) => {
-                self.generate_index_access_expression(base, index);
-            }
-            hir::ExprKind::Let(_pattern, _expr) => todo!("Let expression not implemented yet."),
             hir::ExprKind::Literal(literal) => self.generate_literal(literal),
+            hir::ExprKind::Path(path) => self.generate_path_expression(path),
+            hir::ExprKind::Binary(op, lhs, rhs) if *op == hir::BinaryOpKind::Assign => {
+                self.generate_assignment(lhs, rhs)
+            }
+            hir::ExprKind::Binary(op, lhs, rhs) => self.generate_binary_op(*op, lhs, rhs),
+            hir::ExprKind::Unary(op, inner) => self.generate_unary_op(op, inner),
+            hir::ExprKind::Call(call_expr) => self.generate_call_expression(call_expr),
+            hir::ExprKind::TailCall(call_expr) => {
+                // Mutual tail call (not self-referencing) → regular call
+                self.generate_call_expression(call_expr)
+            }
+            hir::ExprKind::Cast(inner, _) => self.generate_expr(inner),
+            hir::ExprKind::FieldAccess(base, field) => {
+                self.generate_field_access_expression(base, field)
+            }
+            hir::ExprKind::IndexAccess(base, index) => {
+                self.generate_index_access_expression(base, index)
+            }
             hir::ExprKind::List(items) => self.generate_list_expression(items),
             hir::ExprKind::Dict(kvs) => self.generate_dict_expression(kvs),
-            hir::ExprKind::Unary(op, expr) => self.generate_unary_op(op, expr),
-            hir::ExprKind::Binary(op, lhs, rhs) => {
-                self.generate_binary_op(*op, lhs, rhs, parent_op);
-            }
-            hir::ExprKind::Match(expr, arms) => self.generate_match_expression(expr, arms),
-            hir::ExprKind::IfElse(expr, then_branch, else_branches) => {
-                self.generate_if_else(expr, then_branch, else_branches, parent_op);
-            }
             hir::ExprKind::FunctionExpression(decl) => self.generate_function_expression(decl),
-            hir::ExprKind::Range(_) => todo!("Range expression not implemented yet."),
-            hir::ExprKind::Wildcard => {}
-        }
-    }
-
-    fn generate_unary_op(&mut self, op: &ast::UnaryOp, expr: &hir::Expr) {
-        match op {
-            ast::UnaryOp::Not => self.push_char('!'),
-            ast::UnaryOp::Minus => self.push_char('-'),
-            ast::UnaryOp::Spread => {
-                self.push_str("...$spread(");
-                self.generate_expr(expr, None);
-                self.push_char(')');
-                return;
+            hir::ExprKind::IfElse(cond, then_branch, else_branches) => {
+                // After ANF, if-else in expression position is always ternary-worthy.
+                self.generate_ternary(cond, then_branch, else_branches)
             }
-            ast::UnaryOp::Rest => unreachable!("Rest operator is not an operator but a pattern"),
+            hir::ExprKind::Wildcard => {
+                // Wildcard in expression position is used for partial application
+                // and is handled by the call expression generator.
+                self.undefined_expr()
+            }
+            hir::ExprKind::Break(_)
+            | hir::ExprKind::Continue
+            | hir::ExprKind::Block(_)
+            | hir::ExprKind::Loop(_)
+            | hir::ExprKind::Match(..) => {
+                unreachable!(
+                    "Block/Loop/Match/Break/Continue should not appear in expression position after ANF"
+                )
+            }
+            hir::ExprKind::Let(..) => todo!("Let expression not implemented yet."),
+            hir::ExprKind::Range(_) => todo!("Range expression not implemented yet."),
         }
-
-        self.generate_expr(expr, None);
     }
 
-    fn generate_field_access_expression(&mut self, base: &hir::Expr, field: &Ident) {
-        self.generate_expr(base, None);
-        self.push_char('.');
-        self.push_str(field.as_str());
+    pub fn generate_literal(&mut self, literal: &Literal) -> Expression<'a> {
+        match literal {
+            Literal::Integer(value) => self.num_expr(*value as f64),
+            Literal::UnsignedInteger(value) => self.num_expr(*value as f64),
+            Literal::Float(value) => self.num_expr(*value),
+            Literal::Boolean(value) => self.bool_expr(*value),
+            Literal::String(value) | Literal::Char(value) => self.str_expr(value),
+            Literal::None => self.undefined_expr(),
+        }
     }
 
-    fn generate_index_access_expression(&mut self, base: &hir::Expr, index: &hir::Expr) {
-        self.generate_expr(base, None);
-        self.push_char('[');
-        self.generate_expr(index, None);
-        self.push_char(']');
-    }
-
-    fn generate_path_expression(&mut self, path: &hir::Path) {
-        // If we have a full identifier which resolves in the current scope, we use it directly.
-        // We currently do not really have a path resolution mechanism, just a naive lookup.
+    fn generate_path_expression(&mut self, path: &hir::Path) -> Expression<'a> {
+        // If we have a full identifier which resolves in the current scope, use it directly.
         if let Some(identifier) = self.current_scope().resolve_variable(&path.to_string()) {
-            self.push_str(&js::safe_js_variable_name(&identifier));
-            return;
+            return self.ident_expr(&js::safe_js_variable_name(&identifier));
         }
 
         let first_segment = path.segments.first().unwrap();
         let first_name = first_segment.ident.as_str();
 
-        // Protocol objects are emitted with a `$` prefix to avoid collisions with
-        // native JS globals (e.g. `Iterator` is already a built-in in modern JS).
-        if self.is_protocol(first_name) {
-            self.push_str(&Self::protocol_js_name(first_name));
+        let mut result = if self.is_protocol(first_name) {
+            self.ident_expr(&CodegenJS::protocol_js_name(first_name))
         } else {
-            self.generate_identifier(&first_segment.ident);
+            self.generate_identifier(&first_segment.ident)
+        };
+
+        for segment in &path.segments[1..] {
+            let prop = js::safe_js_variable_name(segment.ident.as_str());
+            result = self.static_member_expr(result, &prop);
         }
 
-        self.push_str(
-            &path.segments[1..]
-                .iter()
-                .map(|segment| js::safe_js_variable_name(segment.ident.as_str()))
-                .fold("".to_string(), |acc, segment| acc + "." + &segment),
-        );
+        result
     }
 
-    fn generate_list_expression(&mut self, items: &[hir::Expr]) {
-        self.push_char('[');
-        for (i, item) in items.iter().enumerate() {
-            if i > 0 {
-                self.push_str(", ");
-            }
-            self.generate_expr(item, None);
-        }
-        self.push_char(']');
-    }
-
-    fn generate_dict_expression(&mut self, kvs: &[(hir::Expr, hir::Expr)]) {
-        self.push_str("{\n");
-        self.inc_indent();
-        for (key, value) in kvs {
-            self.push_indent();
-            self.generate_expr(key, None);
-
-            // If both key and value are the same identifier, we can use shorthand syntax.
-            if key.path() != value.path() {
-                self.push_str(": ");
-                self.generate_expr(value, None);
-            }
-            self.push_str(",\n");
-        }
-        self.dec_indent();
-        self.push_indent();
-        self.push_char('}');
-    }
-
-    fn generate_identifier(&mut self, name: &Ident) {
+    fn generate_identifier(&mut self, name: &Ident) -> Expression<'a> {
         let name_string = name.as_str();
         let identifier = self
             .current_scope()
             .resolve_variable(name_string)
             .unwrap_or_else(|| name_string.to_string());
-        self.push_str(&js::safe_js_variable_name(&identifier));
+        self.ident_expr(&js::safe_js_variable_name(&identifier))
     }
 
-    fn generate_ternary_op(
+    fn generate_assignment(&mut self, lhs: &hir::Expr, rhs: &hir::Expr) -> Expression<'a> {
+        let target = self.generate_assignment_target(lhs);
+        let value = self.generate_expr(rhs);
+        self.assign_expr(target, value)
+    }
+
+    fn generate_assignment_target(&mut self, expr: &hir::Expr) -> AssignmentTarget<'a> {
+        match &expr.kind {
+            hir::ExprKind::Path(path) => {
+                let name = if let Some(resolved) =
+                    self.current_scope().resolve_variable(&path.to_string())
+                {
+                    js::safe_js_variable_name(&resolved)
+                } else {
+                    js::safe_js_variable_name(path.first_ident().as_str())
+                };
+
+                if path.segments.len() == 1 {
+                    self.assignment_target_ident(&name)
+                } else {
+                    let mut obj = self.ident_expr(&name);
+                    for segment in &path.segments[1..path.segments.len() - 1] {
+                        let prop = js::safe_js_variable_name(segment.ident.as_str());
+                        obj = self.static_member_expr(obj, &prop);
+                    }
+                    let last =
+                        js::safe_js_variable_name(path.segments.last().unwrap().ident.as_str());
+                    self.assignment_target_member(obj, &last)
+                }
+            }
+            hir::ExprKind::FieldAccess(base, field) => {
+                let obj = self.generate_expr(base);
+                self.assignment_target_member(obj, field.as_str())
+            }
+            hir::ExprKind::IndexAccess(base, index) => {
+                let obj = self.generate_expr(base);
+                let idx = self.generate_expr(index);
+                self.assignment_target_computed(obj, idx)
+            }
+            _ => unreachable!("Invalid assignment target"),
+        }
+    }
+
+    fn generate_binary_op(
         &mut self,
-        expr: &hir::Expr,
-        then_expr: &hir::Expr,
-        else_expr: &hir::Expr,
-        parent_op: Option<hir::BinaryOpKind>,
-    ) {
-        let needs_parenthesis = if let Some(parent_op) = parent_op {
-            should_wrap_with_parentheses(
-                map_operator_info(parent_op),
-                JSOperatorInfo {
-                    precedence: 0,
-                    associativity: JSAssociativity::Right,
-                },
-            )
+        op: hir::BinaryOpKind,
+        lhs: &hir::Expr,
+        rhs: &hir::Expr,
+    ) -> Expression<'a> {
+        let left = self.generate_expr(lhs);
+        let right = self.generate_expr(rhs);
+
+        match map_binary_op(op) {
+            Ok(bin_op) => self.ast.expression_binary(SPAN, left, bin_op, right),
+            Err(log_op) => self.ast.expression_logical(SPAN, left, log_op, right),
+        }
+    }
+
+    fn generate_unary_op(&mut self, op: &ast::UnaryOp, expr: &hir::Expr) -> Expression<'a> {
+        if matches!(op, ast::UnaryOp::Spread) {
+            // Spread in expression position: generate $spread(expr) without the `...` prefix.
+            // The actual SpreadElement wrapping happens in list/call expression generators.
+            let inner = self.generate_expr(expr);
+            let spread_fn = self.ident_expr("$spread");
+            return self.call_expr(spread_fn, vec![Argument::from(inner)]);
+        }
+
+        let argument = self.generate_expr(expr);
+        self.ast.expression_unary(SPAN, map_unary_op(op), argument)
+    }
+
+    fn generate_field_access_expression(
+        &mut self,
+        base: &hir::Expr,
+        field: &Ident,
+    ) -> Expression<'a> {
+        let obj = self.generate_expr(base);
+        self.static_member_expr(obj, field.as_str())
+    }
+
+    fn generate_index_access_expression(
+        &mut self,
+        base: &hir::Expr,
+        index: &hir::Expr,
+    ) -> Expression<'a> {
+        let obj = self.generate_expr(base);
+        let idx = self.generate_expr(index);
+        self.computed_member_expr(obj, idx)
+    }
+
+    fn generate_list_expression(&mut self, items: &[hir::Expr]) -> Expression<'a> {
+        let elements: Vec<ArrayExpressionElement<'a>> = items
+            .iter()
+            .map(|item| {
+                if let hir::ExprKind::Unary(ast::UnaryOp::Spread, inner) = &item.kind {
+                    let inner_expr = self.generate_expr(inner);
+                    let spread_fn = self.ident_expr("$spread");
+                    let call = self.call_expr(spread_fn, vec![Argument::from(inner_expr)]);
+                    ArrayExpressionElement::SpreadElement(self.ast.alloc_spread_element(SPAN, call))
+                } else {
+                    ArrayExpressionElement::from(self.generate_expr(item))
+                }
+            })
+            .collect();
+        self.ast
+            .expression_array(SPAN, self.ast.vec_from_iter(elements))
+    }
+
+    fn generate_dict_expression(&mut self, kvs: &[(hir::Expr, hir::Expr)]) -> Expression<'a> {
+        let properties: Vec<ObjectPropertyKind<'a>> = kvs
+            .iter()
+            .map(|(key, value)| {
+                let key_expr = self.generate_expr(key);
+                let value_expr = self.generate_expr(value);
+                let shorthand = key.path() == value.path();
+                let property_key = PropertyKey::from(key_expr);
+                ObjectPropertyKind::ObjectProperty(self.ast.alloc_object_property(
+                    SPAN,
+                    PropertyKind::Init,
+                    property_key,
+                    value_expr,
+                    false,
+                    shorthand,
+                    false,
+                ))
+            })
+            .collect();
+        self.ast
+            .expression_object(SPAN, self.ast.vec_from_iter(properties))
+    }
+
+    fn generate_ternary(
+        &mut self,
+        cond: &hir::Expr,
+        then_branch: &hir::Block,
+        else_branches: &[hir::ElseClause],
+    ) -> Expression<'a> {
+        let test = self.generate_expr(cond);
+        let consequent = self.generate_expr(then_branch.expr.as_ref().unwrap());
+        let alternate = self.generate_expr(else_branches[0].consequence.expr.as_ref().unwrap());
+        self.ast
+            .expression_conditional(SPAN, test, consequent, alternate)
+    }
+
+    /// Generate an if-else chain as statements (not ternary).
+    pub fn generate_if_else_stmts(
+        &mut self,
+        cond: &hir::Expr,
+        then_branch: &hir::Block,
+        else_branches: &[hir::ElseClause],
+    ) -> Vec<Statement<'a>> {
+        let test = self.generate_expr(cond);
+        let consequent_stmts = self.generate_block_stmts_scoped(then_branch);
+        let consequent = self.block_stmt(consequent_stmts);
+
+        let alternate = if else_branches.is_empty() {
+            None
         } else {
-            false
+            Some(self.generate_else_chain(else_branches))
         };
 
-        if needs_parenthesis {
-            self.push_char('(');
-        }
-
-        self.generate_expr(expr, None);
-        self.push_str(" ? ");
-        self.generate_expr(then_expr, None);
-        self.push_str(" : ");
-        self.generate_expr(else_expr, None);
-
-        if needs_parenthesis {
-            self.push_char(')');
-        }
+        vec![self.ast.statement_if(SPAN, test, consequent, alternate)]
     }
 
-    pub(crate) fn should_render_if_else_as_ternary(
-        &self,
-        expr: &hir::Expr,
-        then_branch: &hir::Block,
-        else_branches: &[hir::ElseClause],
-    ) -> bool {
-        self.get_render_ternary()
-            && self.current_context() == BlockContext::Expression
-            && else_branches.len() == 1 // Let's not nest ternary expressions for now.
-            && if_else_can_render_as_ternary(expr, then_branch, else_branches)
-    }
-
-    fn generate_if_else(
-        &mut self,
-        expr: &hir::Expr,
-        then_branch: &hir::Block,
-        else_branches: &[hir::ElseClause],
-        parent_op: Option<hir::BinaryOpKind>,
-    ) {
-        if self.should_render_if_else_as_ternary(expr, then_branch, else_branches) {
-            self.generate_ternary_op(
-                expr,
-                then_branch.expr.as_ref().unwrap(),
-                else_branches[0].consequence.expr.as_ref().unwrap(),
-                parent_op,
-            );
-            return;
+    fn generate_else_chain(&mut self, else_branches: &[hir::ElseClause]) -> Statement<'a> {
+        if else_branches.is_empty() {
+            return self.block_stmt(vec![]);
         }
 
-        let mut lhs = String::new();
-        // TODO: Potentially in a return position or other expression, before we generate the if
-        //       statement, replace the current statement buffer with a new one, generate the if
-        //       statement, and then swap the statement buffer back.
-        //       Similar to how we generate blocks in expression position.
-        // TODO: Find a way to do this generically for all expressions which are represented as
-        //       statements in JavaScript.
-        // TODO: In case of recursive calls in tail position, we'll want to omit lhs.
-        let has_block_completions =
-            self.current_context() == BlockContext::Expression && then_branch.has_completion();
-        if has_block_completions {
-            // Note: We check if we can reuse the existing completion variable ("return")
-            // instead of creating a new temporary variable each time.
-            if self.can_reuse_current_completion_variable() {
-                self.push_completion_variable(Some("return"));
-                lhs = self.replace_statement_buffer_with_empty_string();
-                self.push_indent();
+        let branch = &else_branches[0];
+        let body_stmts = self.generate_block_stmts_scoped(&branch.consequence);
+        let body = self.block_stmt(body_stmts);
+
+        if let Some(ref condition) = branch.condition {
+            // else if (condition) { ... }
+            let test = self.generate_expr(condition);
+            let alternate = if else_branches.len() > 1 {
+                Some(self.generate_else_chain(&else_branches[1..]))
             } else {
-                lhs = self.replace_statement_buffer_with_empty_string();
-                let completion_tmp_var = self.current_scope().declare_tmp_variable();
-                self.push_let_declaration(&completion_tmp_var);
-                self.push_completion_variable(Some(&completion_tmp_var));
-            }
+                None
+            };
+            self.ast.statement_if(SPAN, test, body, alternate)
         } else {
-            self.push_completion_variable(None);
+            // else { ... }
+            body
         }
-        self.push_str("if (");
-        let indent_level = self.current_indent();
-        self.set_indent(0);
-        self.generate_expr(expr, None);
-        self.set_indent(indent_level);
-        self.push_str(") {\n");
-        self.inc_indent();
-        self.flush_statement_buffer();
-        self.generate_block_expression(then_branch);
-        self.dec_indent();
-
-        for else_branch in else_branches {
-            self.push_indent();
-            self.push_str("} else");
-
-            if let Some(ref condition) = else_branch.condition {
-                self.push_str(" if (");
-                let indent_level = self.current_indent();
-                self.set_indent(0);
-                self.generate_expr(condition, None);
-                self.set_indent(indent_level);
-                self.push_char(')');
-            }
-
-            self.push_str(" {\n");
-            self.inc_indent();
-            self.flush_statement_buffer();
-            self.generate_block_expression(&else_branch.consequence);
-            self.dec_indent();
-        }
-
-        self.push_indent();
-        self.push_char('}');
-        if has_block_completions && self.current_completion_variable() != Some("return") {
-            self.push_newline();
-
-            // If we have an lhs, put the completion var as the rhs of the lhs.
-            // Otherwise, we assign the completion_var to the previous completion_var.
-            if lhs.is_empty() {
-                self.push_indent();
-                let prev_completion_var = self
-                    .nth_completion_variable(self.current_completion_variable_count() - 2)
-                    .unwrap()
-                    .to_string();
-                self.push_str(&prev_completion_var);
-                self.push_str(" = ");
-                self.push_current_completion_variable();
-                self.push_str(";\n");
-            } else {
-                self.push_str(&lhs);
-                self.push_current_completion_variable();
-            }
-        }
-        self.pop_completion_variable();
     }
 
-    fn generate_partial_application(
-        &mut self,
-        call_expr: &hir::CallExpression,
-        wildcard_count: usize,
-    ) {
-        let mut placeholders = Vec::with_capacity(wildcard_count);
-
-        self.push_char('(');
-
-        if wildcard_count == 1 {
-            self.push_char('_');
-            placeholders.push('_'.to_string());
-        } else {
-            for n in 0..wildcard_count {
-                if n > 0 {
-                    self.push_str(", ");
-                }
-
-                let tmp_var = self.current_scope().declare_unique_variable("_");
-
-                self.push_str(&tmp_var);
-
-                placeholders.push(tmp_var);
-            }
-        }
-
-        self.push_str(") => ");
-
-        self.generate_expr(&call_expr.callee, None);
-        self.push_char('(');
-
-        let mut wildcard_index = 0;
-        for (i, arg) in call_expr.arguments.iter().enumerate() {
-            if i > 0 {
-                self.push_str(", ");
-            }
-
-            if let hir::ExprKind::Wildcard = arg.kind {
-                self.push_str(&placeholders[wildcard_index]);
-                wildcard_index += 1;
-            } else {
-                self.generate_expr(arg, None);
-            }
-        }
-
-        self.push_char(')');
-    }
-
-    pub(crate) fn generate_call_expression(&mut self, call_expr: &hir::CallExpression) {
-        // TODO: If the call is to a struct, we instead call it with `new` and map the fields to
-        // the positional arguments of the constructor.
-
+    pub fn generate_call_expression(&mut self, call_expr: &hir::CallExpression) -> Expression<'a> {
         let wildcard_count = call_expr.wildcard_count();
 
         if wildcard_count > 0 {
             return self.generate_partial_application(call_expr, wildcard_count);
         }
 
-        self.generate_expr(&call_expr.callee, None);
-        self.push_char('(');
-
-        let mut args_iter = call_expr.arguments.iter();
-
-        if let Some(arg) = args_iter.next() {
-            self.generate_expr(arg, None);
-        }
-
-        for arg in args_iter {
-            self.push_str(", ");
-            self.generate_expr(arg, None);
-        }
-
-        self.push_char(')');
-    }
-}
-
-fn if_else_can_render_as_ternary(
-    expr: &hir::Expr,
-    then_branch: &hir::Block,
-    else_branches: &[hir::ElseClause],
-) -> bool {
-    then_branch.stmts.is_empty()
-        && expr_can_render_as_js_expr(expr)
-        && expr_can_render_as_js_expr(then_branch.expr.as_ref().unwrap())
-        && else_branches.iter().all(|else_branch| {
-            else_branch.consequence.stmts.is_empty()
-                && (else_branch.condition.is_none()
-                    || expr_can_render_as_js_expr(else_branch.condition.as_ref().unwrap()))
-                && expr_can_render_as_js_expr(else_branch.consequence.expr.as_ref().unwrap())
-        })
-}
-
-pub(crate) fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
-    match &expr.kind {
-        hir::ExprKind::Path(..) => true,
-        hir::ExprKind::Let(..) => false,
-        hir::ExprKind::Literal(..) => true,
-        hir::ExprKind::Binary(_, lhs, rhs) => {
-            expr_can_render_as_js_expr(lhs) && expr_can_render_as_js_expr(rhs)
-        }
-        hir::ExprKind::Unary(_, expr) => expr_can_render_as_js_expr(expr),
-        hir::ExprKind::Block(..) => false,
-        hir::ExprKind::Loop(..) => false,
-        hir::ExprKind::Break(..) => false,
-        hir::ExprKind::Continue => false,
-        hir::ExprKind::IfElse(..) => false,
-        hir::ExprKind::Match(..) => false,
-        hir::ExprKind::Call(call_expr) => {
-            call_expr.arguments.iter().all(expr_can_render_as_js_expr)
-        }
-        hir::ExprKind::Cast(expr, _) => expr_can_render_as_js_expr(expr),
-        hir::ExprKind::FieldAccess(base, _) => expr_can_render_as_js_expr(base),
-        hir::ExprKind::IndexAccess(base, index) => {
-            expr_can_render_as_js_expr(base) && expr_can_render_as_js_expr(index)
-        }
-        hir::ExprKind::TailCall(_) => false,
-        hir::ExprKind::List(exprs) => exprs.iter().all(expr_can_render_as_js_expr),
-        hir::ExprKind::Dict(exprs) => exprs
+        let callee = self.generate_expr(&call_expr.callee);
+        let args: Vec<Argument<'a>> = call_expr
+            .arguments
             .iter()
-            .all(|kv| expr_can_render_as_js_expr(&kv.0) && expr_can_render_as_js_expr(&kv.1)),
-        hir::ExprKind::FunctionExpression(..) => true,
-        hir::ExprKind::Range(..) => true,
-        hir::ExprKind::Wildcard => true,
+            .map(|arg| {
+                if let hir::ExprKind::Unary(ast::UnaryOp::Spread, inner) = &arg.kind {
+                    let inner_expr = self.generate_expr(inner);
+                    let spread_fn = self.ident_expr("$spread");
+                    let call = self.call_expr(spread_fn, vec![Argument::from(inner_expr)]);
+                    Argument::SpreadElement(self.ast.alloc_spread_element(SPAN, call))
+                } else {
+                    Argument::from(self.generate_expr(arg))
+                }
+            })
+            .collect();
+        self.call_expr(callee, args)
+    }
+
+    fn generate_partial_application(
+        &mut self,
+        call_expr: &hir::CallExpression,
+        wildcard_count: usize,
+    ) -> Expression<'a> {
+        let mut placeholders = Vec::with_capacity(wildcard_count);
+
+        if wildcard_count == 1 {
+            placeholders.push("_".to_string());
+        } else {
+            for _ in 0..wildcard_count {
+                let tmp = self.current_scope().declare_unique_variable("_");
+                placeholders.push(tmp);
+            }
+        }
+
+        // Build arrow: (placeholders) => callee(args_with_placeholders)
+        let params: Vec<FormalParameter<'a>> = placeholders
+            .iter()
+            .map(|name| self.formal_param(name))
+            .collect();
+        let formal_params = self.formal_params(self.ast.vec_from_iter(params));
+
+        let callee = self.generate_expr(&call_expr.callee);
+        let mut wildcard_index = 0;
+        let args: Vec<Argument<'a>> = call_expr
+            .arguments
+            .iter()
+            .map(|arg| {
+                if let hir::ExprKind::Wildcard = arg.kind {
+                    let ph = &placeholders[wildcard_index];
+                    wildcard_index += 1;
+                    Argument::from(self.ident_expr(ph))
+                } else {
+                    Argument::from(self.generate_expr(arg))
+                }
+            })
+            .collect();
+
+        let call = self.call_expr(callee, args);
+        let body_stmt = self.ast.statement_expression(SPAN, call);
+        let body = self.fn_body(self.ast.vec1(body_stmt));
+
+        self.ast.expression_arrow_function(
+            SPAN,
+            true, // expression = true (body is single expression)
+            false,
+            NONE,
+            formal_params,
+            NONE,
+            body,
+        )
+    }
+
+    /// Generate block statements (stmts + optional completion as ExpressionStatement).
+    pub fn generate_block_stmts(&mut self, block: &hir::Block) -> Vec<Statement<'a>> {
+        let mut result = self.generate_stmts(&block.stmts);
+
+        if let Some(expr) = &block.expr {
+            // Only emit completion if it has side effects
+            if !matches!(
+                expr.kind,
+                hir::ExprKind::Path(_) | hir::ExprKind::Literal(_)
+            ) {
+                let e = self.generate_expr(expr);
+                result.push(self.expr_stmt(e));
+            }
+        }
+
+        result
+    }
+
+    /// Generate block statements with scope isolation (no propagation).
+    /// Variables declared inside won't leak to the parent scope.
+    pub fn generate_block_stmts_scoped(&mut self, block: &hir::Block) -> Vec<Statement<'a>> {
+        self.push_scope();
+        let result = self.generate_block_stmts(block);
+        self.pop_scope();
+        result
+    }
+
+    /// Generate block statements, propagating local variables to the parent scope.
+    pub fn generate_block_stmts_propagate_scope(
+        &mut self,
+        block: &hir::Block,
+    ) -> Vec<Statement<'a>> {
+        self.push_scope();
+        let result = self.generate_block_stmts(block);
+        let locals = self.current_scope().local_variables().clone();
+        self.pop_scope();
+        for (name, js_name) in locals {
+            self.current_scope().declare_variable_alias(&name, &js_name);
+        }
+        result
+    }
+
+    /// Generate a loop expression as statements.
+    pub fn generate_loop_stmts(&mut self, block: &hir::Block) -> Vec<Statement<'a>> {
+        let body_stmts = self.generate_block_stmts_scoped(block);
+        let body = self.block_stmt(body_stmts);
+        // for (;;) { ... }
+        vec![self.ast.statement_for(SPAN, None, None, None, body)]
+    }
+
+    /// Generate break statement(s).
+    pub fn generate_break_stmts(&mut self, value: &Option<Box<hir::Expr>>) -> Vec<Statement<'a>> {
+        let mut stmts = Vec::new();
+        if let Some(value) = value {
+            let e = self.generate_expr(value);
+            stmts.push(self.expr_stmt(e));
+        }
+        stmts.push(self.ast.statement_break(SPAN, None));
+        stmts
     }
 }
+
+use crate::generator::CodegenJS;

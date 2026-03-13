@@ -16,16 +16,8 @@ fn test_simple_self_recursive_tail_call_converted_to_loop() {
     "});
     let expected_output = indoc! {"
         function factorial(n, acc) {
-            rec:while (true) {
-                if (n === 0) {
-                    return acc;
-                } else {
-                    let $tmp$0 = n - 1;
-                    let $tmp$1 = n * acc;
-                    n = $tmp$0;
-                    acc = $tmp$1;
-                    continue rec;
-                }
+            rec: while (true) {
+                return n === 0 ? acc : factorial(n - 1, n * acc);
             }
         }
     "};
@@ -50,16 +42,8 @@ fn test_fn_expression_explicit_tail_recursive_call_converted_to_loop() {
     let expected_output = indoc! {"
         function factorial(n) {
             let factorial_rec = function rec_helper(n, acc) {
-                rec:while (true) {
-                    if (n === 0) {
-                        return acc;
-                    } else {
-                        let $tmp$0 = n - 1;
-                        let $tmp$1 = n * acc;
-                        n = $tmp$0;
-                        acc = $tmp$1;
-                        continue rec;
-                    }
+                rec: while (true) {
+                    return n === 0 ? acc : rec_helper(n - 1, n * acc);
                 }
             };
             return factorial_rec(n, 1);
@@ -76,7 +60,7 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_simple() {
     "});
     let expected_output = indoc! {"
         function factorial(n, acc) {
-            rec:while (true) {
+            rec: while (true) {
                 let $anf$0;
                 if (n === 0) {
                     $anf$0 = acc;
@@ -106,7 +90,7 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_convenient() {
             return factorial$$2(n, 1);
         }
         function factorial$$2(n, acc) {
-            rec:while (true) {
+            rec: while (true) {
                 let $anf$0;
                 if (n === 0) {
                     $anf$0 = acc;
@@ -144,7 +128,7 @@ fn test_tail_recursive_fibonacci() {
             return fibonacci$$3(n, 0, 1);
         }
         function fibonacci$$3(n, a, b) {
-            rec:while (true) {
+            rec: while (true) {
                 let $anf$0;
                 if (n === 0) {
                     $anf$0 = a;
@@ -181,9 +165,10 @@ fn test_foldl_impl() {
     "});
     let expected_output = indoc! {"
         function foldl(arg0, acc, f) {
-            rec:while (true) {
+            rec: while (true) {
                 let $anf$0;
-                let x,xs;if (arg0.length === 0) {
+                let x, xs;
+                if (arg0.length === 0) {
                     $anf$0 = acc;
                 } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
                     let $tmp$0 = xs;
@@ -230,9 +215,10 @@ fn test_partition_impl() {
         }
         // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
         function partition$$4(list, predicate, satisfies, doesNotSatisfy) {
-            rec:while (true) {
+            rec: while (true) {
                 let $anf$1;
-                let x,xs;if (list.length === 0) {
+                let x, xs;
+                if (list.length === 0) {
                     // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
                     $anf$1 = [satisfies, doesNotSatisfy];
                 } else if (list.length >= 1 && (x = list[0], true) && (xs = list.slice(1), true)) {
@@ -279,9 +265,10 @@ fn test_all_impl() {
         }
         // all(a[], fn(a) -> bool, bool) -> bool
         function all$$3(list, predicate, acc) {
-            rec:while (true) {
+            rec: while (true) {
                 let $anf$0;
-                let x,xs;if (list.length === 0) {
+                let x, xs;
+                if (list.length === 0) {
                     // all(a[], fn(a) -> bool, bool) -> bool
                     $anf$0 = acc;
                 } else if (list.length >= 1 && (x = list[0], true) && !predicate(x)) {
