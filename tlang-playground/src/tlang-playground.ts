@@ -30,7 +30,7 @@ import { repeat } from 'lit/directives/repeat.js';
 import { mediaQuery } from './decorators/media-query';
 import { floating } from './directives/floating';
 
-type OutputDisplay = 'ast' | 'hir' | 'hir' | 'javascript';
+type OutputDisplay = 'ast' | 'hir' | 'jsast' | 'javascript';
 
 function getHashParams() {
   return new URLSearchParams(window.location.hash.slice(1));
@@ -56,12 +56,14 @@ async function defaultSource() {
 const displayLabels = {
   ast: 'AST',
   hir: 'HIR',
+  jsast: 'JS AST',
   javascript: 'JavaScript',
 } satisfies Record<OutputDisplay, string>;
 
 const displayTitles = {
   ast: 'Abstract Syntax Tree',
   hir: 'High-level Intermediate Representation',
+  jsast: 'JavaScript AST (ESTree)',
   javascript: 'JavaScript Code',
 } satisfies Record<OutputDisplay, string>;
 
@@ -77,7 +79,10 @@ function defaultDisplay(): OutputDisplay {
     return 'javascript';
   }
 
-  if (params.get('runner') === 'interpreter' && display === 'javascript') {
+  if (
+    params.get('runner') === 'interpreter' &&
+    (display === 'javascript' || display === 'jsast')
+  ) {
     return 'hir';
   }
 
@@ -304,7 +309,7 @@ export class TlangPlayground extends LitElement {
     if (this.runner === 'Interpreter') {
       return ['ast', 'hir'];
     } else {
-      return ['ast', 'hir', 'javascript'];
+      return ['ast', 'hir', 'jsast', 'javascript'];
     }
   }
 
@@ -391,7 +396,10 @@ export class TlangPlayground extends LitElement {
 
     // When using the interpreter, showing the javascript output does not make
     // sense.
-    if (this.runner === 'Interpreter' && this.display === 'javascript') {
+    if (
+      this.runner === 'Interpreter' &&
+      (this.display === 'javascript' || this.display === 'jsast')
+    ) {
       this.display = 'hir';
     }
 
@@ -467,6 +475,15 @@ export class TlangPlayground extends LitElement {
           .formatter=${(options: JsHirPrettyOptions) =>
             this.tlang.getHIRPretty(options)}
         ></t-hir-pretty>`;
+      case 'jsast':
+        return html`
+          <t-codemirror
+            class="output-code"
+            language="json"
+            .source=${this.tlang.getJSASTString()}
+            readonly
+          ></t-codemirror>
+        `;
       case 'javascript':
         return html`
           <t-codemirror

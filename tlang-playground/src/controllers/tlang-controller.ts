@@ -31,6 +31,7 @@ export class TlangController {
   private cachedAST: string | null = null;
   private cachedHIR: string | null = null;
   private cachedJS: string | null = null;
+  private cachedJSAST: string | null = null;
   private optimizationOptions: JsOptimizationOptions = {
     constantFolding: true,
     anfTransform: undefined,
@@ -71,6 +72,7 @@ export class TlangController {
     this.cachedAST = null;
     this.cachedHIR = null;
     this.cachedJS = null;
+    this.cachedJSAST = null;
 
     this.tlang = this.createTlang(source, runner);
     this.tlang.setOptimizations(this.optimizationOptions);
@@ -175,6 +177,10 @@ export class TlangController {
     return (this.cachedJS ??= this.tlang.getJavaScript());
   }
 
+  getJSASTString() {
+    return (this.cachedJSAST ??= this.tlang.getJSASTString());
+  }
+
   getHIRPretty(options?: JsHirPrettyOptions) {
     return this.tlang.getHIRPretty(options);
   }
@@ -183,6 +189,7 @@ export class TlangController {
     this.optimizationOptions = options;
     this.cachedHIR = null;
     this.cachedJS = null;
+    this.cachedJSAST = null;
     this.tlang.setOptimizations(options);
   }
 

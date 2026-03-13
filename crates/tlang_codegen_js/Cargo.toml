@@ -5,8 +5,9 @@ edition.workspace = true
 
 [dependencies]
 oxc_allocator = "0.118.0"
-oxc_ast = "0.118.0"
+oxc_ast = { version = "0.118.0", features = ["serialize"] }
 oxc_codegen = "0.118.0"
+oxc_estree = { version = "0.118.0", features = ["serialize"] }
 oxc_span = "0.118.0"
 tlang_ast = { path = "../tlang_ast" }
 tlang_hir = { path = "../tlang_hir" }

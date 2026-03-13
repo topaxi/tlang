@@ -419,6 +419,12 @@ impl Tlang {
         self.js.get_output().to_string()
     }
 
+    #[wasm_bindgen(js_name = "getJSASTString")]
+    pub fn js_ast_string(&mut self) -> String {
+        let _ = self.compile_to_js();
+        self.js.get_js_ast_json().to_string()
+    }
+
     #[wasm_bindgen(js_name = "getDiagnostics")]
     pub fn diagnostics(&mut self) -> Result<JsDiagnosticArray, serde_wasm_bindgen::Error> {
         let diagnostics: Vec<JsDiagnostic> = self

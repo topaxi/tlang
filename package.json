@@ -44,5 +44,8 @@
   "volta": {
     "node": "24.0.2",
     "npm": "11.4.2"
+  },
+  "dependencies": {
+    "@codemirror/lang-json": "^6.0.2"
   }
 }

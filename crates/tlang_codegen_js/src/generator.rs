@@ -7,6 +7,7 @@ use oxc_ast::ast::*;
 use oxc_codegen::{Codegen, CodegenOptions, IndentChar};
 use oxc_span::SPAN;
 
+use oxc_estree::{ESTree, PrettyJSSerializer};
 use crate::js_anf_transform::JsAnfTransform;
 use crate::scope::Scope;
 use tlang_hir as hir;
@@ -24,6 +25,7 @@ pub(crate) struct FunctionContext {
 #[derive(Debug)]
 pub struct CodegenJS {
     output: String,
+    js_ast_json: String,
     render_ternary: bool,
     protocol_names: HashSet<String>,
 }
@@ -44,6 +46,7 @@ impl CodegenJS {
 
         Self {
             output: String::new(),
+            js_ast_json: String::new(),
             render_ternary: true,
             protocol_names,
         }
@@ -129,6 +132,11 @@ impl CodegenJS {
         let ast = AstBuilder::new(&allocator);
         let mut inner = InnerCodegen::new(ast, self.render_ternary, self.protocol_names.clone());
         let program = inner.generate_module(&module);
+
+        let mut serializer = PrettyJSSerializer::new(false);
+        program.serialize(&mut serializer);
+        self.js_ast_json = serializer.into_string();
+
         let result = Codegen::new()
             .with_options(CodegenOptions {
                 indent_char: IndentChar::Space,
@@ -141,6 +149,10 @@ impl CodegenJS {
 
     pub fn get_output(&self) -> &str {
         &self.output
+    }
+
+    pub fn get_js_ast_json(&self) -> &str {
+        &self.js_ast_json
     }
 }
 
