@@ -126,6 +126,68 @@ async function updateDisplayHashparam(display: string) {
   updateHashParam('display', display);
 }
 
+// Optimization options are serialized as comma-separated `key:value` pairs in
+// the `opt` hash param.  Only non-default values are stored to keep URLs clean.
+// Short keys:  cf → constantFolding,  anf → anfTransform
+function serializeOptimizations(options: JsOptimizationOptions): string {
+  let parts: string[] = [];
+
+  if (options.constantFolding === false) {
+    parts.push('cf:false');
+  }
+  if (options.anfTransform !== undefined) {
+    parts.push(`anf:${options.anfTransform}`);
+  }
+
+  return parts.join(',');
+}
+
+function deserializeOptimizations(
+  raw: string | null,
+): JsOptimizationOptions | null {
+  if (!raw) return null;
+
+  const options: JsOptimizationOptions = {
+    constantFolding: undefined,
+    anfTransform: undefined,
+  };
+
+  for (const part of raw.split(',')) {
+    const [key, value] = part.split(':');
+
+    if (key === 'cf') {
+      options.constantFolding = value !== 'false';
+    } else if (key === 'anf') {
+      options.anfTransform = value;
+    }
+  }
+
+  return options;
+}
+
+function defaultOptimizationOptions(): JsOptimizationOptions {
+  const params = getHashParams();
+  return (
+    deserializeOptimizations(params.get('opt')) ?? {
+      constantFolding: true,
+      anfTransform: undefined,
+    }
+  );
+}
+
+function updateOptimizationsHashParam(options: JsOptimizationOptions) {
+  const params = getHashParams();
+  const serialized = serializeOptimizations(options);
+
+  if (serialized) {
+    params.set('opt', serialized);
+  } else {
+    params.delete('opt');
+  }
+
+  window.location.hash = params.toString();
+}
+
 @customElement('tlang-playground')
 export class TlangPlayground extends LitElement {
   static override styles = css`
@@ -246,10 +308,8 @@ export class TlangPlayground extends LitElement {
 
   @state() runner: Runner = defaultRunner();
 
-  @state() optimizationOptions: JsOptimizationOptions = {
-    constantFolding: true,
-    anfTransform: undefined,
-  };
+  @state() optimizationOptions: JsOptimizationOptions =
+    defaultOptimizationOptions();
 
   private tlang = new TlangController(this.source, this.runner);
 
@@ -365,6 +425,7 @@ export class TlangPlayground extends LitElement {
       [key]: !this.optimizationOptions[key],
     };
     this.tlang.setOptimizations(this.optimizationOptions);
+    updateOptimizationsHashParam(this.optimizationOptions);
   }
 
   private setOptimizationOption<K extends keyof JsOptimizationOptions>(
@@ -376,6 +437,7 @@ export class TlangPlayground extends LitElement {
       [key]: value,
     };
     this.tlang.setOptimizations(this.optimizationOptions);
+    updateOptimizationsHashParam(this.optimizationOptions);
   }
 
   private handleConsoleCollapse(event: CustomEvent<{ collapsed: boolean }>) {
