@@ -6,7 +6,7 @@
  */
 import { createServer } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
-import { join, extname, resolve } from 'node:path';
+import { join, extname, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -40,7 +40,8 @@ createServer((req, res) => {
     const filePath = resolve(join(distDir, pathname));
 
     // Prevent path traversal: resolved path must stay within distDir
-    if (!filePath.startsWith(distDir + '/') && filePath !== distDir) {
+    const relativePath = relative(distDir, filePath);
+    if (relativePath.startsWith('..') || relativePath === '' || relativePath.includes('..' + require('node:path').sep)) {
       res.writeHead(403);
       res.end('Forbidden');
       return;
