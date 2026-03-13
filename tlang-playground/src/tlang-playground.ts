@@ -137,8 +137,8 @@ function serializeOptimizations(options: JsOptimizationOptions): string {
   if (options.constantFolding === false) {
     parts.push('cf:false');
   }
-  if (options.anfTransform !== undefined) {
-    parts.push(`anf:${options.anfTransform}`);
+  if (options.anfTransform === 'full') {
+    parts.push('anf:full');
   }
 
   return parts.join(',');
@@ -518,7 +518,7 @@ export class TlangPlayground extends LitElement {
                       this.setOptimizationOption(
                         'anfTransform',
                         this.optimizationOptions.anfTransform === 'full'
-                          ? 'off'
+                          ? undefined
                           : 'full',
                       )}
                     .checked=${this.optimizationOptions.anfTransform === 'full'}

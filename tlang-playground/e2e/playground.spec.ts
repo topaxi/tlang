@@ -1,8 +1,21 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+async function gotoPlayground(page: Page, hash = '') {
+  await page.goto(`/tlang${hash}`);
+  await expect(page.locator('.cm-content').first()).toBeVisible();
+}
+
+async function openOptimizationSettings(page: Page) {
+  await page.getByLabel('Optimization Settings').click();
+}
+
+function optimizationRadio(page: Page, label: 'Minimal' | 'Full') {
+  return page.locator('t-menuitem-radio').filter({ hasText: label });
+}
 
 test.describe('Tlang Playground', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/tlang');
+    await gotoPlayground(page);
   });
 
   test('has correct page title', async ({ page }) => {
@@ -39,13 +52,19 @@ test.describe('Tlang Playground', () => {
   });
 
   test('can switch runner to JavaScript (Compiler) mode', async ({ page }) => {
-    await page.locator('.toolbar__runner').selectOption('JavaScript');
+    await page
+      .locator('.toolbar__runner')
+      .locator('select')
+      .selectOption('JavaScript');
     // The JavaScript tab should now appear in the output tabs
     await expect(page.locator('#javascript')).toBeVisible();
   });
 
   test('shows JavaScript output in compiler mode', async ({ page }) => {
-    await page.locator('.toolbar__runner').selectOption('JavaScript');
+    await page
+      .locator('.toolbar__runner')
+      .locator('select')
+      .selectOption('JavaScript');
     // Switching the runner doesn't auto-switch the active tab; click it explicitly.
     await page.locator('#javascript').click();
     const jsOutput = page.locator('.output-code');
@@ -53,7 +72,7 @@ test.describe('Tlang Playground', () => {
   });
 
   test('can load a different example from the dropdown', async ({ page }) => {
-    const exampleSelect = page.locator('.toolbar__example');
+    const exampleSelect = page.locator('.toolbar__example').locator('select');
     // Select the fibonacci example
     await exampleSelect.selectOption('fibonacci.tlang');
     const editorContent = await page
@@ -69,8 +88,14 @@ test.describe('Tlang Playground', () => {
 
   test('shows console output after running code', async ({ page }) => {
     // Load fibonacci example which logs output
-    await page.locator('.toolbar__example').selectOption('fibonacci.tlang');
-    await page.locator('.toolbar__runner').selectOption('JavaScript');
+    await page
+      .locator('.toolbar__example')
+      .locator('select')
+      .selectOption('fibonacci.tlang');
+    await page
+      .locator('.toolbar__runner')
+      .locator('select')
+      .selectOption('JavaScript');
     // Run the code
     await page.locator('t-button').filter({ hasText: 'Run' }).click();
     // run() wraps output in a console.group/groupEnd pair; the first
@@ -80,7 +105,7 @@ test.describe('Tlang Playground', () => {
   });
 
   test('can toggle constant folding optimization', async ({ page }) => {
-    await page.getByLabel('Optimization Settings').click();
+    await openOptimizationSettings(page);
 
     const constantFolding = page.getByRole('menuitemcheckbox', {
       name: 'Constant folding',
@@ -97,16 +122,11 @@ test.describe('Tlang Playground', () => {
 });
 
 test.describe('Optimization options URL persistence', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/tlang');
-    // Ensure the WASM-backed editor is ready before interacting.
-    await expect(page.locator('.cm-content').first()).toBeVisible();
-  });
-
   test('disabling constant folding adds opt=cf:false to hash', async ({
     page,
   }) => {
-    await page.getByLabel('Optimization Settings').click();
+    await gotoPlayground(page);
+    await openOptimizationSettings(page);
     await page
       .getByRole('menuitemcheckbox', { name: 'Constant folding' })
       .click();
@@ -117,7 +137,8 @@ test.describe('Optimization options URL persistence', () => {
   test('enabling ANF transform in interpreter mode adds opt=anf:full to hash', async ({
     page,
   }) => {
-    await page.getByLabel('Optimization Settings').click();
+    await gotoPlayground(page);
+    await openOptimizationSettings(page);
     await page.getByRole('menuitemcheckbox', { name: 'ANF transform' }).click();
 
     await expect(page).toHaveURL(/opt=anf%3Afull/);
@@ -126,7 +147,8 @@ test.describe('Optimization options URL persistence', () => {
   test('removing non-default optimizations removes opt from hash', async ({
     page,
   }) => {
-    await page.getByLabel('Optimization Settings').click();
+    await gotoPlayground(page);
+    await openOptimizationSettings(page);
 
     const anfCheckbox = page.getByRole('menuitemcheckbox', {
       name: 'ANF transform',
@@ -143,9 +165,14 @@ test.describe('Optimization options URL persistence', () => {
   test('selecting ANF Full mode in compiler mode adds opt=anf:full to hash', async ({
     page,
   }) => {
-    await page.locator('.toolbar__runner').selectOption('JavaScript');
-    await page.getByLabel('Optimization Settings').click();
-    await page.getByRole('menuitemradio', { name: 'Full' }).click();
+    await gotoPlayground(page);
+    await page
+      .locator('.toolbar__runner')
+      .locator('select')
+      .selectOption('JavaScript');
+    await expect(page.locator('#javascript')).toBeVisible();
+    await openOptimizationSettings(page);
+    await optimizationRadio(page, 'Full').click();
 
     await expect(page).toHaveURL(/opt=anf%3Afull/);
   });
@@ -153,10 +180,9 @@ test.describe('Optimization options URL persistence', () => {
   test('constant folding off is restored from URL hash on load', async ({
     page,
   }) => {
-    await page.goto('/tlang#opt=cf%3Afalse');
-    await expect(page.locator('.cm-content').first()).toBeVisible();
+    await gotoPlayground(page, '#opt=cf%3Afalse');
 
-    await page.getByLabel('Optimization Settings').click();
+    await openOptimizationSettings(page);
 
     await expect(
       page.getByRole('menuitemcheckbox', { name: 'Constant folding' }),
@@ -166,10 +192,9 @@ test.describe('Optimization options URL persistence', () => {
   test('ANF full mode in interpreter is restored from URL hash on load', async ({
     page,
   }) => {
-    await page.goto('/tlang#opt=anf%3Afull');
-    await expect(page.locator('.cm-content').first()).toBeVisible();
+    await gotoPlayground(page, '#opt=anf%3Afull');
 
-    await page.getByLabel('Optimization Settings').click();
+    await openOptimizationSettings(page);
 
     await expect(
       page.getByRole('menuitemcheckbox', { name: 'ANF transform' }),
@@ -179,26 +204,27 @@ test.describe('Optimization options URL persistence', () => {
   test('ANF full mode in compiler is restored from URL hash on load', async ({
     page,
   }) => {
-    await page.goto('/tlang#runner=JavaScript&opt=anf%3Afull');
-    await expect(page.locator('.cm-content').first()).toBeVisible();
+    await gotoPlayground(page, '#runner=JavaScript&opt=anf%3Afull');
+    await expect(page.locator('#javascript')).toBeVisible();
 
-    await page.getByLabel('Optimization Settings').click();
+    await openOptimizationSettings(page);
 
-    await expect(
-      page.getByRole('menuitemradio', { name: 'Full' }),
-    ).toHaveJSProperty('checked', true);
-    await expect(
-      page.getByRole('menuitemradio', { name: 'Minimal' }),
-    ).toHaveJSProperty('checked', false);
+    await expect(optimizationRadio(page, 'Full')).toHaveJSProperty(
+      'checked',
+      true,
+    );
+    await expect(optimizationRadio(page, 'Minimal')).toHaveJSProperty(
+      'checked',
+      false,
+    );
   });
 
   test('combined options are restored from URL hash on load', async ({
     page,
   }) => {
-    await page.goto('/tlang#opt=cf%3Afalse%2Canf%3Afull');
-    await expect(page.locator('.cm-content').first()).toBeVisible();
+    await gotoPlayground(page, '#opt=cf%3Afalse%2Canf%3Afull');
 
-    await page.getByLabel('Optimization Settings').click();
+    await openOptimizationSettings(page);
 
     await expect(
       page.getByRole('menuitemcheckbox', { name: 'Constant folding' }),
