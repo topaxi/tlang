@@ -130,6 +130,10 @@ export class TabElement extends LitElement {
       cursor: pointer;
       padding: 0 1ch;
     }
+
+    button:hover {
+      background-color: var(--t-button-hover-background-color);
+    }
   `;
 
   @property({ type: String, reflect: true })
