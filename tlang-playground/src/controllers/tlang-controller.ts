@@ -33,7 +33,7 @@ export class TlangController {
   private cachedJS: string | null = null;
   private optimizationOptions: JsOptimizationOptions = {
     constantFolding: true,
-    anfTransform: true,
+    anfTransform: undefined,
   };
 
   constructor(initialSource: string, initialRunner: Runner) {

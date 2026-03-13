@@ -86,7 +86,8 @@ impl JsHirPrettyOptions {
 #[serde(rename_all = "camelCase")]
 pub struct JsOptimizationOptions {
     pub constant_folding: Option<bool>,
-    pub anf_transform: Option<bool>,
+    /// ANF transform mode: `"off"`, `"minimal"` (JS-only lifting), or `"full"`.
+    pub anf_transform: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -151,7 +152,7 @@ impl Tlang {
             runner: runner_kind,
             optimization_options: JsOptimizationOptions {
                 constant_folding: Some(true),
-                anf_transform: Some(false),
+                anf_transform: None,
             },
             build: BuildArtifacts::default(),
             analyzer,
@@ -259,11 +260,19 @@ impl Tlang {
 
             match self.runner {
                 RunnerKind::JavaScript => {
-                    // JsAnfTransform is always required for correct JS codegen —
-                    // it lifts non-JS-expressible expressions (for-loops, match
-                    // expressions, etc.) that cannot be emitted as JS expressions.
-                    let mut passes: Vec<Box<dyn HirPass>> =
-                        vec![Box::new(JsAnfTransform::default())];
+                    let anf_mode = self
+                        .optimization_options
+                        .anf_transform
+                        .as_deref()
+                        .unwrap_or("minimal");
+
+                    let mut passes: Vec<Box<dyn HirPass>> = match anf_mode {
+                        "full" => vec![Box::new(tlang_hir_opt::anf_transform::AnfTransform::<
+                            tlang_hir_opt::anf_transform::FullAnfFilter,
+                        >::default())],
+                        // "minimal" or any other value: use JS-specific filter
+                        _ => vec![Box::new(JsAnfTransform::default())],
+                    };
 
                     passes.push(Box::new(
                         tlang_hir_opt::symbol_resolution::SymbolResolution::default(),
@@ -283,7 +292,13 @@ impl Tlang {
 
                     // Optional general ANF transform — off by default; reserved for
                     // future bytecode compilation work.
-                    if self.optimization_options.anf_transform.unwrap_or(false) {
+                    if self
+                        .optimization_options
+                        .anf_transform
+                        .as_deref()
+                        .unwrap_or("off")
+                        == "full"
+                    {
                         passes.push(Box::new(tlang_hir_opt::anf_transform::AnfTransform::<
                             tlang_hir_opt::anf_transform::FullAnfFilter,
                         >::default()));

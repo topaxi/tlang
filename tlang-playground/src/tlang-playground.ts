@@ -164,6 +164,19 @@ export class TlangPlayground extends LitElement {
       text-decoration: underline;
     }
 
+    .anf-mode {
+      display: flex;
+      align-items: center;
+    }
+
+    .anf-mode::before {
+      content: '\\00a0\\00a0';
+    }
+
+    .anf-mode > label {
+      margin-right: 0.25em;
+    }
+
     .editor-split {
       overflow: hidden;
     }
@@ -235,7 +248,7 @@ export class TlangPlayground extends LitElement {
 
   @state() optimizationOptions: JsOptimizationOptions = {
     constantFolding: true,
-    anfTransform: false,
+    anfTransform: undefined,
   };
 
   private tlang = new TlangController(this.source, this.runner);
@@ -354,6 +367,17 @@ export class TlangPlayground extends LitElement {
     this.tlang.setOptimizations(this.optimizationOptions);
   }
 
+  private setOptimizationOption<K extends keyof JsOptimizationOptions>(
+    key: K,
+    value: JsOptimizationOptions[K],
+  ) {
+    this.optimizationOptions = {
+      ...this.optimizationOptions,
+      [key]: value,
+    };
+    this.tlang.setOptimizations(this.optimizationOptions);
+  }
+
   private handleConsoleCollapse(event: CustomEvent<{ collapsed: boolean }>) {
     this.outputSplit.disabled = event.detail.collapsed ? 'resize-only' : false;
 
@@ -444,12 +468,38 @@ export class TlangPlayground extends LitElement {
               </t-menuitem-checkbox>
               ${this.runner === 'Interpreter'
                 ? html`<t-menuitem-checkbox
-                    @change=${() => this.toggleOptimization('anfTransform')}
-                    .checked=${this.optimizationOptions.anfTransform}
+                    @change=${() =>
+                      this.setOptimizationOption(
+                        'anfTransform',
+                        this.optimizationOptions.anfTransform === 'full'
+                          ? 'off'
+                          : 'full',
+                      )}
+                    .checked=${this.optimizationOptions.anfTransform === 'full'}
                   >
                     ANF transform
                   </t-menuitem-checkbox>`
-                : null}
+                : html`<t-menuitem-group class="anf-mode">
+                    <label id="anf-mode__label">ANF</label>
+                    <t-menuitem-radio
+                      aria-labelledby="anf-mode__label"
+                      @click=${() =>
+                        this.setOptimizationOption('anfTransform', 'minimal')}
+                      .checked=${this.optimizationOptions.anfTransform !==
+                      'full'}
+                    >
+                      Minimal
+                    </t-menuitem-radio>
+                    <t-menuitem-radio
+                      aria-labelledby="anf-mode__label"
+                      @click=${() =>
+                        this.setOptimizationOption('anfTransform', 'full')}
+                      .checked=${this.optimizationOptions.anfTransform ===
+                      'full'}
+                    >
+                      Full
+                    </t-menuitem-radio>
+                  </t-menuitem-group>`}
             </t-menu>
             <t-button @click=${this.share}>Share</t-button>
             <select
