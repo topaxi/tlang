@@ -30,6 +30,7 @@ tlang_symbols = { path = "../tlang_symbols", features = ["serde"] }
 tlang_runtime = { path = "../tlang_runtime" }
 tlang_macros = { path = "../tlang_macros" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }
+tlang_diagnostics = { path = "../tlang_diagnostics" }
 inventory = { workspace = true }
 log = { workspace = true }
 ron = { workspace = true }

@@ -11,6 +11,7 @@ use tlang_hir as hir;
 use tlang_hir_opt::HirPass;
 use tlang_hir_opt::hir_opt::HirOptimizer;
 use tlang_hir_pretty::{HirPretty, HirPrettyOptions};
+use tlang_diagnostics::{render_parse_issues, render_semantic_diagnostics};
 use tlang_parser::Parser;
 use tlang_parser::error::{ParseError, ParseIssue};
 use tlang_semantics::SemanticAnalyzer;
@@ -430,6 +431,25 @@ impl Tlang {
     pub fn js_ast_string(&mut self) -> String {
         let _ = self.compile_to_js();
         self.js.get_js_ast_json().to_string()
+    }
+
+    #[wasm_bindgen(js_name = "renderDiagnostics")]
+    pub fn render_diagnostics(&mut self) -> String {
+        let diagnostics = self.analyzer.get_diagnostics();
+        if diagnostics.is_empty() {
+            return String::new();
+        }
+        render_semantic_diagnostics("playground.tlang", &self.source, &diagnostics)
+    }
+
+    #[wasm_bindgen(js_name = "renderParseErrors")]
+    pub fn render_parse_errors(&mut self) -> String {
+        let source = self.source.clone();
+        let issues = self.parse_issues();
+        if issues.is_empty() {
+            return String::new();
+        }
+        render_parse_issues("playground.tlang", &source, issues)
     }
 
     #[wasm_bindgen(js_name = "getDiagnostics")]

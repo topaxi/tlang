@@ -121,6 +121,28 @@ test.describe('Tlang Playground', () => {
   });
 });
 
+test.describe('Diagnostics in console', () => {
+  test('semantic error appears exactly once in the console', async ({
+    page,
+  }) => {
+    // Source: `missing_var;` — triggers "Use of undeclared variable" error
+    await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
+
+    await expect(
+      page.locator('t-console-message[type="error"]'),
+    ).toHaveCount(1);
+  });
+
+  test('parse error appears exactly once in the console', async ({ page }) => {
+    // Source: `let x = ;` — triggers a parse error
+    await gotoPlayground(page, '#source=DYUwLgBAHhC8EG4g');
+
+    await expect(
+      page.locator('t-console-message[type="error"]'),
+    ).toHaveCount(1);
+  });
+});
+
 test.describe('Optimization options URL persistence', () => {
   test('disabling constant folding adds opt=cf:false to hash', async ({
     page,

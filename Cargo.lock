@@ -1685,6 +1685,7 @@ dependencies = [
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_codegen_js",
+ "tlang_diagnostics",
  "tlang_hir",
  "tlang_hir_opt",
  "tlang_hir_pretty",
