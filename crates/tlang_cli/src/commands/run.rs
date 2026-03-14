@@ -66,6 +66,18 @@ fn compile(input_file: &str) -> tlang_hir::Module {
         std::process::exit(1);
     }
 
+    let warnings = semantic_analyzer
+        .get_diagnostics()
+        .into_iter()
+        .filter(|d| d.is_warning())
+        .collect::<Vec<_>>();
+    if !warnings.is_empty() {
+        eprint!(
+            "{}",
+            render_semantic_diagnostics(&path.to_string_lossy(), &source, &warnings)
+        );
+    }
+
     let (mut module, meta) = lower_to_hir(
         &ast,
         semantic_analyzer.symbol_id_allocator(),

@@ -11,3 +11,33 @@ More bad: \z
 Good: 
 , Bad: \w
 \p
+
+warning: Unknown escape sequence '\q' in string literal
+  ┌─ /home/topaxi/projects/tlang/tests/strings/invalid_escape_sequences.tlang:6:20
+  │
+6 │     let invalid1 = "Bad escape: \q";
+  │                    ^^^^^^^^^^^^^^^^
+
+warning: Unknown escape sequence '\x' in string literal
+  ┌─ /home/topaxi/projects/tlang/tests/strings/invalid_escape_sequences.tlang:7:20
+  │
+7 │     let invalid2 = "Another bad: \x";
+  │                    ^^^^^^^^^^^^^^^^^
+
+warning: Unknown escape sequence '\z' in string literal
+  ┌─ /home/topaxi/projects/tlang/tests/strings/invalid_escape_sequences.tlang:8:20
+  │
+8 │     let invalid3 = "More bad: \z";
+  │                    ^^^^^^^^^^^^^^
+
+warning: Unknown escape sequence '\w' in string literal
+   ┌─ /home/topaxi/projects/tlang/tests/strings/invalid_escape_sequences.tlang:11:17
+   │
+11 │     let mixed = "Good: \n, Bad: \w";
+   │                 ^^^^^^^^^^^^^^^^^^^
+
+warning: Unknown escape sequence '\p' in string literal
+   ┌─ /home/topaxi/projects/tlang/tests/strings/invalid_escape_sequences.tlang:14:20
+   │
+14 │     let bad_char = '\p';
+   │                    ^^^^

@@ -29,18 +29,6 @@ fn is_alpha([c, ...rest]) {
     (is_upper || is_lower) && is_alpha(rest)
 }
 
-// Simulated char_code function (simplified)
-fn char_code("a") { 97 }
-fn char_code("b") { 98 }
-fn char_code("c") { 99 }
-fn char_code("A") { 65 }
-fn char_code("B") { 66 }
-fn char_code("C") { 67 }
-fn char_code("1") { 49 }
-fn char_code("2") { 50 }
-fn char_code(" ") { 32 }
-fn char_code(_) { 32 }  // Default for unknown chars
-
 log("=== String Processing Demo ===");
 
 // Test palindrome detection

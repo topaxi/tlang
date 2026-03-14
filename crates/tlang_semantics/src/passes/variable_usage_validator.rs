@@ -323,6 +323,31 @@ impl<'ast> Visitor<'ast> for VariableUsageValidator {
             StmtKind::Let(decl) => {
                 self.analyze_variable_declaration(decl, ctx);
             }
+            StmtKind::ImplBlock(impl_block) => {
+                // Implementing a protocol counts as using it.
+                let protocol_name = impl_block.protocol_name.to_string();
+                self.mark_as_used_by_name(&protocol_name, stmt.span, ctx);
+
+                // Methods installed via `apply X` are dispatched through method lookups on the
+                // target type and are never called directly in source code, so mark them as used.
+                for apply_ident in &impl_block.apply_methods {
+                    let method_name = apply_ident.as_str();
+                    let qualified_name = format!("{protocol_name}::{method_name}");
+                    for method in &impl_block.methods {
+                        if method.name() == method_name {
+                            let arity = method.parameters.len();
+                            self.mark_as_used_by_name_and_arity(
+                                &qualified_name,
+                                arity,
+                                apply_ident.span,
+                                ctx,
+                            );
+                        }
+                    }
+                }
+
+                walk_stmt(self, stmt, ctx);
+            }
             _ => walk_stmt(self, stmt, ctx),
         }
     }

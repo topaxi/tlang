@@ -143,11 +143,11 @@ mod tests {
                     })?
             }
             Backend::JavaScript => {
-                #[allow(clippy::zombie_processes)]
                 let tlang_js_compiler_output = Command::new("./target/release/tlang")
                     .arg("compile")
                     .arg(file_path)
                     .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
                     .spawn()
                     .map_err(|err| {
                         format!(
@@ -159,6 +159,7 @@ mod tests {
 
                 exec_start = std::time::Instant::now();
 
+                #[allow(clippy::zombie_processes)]
                 let javascript_output = Command::new("node")
                     .stdin(tlang_js_compiler_output.stdout.unwrap())
                     .stdout(Stdio::piped())
@@ -172,13 +173,28 @@ mod tests {
                         )
                     })?;
 
-                javascript_output.wait_with_output().map_err(|e| {
+                let compiler_stderr = tlang_js_compiler_output.stderr.unwrap();
+                let mut node_output = javascript_output.wait_with_output().map_err(|e| {
                     format!(
                         "Failed to get JavaScript output for {}: {}",
                         file_path.display(),
                         e
                     )
-                })?
+                })?;
+
+                // Prepend compiler warnings (stderr) to the captured output so
+                // they appear in snapshots just like interpreter warnings do.
+                use std::io::Read;
+                let mut compiler_warnings = Vec::new();
+                std::io::BufReader::new(compiler_stderr)
+                    .read_to_end(&mut compiler_warnings)
+                    .ok();
+                if !compiler_warnings.is_empty() {
+                    compiler_warnings.extend_from_slice(&node_output.stderr);
+                    node_output.stderr = compiler_warnings;
+                }
+
+                node_output
             }
         };
         let elapsed = start.elapsed();

@@ -24,15 +24,7 @@ fn compose(f, g) { fn(x) { f(g(x)) } }
 fn add(a) { fn(b) { a + b } }
 fn multiply(a) { fn(b) { a * b } }
 
-fn add_then_multiply(add_val, mult_val) {
-    compose(multiply(mult_val), add(add_val))
-}
-
 // Partial application helpers
-fn partial_apply_2(func, arg1) {
-    fn(arg2) { func(arg1, arg2) }
-}
-
 fn apply_twice(func) {
     fn(x) { func(func(x)) }
 }
