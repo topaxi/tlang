@@ -17,7 +17,7 @@ Alphabetic string tests:
 [true, false, true, true]
 
 warning: Unused function `is_alpha/1`
-   ┌─ /home/topaxi/projects/tlang/tests/strings/string_processing.tlang:24:4
+   ┌─ [WORKSPACE_ROOT]/tests/strings/string_processing.tlang:24:4
    │
 24 │ fn is_alpha("") { true }
    │    ^^^^^^^^

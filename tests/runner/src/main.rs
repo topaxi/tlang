@@ -225,8 +225,13 @@ mod tests {
         THREAD_PANIC_RE.replace_all(output, "thread '$1' panicked at")
     }
 
-    fn apply_redactions(output: &str) -> String {
+    fn apply_redactions(output: &str, workspace_root: &std::path::Path) -> String {
         let mut result = output.to_string();
+
+        // Redact the absolute workspace root path so snapshots are portable across machines
+        // (e.g. /home/topaxi/projects/tlang → [WORKSPACE_ROOT])
+        let workspace_root_str = workspace_root.to_string_lossy();
+        result = result.replace(workspace_root_str.as_ref(), "[WORKSPACE_ROOT]");
 
         // Redact log timestamps that may vary between runs
         result = TIMESTAMP_RE
@@ -329,13 +334,13 @@ mod tests {
                             insta::with_settings!({
                                 description => format!("Known failure for Backend: {}\n\tOutput mismatch.", backend.as_str()),
                             }, {
-                                insta::assert_snapshot!(test_name, apply_redactions(&output));
+                                insta::assert_snapshot!(test_name, apply_redactions(&output, workspace_root));
                             });
                         } else {
                             insta::with_settings!({
                                 description => format!("Backend: {}", backend.as_str()),
                             }, {
-                                insta::assert_snapshot!(test_name, apply_redactions(&output));
+                                insta::assert_snapshot!(test_name, apply_redactions(&output, workspace_root));
                             });
                         }
                     }
