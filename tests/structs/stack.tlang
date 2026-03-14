@@ -10,7 +10,7 @@ fn pop([]) { Option::None }
 fn pop([top, ...rest]) { Option::Some([top, rest]) }
 
 fn peek([]) { Option::None }
-fn peek([top, ...rest]) { Option::Some(top) }
+fn peek([top]) { Option::Some(top) }
 
 fn is_empty([]) { true }
 fn is_empty(_) { false }
