@@ -360,11 +360,18 @@ impl Tlang {
             let _ = self.parse();
             self.lower_to_hir();
             if let Some(hir) = self.build.hir.as_ref() {
-                self.js.generate_code(hir);
+                self.js
+                    .generate_code_with_source_map(hir, "playground.tlang", &self.source);
             }
         }
 
         Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "getSourceMap")]
+    pub fn get_source_map(&mut self) -> Option<String> {
+        let _ = self.compile_to_js();
+        self.js.get_source_map_json()
     }
 
     #[wasm_bindgen(js_name = "getHIRString")]

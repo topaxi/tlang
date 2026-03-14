@@ -7,6 +7,12 @@ import {
   type Runner,
 } from '../tlang';
 import { ConsoleMessage, createConsoleMessage } from '../components/t-console';
+import {
+  type ParsedSourceMap,
+  parseSourceMap,
+  remapStack,
+  shiftSourceMapLines,
+} from '../utils/source-map';
 
 type CodemirrorSeverity = 'hint' | 'info' | 'warning' | 'error';
 
@@ -32,6 +38,8 @@ export class TlangController {
   private cachedHIR: string | null = null;
   private cachedJS: string | null = null;
   private cachedJSAST: string | null = null;
+  private cachedSourceMap: ParsedSourceMap | null = null;
+  private prefixLines = 0;
   private optimizationOptions: JsOptimizationOptions = {
     constantFolding: true,
     anfTransform: undefined,
@@ -73,6 +81,8 @@ export class TlangController {
     this.cachedHIR = null;
     this.cachedJS = null;
     this.cachedJSAST = null;
+    this.cachedSourceMap = null;
+    this.prefixLines = 0;
 
     this.tlang = this.createTlang(source, runner);
     this.tlang.setOptimizations(this.optimizationOptions);
@@ -121,7 +131,7 @@ export class TlangController {
       }
     } catch (error) {
       if (error instanceof Error) {
-        this.logToConsole('error', error);
+        this.logToConsole('error', this.remapError(error));
       }
 
       let openGroups = this.getConsoleOpenGroups();
@@ -148,17 +158,50 @@ export class TlangController {
   }
 
   private runCompiled() {
-    let bindings = {
+    const bindings = {
       console: this.tlangConsole,
     };
 
-    let bindingsDestructuring = `let {${Object.keys(bindings).join(',')}} = ___js_bindings;`;
-    let fn = new Function(
+    const bindingsDestructuring = `let {${Object.keys(bindings).join(',')}} = ___js_bindings;`;
+    const stdlib = getStandardLibraryCompiled();
+
+    // Compute the number of newlines in the preamble that precedes user code.
+    // This is needed to shift the source map so generated-line numbers match
+    // the actual lines inside the new Function body.
+    const prefix = `${bindingsDestructuring}${stdlib}\n{`;
+    const prefixLines = (prefix.match(/\n/g) ?? []).length;
+    this.prefixLines = prefixLines;
+
+    let sourceMappingComment = '\n//# sourceURL=tlang-script';
+
+    const rawMap = this.tlang.getSourceMap?.();
+    if (rawMap) {
+      const shifted = shiftSourceMapLines(rawMap, prefixLines);
+      this.cachedSourceMap = parseSourceMap(shifted);
+      const encoded = btoa(shifted);
+      sourceMappingComment += `\n//# sourceMappingURL=data:application/json;base64,${encoded}`;
+    }
+
+    const fn = new Function(
       '___js_bindings',
-      `${bindingsDestructuring}${getStandardLibraryCompiled()}\n{${this.tlang.getJavaScript()}};`,
+      `${prefix}${this.tlang.getJavaScript()}};${sourceMappingComment}`,
     );
 
     fn(bindings);
+  }
+
+  /** Remap an error's stack trace using the current source map, if available. */
+  private remapError(error: Error): Error {
+    if (!this.cachedSourceMap || !error.stack) return error;
+    const remappedStack = remapStack(
+      error.stack,
+      this.cachedSourceMap,
+      'tlang-script',
+      this.prefixLines,
+    );
+    const remapped = new Error(error.message);
+    remapped.stack = remappedStack;
+    return remapped;
   }
 
   private runInterpreted() {
@@ -190,6 +233,7 @@ export class TlangController {
     this.cachedHIR = null;
     this.cachedJS = null;
     this.cachedJSAST = null;
+    this.cachedSourceMap = null;
     this.tlang.setOptimizations(options);
   }
 
