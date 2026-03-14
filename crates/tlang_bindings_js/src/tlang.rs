@@ -451,12 +451,12 @@ impl Tlang {
             .analyzer
             .get_diagnostics()
             .iter()
-            .map(|d| codemirror::from_tlang_diagnostic(d))
+            .map(codemirror::from_tlang_diagnostic)
             .collect::<Vec<_>>();
         let parse_errors = self
             .parse_issues()
             .iter()
-            .map(|e| codemirror::from_parse_issue(e));
+            .map(codemirror::from_parse_issue);
 
         let all: Vec<_> = parse_errors.chain(diagnostics).collect();
         Ok(serde_wasm_bindgen::to_value(&all)?.unchecked_into())
