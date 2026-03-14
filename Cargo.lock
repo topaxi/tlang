@@ -1718,6 +1718,7 @@ dependencies = [
  "oxc_ast",
  "oxc_codegen",
  "oxc_estree",
+ "oxc_sourcemap",
  "oxc_span",
  "pretty_assertions",
  "tlang_ast",

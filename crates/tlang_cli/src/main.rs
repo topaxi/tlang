@@ -16,6 +16,7 @@ fn validate_compile_args(matches: &ArgMatches) -> Command {
     let silent = matches.get_flag("silent");
     let output_stdlib = matches.get_flag("output_stdlib");
     let quiet_warnings = matches.get_flag("quiet_warnings");
+    let source_map = matches.get_flag("source_map");
 
     let input_file = if output_stdlib {
         None
@@ -50,6 +51,7 @@ fn validate_compile_args(matches: &ArgMatches) -> Command {
         output_stdlib,
         silent,
         quiet_warnings,
+        source_map,
     })
 }
 
@@ -68,7 +70,8 @@ fn get_args() -> Command {
                 .arg(arg!(output_stdlib: --"output-stdlib" "Flag to output the stdlib"))
                 .arg(arg!(output_type: -t --"output-type" <OUTPUT_TYPE> "Output type, defaults to js"))
                 .arg(arg!(silent: -s --"silent" "Flag to suppress output"))
-                .arg(arg!(quiet_warnings: -q --"quiet-warnings" "Flag to suppress warning output")),
+                .arg(arg!(quiet_warnings: -q --"quiet-warnings" "Flag to suppress warning output"))
+                .arg(arg!(source_map: --"source-map" "Emit a source map alongside JS output (requires --output-file)")),
         );
 
     let matches = command.clone().get_matches();

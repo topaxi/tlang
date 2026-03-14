@@ -56,6 +56,7 @@ pub struct CompileOptions {
     pub output_stdlib: bool,
     pub silent: bool,
     pub quiet_warnings: bool,
+    pub source_map: bool,
 }
 
 fn compile_standard_library() -> Result<String, ParserError> {
@@ -138,7 +139,34 @@ pub fn handle_compile(options: CompileOptions) {
                 Ok(mut module) => {
                     match (&options.target, &options.output_format) {
                         (CompileTargetArg::Js, OutputFormat::Source) => {
-                            JsTarget.compile(&source, &mut module)
+                            if options.source_map {
+                                let source_name = path.to_string_lossy();
+                                let mut generator = CodegenJS::default();
+                                generator.generate_code_with_source_map(
+                                    &module,
+                                    &source_name,
+                                    &source,
+                                );
+                                if let Some(output_file) = &options.output_file {
+                                    // Write source map alongside the output file.
+                                    let map_file = format!("{output_file}.map");
+                                    if let Some(map) = generator.get_source_map() {
+                                        let map_json = map.to_json_string();
+                                        let mut f = match File::create(&map_file) {
+                                            Err(why) => {
+                                                panic!("couldn't create {map_file}: {why}")
+                                            }
+                                            Ok(f) => f,
+                                        };
+                                        if let Err(why) = f.write_all(map_json.as_bytes()) {
+                                            panic!("couldn't write to {map_file}: {why}")
+                                        }
+                                    }
+                                }
+                                Ok(generator.get_output().to_string())
+                            } else {
+                                JsTarget.compile(&source, &mut module)
+                            }
                         }
                         (_, OutputFormat::HirRaw) => HirRawTarget.compile(&source, &mut module),
                         (_, OutputFormat::Hir) => HirTarget.compile(&source, &mut module),
