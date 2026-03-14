@@ -39,8 +39,7 @@ fn main() {
     };
 
     let mut parser = tlang_parser::Parser::from_source(&code);
-    let parse_result =
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| parser.parse()));
+    let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| parser.parse()));
     let mut ast = match parse_result {
         Ok(Ok(ast)) => ast,
         Ok(Err(err)) => {
