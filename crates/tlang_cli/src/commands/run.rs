@@ -1,10 +1,10 @@
 use std::{fs::File, io::Read, path::Path};
 
 use tlang_ast_lowering::lower_to_hir;
+use tlang_diagnostics::{render_parse_issues, render_semantic_diagnostics};
 use tlang_hir_opt::HirOptimizer;
 use tlang_runtime::{memory::TlangValue, vm::VM};
 use tlang_semantics::SemanticAnalyzer;
-use tlang_diagnostics::{render_parse_issues, render_semantic_diagnostics};
 
 pub fn handle_run(input_file: &str) {
     let module = compile(input_file);
@@ -37,7 +37,10 @@ fn compile(input_file: &str) -> tlang_hir::Module {
     let mut ast = match parse_result {
         Ok(Ok(ast)) => ast,
         Ok(Err(err)) => {
-            eprint!("{}", render_parse_issues(&path.to_string_lossy(), &source, err.issues()));
+            eprint!(
+                "{}",
+                render_parse_issues(&path.to_string_lossy(), &source, err.issues())
+            );
             std::process::exit(1);
         }
         Err(payload) => {
@@ -45,7 +48,10 @@ fn compile(input_file: &str) -> tlang_hir::Module {
             if issues.is_empty() {
                 std::panic::resume_unwind(payload);
             }
-            eprint!("{}", render_parse_issues(&path.to_string_lossy(), &source, issues));
+            eprint!(
+                "{}",
+                render_parse_issues(&path.to_string_lossy(), &source, issues)
+            );
             std::process::exit(1);
         }
     };

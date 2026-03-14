@@ -237,7 +237,10 @@ impl VariableUsageValidator {
                     suggestion.name,
                 )
                 .with_label(
-                    format!("{} `{}` is defined here", suggestion.symbol_type, suggestion.name),
+                    format!(
+                        "{} `{}` is defined here",
+                        suggestion.symbol_type, suggestion.name
+                    ),
                     suggestion.defined_at,
                 ),
             );
