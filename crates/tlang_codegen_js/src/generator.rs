@@ -183,6 +183,32 @@ impl CodegenJS {
     pub fn get_source_map(&self) -> Option<&SourceMap> {
         self.source_map.as_ref()
     }
+
+    /// Returns the source map serialized as a JSON string, or `None` if no
+    /// source map was generated. The generated line positions in the map
+    /// correspond to `get_output()` — call [`shift_source_map_lines`] if you
+    /// need to account for lines prepended to the final file (e.g. stdlib).
+    pub fn get_source_map_json(&self) -> Option<String> {
+        self.source_map.as_ref().map(|m| m.to_json_string())
+    }
+}
+
+/// Prepend `line_offset` empty source-map lines to `map_json` by inserting
+/// that many semicolon separators at the start of the `"mappings"` value.
+///
+/// The source map spec uses `;` as a generated-line separator, so N leading
+/// semicolons shift every mapping forward by N lines — exactly what is needed
+/// when the generated code is preceded by N lines of preamble (e.g. the
+/// compiled standard library) in the final output file.
+pub fn shift_source_map_lines(map_json: &str, line_offset: usize) -> String {
+    if line_offset == 0 {
+        return map_json.to_string();
+    }
+    let prefix = ";".repeat(line_offset);
+    // OXC always serialises the mappings field as `"mappings":"..."`.
+    // The VLQ alphabet (A-Za-z0-9+/,;) never contains `"`, so a single
+    // targeted replacement is safe here.
+    map_json.replacen(r#""mappings":""#, &format!(r#""mappings":"{prefix}"#), 1)
 }
 
 // ---------------------------------------------------------------------------

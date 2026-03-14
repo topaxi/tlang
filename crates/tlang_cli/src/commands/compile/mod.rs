@@ -8,7 +8,10 @@ use std::{
 
 use output::{CompileTarget, ast::AstTarget, hir::HirTarget, hir_raw::HirRawTarget, js::JsTarget};
 use tlang_ast_lowering::lower_to_hir;
-use tlang_codegen_js::{generator::CodegenJS, js_hir_opt::JsHirOptimizer};
+use tlang_codegen_js::{
+    generator::{CodegenJS, shift_source_map_lines},
+    js_hir_opt::JsHirOptimizer,
+};
 use tlang_hir_opt::{HirOptimizer, HirPass};
 use tlang_semantics::SemanticAnalyzer;
 
@@ -129,72 +132,11 @@ pub fn handle_compile(options: CompileOptions) {
             panic!("couldn't read {}: {}", path.display(), why)
         }
 
-        let output_result = if options.output_format == OutputFormat::Ast {
-            // AST output has a separate pipeline path as it doesn't require HIR lowering
-            let mut module = tlang_hir::Module::default();
-            AstTarget.compile(&source, &mut module)
-        } else {
-            // Standard pipeline: Parse -> AST -> Semantics -> HIR -> Optimize
-            match compile_to_hir(&source, &options.target, !options.quiet_warnings) {
-                Ok(mut module) => {
-                    match (&options.target, &options.output_format) {
-                        (CompileTargetArg::Js, OutputFormat::Source) => {
-                            if options.source_map {
-                                let source_name = path.to_string_lossy();
-                                let mut generator = CodegenJS::default();
-                                generator.generate_code_with_source_map(
-                                    &module,
-                                    &source_name,
-                                    &source,
-                                );
-                                if let Some(output_file) = &options.output_file {
-                                    // Write source map alongside the output file.
-                                    let map_file = format!("{output_file}.map");
-                                    if let Some(map) = generator.get_source_map() {
-                                        let map_json = map.to_json_string();
-                                        let mut f = match File::create(&map_file) {
-                                            Err(why) => {
-                                                panic!("couldn't create {map_file}: {why}")
-                                            }
-                                            Ok(f) => f,
-                                        };
-                                        if let Err(why) = f.write_all(map_json.as_bytes()) {
-                                            panic!("couldn't write to {map_file}: {why}")
-                                        }
-                                    }
-                                }
-                                Ok(generator.get_output().to_string())
-                            } else {
-                                JsTarget.compile(&source, &mut module)
-                            }
-                        }
-                        (_, OutputFormat::HirRaw) => HirRawTarget.compile(&source, &mut module),
-                        (_, OutputFormat::Hir) => HirTarget.compile(&source, &mut module),
-                        // Invalid combinations should be caught by argument parsing, but as a fallback:
-                        _ => panic!("Unsupported target/format combination"),
-                    }
-                }
-                Err(err) => Err(err),
-            }
-        };
+        let (mut output, source_map) = compile_source(path, &source, &options);
 
-        let output = match output_result {
-            Ok(output) => output,
-            Err(errors) => {
-                eprintln!("{errors:?}");
-                return;
-            }
-        };
-
-        let output = if matches!(
-            (&options.target, &options.output_format),
-            (CompileTargetArg::Js, OutputFormat::Source)
-        ) {
-            let std_lib_source = compile_standard_library().unwrap();
-            format!("{std_lib_source}\n{{{output}}}")
-        } else {
-            output
-        };
+        if let Some(map_json) = source_map {
+            append_source_map(&mut output, &map_json, options.output_file.as_deref());
+        }
 
         if options.output_file.is_none() {
             println!("{output}");
@@ -211,4 +153,118 @@ pub fn handle_compile(options: CompileOptions) {
             panic!("couldn't write to {output_file_name}: {why}")
         }
     }
+}
+
+/// Compile `source` through the full pipeline and return `(js_output, optional_map_json)`.
+/// The map JSON (when present) already has its generated lines shifted to
+/// account for the stdlib preamble that is prepended to the JS output.
+fn compile_source(path: &Path, source: &str, options: &CompileOptions) -> (String, Option<String>) {
+    // Holds the unshifted source map JSON; shifted once we know the stdlib
+    // preamble line count.
+    let mut pending_source_map: Option<String> = None;
+
+    let output_result = if options.output_format == OutputFormat::Ast {
+        let mut module = tlang_hir::Module::default();
+        AstTarget.compile(source, &mut module)
+    } else {
+        match compile_to_hir(source, &options.target, !options.quiet_warnings) {
+            Ok(mut module) => match (&options.target, &options.output_format) {
+                (CompileTargetArg::Js, OutputFormat::Source) => {
+                    if options.source_map {
+                        let source_name = path.to_string_lossy();
+                        let mut generator = CodegenJS::default();
+                        generator.generate_code_with_source_map(&module, &source_name, source);
+                        pending_source_map = generator.get_source_map_json();
+                        Ok(generator.get_output().to_string())
+                    } else {
+                        JsTarget.compile(source, &mut module)
+                    }
+                }
+                (_, OutputFormat::HirRaw) => HirRawTarget.compile(source, &mut module),
+                (_, OutputFormat::Hir) => HirTarget.compile(source, &mut module),
+                _ => panic!("Unsupported target/format combination"),
+            },
+            Err(err) => Err(err),
+        }
+    };
+
+    let output = match output_result {
+        Ok(output) => output,
+        Err(errors) => {
+            eprintln!("{errors:?}");
+            return (String::new(), None);
+        }
+    };
+
+    let output = if matches!(
+        (&options.target, &options.output_format),
+        (CompileTargetArg::Js, OutputFormat::Source)
+    ) {
+        let std_lib_source = compile_standard_library().unwrap();
+        if let Some(map_json) = pending_source_map.take() {
+            let stdlib_line_count = std_lib_source.lines().count();
+            pending_source_map = Some(shift_source_map_lines(&map_json, stdlib_line_count));
+        }
+        format!("{std_lib_source}\n{{{output}}}")
+    } else {
+        output
+    };
+
+    (output, pending_source_map)
+}
+
+/// Append a `//# sourceMappingURL=` comment to `output` and, when an output
+/// file is given, write the map to `<output_file>.map`.  Falls back to an
+/// inline base64 data URL when no output file is available (e.g. stdout).
+fn append_source_map(output: &mut String, map_json: &str, output_file: Option<&str>) {
+    if let Some(output_file) = output_file {
+        let map_file = format!("{output_file}.map");
+        match File::create(&map_file) {
+            Err(why) => panic!("couldn't create {map_file}: {why}"),
+            Ok(mut f) => {
+                if let Err(why) = f.write_all(map_json.as_bytes()) {
+                    panic!("couldn't write to {map_file}: {why}");
+                }
+            }
+        }
+        let map_basename = format!(
+            "{}.map",
+            Path::new(output_file)
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+        );
+        output.push_str(&format!("\n//# sourceMappingURL={map_basename}"));
+    } else {
+        let encoded = base64_encode(map_json.as_bytes());
+        output.push_str(&format!(
+            "\n//# sourceMappingURL=data:application/json;base64,{encoded}"
+        ));
+    }
+}
+
+/// Minimal base64 encoder — avoids a heavy dependency for embedding inline
+/// source map data URLs in stdout output.
+fn base64_encode(data: &[u8]) -> String {
+    const CHARS: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity((data.len() * 4).div_ceil(3));
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
+        let n = (b0 << 16) | (b1 << 8) | b2;
+        out.push(CHARS[((n >> 18) & 63) as usize] as char);
+        out.push(CHARS[((n >> 12) & 63) as usize] as char);
+        out.push(if chunk.len() > 1 {
+            CHARS[((n >> 6) & 63) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            CHARS[(n & 63) as usize] as char
+        } else {
+            '='
+        });
+    }
+    out
 }
