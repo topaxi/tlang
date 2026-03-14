@@ -5,7 +5,7 @@ use oxc_ast::AstBuilder;
 use oxc_ast::NONE;
 use oxc_ast::ast::*;
 use oxc_codegen::{Codegen, CodegenOptions, IndentChar};
-use oxc_sourcemap::SourceMap;
+use oxc_sourcemap::{SourceMap, Token};
 use oxc_span::SPAN;
 
 use crate::js_anf_transform::JsAnfTransform;
@@ -193,22 +193,57 @@ impl CodegenJS {
     }
 }
 
-/// Prepend `line_offset` empty source-map lines to `map_json` by inserting
-/// that many semicolon separators at the start of the `"mappings"` value.
+/// Shift every generated mapping in `map_json` down by `line_offset` lines.
 ///
-/// The source map spec uses `;` as a generated-line separator, so N leading
-/// semicolons shift every mapping forward by N lines — exactly what is needed
-/// when the generated code is preceded by N lines of preamble (e.g. the
-/// compiled standard library) in the final output file.
+/// This is used when the compiled output is prefixed with a preamble such as
+/// the stdlib, so generated JS line numbers still point back to the original
+/// tlang source locations.
+///
+/// # Panics
+///
+/// Panics if `map_json` is not a valid source map JSON string.
 pub fn shift_source_map_lines(map_json: &str, line_offset: usize) -> String {
     if line_offset == 0 {
         return map_json.to_string();
     }
-    let prefix = ";".repeat(line_offset);
-    // OXC always serialises the mappings field as `"mappings":"..."`.
-    // The VLQ alphabet (A-Za-z0-9+/,;) never contains `"`, so a single
-    // targeted replacement is safe here.
-    map_json.replacen(r#""mappings":""#, &format!(r#""mappings":"{prefix}"#), 1)
+
+    let source_map =
+        SourceMap::from_json_string(map_json).expect("generated source map should be valid JSON");
+    let mut shifted = SourceMap::new(
+        source_map.get_file().cloned(),
+        source_map.get_names().cloned().collect(),
+        source_map.get_source_root().map(str::to_owned),
+        source_map.get_sources().cloned().collect(),
+        source_map
+            .get_source_contents()
+            .map(|content| content.cloned())
+            .collect(),
+        source_map
+            .get_tokens()
+            .map(|token| {
+                Token::new(
+                    token.get_dst_line() + line_offset as u32,
+                    token.get_dst_col(),
+                    token.get_src_line(),
+                    token.get_src_col(),
+                    token.get_source_id(),
+                    token.get_name_id(),
+                )
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice(),
+        None,
+    );
+
+    if let Some(ignore_list) = source_map.get_x_google_ignore_list() {
+        shifted.set_x_google_ignore_list(ignore_list.to_vec());
+    }
+
+    if let Some(debug_id) = source_map.get_debug_id() {
+        shifted.set_debug_id(debug_id);
+    }
+
+    shifted.to_json_string()
 }
 
 // ---------------------------------------------------------------------------
@@ -635,5 +670,43 @@ impl<'a> InnerCodegen<'a> {
     pub fn call_expr(&self, callee: Expression<'a>, args: Vec<Argument<'a>>) -> Expression<'a> {
         self.ast
             .expression_call(SPAN, callee, NONE, self.ast.vec_from_iter(args), false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::shift_source_map_lines;
+    use oxc_sourcemap::{SourceMap, Token};
+
+    #[test]
+    fn shift_source_map_lines_preserves_metadata_and_offsets_tokens() {
+        let mut source_map = SourceMap::new(
+            Some("out.js".into()),
+            vec!["main".into()],
+            Some("src".to_string()),
+            vec!["input.tlang".into()],
+            vec![Some("fn main() { 1 }".into())],
+            vec![
+                Token::new(0, 0, 0, 0, Some(0), Some(0)),
+                Token::new(2, 4, 0, 3, Some(0), None),
+            ]
+            .into_boxed_slice(),
+            None,
+        );
+        source_map.set_debug_id("debug-id");
+        source_map.set_x_google_ignore_list(vec![0]);
+
+        let shifted_json = shift_source_map_lines(&source_map.to_json_string(), 3);
+        let shifted = SourceMap::from_json_string(&shifted_json).unwrap();
+        let shifted_lines = shifted
+            .get_tokens()
+            .map(|token| token.get_dst_line())
+            .collect::<Vec<_>>();
+
+        assert_eq!(shifted_lines, vec![3, 5]);
+        assert_eq!(shifted.get_file().map(|file| file.as_ref()), Some("out.js"));
+        assert_eq!(shifted.get_source_root(), Some("src"));
+        assert_eq!(shifted.get_debug_id(), Some("debug-id"));
+        assert_eq!(shifted.get_x_google_ignore_list(), Some(&[0][..]));
     }
 }

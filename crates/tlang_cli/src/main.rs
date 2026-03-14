@@ -71,7 +71,7 @@ fn get_args() -> Command {
                 .arg(arg!(output_type: -t --"output-type" <OUTPUT_TYPE> "Output type, defaults to js"))
                 .arg(arg!(silent: -s --"silent" "Flag to suppress output"))
                 .arg(arg!(quiet_warnings: -q --"quiet-warnings" "Flag to suppress warning output"))
-                .arg(arg!(source_map: --"source-map" "Emit a source map alongside JS output (requires --output-file)")),
+                .arg(arg!(source_map: --"source-map" "Emit a source map alongside JS output, or inline when writing to stdout")),
         );
 
     let matches = command.clone().get_matches();

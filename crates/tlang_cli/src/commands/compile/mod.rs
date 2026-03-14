@@ -132,7 +132,13 @@ pub fn handle_compile(options: CompileOptions) {
             panic!("couldn't read {}: {}", path.display(), why)
         }
 
-        let (mut output, source_map) = compile_source(path, &source, &options);
+        let (mut output, source_map) = match compile_source(path, &source, &options) {
+            Ok(result) => result,
+            Err(errors) => {
+                eprintln!("{errors:?}");
+                return;
+            }
+        };
 
         if let Some(map_json) = source_map {
             append_source_map(&mut output, &map_json, options.output_file.as_deref());
@@ -158,7 +164,11 @@ pub fn handle_compile(options: CompileOptions) {
 /// Compile `source` through the full pipeline and return `(js_output, optional_map_json)`.
 /// The map JSON (when present) already has its generated lines shifted to
 /// account for the stdlib preamble that is prepended to the JS output.
-fn compile_source(path: &Path, source: &str, options: &CompileOptions) -> (String, Option<String>) {
+fn compile_source(
+    path: &Path,
+    source: &str,
+    options: &CompileOptions,
+) -> Result<(String, Option<String>), ParserError> {
     // Holds the unshifted source map JSON; shifted once we know the stdlib
     // preamble line count.
     let mut pending_source_map: Option<String> = None;
@@ -188,13 +198,7 @@ fn compile_source(path: &Path, source: &str, options: &CompileOptions) -> (Strin
         }
     };
 
-    let output = match output_result {
-        Ok(output) => output,
-        Err(errors) => {
-            eprintln!("{errors:?}");
-            return (String::new(), None);
-        }
-    };
+    let output = output_result?;
 
     let output = if matches!(
         (&options.target, &options.output_format),
@@ -210,7 +214,7 @@ fn compile_source(path: &Path, source: &str, options: &CompileOptions) -> (Strin
         output
     };
 
-    (output, pending_source_map)
+    Ok((output, pending_source_map))
 }
 
 /// Append a `//# sourceMappingURL=` comment to `output` and, when an output
@@ -267,4 +271,46 @@ fn base64_encode(data: &[u8]) -> String {
         });
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    #[test]
+    fn handle_compile_keeps_existing_output_when_compilation_fails() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let temp_dir = std::env::temp_dir().join(format!(
+            "tlang-handle-compile-{unique}-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let input_file = temp_dir.join("input.tlang");
+        let output_file = temp_dir.join("output.js");
+        fs::write(&input_file, "missing_symbol;").unwrap();
+        fs::write(&output_file, "existing output").unwrap();
+
+        handle_compile(CompileOptions {
+            input_file: Some(input_file.to_string_lossy().into_owned()),
+            output_file: Some(output_file.to_string_lossy().into_owned()),
+            target: CompileTargetArg::Js,
+            output_format: OutputFormat::Source,
+            output_stdlib: false,
+            silent: false,
+            quiet_warnings: false,
+            source_map: false,
+        });
+
+        assert_eq!(fs::read_to_string(&output_file).unwrap(), "existing output");
+
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
 }
