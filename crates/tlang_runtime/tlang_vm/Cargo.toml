@@ -5,7 +5,7 @@ edition.workspace = true
 
 [features]
 default = ["stdlib"]
-binary = ["dep:tlang_ast_lowering", "dep:tlang_hir_opt", "dep:tlang_parser", "dep:tlang_semantics", "dep:env_logger"]
+binary = ["dep:tlang_ast_lowering", "dep:tlang_diagnostics", "dep:tlang_hir_opt", "dep:tlang_parser", "dep:tlang_semantics", "dep:env_logger"]
 stdlib = ["tlang_interpreter/stdlib"]
 # Activates the pipeline deps needed for integration tests
 testing = ["binary"]
@@ -17,6 +17,7 @@ required-features = ["binary"]
 
 [dependencies]
 tlang_ast_lowering = { path = "../../tlang_ast_lowering", optional = true }
+tlang_diagnostics = { path = "../../tlang_diagnostics", optional = true }
 tlang_hir = { path = "../../tlang_hir" }
 tlang_hir_opt = { path = "../../tlang_hir_opt", optional = true }
 tlang_interpreter = { path = "../tlang_interpreter", default-features = false }

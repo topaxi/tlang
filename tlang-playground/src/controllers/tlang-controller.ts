@@ -63,7 +63,6 @@ export class TlangController {
       this.optimizationOptions = initialOptimizationOptions;
       this.tlang.setOptimizations(initialOptimizationOptions);
     }
-    this.analyze();
   }
 
   private createTlang(source: string, runner: Runner): Tlang {
@@ -93,37 +92,27 @@ export class TlangController {
 
     this.tlang = this.createTlang(source, runner);
     this.tlang.setOptimizations(this.optimizationOptions);
-    this.analyze();
   }
 
   analyze(): CodemirrorDiagnostic[] {
-    try {
-      this.tlang.analyze();
+    this.tlang.analyze();
 
-      for (let diagnostic of this.tlang.getDiagnostics()) {
-        let method =
-          diagnostic.severity === 'error'
-            ? ('error' as const)
-            : ('warn' as const);
-        let formatted = `${diagnostic.message} at ${diagnostic.span.start_lc.line}:${diagnostic.span.start_lc.column}`;
-
-        this.logToConsole(method, formatted);
-      }
-
-      return this.tlang.getCodemirrorDiagnostics();
-    } catch {
-      for (let parseError of this.tlang.getParseErrors()) {
-        let kind =
-          typeof parseError.kind === 'string'
-            ? parseError.kind
-            : Object.keys(parseError.kind)[0];
-        let formatted = `${kind}: ${parseError.msg} at ${parseError.span.start_lc.line}:${parseError.span.start_lc.column}`;
-
-        this.logToConsole('error', formatted);
-      }
-
-      return [];
+    const renderedParseErrors = this.tlang.renderParseErrors();
+    if (renderedParseErrors) {
+      this.logToConsole('error', renderedParseErrors);
     }
+
+    const renderedErrors = this.tlang.renderErrorDiagnostics();
+    if (renderedErrors) {
+      this.logToConsole('error', renderedErrors);
+    }
+
+    const renderedWarnings = this.tlang.renderWarningDiagnostics();
+    if (renderedWarnings) {
+      this.logToConsole('warn', renderedWarnings);
+    }
+
+    return this.tlang.getCodemirrorDiagnostics();
   }
 
   async run(runner: Runner) {

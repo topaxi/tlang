@@ -218,19 +218,28 @@ fn test_should_error_on_unused_identifier_in_function_definition() {
 
     assert_eq!(
         diagnostics[..1],
-        vec![Diagnostic::error(
-            "Use of undeclared variable `c`, did you mean the parameter `a`?",
-            Span::lc(
-                LineColumn {
-                    line: 1,
-                    column: 13
-                },
-                LineColumn {
-                    line: 1,
-                    column: 14
-                }
-            ),
-        )]
+        vec![
+            Diagnostic::error(
+                "Use of undeclared variable `c`, did you mean the parameter `a`?",
+                Span::lc(
+                    LineColumn {
+                        line: 1,
+                        column: 13
+                    },
+                    LineColumn {
+                        line: 1,
+                        column: 14
+                    }
+                ),
+            )
+            .with_label(
+                "parameter `a` is defined here",
+                Span::lc(
+                    LineColumn { line: 0, column: 7 },
+                    LineColumn { line: 0, column: 8 }
+                ),
+            )
+        ]
     );
 }
 
@@ -250,7 +259,8 @@ fn should_not_allow_using_variables_from_outer_function_scope_before_declaration
             Diagnostic::error(
                 "Use of undeclared variable `c`, did you mean the variable `c`?",
                 Span::lc((1, 5), (1, 6)),
-            ),
+            )
+            .with_label("variable `c` is defined here", Span::lc((4, 5), (4, 6)),),
             Diagnostic::warn("Unused function `add/2`", Span::lc((0, 3), (0, 6)),),
             Diagnostic::warn(
                 "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`",

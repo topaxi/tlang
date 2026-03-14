@@ -4,10 +4,10 @@ fn A::new() {
     A {}
 }
 
-fn A.method(self) {
+fn A.method(_self) {
     "called with just self"
 }
-fn A.method(self, a) {
+fn A.method(_self, _a) {
     "called with a single argument"
 }
 

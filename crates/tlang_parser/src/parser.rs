@@ -117,20 +117,9 @@ impl<'src> Parser<'src> {
 
     #[inline(never)]
     #[allow(clippy::needless_pass_by_value)]
-    fn panic_unexpected_token(&self, expected: &str, actual: Token) -> ! {
-        let start_lc = actual.span.start_lc;
-        let source_line = self
-            .lexer
-            .source()
-            .lines()
-            .nth(start_lc.line as usize)
-            .unwrap_or_default();
-        let caret = " ".repeat(start_lc.column as usize) + "^";
-
-        panic!(
-            "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
-            expected, start_lc.line, start_lc.column, actual.kind, source_line, caret
-        );
+    fn panic_unexpected_token(&mut self, expected: &str, actual: Token) -> ! {
+        self.push_unexpected_token_error(expected, actual);
+        panic!("parse error");
     }
 
     #[inline(never)]
@@ -1132,7 +1121,17 @@ impl<'src> Parser<'src> {
             TokenKind::Keyword(Keyword::_Self) => self.parse_self_expression(),
             TokenKind::Identifier(_) => self.parse_identifier_expr(),
             _ => {
-                self.panic_unexpected_token("primary expression", self.current_token.clone());
+                if self.recoverable() {
+                    // `expect_token_matches!` above already pushed an error and advanced
+                    // past the unexpected token.  Return a placeholder so the caller
+                    // can continue recovering.
+                    node::expr!(
+                        self.unique_id(),
+                        Literal(Box::new(Literal::UnsignedInteger(0)))
+                    )
+                } else {
+                    self.panic_unexpected_token("primary expression", self.current_token.clone());
+                }
             }
         };
 

@@ -1,0 +1,17 @@
+[package]
+name = "tlang_diagnostics"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+codespan-reporting = { workspace = true }
+tlang_parser = { path = "../tlang_parser" }
+tlang_semantics = { path = "../tlang_semantics" }
+tlang_span = { path = "../tlang_span" }
+
+[dev-dependencies]
+indoc = { workspace = true }
+insta = { workspace = true }
+
+[lints]
+workspace = true

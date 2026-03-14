@@ -3,6 +3,7 @@ use std::fs;
 use std::process;
 
 use tlang_ast_lowering::lower_to_hir;
+use tlang_diagnostics::{render_parse_issues, render_semantic_diagnostics};
 use tlang_hir_opt::HirOptimizer;
 use tlang_semantics::SemanticAnalyzer;
 use tlang_semantics::diagnostic::Diagnostic;
@@ -38,10 +39,15 @@ fn main() {
     };
 
     let mut parser = tlang_parser::Parser::from_source(&code);
-    let mut ast = match parser.parse() {
-        Ok(ast) => ast,
-        Err(err) => {
-            eprintln!("Error parsing file '{}': {}", filename, err);
+    let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| parser.parse()));
+    let mut ast = match parse_result {
+        Ok(Ok(ast)) => ast,
+        Ok(Err(err)) => {
+            eprint!("{}", render_parse_issues(filename, &code, err.issues()));
+            process::exit(1);
+        }
+        Err(_) => {
+            eprintln!("parse error");
             process::exit(1);
         }
     };
@@ -51,9 +57,10 @@ fn main() {
     match analyzer.analyze(&mut ast) {
         Ok(_) => {}
         Err(diagnostics) => {
-            for diagnostic in &diagnostics {
-                eprintln!("{}", diagnostic);
-            }
+            eprint!(
+                "{}",
+                render_semantic_diagnostics(filename, &code, &diagnostics)
+            );
 
             if diagnostics.iter().any(Diagnostic::is_error) {
                 process::exit(1);

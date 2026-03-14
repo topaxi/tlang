@@ -1,0 +1,11 @@
+---
+source: crates/tlang_diagnostics/src/lib.rs
+expression: "render_semantic_diagnostics(\"test.tlang\", source, &errors)"
+---
+error: Use of undeclared variable `va`, did you mean the parameter `val`?
+  ┌─ test.tlang:1:20
+  │
+1 │ fn evaluate(val) { va }
+  │             ---    ^^
+  │             │       
+  │             parameter `val` is defined here

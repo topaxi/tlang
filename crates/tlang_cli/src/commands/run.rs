@@ -1,6 +1,7 @@
 use std::{fs::File, io::Read, path::Path};
 
 use tlang_ast_lowering::lower_to_hir;
+use tlang_diagnostics::{render_parse_issues, render_semantic_diagnostics};
 use tlang_hir_opt::HirOptimizer;
 use tlang_runtime::{memory::TlangValue, vm::VM};
 use tlang_semantics::SemanticAnalyzer;
@@ -29,10 +30,28 @@ fn compile(input_file: &str) -> tlang_hir::Module {
     }
 
     let mut parser = tlang_parser::Parser::from_source(&source);
-    let mut ast = match parser.parse() {
-        Ok(ast) => ast,
-        Err(err) => {
-            eprintln!("{err:?}");
+    let prev_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| parser.parse()));
+    std::panic::set_hook(prev_hook);
+    let mut ast = match parse_result {
+        Ok(Ok(ast)) => ast,
+        Ok(Err(err)) => {
+            eprint!(
+                "{}",
+                render_parse_issues(&path.to_string_lossy(), &source, err.issues())
+            );
+            std::process::exit(1);
+        }
+        Err(payload) => {
+            let issues = parser.errors();
+            if issues.is_empty() {
+                std::panic::resume_unwind(payload);
+            }
+            eprint!(
+                "{}",
+                render_parse_issues(&path.to_string_lossy(), &source, issues)
+            );
             std::process::exit(1);
         }
     };
@@ -40,7 +59,10 @@ fn compile(input_file: &str) -> tlang_hir::Module {
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols_with_slots(&VM::builtin_symbols());
     if let Err(err) = semantic_analyzer.analyze(&mut ast) {
-        eprintln!("{err:?}");
+        eprint!(
+            "{}",
+            render_semantic_diagnostics(&path.to_string_lossy(), &source, &err)
+        );
         std::process::exit(1);
     }
 

@@ -110,6 +110,10 @@ export class ConsoleMessageElement extends LitElement {
       gap: 1ch;
     }
 
+    [part='arg'] {
+      white-space: pre-wrap;
+    }
+
     [part='stack'] {
       display: block;
       padding-left: 2ch;

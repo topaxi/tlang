@@ -22,13 +22,22 @@ impl Display for Severity {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct DiagnosticLabel {
+    pub message: String,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Diagnostic {
     /// The message to display to the user.
     message: String,
-    /// The location of the error.
+    /// The primary location of the error.
     span: Span,
     /// The severity of the error.
     severity: Severity,
+    /// Optional secondary labeled spans (e.g. "defined here" pointers).
+    labels: Vec<DiagnosticLabel>,
 }
 
 impl Diagnostic {
@@ -37,6 +46,7 @@ impl Diagnostic {
             message,
             span,
             severity,
+            labels: Vec::new(),
         }
     }
 
@@ -46,6 +56,15 @@ impl Diagnostic {
 
     pub fn error(message: &str, span: Span) -> Self {
         Diagnostic::new(Severity::Error, message.to_string(), span)
+    }
+
+    /// Attach a secondary labeled span to this diagnostic (builder-style).
+    pub fn with_label(mut self, message: impl Into<String>, span: Span) -> Self {
+        self.labels.push(DiagnosticLabel {
+            message: message.into(),
+            span,
+        });
+        self
     }
 
     pub fn message(&self) -> &str {
@@ -58,6 +77,10 @@ impl Diagnostic {
 
     pub fn span(&self) -> &Span {
         &self.span
+    }
+
+    pub fn labels(&self) -> &[DiagnosticLabel] {
+        &self.labels
     }
 
     pub fn is_error(&self) -> bool {

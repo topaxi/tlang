@@ -20,10 +20,13 @@ macro_rules! expect_token_matches {
                     $parser.panic_unexpected_token(&format!("{:?}", stringify!($pattern)), $parser.current_token.clone());
                 }
 
-                $parser.push_unexpected_token_error(
-                    &format!("{:?}", stringify!($pattern)),
-                    $parser.current_token.clone(),
-                );
+                // At EOF, only push the first error — further mismatches are cascades.
+                if !$parser.at_eof() || $parser.errors.is_empty() {
+                    $parser.push_unexpected_token_error(
+                        &format!("{:?}", stringify!($pattern)),
+                        $parser.current_token.clone(),
+                    );
+                }
                 advance_until!($parser, $pattern);
             }
         }
@@ -38,10 +41,13 @@ macro_rules! expect_token_matches {
                     $parser.panic_unexpected_token($message, $parser.current_token.clone());
                 }
 
-                $parser.push_unexpected_token_error(
-                    $message,
-                    $parser.current_token.clone(),
-                );
+                // At EOF, only push the first error — further mismatches are cascades.
+                if !$parser.at_eof() || $parser.errors.is_empty() {
+                    $parser.push_unexpected_token_error(
+                        $message,
+                        $parser.current_token.clone(),
+                    );
+                }
                 advance_until!($parser, $pattern);
             }
         }

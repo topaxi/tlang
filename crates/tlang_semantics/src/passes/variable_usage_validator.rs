@@ -229,12 +229,21 @@ impl VariableUsageValidator {
         let did_you_mean = did_you_mean(name, &symbol_table.borrow().get_all_declared_symbols());
 
         if let Some(suggestion) = did_you_mean {
-            ctx.add_diagnostic(diagnostic::error_at!(
-                span,
-                "Use of undeclared variable `{name}`, did you mean the {} `{}`?",
-                suggestion.symbol_type,
-                suggestion.name,
-            ));
+            ctx.add_diagnostic(
+                diagnostic::error_at!(
+                    span,
+                    "Use of undeclared variable `{name}`, did you mean the {} `{}`?",
+                    suggestion.symbol_type,
+                    suggestion.name,
+                )
+                .with_label(
+                    format!(
+                        "{} `{}` is defined here",
+                        suggestion.symbol_type, suggestion.name
+                    ),
+                    suggestion.defined_at,
+                ),
+            );
         } else {
             ctx.add_diagnostic(diagnostic::error_at!(
                 span,
@@ -255,12 +264,18 @@ impl VariableUsageValidator {
         let did_you_mean = did_you_mean(name, &symbol_table.borrow().get_all_declared_symbols());
 
         if let Some(suggestion) = did_you_mean {
-            ctx.add_diagnostic(diagnostic::error_at!(
-                span,
-                "Use of undeclared function `{name}` with arity {arity}, did you mean the {} `{}`?",
-                suggestion.symbol_type,
-                suggestion.name
-            ));
+            ctx.add_diagnostic(
+                diagnostic::error_at!(
+                    span,
+                    "Use of undeclared function `{name}` with arity {arity}, did you mean the {} `{}`?",
+                    suggestion.symbol_type,
+                    suggestion.name
+                )
+                .with_label(
+                    format!("{} `{}` is defined here", suggestion.symbol_type, suggestion.name),
+                    suggestion.defined_at,
+                ),
+            );
         } else {
             ctx.add_diagnostic(diagnostic::error_at!(
                 span,
