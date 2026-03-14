@@ -30,12 +30,21 @@ fn diagnostic_report(
         Severity::Warning => ReportSeverity::Warning,
     };
 
+    let mut labels = vec![Label::primary(
+        file_id,
+        label_range(diagnostic.span(), source_len),
+    )];
+
+    for label in diagnostic.labels() {
+        labels.push(
+            Label::secondary(file_id, label_range(&label.span, source_len))
+                .with_message(&label.message),
+        );
+    }
+
     ReportDiagnostic::new(severity)
         .with_message(diagnostic.message())
-        .with_labels(vec![Label::primary(
-            file_id,
-            label_range(diagnostic.span(), source_len),
-        )])
+        .with_labels(labels)
 }
 
 fn parse_issue_report(
@@ -232,6 +241,32 @@ mod tests {
           │
         1 │ let unused_var = 42;
           │     ^^^^^^^^^^
+        ");
+    }
+
+    #[test]
+    fn renders_did_you_mean_with_secondary_label() {
+        let source = indoc! {"
+            fn evaluate(val) { va }
+        "};
+        let mut parser = Parser::from_source(source);
+        let mut ast = parser.parse().expect("source should parse");
+        let mut analyzer = SemanticAnalyzer::default();
+        let _ = analyzer.analyze(&mut ast);
+        let errors: Vec<_> = analyzer
+            .get_diagnostics()
+            .into_iter()
+            .filter(|d| d.is_error())
+            .collect();
+
+        assert_snapshot!(render_semantic_diagnostics("test.tlang", source, &errors), @r"
+        error: Use of undeclared variable `va`, did you mean the parameter `val`?
+          ┌─ test.tlang:1:20
+          │
+        1 │ fn evaluate(val) { va }
+          │             ---    ^^
+          │             │       
+          │             parameter `val` is defined here
         ");
     }
 }
