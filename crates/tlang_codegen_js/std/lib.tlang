@@ -1,3 +1,5 @@
+fn string() { "" }
+
 enum Option {
   Some(value),
   None,

@@ -1,20 +1,11 @@
 // String processing and manipulation
 // Demonstrates: string operations, recursion, pattern matching on strings
 
-// Helper functions
-fn filter([], _) { [] }
-fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
-fn filter([_, ...xs], f) { rec filter(xs, f) }
-
-fn length([]) { 0 }
-fn length([_, ...xs]) { 1 + length(xs) }
-
 // String reverse function
-fn reverse_string(str) { reverse_string_helper(str, "") }
-
-fn reverse_string_helper("", acc) { acc }
-fn reverse_string_helper([c, ...rest], acc) { 
-    rec reverse_string_helper(rest, c + acc) 
+fn reverse_string(str) { reverse_string(str, "") }
+fn reverse_string("", acc) { acc }
+fn reverse_string([c, ...rest], acc) {
+    rec reverse_string(rest, c + acc)
 }
 
 // Check if string is palindrome
@@ -32,7 +23,7 @@ fn count_char([_, ...rest], target) {
 // Check if string contains only alphabetic characters
 fn is_alpha("") { true }
 fn is_alpha([c, ...rest]) {
-    let code = char_code(c);
+    let code = string::char_code_at(c, 0);
     let is_upper = code >= 65 && code <= 90;   // A-Z
     let is_lower = code >= 97 && code <= 122;  // a-z
     (is_upper || is_lower) && is_alpha(rest)

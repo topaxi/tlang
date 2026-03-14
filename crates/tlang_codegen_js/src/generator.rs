@@ -110,6 +110,9 @@ impl CodegenJS {
             ("sum", SymbolType::Function(1)),
             ("zip", SymbolType::Function(2)),
             ("panic", SymbolType::Function(1)),
+            ("string", SymbolType::Module),
+            ("string::from_char_code", SymbolType::Function(1)),
+            ("string::char_code_at", SymbolType::Function(2)),
         ]
     }
 

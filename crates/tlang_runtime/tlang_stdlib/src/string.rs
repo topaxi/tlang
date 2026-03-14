@@ -12,6 +12,19 @@ pub fn from_char_code(state: &mut VMState, code: TlangValue) -> TlangValue {
     }
 }
 
+#[native_fn]
+pub fn char_code_at(state: &mut VMState, string: TlangValue, index: TlangValue) -> TlangValue {
+    if let Some(ch) = state
+        .get_object(string)
+        .and_then(|o| o.as_str())
+        .and_then(|string| string.chars().nth(index.as_usize()))
+    {
+        TlangValue::U32(ch as u64)
+    } else {
+        state.panic(format!("Index out of bounds: {}", index))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use tlang_memory::VMState;

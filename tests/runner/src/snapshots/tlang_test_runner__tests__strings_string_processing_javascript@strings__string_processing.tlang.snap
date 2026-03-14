@@ -14,4 +14,4 @@ Character counting:
 2
 3
 Alphabetic string tests:
-[ false, false, true, false ]
+[ true, false, true, true ]
