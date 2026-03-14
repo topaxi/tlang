@@ -64,7 +64,7 @@ pub struct CompileOptions {
 
 fn compile_standard_library() -> Result<String, ParserError> {
     let source = CodegenJS::get_standard_library_source();
-    let mut module = compile_to_hir(&source, &CompileTargetArg::Js, false)?;
+    let mut module = compile_to_hir("<stdlib>", &source, &CompileTargetArg::Js, false)?;
     let mut js = JsTarget.compile(&source, &mut module)?;
 
     js.push('\n');
@@ -74,6 +74,7 @@ fn compile_standard_library() -> Result<String, ParserError> {
 }
 
 fn compile_to_hir(
+    source_name: &str,
     source: &str,
     target: &CompileTargetArg,
     show_warnings: bool,
@@ -87,10 +88,17 @@ fn compile_to_hir(
 
     // Display warnings (but don't fail compilation)
     if show_warnings {
-        for diagnostic in semantic_analyzer.get_diagnostics() {
-            if diagnostic.is_warning() {
-                eprintln!("{diagnostic}");
-            }
+        let warnings = semantic_analyzer
+            .get_diagnostics()
+            .into_iter()
+            .filter(|diagnostic| diagnostic.is_warning())
+            .collect::<Vec<_>>();
+
+        if !warnings.is_empty() {
+            eprint!(
+                "{}",
+                tlang_diagnostics::render_semantic_diagnostics(source_name, source, &warnings)
+            );
         }
     }
 
@@ -135,7 +143,7 @@ pub fn handle_compile(options: CompileOptions) {
         let (mut output, source_map) = match compile_source(path, &source, &options) {
             Ok(result) => result,
             Err(errors) => {
-                eprintln!("{errors:?}");
+                eprint!("{}", errors.render(&path.to_string_lossy(), &source));
                 return;
             }
         };
@@ -169,6 +177,7 @@ fn compile_source(
     source: &str,
     options: &CompileOptions,
 ) -> Result<(String, Option<String>), ParserError> {
+    let source_name = path.to_string_lossy();
     // Holds the unshifted source map JSON; shifted once we know the stdlib
     // preamble line count.
     let mut pending_source_map: Option<String> = None;
@@ -177,7 +186,12 @@ fn compile_source(
         let mut module = tlang_hir::Module::default();
         AstTarget.compile(source, &mut module)
     } else {
-        match compile_to_hir(source, &options.target, !options.quiet_warnings) {
+        match compile_to_hir(
+            &source_name,
+            source,
+            &options.target,
+            !options.quiet_warnings,
+        ) {
             Ok(mut module) => match (&options.target, &options.output_format) {
                 (CompileTargetArg::Js, OutputFormat::Source) => {
                     if options.source_map {

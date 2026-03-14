@@ -1132,7 +1132,17 @@ impl<'src> Parser<'src> {
             TokenKind::Keyword(Keyword::_Self) => self.parse_self_expression(),
             TokenKind::Identifier(_) => self.parse_identifier_expr(),
             _ => {
-                self.panic_unexpected_token("primary expression", self.current_token.clone());
+                if self.recoverable() {
+                    // `expect_token_matches!` above already pushed an error and advanced
+                    // past the unexpected token.  Return a placeholder so the caller
+                    // can continue recovering.
+                    node::expr!(
+                        self.unique_id(),
+                        Literal(Box::new(Literal::UnsignedInteger(0)))
+                    )
+                } else {
+                    self.panic_unexpected_token("primary expression", self.current_token.clone());
+                }
             }
         };
 
