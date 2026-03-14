@@ -102,12 +102,14 @@ export class TlangController {
       this.logToConsole('error', renderedParseErrors);
     }
 
-    const rendered = this.tlang.renderDiagnostics();
-    if (rendered) {
-      const hasErrors = this.tlang
-        .getDiagnostics()
-        .some((d) => d.severity === 'error');
-      this.logToConsole(hasErrors ? 'error' : 'warn', rendered);
+    const renderedErrors = this.tlang.renderErrorDiagnostics();
+    if (renderedErrors) {
+      this.logToConsole('error', renderedErrors);
+    }
+
+    const renderedWarnings = this.tlang.renderWarningDiagnostics();
+    if (renderedWarnings) {
+      this.logToConsole('warn', renderedWarnings);
     }
 
     return this.tlang.getCodemirrorDiagnostics();

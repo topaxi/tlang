@@ -442,6 +442,34 @@ impl Tlang {
         render_semantic_diagnostics("playground.tlang", &self.source, &diagnostics)
     }
 
+    #[wasm_bindgen(js_name = "renderErrorDiagnostics")]
+    pub fn render_error_diagnostics(&mut self) -> String {
+        let diagnostics: Vec<_> = self
+            .analyzer
+            .get_diagnostics()
+            .into_iter()
+            .filter(|d| d.is_error())
+            .collect();
+        if diagnostics.is_empty() {
+            return String::new();
+        }
+        render_semantic_diagnostics("playground.tlang", &self.source, &diagnostics)
+    }
+
+    #[wasm_bindgen(js_name = "renderWarningDiagnostics")]
+    pub fn render_warning_diagnostics(&mut self) -> String {
+        let diagnostics: Vec<_> = self
+            .analyzer
+            .get_diagnostics()
+            .into_iter()
+            .filter(|d| d.is_warning())
+            .collect();
+        if diagnostics.is_empty() {
+            return String::new();
+        }
+        render_semantic_diagnostics("playground.tlang", &self.source, &diagnostics)
+    }
+
     #[wasm_bindgen(js_name = "renderParseErrors")]
     pub fn render_parse_errors(&mut self) -> String {
         let source = self.source.clone();
