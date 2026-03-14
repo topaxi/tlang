@@ -73,7 +73,7 @@ pub struct SymbolInfo {
     pub name: Box<str>,
     pub symbol_type: SymbolType,
     pub defined_at: Span,
-    pub scope_start: LineColumn,
+    pub scope_start: u32,
     pub node_id: Option<NodeId>,
     pub hir_id: Option<HirId>,
     /// Whether the symbol is temporary (e.g., a loop variable), only used for information during
@@ -92,7 +92,7 @@ impl SymbolInfo {
         name: &str,
         symbol_type: SymbolType,
         defined_at: Span,
-        scope_start: LineColumn,
+        scope_start: u32,
     ) -> Self {
         SymbolInfo {
             id,
@@ -116,13 +116,7 @@ impl SymbolInfo {
         symbol_type: SymbolType,
         global_slot: Option<usize>,
     ) -> Self {
-        let mut symbol_info = SymbolInfo::new(
-            id,
-            name,
-            symbol_type,
-            Span::default(),
-            LineColumn::default(),
-        );
+        let mut symbol_info = SymbolInfo::new(id, name, symbol_type, Span::default(), 0);
         symbol_info.builtin = true;
         symbol_info.global_slot = global_slot;
         symbol_info
@@ -319,7 +313,7 @@ impl SymbolTable {
             .iter()
             .rev()
             .filter(|s| s.declared)
-            .find(|s| s.scope_start < span.start)
+            .find(|s| s.scope_start < span.start_lc.line)
             .cloned();
 
         if closest.is_some() {
@@ -330,7 +324,7 @@ impl SymbolTable {
             .iter()
             .rev()
             .filter(|s| s.declared)
-            .find(|s| s.defined_at.start < span.start || s.is_any_fn() || s.is_builtin())
+            .find(|s| s.defined_at.start_lc < span.start_lc || s.is_any_fn() || s.is_builtin())
             .cloned()
     }
 

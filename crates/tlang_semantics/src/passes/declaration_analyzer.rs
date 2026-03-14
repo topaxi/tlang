@@ -7,7 +7,7 @@ use tlang_ast::node::{
     StmtKind,
 };
 use tlang_ast::visit::{Visitor, walk_expr, walk_stmt};
-use tlang_span::{LineColumn, NodeId, Span};
+use tlang_span::{NodeId, Span};
 use tlang_symbols::{SymbolInfo, SymbolTable, SymbolType};
 
 use crate::analyzer::{SemanticAnalysisContext, SemanticAnalysisPass};
@@ -53,7 +53,7 @@ impl DeclarationAnalyzer {
         name: &str,
         symbol_type: SymbolType,
         defined_at: Span,
-        scope_start: LineColumn,
+        scope_start: u32,
     ) {
         let id = ctx.symbol_id_allocator.next_id();
         let symbol_info =
@@ -76,7 +76,7 @@ impl DeclarationAnalyzer {
                 &qualified_name,
                 SymbolType::ProtocolMethod(method.parameters.len() as u16),
                 method.span,
-                method.span.end,
+                method.span.end_lc.line,
             );
 
             // Enter function scope for parameter/body analysis
@@ -90,12 +90,12 @@ impl DeclarationAnalyzer {
                 &method_name,
                 SymbolType::FunctionSelfRef(method.parameters.len() as u16),
                 method.name.span,
-                method.name.span.end,
+                method.name.span.end_lc.line,
             );
 
             self.symbol_type_context.push(SymbolType::Parameter);
             for param in &method.parameters {
-                self.collect_pattern(&param.pattern, param.span.end, ctx);
+                self.collect_pattern(&param.pattern, param.span.end_lc.line, ctx);
             }
             self.symbol_type_context.pop();
 
@@ -167,7 +167,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     decl.name.as_str(),
                     SymbolType::Enum,
                     stmt.span,
-                    stmt.span.end,
+                    stmt.span.end_lc.line,
                 );
 
                 for element in &decl.variants {
@@ -177,7 +177,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                         &(decl.name.to_string() + "::" + element.name.as_str()),
                         SymbolType::EnumVariant(element.parameters.len() as u16),
                         element.span,
-                        element.span.end,
+                        element.span.end_lc.line,
                     );
                 }
             }
@@ -188,7 +188,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     decl.name.as_str(),
                     SymbolType::Struct,
                     stmt.span,
-                    stmt.span.end,
+                    stmt.span.end_lc.line,
                 );
 
                 // Also store the struct declaration for later reference
@@ -202,7 +202,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     decl.name.as_str(),
                     SymbolType::Protocol,
                     stmt.span,
-                    stmt.span.end,
+                    stmt.span.end_lc.line,
                 );
             }
             StmtKind::ImplBlock(impl_block) => {
@@ -211,7 +211,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             }
             StmtKind::Let(decl) => {
                 self.visit_expr(&decl.expression, ctx);
-                self.collect_pattern(&decl.pattern, stmt.span.end, ctx);
+                self.collect_pattern(&decl.pattern, stmt.span.end_lc.line, ctx);
                 return; // Don't walk the statement again
             }
             _ => {}
@@ -241,7 +241,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             &name_as_str,
             SymbolType::Function(declaration.parameters.len() as u16),
             declaration.name.span,
-            declaration.span.end,
+            declaration.span.end_lc.line,
         );
 
         // Enter function scope
@@ -255,7 +255,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             &name_as_str,
             SymbolType::FunctionSelfRef(declaration.parameters.len() as u16),
             declaration.name.span,
-            declaration.name.span.end,
+            declaration.name.span.end_lc.line,
         );
 
         // Handle parameters
@@ -284,7 +284,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
         match &expr.kind {
             ExprKind::Let(pattern, expr) => {
                 self.visit_expr(expr, ctx);
-                self.collect_pattern(pattern, expr.span.end, ctx);
+                self.collect_pattern(pattern, expr.span.end_lc.line, ctx);
             }
             ExprKind::FunctionExpression(decl) => {
                 // Declare the function self-reference symbol first
@@ -296,7 +296,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     &name_as_str,
                     SymbolType::FunctionSelfRef(decl.parameters.len() as u16),
                     decl.name.span,
-                    decl.name.span.end,
+                    decl.name.span.end_lc.line,
                 );
 
                 // Use default function declaration walker for the rest
@@ -322,14 +322,14 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
     }
 
     fn visit_fn_param(&mut self, parameter: &'ast FunctionParameter, ctx: &mut Self::Context) {
-        self.collect_pattern(&parameter.pattern, parameter.span.end, ctx);
+        self.collect_pattern(&parameter.pattern, parameter.span.end_lc.line, ctx);
         // Don't visit type annotation as it doesn't contain declarations
     }
 
     fn visit_pat(&mut self, pattern: &'ast Pat, ctx: &mut Self::Context) {
         // Override to use collect_pattern instead of the default walker
         // This ensures that when the default walkers call visit_pat, we collect patterns correctly
-        self.collect_pattern(pattern, pattern.span.end, ctx);
+        self.collect_pattern(pattern, pattern.span.end_lc.line, ctx);
     }
 }
 
@@ -337,7 +337,7 @@ impl DeclarationAnalyzer {
     fn collect_pattern(
         &mut self,
         pattern: &Pat,
-        scope_start: LineColumn,
+        scope_start: u32,
         ctx: &mut SemanticAnalysisContext,
     ) {
         match &pattern.kind {

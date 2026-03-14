@@ -52,7 +52,7 @@ impl Display for ParseIssue {
         write!(
             f,
             "ParseError: {} at {}:{}",
-            self.msg, self.span.start.line, self.span.start.column
+            self.msg, self.span.start_lc.line, self.span.start_lc.column
         )
     }
 }

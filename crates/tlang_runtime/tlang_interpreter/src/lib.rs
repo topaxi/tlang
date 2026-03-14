@@ -1889,7 +1889,8 @@ mod tests {
 
         fn parse_src(&mut self, src: &str) -> tlang_ast::node::Module {
             let mut parser = tlang_parser::Parser::from_source(src)
-                .with_line_offset(self.last_span.end.line + 1)
+                .with_line_offset(self.last_span.end_lc.line + 1)
+                .with_byte_offset(self.last_span.end)
                 .set_node_id_allocator(self.node_id_allocator);
             let module = parser.parse().unwrap();
 

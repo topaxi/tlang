@@ -388,16 +388,16 @@ fn test_token_span() {
     let mut lexer = Lexer::new("let x = 1 + 2;");
 
     let token = lexer.next_token();
-    assert_eq!(token.span.start.line, 0);
-    assert_eq!(token.span.start.column, 0);
-    assert_eq!(token.span.end.line, 0);
-    assert_eq!(token.span.end.column, 3);
+    assert_eq!(token.span.start_lc.line, 0);
+    assert_eq!(token.span.start_lc.column, 0);
+    assert_eq!(token.span.end_lc.line, 0);
+    assert_eq!(token.span.end_lc.column, 3);
 
     let token = lexer.next_token();
-    assert_eq!(token.span.start.line, 0);
-    assert_eq!(token.span.start.column, 4);
-    assert_eq!(token.span.end.line, 0);
-    assert_eq!(token.span.end.column, 5);
+    assert_eq!(token.span.start_lc.line, 0);
+    assert_eq!(token.span.start_lc.column, 4);
+    assert_eq!(token.span.end_lc.line, 0);
+    assert_eq!(token.span.end_lc.column, 5);
 }
 
 #[test]

@@ -43,43 +43,20 @@ impl CodemirrorDiagnostic {
     }
 }
 
-pub fn from_parse_issue(src: &str, error: &ParseIssue) -> CodemirrorDiagnostic {
+pub fn from_parse_issue(_src: &str, error: &ParseIssue) -> CodemirrorDiagnostic {
     CodemirrorDiagnostic::new(
         &error.msg,
         CodemirrorSeverity::Error,
-        line_column_to_offset(src, error.span.start.line, error.span.start.column),
-        line_column_to_offset(src, error.span.end.line, error.span.end.column),
+        error.span.start,
+        error.span.end,
     )
 }
 
-pub fn from_tlang_diagnostic(src: &str, diagnostic: &Diagnostic) -> CodemirrorDiagnostic {
+pub fn from_tlang_diagnostic(_src: &str, diagnostic: &Diagnostic) -> CodemirrorDiagnostic {
     CodemirrorDiagnostic::new(
         diagnostic.message(),
         diagnostic.severity().into(),
-        line_column_to_offset(
-            src,
-            diagnostic.span().start.line,
-            diagnostic.span().start.column.saturating_sub(1),
-        ),
-        line_column_to_offset(
-            src,
-            diagnostic.span().end.line,
-            diagnostic.span().end.column.saturating_sub(1),
-        ),
+        diagnostic.span().start,
+        diagnostic.span().end,
     )
-}
-
-fn line_column_to_offset(src: &str, line: u32, column: u32) -> u32 {
-    let mut offset = 0;
-    let lines = src.lines();
-
-    for (i, l) in lines.enumerate() {
-        if i as u32 == line {
-            offset += column;
-            break;
-        }
-        offset += l.len() as u32 + 1;
-    }
-
-    offset
 }

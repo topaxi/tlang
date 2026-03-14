@@ -49,6 +49,11 @@ impl<'src> Parser<'src> {
         self
     }
 
+    pub fn with_byte_offset(mut self, byte_offset: u32) -> Self {
+        self.lexer.set_byte_offset(byte_offset);
+        self
+    }
+
     pub fn recoverable(&self) -> bool {
         self.recoverable
     }
@@ -98,6 +103,7 @@ impl<'src> Parser<'src> {
 
     fn end_span_from_previous_token(&self, span: &mut Span) {
         span.end = self.previous_span.end;
+        span.end_lc = self.previous_span.end_lc;
     }
 
     #[inline(never)]
@@ -112,36 +118,36 @@ impl<'src> Parser<'src> {
     #[inline(never)]
     #[allow(clippy::needless_pass_by_value)]
     fn panic_unexpected_token(&self, expected: &str, actual: Token) -> ! {
-        let start_span = actual.span.start;
+        let start_lc = actual.span.start_lc;
         let source_line = self
             .lexer
             .source()
             .lines()
-            .nth(start_span.line as usize)
+            .nth(start_lc.line as usize)
             .unwrap_or_default();
-        let caret = " ".repeat(start_span.column as usize) + "^";
+        let caret = " ".repeat(start_lc.column as usize) + "^";
 
         panic!(
             "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
-            expected, start_span.line, start_span.column, actual.kind, source_line, caret
+            expected, start_lc.line, start_lc.column, actual.kind, source_line, caret
         );
     }
 
     #[inline(never)]
     #[allow(clippy::needless_pass_by_value)]
     fn panic_unexpected_stmt(&self, expected: &str, actual: Stmt) -> ! {
-        let start_span = actual.span.start;
+        let start_lc = actual.span.start_lc;
         let source_line = self
             .lexer
             .source()
             .lines()
-            .nth(start_span.line as usize)
+            .nth(start_lc.line as usize)
             .unwrap_or_default();
-        let caret = " ".repeat(start_span.column as usize) + "^";
+        let caret = " ".repeat(start_lc.column as usize) + "^";
 
         panic!(
             "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
-            expected, start_span.line, start_span.column, actual.kind, source_line, caret
+            expected, start_lc.line, start_lc.column, actual.kind, source_line, caret
         );
     }
 
@@ -149,18 +155,18 @@ impl<'src> Parser<'src> {
     #[allow(clippy::needless_pass_by_value)]
     fn panic_unexpected_expr(&self, expected: &str, actual: Option<Expr>) -> ! {
         let node = actual.as_ref().unwrap();
-        let start_span = node.span.start;
+        let start_lc = node.span.start_lc;
         let source_line = self
             .lexer
             .source()
             .lines()
-            .nth(start_span.line as usize)
+            .nth(start_lc.line as usize)
             .unwrap_or_default();
-        let caret = " ".repeat(start_span.column as usize) + "^";
+        let caret = " ".repeat(start_lc.column as usize) + "^";
 
         panic!(
             "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
-            expected, start_span.line, start_span.column, node.kind, source_line, caret
+            expected, start_lc.line, start_lc.column, node.kind, source_line, caret
         );
     }
 

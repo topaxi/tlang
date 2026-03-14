@@ -88,7 +88,7 @@ export class TlangController {
           diagnostic.severity === 'error'
             ? ('error' as const)
             : ('warn' as const);
-        let formatted = `${diagnostic.message} at ${diagnostic.span.start.line}:${diagnostic.span.start.column}`;
+        let formatted = `${diagnostic.message} at ${diagnostic.span.start_lc.line}:${diagnostic.span.start_lc.column}`;
 
         this.logToConsole(method, formatted);
       }
@@ -100,7 +100,7 @@ export class TlangController {
           typeof parseError.kind === 'string'
             ? parseError.kind
             : Object.keys(parseError.kind)[0];
-        let formatted = `${kind}: ${parseError.msg} at ${parseError.span.start.line}:${parseError.span.start.column}`;
+        let formatted = `${kind}: ${parseError.msg} at ${parseError.span.start_lc.line}:${parseError.span.start_lc.column}`;
 
         this.logToConsole('error', formatted);
       }

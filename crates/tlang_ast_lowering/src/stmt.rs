@@ -195,7 +195,7 @@ impl LoweringContext {
                 dyn_fn_decl.hir_id,
                 &first_declaration.name(),
                 SymbolType::Variable, // TODO, add symbol type for dyn dispatch functions
-                first_declaration.span.start,
+                first_declaration.span.start_lc.line,
                 |symbol| symbol.node_id == last_decl_id,
             );
 
@@ -434,7 +434,7 @@ impl LoweringContext {
             hir_id,
             &first_declaration.name(),
             SymbolType::FunctionSelfRef(params.len() as u16),
-            first_declaration.span.start,
+            first_declaration.span.start_lc.line,
         );
 
         for param in params {
@@ -442,7 +442,7 @@ impl LoweringContext {
                 param.hir_id,
                 param.name.as_str(),
                 SymbolType::Parameter,
-                param.span.start,
+                param.span.start_lc.line,
             );
         }
     }

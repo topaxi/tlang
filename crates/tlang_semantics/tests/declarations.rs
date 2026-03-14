@@ -39,14 +39,11 @@ fn test_analyze_variable_declaration() {
             id: SymbolId::new(2),
             name: "a".into(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
+            defined_at: Span::lc(
                 LineColumn { line: 0, column: 4 },
                 LineColumn { line: 0, column: 5 }
             ),
-            scope_start: LineColumn {
-                line: 0,
-                column: 10
-            },
+            scope_start: 10,
             declared: true,
             temp: false,
             builtin: false,
@@ -84,7 +81,7 @@ fn test_block_scope() {
             id: SymbolId::new(2),
             name: "a".into(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
+            defined_at: Span::lc(
                 LineColumn {
                     line: 1,
                     column: 13
@@ -94,10 +91,7 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
-            scope_start: LineColumn {
-                line: 1,
-                column: 19
-            },
+            scope_start: 19,
             declared: true,
             temp: false,
             builtin: false,
@@ -129,7 +123,7 @@ fn test_block_scope() {
             id: SymbolId::new(2),
             name: "a".into(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
+            defined_at: Span::lc(
                 LineColumn {
                     line: 1,
                     column: 13
@@ -139,10 +133,7 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
-            scope_start: LineColumn {
-                line: 1,
-                column: 19
-            },
+            scope_start: 19,
             declared: true,
             temp: false,
             builtin: false,
@@ -158,7 +149,7 @@ fn test_block_scope() {
             id: SymbolId::new(3),
             name: "b".into(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
+            defined_at: Span::lc(
                 LineColumn {
                     line: 3,
                     column: 17
@@ -168,10 +159,7 @@ fn test_block_scope() {
                     column: 18
                 }
             ),
-            scope_start: LineColumn {
-                line: 3,
-                column: 23
-            },
+            scope_start: 52,
             declared: true,
             temp: false,
             builtin: false,
@@ -205,7 +193,7 @@ fn test_block_scope() {
             id: SymbolId::new(2),
             name: "a".into(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
+            defined_at: Span::lc(
                 LineColumn {
                     line: 1,
                     column: 13
@@ -215,10 +203,7 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
-            scope_start: LineColumn {
-                line: 1,
-                column: 19
-            },
+            scope_start: 19,
             declared: true,
             temp: false,
             builtin: false,
@@ -234,7 +219,7 @@ fn test_block_scope() {
             id: SymbolId::new(3),
             name: "b".into(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
+            defined_at: Span::lc(
                 LineColumn {
                     line: 3,
                     column: 17
@@ -244,10 +229,7 @@ fn test_block_scope() {
                     column: 18
                 }
             ),
-            scope_start: LineColumn {
-                line: 3,
-                column: 23
-            },
+            scope_start: 52,
             declared: true,
             temp: false,
             builtin: false,
@@ -263,7 +245,7 @@ fn test_block_scope() {
             id: SymbolId::new(4),
             name: "c".into(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
+            defined_at: Span::lc(
                 LineColumn {
                     line: 5,
                     column: 21
@@ -273,10 +255,7 @@ fn test_block_scope() {
                     column: 22
                 }
             ),
-            scope_start: LineColumn {
-                line: 5,
-                column: 27
-            },
+            scope_start: 93,
             declared: true,
             temp: false,
             builtin: false,
@@ -307,11 +286,11 @@ fn test_should_collect_function_definitions() {
             id: SymbolId::new(2),
             name: "add".into(),
             symbol_type: SymbolType::Function(2),
-            defined_at: Span::new(
+            defined_at: Span::lc(
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
-            scope_start: LineColumn { line: 2, column: 2 },
+            scope_start: 26,
             declared: true,
             temp: false,
             builtin: false,
@@ -342,11 +321,11 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
             id: SymbolId::new(2),
             name: "add".into(),
             symbol_type: SymbolType::Function(1),
-            defined_at: Span::new(
+            defined_at: Span::lc(
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
-            scope_start: LineColumn { line: 2, column: 2 },
+            scope_start: 28,
             declared: true,
             temp: false,
             builtin: false,
@@ -377,11 +356,11 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
             id: SymbolId::new(2),
             name: "sum".into(),
             symbol_type: SymbolType::Function(1),
-            defined_at: Span::new(
+            defined_at: Span::lc(
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
-            scope_start: LineColumn { line: 2, column: 2 },
+            scope_start: 38,
             declared: true,
             temp: false,
             builtin: false,
@@ -412,17 +391,14 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                 id: SymbolId::new(2),
                 name: "factorial".into(),
                 symbol_type: SymbolType::Function(2),
-                defined_at: Span::new(
+                defined_at: Span::lc(
                     LineColumn { line: 0, column: 3 },
                     LineColumn {
                         line: 0,
                         column: 12
                     }
                 ),
-                scope_start: LineColumn {
-                    line: 0,
-                    column: 28
-                },
+                scope_start: 28,
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -435,17 +411,14 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                 id: SymbolId::new(5),
                 name: "factorial".into(),
                 symbol_type: SymbolType::Function(2),
-                defined_at: Span::new(
+                defined_at: Span::lc(
                     LineColumn { line: 1, column: 4 },
                     LineColumn {
                         line: 1,
                         column: 13
                     }
                 ),
-                scope_start: LineColumn {
-                    line: 1,
-                    column: 63
-                },
+                scope_start: 91,
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -482,17 +455,14 @@ fn should_collect_function_arguments_with_enum_extraction() {
                 id: SymbolId::new(5),
                 name: "unwrap".into(),
                 symbol_type: SymbolType::Function(1),
-                defined_at: Span::new(
+                defined_at: Span::lc(
                     LineColumn { line: 5, column: 4 },
                     LineColumn {
                         line: 5,
                         column: 10
                     }
                 ),
-                scope_start: LineColumn {
-                    line: 5,
-                    column: 57
-                },
+                scope_start: 100,
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -505,17 +475,14 @@ fn should_collect_function_arguments_with_enum_extraction() {
                 id: SymbolId::new(7),
                 name: "unwrap".into(),
                 symbol_type: SymbolType::Function(1),
-                defined_at: Span::new(
+                defined_at: Span::lc(
                     LineColumn { line: 6, column: 4 },
                     LineColumn {
                         line: 6,
                         column: 10
                     }
                 ),
-                scope_start: LineColumn {
-                    line: 6,
-                    column: 41
-                },
+                scope_start: 141,
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -549,17 +516,14 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                 id: SymbolId::new(2),
                 name: "used_fn".into(),
                 symbol_type: SymbolType::Function(0),
-                defined_at: Span::new(
+                defined_at: Span::lc(
                     LineColumn { line: 0, column: 3 },
                     LineColumn {
                         line: 0,
                         column: 10
                     }
                 ),
-                scope_start: LineColumn {
-                    line: 0,
-                    column: 15
-                },
+                scope_start: 15,
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -572,17 +536,14 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                 id: SymbolId::new(4),
                 name: "used_fn".into(),
                 symbol_type: SymbolType::Function(1),
-                defined_at: Span::new(
+                defined_at: Span::lc(
                     LineColumn { line: 1, column: 4 },
                     LineColumn {
                         line: 1,
                         column: 11
                     }
                 ),
-                scope_start: LineColumn {
-                    line: 1,
-                    column: 24
-                },
+                scope_start: 39,
                 declared: true,
                 temp: false,
                 builtin: false,
