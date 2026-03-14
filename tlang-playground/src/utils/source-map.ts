@@ -128,13 +128,18 @@ export function shiftSourceMapLines(mapJson: string, offset: number): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Convert a JS arity-dispatch suffix back to tlang notation.
+ * Convert JS-encoded tlang name separators back to their source notation.
  *
- * The JS codegen encodes `name/arity` as `name$$arity` because `/` is not a
- * valid JavaScript identifier character.  e.g. `binary_search$$4` → `binary_search/4`.
+ * The JS codegen replaces tlang's `/` (arity) and `::` (namespace) with `$$`
+ * because neither is a valid JavaScript identifier character.
+ *
+ * - `name$$N`    (digits)  → `name/N`   e.g. `binary_search$$4` → `binary_search/4`
+ * - `Foo$$bar`   (word)    → `Foo::bar` e.g. `Functor$$map`      → `Functor::map`
  */
 function tlangFnName(name: string): string {
-  return name.replace(/\$\$(\d+)$/, '/$1');
+  return name
+    .replace(/\$\$(\d+)/g, '/$1')
+    .replace(/\$\$([A-Za-z_]\w*)/g, '::$1');
 }
 
 interface StackFrame {
