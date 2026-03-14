@@ -127,6 +127,16 @@ export function shiftSourceMapLines(mapJson: string, offset: number): string {
 // Stack frame parsing — handles Chrome/V8 and Firefox/Safari formats.
 // ---------------------------------------------------------------------------
 
+/**
+ * Convert a JS arity-dispatch suffix back to tlang notation.
+ *
+ * The JS codegen encodes `name/arity` as `name$$arity` because `/` is not a
+ * valid JavaScript identifier character.  e.g. `binary_search$$4` → `binary_search/4`.
+ */
+function tlangFnName(name: string): string {
+  return name.replace(/\$\$(\d+)$/, '/$1');
+}
+
 interface StackFrame {
   fnName: string;
   file: string;
@@ -205,7 +215,8 @@ export function remapStack(
       if (!orig) return raw;
 
       const loc = `${sourceName}:${orig.line}:${orig.column}`;
-      return frame.fnName ? `    at ${frame.fnName} (${loc})` : `    at ${loc}`;
+      const fn = frame.fnName ? tlangFnName(frame.fnName) : '';
+      return fn ? `    at ${fn} (${loc})` : `    at ${loc}`;
     })
     .join('\n');
 }
