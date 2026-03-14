@@ -43,7 +43,7 @@ impl CodemirrorDiagnostic {
     }
 }
 
-pub fn from_parse_issue(_src: &str, error: &ParseIssue) -> CodemirrorDiagnostic {
+pub fn from_parse_issue(error: &ParseIssue) -> CodemirrorDiagnostic {
     CodemirrorDiagnostic::new(
         &error.msg,
         CodemirrorSeverity::Error,
@@ -52,7 +52,7 @@ pub fn from_parse_issue(_src: &str, error: &ParseIssue) -> CodemirrorDiagnostic 
     )
 }
 
-pub fn from_tlang_diagnostic(_src: &str, diagnostic: &Diagnostic) -> CodemirrorDiagnostic {
+pub fn from_tlang_diagnostic(diagnostic: &Diagnostic) -> CodemirrorDiagnostic {
     CodemirrorDiagnostic::new(
         diagnostic.message(),
         diagnostic.severity().into(),
