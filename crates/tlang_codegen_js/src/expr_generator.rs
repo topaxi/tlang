@@ -1,6 +1,6 @@
 use oxc_ast::NONE;
 use oxc_ast::ast::*;
-use oxc_span::SPAN;
+use oxc_span::{GetSpanMut, SPAN};
 use tlang_ast::node::{self as ast, Ident};
 use tlang_ast::token::Literal;
 use tlang_hir as hir;
@@ -11,7 +11,7 @@ use crate::js;
 
 impl<'a> InnerCodegen<'a> {
     pub fn generate_expr(&mut self, expr: &hir::Expr) -> Expression<'a> {
-        match &expr.kind {
+        let mut js_expr = match &expr.kind {
             hir::ExprKind::Literal(literal) => self.generate_literal(literal),
             hir::ExprKind::Path(path) => self.generate_path_expression(path),
             hir::ExprKind::Binary(op, lhs, rhs) if *op == hir::BinaryOpKind::Assign => {
@@ -54,7 +54,9 @@ impl<'a> InnerCodegen<'a> {
             }
             hir::ExprKind::Let(..) => todo!("Let expression not implemented yet."),
             hir::ExprKind::Range(_) => todo!("Range expression not implemented yet."),
-        }
+        };
+        *js_expr.span_mut() = Self::hir_span(expr.span);
+        js_expr
     }
 
     pub fn generate_literal(&mut self, literal: &Literal) -> Expression<'a> {

@@ -8,7 +8,7 @@ use tlang_ast as ast;
 use tlang_ast::keyword::kw;
 use tlang_ast::node::{EnumPattern, FunctionDeclaration, Ident};
 use tlang_hir as hir;
-use tlang_span::{HirId, HirIdAllocator, LineColumn, NodeId};
+use tlang_span::{HirId, HirIdAllocator, NodeId};
 use tlang_symbols::{SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType};
 
 mod expr;
@@ -150,7 +150,7 @@ impl LoweringContext {
         hir_id: HirId,
         name: &str,
         symbol_type: SymbolType,
-        scope_start: LineColumn,
+        scope_start: u32,
     ) {
         let symbol_info = SymbolInfo::new(
             self.symbol_id_allocator.next_id(),
@@ -171,7 +171,7 @@ impl LoweringContext {
         hir_id: HirId,
         name: &str,
         symbol_type: SymbolType,
-        scope_start: LineColumn,
+        scope_start: u32,
     ) {
         let symbol_info = SymbolInfo::new(
             self.symbol_id_allocator.next_id(),
@@ -191,7 +191,7 @@ impl LoweringContext {
         hir_id: HirId,
         name: &str,
         symbol_type: SymbolType,
-        scope_start: LineColumn,
+        scope_start: u32,
         predicate: impl Fn(&SymbolInfo) -> bool,
     ) {
         let symbol_info = SymbolInfo::new(

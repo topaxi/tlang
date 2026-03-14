@@ -27,15 +27,19 @@ impl From<LineColumn> for JsLineColumn {
 #[derive(Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi)]
 pub struct JsSpan {
-    pub start: JsLineColumn,
-    pub end: JsLineColumn,
+    pub start: u32,
+    pub end: u32,
+    pub start_lc: JsLineColumn,
+    pub end_lc: JsLineColumn,
 }
 
 impl From<Span> for JsSpan {
     fn from(span: Span) -> Self {
         Self {
-            start: span.start.into(),
-            end: span.end.into(),
+            start: span.start,
+            end: span.end,
+            start_lc: span.start_lc.into(),
+            end_lc: span.end_lc.into(),
         }
     }
 }

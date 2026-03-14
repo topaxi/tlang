@@ -5,6 +5,7 @@ use oxc_ast::AstBuilder;
 use oxc_ast::NONE;
 use oxc_ast::ast::*;
 use oxc_codegen::{Codegen, CodegenOptions, IndentChar};
+use oxc_sourcemap::{SourceMap, Token};
 use oxc_span::SPAN;
 
 use crate::js_anf_transform::JsAnfTransform;
@@ -12,7 +13,7 @@ use crate::scope::Scope;
 use oxc_estree::{ESTree, PrettyJSSerializer};
 use tlang_hir as hir;
 use tlang_hir_opt::hir_opt::{HirOptContext, HirPass};
-use tlang_span::{HirId, HirIdAllocator};
+use tlang_span::{HirId, HirIdAllocator, Span as TlangSpan};
 use tlang_symbols::SymbolType;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,6 +27,7 @@ pub(crate) struct FunctionContext {
 pub struct CodegenJS {
     output: String,
     js_ast_json: String,
+    source_map: Option<SourceMap>,
     protocol_names: HashSet<String>,
 }
 
@@ -46,6 +48,7 @@ impl CodegenJS {
         Self {
             output: String::new(),
             js_ast_json: String::new(),
+            source_map: None,
             protocol_names,
         }
     }
@@ -111,6 +114,27 @@ impl CodegenJS {
     }
 
     pub fn generate_code(&mut self, module: &hir::Module) {
+        self.run_codegen(module, None, None);
+    }
+
+    /// Generate code and produce a source map mapping generated JS back to the
+    /// original tlang source. `source_name` is stored as the source file name in
+    /// the map; `source_text` is the original tlang source used to build it.
+    pub fn generate_code_with_source_map(
+        &mut self,
+        module: &hir::Module,
+        source_name: &str,
+        source_text: &str,
+    ) {
+        self.run_codegen(module, Some(source_text), Some(source_name));
+    }
+
+    fn run_codegen(
+        &mut self,
+        module: &hir::Module,
+        source_text: Option<&str>,
+        source_name: Option<&str>,
+    ) {
         // ANF is required: the OXC-based codegen assumes all expressions in
         // value positions are JS-expressible. Clone + ANF to guarantee this.
         let mut module = module.clone();
@@ -125,20 +149,27 @@ impl CodegenJS {
         let allocator = Allocator::default();
         let ast = AstBuilder::new(&allocator);
         let mut inner = InnerCodegen::new(ast, self.protocol_names.clone());
+        if let Some(st) = source_text {
+            inner = inner.with_source_text(st.to_string());
+        }
         let program = inner.generate_module(&module);
 
         let mut serializer = PrettyJSSerializer::new(false);
         program.serialize(&mut serializer);
         self.js_ast_json = serializer.into_string();
 
-        let result = Codegen::new()
-            .with_options(CodegenOptions {
-                indent_char: IndentChar::Space,
-                indent_width: 4,
-                ..CodegenOptions::default()
-            })
-            .build(&program);
+        let mut options = CodegenOptions {
+            indent_char: IndentChar::Space,
+            indent_width: 4,
+            ..CodegenOptions::default()
+        };
+        if let Some(name) = source_name {
+            options.source_map_path = Some(std::path::PathBuf::from(name));
+        }
+
+        let result = Codegen::new().with_options(options).build(&program);
         self.output = result.code;
+        self.source_map = result.map;
     }
 
     pub fn get_output(&self) -> &str {
@@ -148,6 +179,71 @@ impl CodegenJS {
     pub fn get_js_ast_json(&self) -> &str {
         &self.js_ast_json
     }
+
+    pub fn get_source_map(&self) -> Option<&SourceMap> {
+        self.source_map.as_ref()
+    }
+
+    /// Returns the source map serialized as a JSON string, or `None` if no
+    /// source map was generated. The generated line positions in the map
+    /// correspond to `get_output()` — call [`shift_source_map_lines`] if you
+    /// need to account for lines prepended to the final file (e.g. stdlib).
+    pub fn get_source_map_json(&self) -> Option<String> {
+        self.source_map.as_ref().map(|m| m.to_json_string())
+    }
+}
+
+/// Shift every generated mapping in `map_json` down by `line_offset` lines.
+///
+/// This is used when the compiled output is prefixed with a preamble such as
+/// the stdlib, so generated JS line numbers still point back to the original
+/// tlang source locations.
+///
+/// # Panics
+///
+/// Panics if `map_json` is not a valid source map JSON string.
+pub fn shift_source_map_lines(map_json: &str, line_offset: usize) -> String {
+    if line_offset == 0 {
+        return map_json.to_string();
+    }
+
+    let source_map =
+        SourceMap::from_json_string(map_json).expect("generated source map should be valid JSON");
+    let mut shifted = SourceMap::new(
+        source_map.get_file().cloned(),
+        source_map.get_names().cloned().collect(),
+        source_map.get_source_root().map(str::to_owned),
+        source_map.get_sources().cloned().collect(),
+        source_map
+            .get_source_contents()
+            .map(|content| content.cloned())
+            .collect(),
+        source_map
+            .get_tokens()
+            .map(|token| {
+                Token::new(
+                    token.get_dst_line() + line_offset as u32,
+                    token.get_dst_col(),
+                    token.get_src_line(),
+                    token.get_src_col(),
+                    token.get_source_id(),
+                    token.get_name_id(),
+                )
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice(),
+        None,
+    );
+
+    if let Some(ignore_list) = source_map.get_x_google_ignore_list() {
+        shifted.set_x_google_ignore_list(ignore_list.to_vec());
+    }
+
+    if let Some(debug_id) = source_map.get_debug_id() {
+        shifted.set_debug_id(debug_id);
+    }
+
+    shifted.to_json_string()
 }
 
 // ---------------------------------------------------------------------------
@@ -159,13 +255,18 @@ pub(crate) struct InnerCodegen<'a> {
     pub scopes: Scope,
     pub function_context_stack: Vec<FunctionContext>,
     pub protocol_names: HashSet<String>,
+    /// Original tlang source text. When non-empty, it's prepended to
+    /// `comment_source` as the combined `Program.source_text`, enabling OXC's
+    /// built-in source map generation (which reads byte offsets from node spans).
+    source_text: String,
     /// Buffer of synthetic source text containing comment strings.
     /// OXC codegen reads comment content from Program.source_text using byte spans.
     comment_source: String,
     /// Collected OXC comments to be attached to the Program.
     oxc_comments: Vec<oxc_ast::Comment>,
-    /// Counter for assigning unique span start positions to statements,
-    /// so OXC's comment system can attach comments to them.
+    /// Counter for assigning unique span start positions to comment-bearing
+    /// statement nodes, ensuring comment attachment keys are always distinct
+    /// (even when multiple HIR nodes derive from the same source position).
     span_counter: u32,
 }
 
@@ -176,16 +277,25 @@ impl<'a> InnerCodegen<'a> {
             scopes: Scope::default(),
             function_context_stack: Vec::new(),
             protocol_names,
+            source_text: String::new(),
             comment_source: String::new(),
             oxc_comments: Vec::new(),
             span_counter: 1,
         }
     }
 
+    pub fn with_source_text(mut self, source_text: String) -> Self {
+        self.source_text = source_text;
+        self
+    }
+
     pub fn generate_module(&mut self, module: &hir::Module) -> Program<'a> {
         let stmts = self.generate_stmts(&module.block.stmts);
         let body = self.ast.vec_from_iter(stmts);
-        let source_text = self.ast.allocator.alloc_str(&self.comment_source);
+        // Combine the original tlang source (for source map byte-offset lookups)
+        // with the synthetic comment buffer (for OXC's comment printer).
+        let combined = format!("{}{}", self.source_text, self.comment_source);
+        let source_text = self.ast.allocator.alloc_str(&combined);
         let comments = self.ast.vec_from_iter(self.oxc_comments.drain(..));
         self.ast.program(
             SPAN,
@@ -196,6 +306,11 @@ impl<'a> InnerCodegen<'a> {
             self.ast.vec(),
             body,
         )
+    }
+
+    /// Convert a tlang span to an OXC span using byte offsets.
+    pub fn hir_span(span: TlangSpan) -> oxc_span::Span {
+        oxc_span::Span::new(span.start, span.end)
     }
 
     // -- Scope helpers -------------------------------------------------------
@@ -275,8 +390,12 @@ impl<'a> InnerCodegen<'a> {
         id
     }
 
-    /// Attach HIR leading comments to an OXC statement by assigning it a unique
-    /// span and creating OXC Comment objects pointing into our synthetic source text.
+    /// Attach HIR leading comments to an OXC statement. A unique counter-based
+    /// ID is used as the attachment key so that nodes derived from the same
+    /// source position (e.g., a function clause and its pattern-dispatch branch)
+    /// don't accidentally share a `span.start` and trigger duplicate comments.
+    /// Comment text is appended to `comment_source`, placed after the original
+    /// source in the combined `Program.source_text`.
     pub fn attach_leading_comments(
         &mut self,
         stmt: &mut Statement<'a>,
@@ -308,7 +427,10 @@ impl<'a> InnerCodegen<'a> {
                 _ => continue,
             };
 
-            let start = self.comment_source.len() as u32;
+            // Offset the comment span past the original source text so that the
+            // combined Program.source_text (original + comment_source) is indexed
+            // correctly by both the source map builder and the comment printer.
+            let start = self.source_text.len() as u32 + self.comment_source.len() as u32;
             self.comment_source.push_str(&text);
             self.comment_source.push('\n');
             let end = start + text.len() as u32;
@@ -548,5 +670,43 @@ impl<'a> InnerCodegen<'a> {
     pub fn call_expr(&self, callee: Expression<'a>, args: Vec<Argument<'a>>) -> Expression<'a> {
         self.ast
             .expression_call(SPAN, callee, NONE, self.ast.vec_from_iter(args), false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::shift_source_map_lines;
+    use oxc_sourcemap::{SourceMap, Token};
+
+    #[test]
+    fn shift_source_map_lines_preserves_metadata_and_offsets_tokens() {
+        let mut source_map = SourceMap::new(
+            Some("out.js".into()),
+            vec!["main".into()],
+            Some("src".to_string()),
+            vec!["input.tlang".into()],
+            vec![Some("fn main() { 1 }".into())],
+            vec![
+                Token::new(0, 0, 0, 0, Some(0), Some(0)),
+                Token::new(2, 4, 0, 3, Some(0), None),
+            ]
+            .into_boxed_slice(),
+            None,
+        );
+        source_map.set_debug_id("debug-id");
+        source_map.set_x_google_ignore_list(vec![0]);
+
+        let shifted_json = shift_source_map_lines(&source_map.to_json_string(), 3);
+        let shifted = SourceMap::from_json_string(&shifted_json).unwrap();
+        let shifted_lines = shifted
+            .get_tokens()
+            .map(|token| token.get_dst_line())
+            .collect::<Vec<_>>();
+
+        assert_eq!(shifted_lines, vec![3, 5]);
+        assert_eq!(shifted.get_file().map(|file| file.as_ref()), Some("out.js"));
+        assert_eq!(shifted.get_source_root(), Some("src"));
+        assert_eq!(shifted.get_debug_id(), Some("debug-id"));
+        assert_eq!(shifted.get_x_google_ignore_list(), Some(&[0][..]));
     }
 }

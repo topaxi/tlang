@@ -40,7 +40,7 @@ impl<'a> InnerCodegen<'a> {
         if let Some((target, method_name)) = binding {
             // target.method = function name(...) { ... };
             let func = self.ast.expression_function(
-                SPAN,
+                Self::hir_span(declaration.span),
                 FunctionType::FunctionExpression,
                 Some(self.binding_ident(&name_as_str)),
                 false,
@@ -58,7 +58,7 @@ impl<'a> InnerCodegen<'a> {
         } else {
             // function name(...) { ... }
             let decl = Statement::FunctionDeclaration(self.ast.alloc_function(
-                SPAN,
+                Self::hir_span(declaration.span),
                 FunctionType::FunctionDeclaration,
                 Some(self.binding_ident(&name_as_str)),
                 false,
@@ -193,7 +193,7 @@ impl<'a> InnerCodegen<'a> {
                 let body_stmt = self.expr_stmt(body_expr);
                 let body = self.fn_body(self.ast.vec1(body_stmt));
                 self.ast.expression_arrow_function(
-                    SPAN,
+                    Self::hir_span(declaration.span),
                     true,
                     false,
                     NONE,
@@ -205,7 +205,7 @@ impl<'a> InnerCodegen<'a> {
                 let body_stmts = self.generate_function_body(&declaration.body, false);
                 let body = self.fn_body(self.ast.vec_from_iter(body_stmts));
                 self.ast.expression_arrow_function(
-                    SPAN,
+                    Self::hir_span(declaration.span),
                     false,
                     false,
                     NONE,
@@ -225,7 +225,7 @@ impl<'a> InnerCodegen<'a> {
             };
 
             self.ast.expression_function(
-                SPAN,
+                Self::hir_span(declaration.span),
                 FunctionType::FunctionExpression,
                 id,
                 false,

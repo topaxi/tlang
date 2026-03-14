@@ -335,11 +335,11 @@ export class TlangPlayground extends LitElement {
   @query('t-console', true)
   private consoleElement!: ConsoleElement;
 
-  private run() {
+  private async run() {
     if (!this.consoleElement.persist) {
       this.tlang.clearConsole();
     }
-    this.tlang.run(this.runner);
+    await this.tlang.run(this.runner);
     this.consoleMessages = [...this.tlang.consoleMessages];
   }
 

@@ -9,6 +9,7 @@ pub struct Lexer<'src> {
     source: &'src str,
     chars: std::str::Chars<'src>, // char iterator over `source`.
     position: usize,
+    byte_offset: u32,
     current_line: u32,
     current_column: u32,
     current_char: char,
@@ -24,6 +25,7 @@ impl Lexer<'_> {
         Lexer {
             source,
             position: 0,
+            byte_offset: 0,
             current_line: 0,
             current_column: 0,
             current_char,
@@ -34,6 +36,10 @@ impl Lexer<'_> {
 
     pub fn set_line_offset(&mut self, line: u32) {
         self.current_line = line;
+    }
+
+    pub fn set_byte_offset(&mut self, offset: u32) {
+        self.byte_offset = offset;
     }
 
     pub fn current_line(&self) -> u32 {
@@ -83,7 +89,7 @@ impl Lexer<'_> {
         }
     }
 
-    fn read_number_literal(&mut self, start: LineColumn) -> Token {
+    fn read_number_literal(&mut self, start_pos: u32, start_lc: LineColumn) -> Token {
         let start_position = self.position;
 
         self.advance_while(Self::is_number_literal_char);
@@ -95,7 +101,7 @@ impl Lexer<'_> {
             TokenKind::Literal(Literal::UnsignedInteger(slice.parse().unwrap_or(0)))
         };
 
-        self.token(token_kind, start)
+        self.token(token_kind, start_pos, start_lc)
     }
 
     fn is_alphanumeric(ch: char) -> bool {
@@ -217,17 +223,30 @@ impl Lexer<'_> {
         }
     }
 
-    fn token(&self, kind: TokenKind, start: LineColumn) -> Token {
-        Token::new(kind, Span::new(start, self.line_column()))
+    fn byte_position(&self) -> u32 {
+        self.position as u32 + self.byte_offset
+    }
+
+    fn token(&self, kind: TokenKind, start_pos: u32, start_lc: LineColumn) -> Token {
+        Token::new(
+            kind,
+            Span::new(
+                start_pos,
+                self.byte_position(),
+                start_lc,
+                self.line_column(),
+            ),
+        )
     }
 
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
-        let start = self.line_column();
+        let start_pos = self.byte_position();
+        let start_lc = self.line_column();
 
         if self.current_char == '\0' {
-            return self.token(TokenKind::Eof, start);
+            return self.token(TokenKind::Eof, start_pos, start_lc);
         }
 
         let ch = self.current_char;
@@ -235,26 +254,26 @@ impl Lexer<'_> {
         match ch {
             '+' => {
                 self.advance();
-                self.token(TokenKind::Plus, start)
+                self.token(TokenKind::Plus, start_pos, start_lc)
             }
             '-' => {
                 if self.next_char == '>' {
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::Arrow, start)
+                    self.token(TokenKind::Arrow, start_pos, start_lc)
                 } else {
                     self.advance();
-                    self.token(TokenKind::Minus, start)
+                    self.token(TokenKind::Minus, start_pos, start_lc)
                 }
             }
             '*' => {
                 if self.next_char == '*' {
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::AsteriskAsterisk, start)
+                    self.token(TokenKind::AsteriskAsterisk, start_pos, start_lc)
                 } else {
                     self.advance();
-                    self.token(TokenKind::Asterisk, start)
+                    self.token(TokenKind::Asterisk, start_pos, start_lc)
                 }
             }
             '/' => {
@@ -264,7 +283,7 @@ impl Lexer<'_> {
                     let start_position = self.position;
                     self.advance_while(|ch| ch != '\n');
                     let comment = self.source[start_position..self.position].to_string();
-                    self.token(TokenKind::SingleLineComment(comment), start)
+                    self.token(TokenKind::SingleLineComment(comment), start_pos, start_lc)
                 } else if self.next_char == '*' {
                     self.advance();
                     self.advance();
@@ -277,133 +296,133 @@ impl Lexer<'_> {
                     let comment = self.source[start_position..self.position].to_string();
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::MultiLineComment(comment), start)
+                    self.token(TokenKind::MultiLineComment(comment), start_pos, start_lc)
                 } else {
                     self.advance();
-                    self.token(TokenKind::Slash, start)
+                    self.token(TokenKind::Slash, start_pos, start_lc)
                 }
             }
             '%' => {
                 self.advance();
-                self.token(TokenKind::Percent, start)
+                self.token(TokenKind::Percent, start_pos, start_lc)
             }
             '^' => {
                 self.advance();
-                self.token(TokenKind::Caret, start)
+                self.token(TokenKind::Caret, start_pos, start_lc)
             }
             '|' => {
                 if self.next_char == '|' {
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::DoublePipe, start)
+                    self.token(TokenKind::DoublePipe, start_pos, start_lc)
                 } else if self.next_char == '>' {
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::Pipeline, start)
+                    self.token(TokenKind::Pipeline, start_pos, start_lc)
                 } else {
                     self.advance();
-                    self.token(TokenKind::Pipe, start)
+                    self.token(TokenKind::Pipe, start_pos, start_lc)
                 }
             }
             '&' => {
                 if self.next_char == '&' {
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::DoubleAmpersand, start)
+                    self.token(TokenKind::DoubleAmpersand, start_pos, start_lc)
                 } else {
                     self.advance();
-                    self.token(TokenKind::Ampersand, start)
+                    self.token(TokenKind::Ampersand, start_pos, start_lc)
                 }
             }
             '<' => {
                 if self.next_char == '=' {
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::LessThanOrEqual, start)
+                    self.token(TokenKind::LessThanOrEqual, start_pos, start_lc)
                 } else {
                     self.advance();
-                    self.token(TokenKind::LessThan, start)
+                    self.token(TokenKind::LessThan, start_pos, start_lc)
                 }
             }
             '>' => {
                 if self.next_char == '=' {
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::GreaterThanOrEqual, start)
+                    self.token(TokenKind::GreaterThanOrEqual, start_pos, start_lc)
                 } else {
                     self.advance();
-                    self.token(TokenKind::GreaterThan, start)
+                    self.token(TokenKind::GreaterThan, start_pos, start_lc)
                 }
             }
             '(' => {
                 self.advance();
-                self.token(TokenKind::LParen, start)
+                self.token(TokenKind::LParen, start_pos, start_lc)
             }
             ')' => {
                 self.advance();
-                self.token(TokenKind::RParen, start)
+                self.token(TokenKind::RParen, start_pos, start_lc)
             }
             '{' => {
                 self.advance();
-                self.token(TokenKind::LBrace, start)
+                self.token(TokenKind::LBrace, start_pos, start_lc)
             }
             '}' => {
                 self.advance();
-                self.token(TokenKind::RBrace, start)
+                self.token(TokenKind::RBrace, start_pos, start_lc)
             }
             '[' => {
                 self.advance();
-                self.token(TokenKind::LBracket, start)
+                self.token(TokenKind::LBracket, start_pos, start_lc)
             }
             ']' => {
                 self.advance();
-                self.token(TokenKind::RBracket, start)
+                self.token(TokenKind::RBracket, start_pos, start_lc)
             }
             ',' => {
                 self.advance();
-                self.token(TokenKind::Comma, start)
+                self.token(TokenKind::Comma, start_pos, start_lc)
             }
             '=' => {
                 if self.next_char == '=' {
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::EqualEqual, start)
+                    self.token(TokenKind::EqualEqual, start_pos, start_lc)
                 } else if self.next_char == '>' {
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::FatArrow, start)
+                    self.token(TokenKind::FatArrow, start_pos, start_lc)
                 } else {
                     self.advance();
-                    self.token(TokenKind::EqualSign, start)
+                    self.token(TokenKind::EqualSign, start_pos, start_lc)
                 }
             }
             '!' => {
                 if self.next_char == '=' {
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::NotEqual, start)
+                    self.token(TokenKind::NotEqual, start_pos, start_lc)
                 } else {
                     self.advance();
-                    self.token(TokenKind::ExclamationMark, start)
+                    self.token(TokenKind::ExclamationMark, start_pos, start_lc)
                 }
             }
             '?' => {
                 self.advance();
-                self.token(TokenKind::QuestionMark, start)
+                self.token(TokenKind::QuestionMark, start_pos, start_lc)
             }
             ':' => {
                 if self.next_char == ':' {
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::PathSeparator, start)
+                    self.token(TokenKind::PathSeparator, start_pos, start_lc)
                 } else {
                     self.advance();
-                    self.token(TokenKind::Colon, start)
+                    self.token(TokenKind::Colon, start_pos, start_lc)
                 }
             }
             ';' => {
                 self.advance();
-                self.token(TokenKind::Semicolon, start)
+                self.token(TokenKind::Semicolon, start_pos, start_lc)
             }
             '.' => {
                 if self.next_char == '.' {
@@ -411,22 +430,22 @@ impl Lexer<'_> {
                         self.advance();
                         self.advance();
                         self.advance();
-                        self.token(TokenKind::DotDotDot, start)
+                        self.token(TokenKind::DotDotDot, start_pos, start_lc)
                     } else {
                         self.advance();
                         self.advance();
-                        self.token(TokenKind::DotDot, start)
+                        self.token(TokenKind::DotDot, start_pos, start_lc)
                     }
                 } else {
                     self.advance();
-                    self.token(TokenKind::Dot, start)
+                    self.token(TokenKind::Dot, start_pos, start_lc)
                 }
             }
             '#' => {
                 self.advance();
-                self.token(TokenKind::Hash, start)
+                self.token(TokenKind::Hash, start_pos, start_lc)
             }
-            '0'..='9' => self.read_number_literal(start),
+            '0'..='9' => self.read_number_literal(start_pos, start_lc),
             '"' | '\'' => {
                 let quote = ch;
                 self.advance();
@@ -434,30 +453,50 @@ impl Lexer<'_> {
                     Ok(literal) => {
                         let literal = literal.into();
                         if quote == '"' {
-                            self.token(TokenKind::Literal(Literal::String(literal)), start)
+                            self.token(
+                                TokenKind::Literal(Literal::String(literal)),
+                                start_pos,
+                                start_lc,
+                            )
                         } else {
-                            self.token(TokenKind::Literal(Literal::Char(literal)), start)
+                            self.token(
+                                TokenKind::Literal(Literal::Char(literal)),
+                                start_pos,
+                                start_lc,
+                            )
                         }
                     }
                     Err(_error) => {
                         // Only for unterminated strings, return an Unknown token
-                        self.token(TokenKind::Unknown, start)
+                        self.token(TokenKind::Unknown, start_pos, start_lc)
                     }
                 }
             }
             ch if Self::is_alphanumeric(ch) => match self.read_identifier() {
-                "true" => self.token(TokenKind::Literal(Literal::Boolean(true)), start),
-                "false" => self.token(TokenKind::Literal(Literal::Boolean(false)), start),
+                "true" => self.token(
+                    TokenKind::Literal(Literal::Boolean(true)),
+                    start_pos,
+                    start_lc,
+                ),
+                "false" => self.token(
+                    TokenKind::Literal(Literal::Boolean(false)),
+                    start_pos,
+                    start_lc,
+                ),
                 identifier if is_keyword(identifier) => {
                     let kw = Keyword::from(identifier);
-                    self.token(TokenKind::Keyword(kw), start)
+                    self.token(TokenKind::Keyword(kw), start_pos, start_lc)
                 }
                 identifier => {
                     let identifier_string = identifier.to_string();
-                    self.token(TokenKind::Identifier(identifier_string), start)
+                    self.token(
+                        TokenKind::Identifier(identifier_string),
+                        start_pos,
+                        start_lc,
+                    )
                 }
             },
-            _ => self.token(TokenKind::Unknown, start),
+            _ => self.token(TokenKind::Unknown, start_pos, start_lc),
         }
     }
 }

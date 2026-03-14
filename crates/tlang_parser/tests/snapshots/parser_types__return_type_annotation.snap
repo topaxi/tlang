@@ -16,11 +16,13 @@ Module(
               Ident(
                 name: "foo",
                 span: Span(
-                  start: LineColumn(
+                  start: 3,
+                  end: 6,
+                  start_lc: LineColumn(
                     line: 0,
                     column: 3,
                   ),
-                  end: LineColumn(
+                  end_lc: LineColumn(
                     line: 0,
                     column: 6,
                   ),
@@ -29,11 +31,13 @@ Module(
             ],
             res: Unresolved,
             span: Span(
-              start: LineColumn(
+              start: 3,
+              end: 6,
+              start_lc: LineColumn(
                 line: 0,
                 column: 3,
               ),
-              end: LineColumn(
+              end_lc: LineColumn(
                 line: 0,
                 column: 6,
               ),
@@ -42,11 +46,13 @@ Module(
           leading_comments: [],
           trailing_comments: [],
           span: Span(
-            start: LineColumn(
+            start: 3,
+            end: 6,
+            start_lc: LineColumn(
               line: 0,
               column: 3,
             ),
-            end: LineColumn(
+            end_lc: LineColumn(
               line: 0,
               column: 6,
             ),
@@ -61,11 +67,13 @@ Module(
               Ident(
                 name: "i64",
                 span: Span(
-                  start: LineColumn(
+                  start: 12,
+                  end: 15,
+                  start_lc: LineColumn(
                     line: 0,
                     column: 12,
                   ),
-                  end: LineColumn(
+                  end_lc: LineColumn(
                     line: 0,
                     column: 15,
                   ),
@@ -74,11 +82,13 @@ Module(
             ],
             res: Unresolved,
             span: Span(
-              start: LineColumn(
+              start: 12,
+              end: 15,
+              start_lc: LineColumn(
                 line: 0,
                 column: 12,
               ),
-              end: LineColumn(
+              end_lc: LineColumn(
                 line: 0,
                 column: 15,
               ),
@@ -86,11 +96,13 @@ Module(
           )),
           parameters: [],
           span: Span(
-            start: LineColumn(
+            start: 0,
+            end: 0,
+            start_lc: LineColumn(
               line: 0,
               column: 0,
             ),
-            end: LineColumn(
+            end_lc: LineColumn(
               line: 0,
               column: 0,
             ),
@@ -105,22 +117,26 @@ Module(
             leading_comments: [],
             trailing_comments: [],
             span: Span(
-              start: LineColumn(
+              start: 18,
+              end: 19,
+              start_lc: LineColumn(
                 line: 0,
                 column: 18,
               ),
-              end: LineColumn(
+              end_lc: LineColumn(
                 line: 0,
                 column: 19,
               ),
             ),
           )),
           span: Span(
-            start: LineColumn(
+            start: 16,
+            end: 21,
+            start_lc: LineColumn(
               line: 0,
               column: 16,
             ),
-            end: LineColumn(
+            end_lc: LineColumn(
               line: 0,
               column: 21,
             ),
@@ -129,22 +145,26 @@ Module(
         leading_comments: [],
         trailing_comments: [],
         span: Span(
-          start: LineColumn(
+          start: 0,
+          end: 21,
+          start_lc: LineColumn(
             line: 0,
             column: 0,
           ),
-          end: LineColumn(
+          end_lc: LineColumn(
             line: 0,
             column: 21,
           ),
         ),
       )),
       span: Span(
-        start: LineColumn(
+        start: 0,
+        end: 21,
+        start_lc: LineColumn(
           line: 0,
           column: 0,
         ),
-        end: LineColumn(
+        end_lc: LineColumn(
           line: 0,
           column: 21,
         ),
@@ -154,11 +174,13 @@ Module(
     ),
   ],
   span: Span(
-    start: LineColumn(
+    start: 0,
+    end: 21,
+    start_lc: LineColumn(
       line: 0,
       column: 0,
     ),
-    end: LineColumn(
+    end_lc: LineColumn(
       line: 0,
       column: 21,
     ),

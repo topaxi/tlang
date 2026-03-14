@@ -7,8 +7,17 @@ import {
   type Runner,
 } from '../tlang';
 import { ConsoleMessage, createConsoleMessage } from '../components/t-console';
+import {
+  type ParsedSourceMap,
+  parseSourceMap,
+  remapStack,
+} from '../utils/source-map';
 
 type CodemirrorSeverity = 'hint' | 'info' | 'warning' | 'error';
+
+interface StdlibModule {
+  __exec: (code: string, console: object) => unknown;
+}
 
 export interface LocalDiagnostic {
   from: number;
@@ -32,10 +41,17 @@ export class TlangController {
   private cachedHIR: string | null = null;
   private cachedJS: string | null = null;
   private cachedJSAST: string | null = null;
+  private cachedSourceMap: ParsedSourceMap | null = null;
   private optimizationOptions: JsOptimizationOptions = {
     constantFolding: true,
     anfTransform: undefined,
   };
+
+  /**
+   * Cached Promise for the stdlib Blob URL module.  Resolved once and reused
+   * for every subsequent run so the stdlib is only compiled/loaded once.
+   */
+  private stdlibModulePromise: Promise<StdlibModule> | null = null;
 
   constructor(
     initialSource: string,
@@ -73,6 +89,7 @@ export class TlangController {
     this.cachedHIR = null;
     this.cachedJS = null;
     this.cachedJSAST = null;
+    this.cachedSourceMap = null;
 
     this.tlang = this.createTlang(source, runner);
     this.tlang.setOptimizations(this.optimizationOptions);
@@ -88,7 +105,7 @@ export class TlangController {
           diagnostic.severity === 'error'
             ? ('error' as const)
             : ('warn' as const);
-        let formatted = `${diagnostic.message} at ${diagnostic.span.start.line}:${diagnostic.span.start.column}`;
+        let formatted = `${diagnostic.message} at ${diagnostic.span.start_lc.line}:${diagnostic.span.start_lc.column}`;
 
         this.logToConsole(method, formatted);
       }
@@ -100,7 +117,7 @@ export class TlangController {
           typeof parseError.kind === 'string'
             ? parseError.kind
             : Object.keys(parseError.kind)[0];
-        let formatted = `${kind}: ${parseError.msg} at ${parseError.span.start.line}:${parseError.span.start.column}`;
+        let formatted = `${kind}: ${parseError.msg} at ${parseError.span.start_lc.line}:${parseError.span.start_lc.column}`;
 
         this.logToConsole('error', formatted);
       }
@@ -109,19 +126,19 @@ export class TlangController {
     }
   }
 
-  run(runner: Runner) {
+  async run(runner: Runner) {
     this.logToConsole('group');
     let beforeOpenGroups = this.getConsoleOpenGroups();
 
     try {
       if (runner === 'JavaScript') {
-        this.runCompiled();
+        await this.runCompiled();
       } else {
         this.runInterpreted();
       }
     } catch (error) {
       if (error instanceof Error) {
-        this.logToConsole('error', error);
+        this.logToConsole('error', this.remapError(error));
       }
 
       let openGroups = this.getConsoleOpenGroups();
@@ -147,18 +164,60 @@ export class TlangController {
       .length;
   }
 
-  private runCompiled() {
-    let bindings = {
-      console: this.tlangConsole,
-    };
+  /**
+   * Load (or return the cached) stdlib ES module.
+   *
+   * The stdlib is wrapped in a Blob URL module that exports `__exec`.
+   * `eval()` inside a module function has lexical access to the module scope,
+   * so user code eval'd through `__exec` sees all stdlib names with zero
+   * preamble offset — source maps work without any line shifting.
+   */
+  private getStdlibModule(): Promise<StdlibModule> {
+    if (!this.stdlibModulePromise) {
+      const stdlib = getStandardLibraryCompiled();
+      const moduleCode =
+        stdlib +
+        '\nexport function __exec(code, ___console) {\n' +
+        '  const console = ___console;\n' +
+        '  return eval(code);\n' +
+        '}';
+      const blob = new Blob([moduleCode], { type: 'text/javascript' });
+      const url = URL.createObjectURL(blob);
+      this.stdlibModulePromise = import(
+        /* @vite-ignore */ url
+      ) as Promise<StdlibModule>;
+    }
+    return this.stdlibModulePromise;
+  }
 
-    let bindingsDestructuring = `let {${Object.keys(bindings).join(',')}} = ___js_bindings;`;
-    let fn = new Function(
-      '___js_bindings',
-      `${bindingsDestructuring}${getStandardLibraryCompiled()}\n{${this.tlang.getJavaScript()}};`,
+  private async runCompiled() {
+    const mod = await this.getStdlibModule();
+
+    const rawMap = this.tlang.getSourceMap?.();
+    if (rawMap && !this.cachedSourceMap) {
+      this.cachedSourceMap = parseSourceMap(rawMap);
+    }
+
+    let code = this.tlang.getJavaScript();
+    code += '\n//# sourceURL=playground.tlang';
+    if (rawMap) {
+      code += `\n//# sourceMappingURL=data:application/json;base64,${btoa(rawMap)}`;
+    }
+
+    mod.__exec(code, this.tlangConsole);
+  }
+
+  /** Remap an error's stack trace using the current source map, if available. */
+  private remapError(error: Error): Error {
+    if (!this.cachedSourceMap || !error.stack) return error;
+    const remappedStack = remapStack(
+      error.stack,
+      this.cachedSourceMap,
+      'playground.tlang',
     );
-
-    fn(bindings);
+    const remapped = new Error(error.message);
+    remapped.stack = remappedStack;
+    return remapped;
   }
 
   private runInterpreted() {
@@ -190,6 +249,7 @@ export class TlangController {
     this.cachedHIR = null;
     this.cachedJS = null;
     this.cachedJSAST = null;
+    this.cachedSourceMap = null;
     this.tlang.setOptimizations(options);
   }
 

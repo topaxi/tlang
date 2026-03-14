@@ -76,8 +76,8 @@ impl Display for Diagnostic {
             "{}: {} on line {}:{}",
             self.severity.to_string().to_uppercase(),
             self.message,
-            self.span.start.line + 1,
-            self.span.start.column + 1
+            self.span.start_lc.line + 1,
+            self.span.start_lc.column + 1
         )
     }
 }

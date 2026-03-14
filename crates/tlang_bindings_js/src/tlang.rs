@@ -360,11 +360,18 @@ impl Tlang {
             let _ = self.parse();
             self.lower_to_hir();
             if let Some(hir) = self.build.hir.as_ref() {
-                self.js.generate_code(hir);
+                self.js
+                    .generate_code_with_source_map(hir, "playground.tlang", &self.source);
             }
         }
 
         Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "getSourceMap")]
+    pub fn get_source_map(&mut self) -> Option<String> {
+        let _ = self.compile_to_js();
+        self.js.get_source_map_json()
     }
 
     #[wasm_bindgen(js_name = "getHIRString")]
@@ -440,17 +447,13 @@ impl Tlang {
     pub fn codemirror_diagnostics(
         &mut self,
     ) -> Result<JsCodemirrorDiagnosticArray, serde_wasm_bindgen::Error> {
-        let source = self.source.clone();
         let diagnostics = self
             .analyzer
             .get_diagnostics()
             .iter()
-            .map(|d| codemirror::from_tlang_diagnostic(&source, d))
+            .map(codemirror::from_tlang_diagnostic)
             .collect::<Vec<_>>();
-        let parse_errors = self
-            .parse_issues()
-            .iter()
-            .map(|e| codemirror::from_parse_issue(&source, e));
+        let parse_errors = self.parse_issues().iter().map(codemirror::from_parse_issue);
 
         let all: Vec<_> = parse_errors.chain(diagnostics).collect();
         Ok(serde_wasm_bindgen::to_value(&all)?.unchecked_into())

@@ -1,6 +1,5 @@
 ---
 source: tests/runner/src/main.rs
-assertion_line: 322
 description: "Backend: interpreter"
 expression: apply_redactions(&output)
 input_file: tests/enums/result.tlang
@@ -15,6 +14,6 @@ true
 thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:518:9:
 Called unwrap on Err
   at native function Result::unwrap
-  at root 10:1
+  at root 164
 
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
