@@ -117,20 +117,9 @@ impl<'src> Parser<'src> {
 
     #[inline(never)]
     #[allow(clippy::needless_pass_by_value)]
-    fn panic_unexpected_token(&self, expected: &str, actual: Token) -> ! {
-        let start_lc = actual.span.start_lc;
-        let source_line = self
-            .lexer
-            .source()
-            .lines()
-            .nth(start_lc.line as usize)
-            .unwrap_or_default();
-        let caret = " ".repeat(start_lc.column as usize) + "^";
-
-        panic!(
-            "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
-            expected, start_lc.line, start_lc.column, actual.kind, source_line, caret
-        );
+    fn panic_unexpected_token(&mut self, expected: &str, actual: Token) -> ! {
+        self.push_unexpected_token_error(expected, actual);
+        panic!("parse error");
     }
 
     #[inline(never)]

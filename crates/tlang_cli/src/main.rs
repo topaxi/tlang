@@ -97,7 +97,11 @@ fn main() {
     let command = get_args();
 
     match command {
-        Command::Compile(options) => handle_compile(options),
+        Command::Compile(options) => {
+            if !handle_compile(options) {
+                std::process::exit(1);
+            }
+        }
         Command::Run { input_file } => handle_run(&input_file),
     }
 }

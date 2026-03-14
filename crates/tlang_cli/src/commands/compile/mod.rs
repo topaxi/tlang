@@ -80,7 +80,21 @@ fn compile_to_hir(
     show_warnings: bool,
 ) -> Result<tlang_hir::Module, ParserError> {
     let mut parser = tlang_parser::Parser::from_source(source);
-    let mut ast = parser.parse()?;
+    let prev_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| parser.parse()));
+    std::panic::set_hook(prev_hook);
+    let mut ast = match parse_result {
+        Ok(Ok(ast)) => ast,
+        Ok(Err(err)) => return Err(err.into()),
+        Err(payload) => {
+            let issues = parser.errors();
+            if issues.is_empty() {
+                std::panic::resume_unwind(payload);
+            }
+            return Err(ParserError::ParseError(issues.to_vec()));
+        }
+    };
 
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
@@ -121,12 +135,12 @@ fn compile_to_hir(
     Ok(module)
 }
 
-pub fn handle_compile(options: CompileOptions) {
+pub fn handle_compile(options: CompileOptions) -> bool {
     if options.output_stdlib {
         if !options.silent {
             println!("{}", compile_standard_library().unwrap());
         }
-        return;
+        return true;
     }
 
     if let Some(input_file) = &options.input_file {
@@ -144,7 +158,7 @@ pub fn handle_compile(options: CompileOptions) {
             Ok(result) => result,
             Err(errors) => {
                 eprint!("{}", errors.render(&path.to_string_lossy(), &source));
-                return;
+                return false;
             }
         };
 
@@ -154,7 +168,7 @@ pub fn handle_compile(options: CompileOptions) {
 
         if options.output_file.is_none() {
             println!("{output}");
-            return;
+            return true;
         }
 
         let output_file_name = options.output_file.unwrap();
@@ -167,6 +181,8 @@ pub fn handle_compile(options: CompileOptions) {
             panic!("couldn't write to {output_file_name}: {why}")
         }
     }
+
+    true
 }
 
 /// Compile `source` through the full pipeline and return `(js_output, optional_map_json)`.
