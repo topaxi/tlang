@@ -183,7 +183,9 @@ export class TlangController {
         '}';
       const blob = new Blob([moduleCode], { type: 'text/javascript' });
       const url = URL.createObjectURL(blob);
-      this.stdlibModulePromise = import(url) as Promise<StdlibModule>;
+      this.stdlibModulePromise = import(
+        /* @vite-ignore */ url
+      ) as Promise<StdlibModule>;
     }
     return this.stdlibModulePromise;
   }
