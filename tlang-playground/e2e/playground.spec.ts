@@ -148,9 +148,7 @@ test.describe('Diagnostics in console', () => {
     // Source: `let x = 42;` — triggers "Unused variable" warning only
     await gotoPlayground(page, '#source=DYUwLgBAHhC8EBYBMBuIA');
 
-    await expect(page.locator('t-console-message[type="warn"]')).toHaveCount(
-      1,
-    );
+    await expect(page.locator('t-console-message[type="warn"]')).toHaveCount(1);
     await expect(page.locator('t-console-message[type="error"]')).toHaveCount(
       0,
     );
