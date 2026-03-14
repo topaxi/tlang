@@ -1,0 +1,20 @@
+---
+source: crates/tlang_hir_opt/tests/anf_transform.rs
+expression: "common::pretty_print(&hir)"
+---
+fn filter(arg0: Slice, f: unknown) -> unknown {
+    let $anf$0: unknown = [arg0, f];
+    let $anf$1: unknown = nil;
+    match $anf$0 {
+        [[], _] => {
+            ($anf$1 = []);
+        },
+        [[x, ...xs], f] if f(x) => {
+            ($anf$1 = [x]);
+        },
+        [[_, ...xs], f] => {
+            ($anf$1 = []);
+        },
+    };
+    $anf$1
+}

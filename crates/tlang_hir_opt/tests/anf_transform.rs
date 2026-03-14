@@ -222,3 +222,29 @@ fn return_with_compound_expr() {
     }
     ");
 }
+
+#[test]
+fn multi_arm_function_with_guard() {
+    // Regression: the match scrutinee lifted by FullAnfFilter was being lost
+    // when fold_block cleared self.pending while processing arm bodies.
+    // After the fix the let-binding for the list appears before the match.
+    let source = r#"
+        fn search(_, _, low, high) if low > high { -1 }
+        fn search(list, target, low, high) { low + high }
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir));
+}
+
+#[test]
+fn multi_arm_function_guard_with_pattern_bound_var() {
+    // Regression: guard referencing a pattern-bound variable (not a function
+    // parameter) must NOT be lifted to before the match.
+    let source = r#"
+        fn filter([], _) { [] }
+        fn filter([x, ...xs], f) if f(x) { [x] }
+        fn filter([_, ...xs], f) { [] }
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir));
+}

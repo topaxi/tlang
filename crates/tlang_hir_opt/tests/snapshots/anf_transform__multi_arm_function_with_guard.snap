@@ -1,0 +1,17 @@
+---
+source: crates/tlang_hir_opt/tests/anf_transform.rs
+expression: "common::pretty_print(&hir)"
+---
+fn search(list: unknown, target: unknown, low: unknown, high: unknown) -> unknown {
+    let $anf$0: unknown = [list, target, low, high];
+    let $anf$1: unknown = nil;
+    match $anf$0 {
+        [_, _, low, high] if (low > high) => {
+            ($anf$1 = -1);
+        },
+        [list, target, low, high] => {
+            ($anf$1 = (low + high));
+        },
+    };
+    $anf$1
+}

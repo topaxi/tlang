@@ -447,11 +447,9 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                         guard: arm.guard.map(|g| {
                             if let hir::ExprKind::Let(pat, inner) = g.kind {
                                 // Preserve let-guards as-is so that the codegen can handle
-                                // them via `generate_match_arm_guard`.  Lifting the Let node
-                                // would cause the pending declaration to be discarded when
-                                // the arm-block `fold_block` clears `self.pending`, leaving
-                                // an undeclared `$anf$N` reference in the condition.
-                                // Only normalise the inner RHS expression.
+                                // them via `generate_match_arm_guard`.  Only normalise the
+                                // inner RHS expression; the let-guard node itself stays
+                                // inline so the codegen sees the Let structure.
                                 hir::Expr {
                                     hir_id: g.hir_id,
                                     kind: hir::ExprKind::Let(
@@ -461,7 +459,13 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                                     span: g.span,
                                 }
                             } else {
-                                self.normalize_expr(g)
+                                // Regular guards may reference pattern-bound variables that
+                                // are not available before the match expression.  Lifting
+                                // them into the enclosing block (via normalize_expr) would
+                                // evaluate them before the pattern binds those variables,
+                                // producing incorrect results.  Pass the guard through
+                                // unchanged so the codegen emits it inline in the condition.
+                                g
                             }
                         }),
                         block: self.fold_block(arm.block),
@@ -622,6 +626,12 @@ fn rewrite_break_values_in_expr<F: AnfFilter>(
 
 impl<F: AnfFilter> Folder for AnfFolder<'_, F> {
     fn fold_block(&mut self, block: hir::Block) -> hir::Block {
+        // Save any items accumulated by the caller before entering this block.
+        // fold_block uses self.pending as a local accumulator; items belonging to
+        // the enclosing scope (e.g. lifted match scrutinees or let-guard RHSes)
+        // must survive the block's internal pending.clear() calls.
+        let outer_pending = std::mem::take(&mut self.pending);
+
         let mut new_stmts = Vec::with_capacity(block.stmts.len());
 
         for stmt in block.stmts {
@@ -634,6 +644,9 @@ impl<F: AnfFilter> Folder for AnfFolder<'_, F> {
         self.pending.clear();
         let new_expr = block.expr.map(|expr| self.normalize_for_binding(expr));
         new_stmts.append(&mut self.pending);
+
+        // Restore the caller's pending items.
+        self.pending = outer_pending;
 
         hir::Block {
             hir_id: block.hir_id,
