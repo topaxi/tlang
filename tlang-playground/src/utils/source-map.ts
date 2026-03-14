@@ -123,56 +123,89 @@ export function shiftSourceMapLines(mapJson: string, offset: number): string {
   return mapJson.replace(/"mappings":"/, `"mappings":"${prefix}`);
 }
 
-// V8 stack frame patterns:
-//   "    at Name (file:line:col)"
-//   "    at file:line:col"
-const FRAME_WITH_FN = /^(\s+at )(.+?) \((.+?):(\d+):(\d+)\)(.*)$/;
-const FRAME_NO_FN = /^(\s+at )(.+?):(\d+):(\d+)(.*)$/;
+// ---------------------------------------------------------------------------
+// Stack frame parsing — handles Chrome/V8 and Firefox/Safari formats.
+// ---------------------------------------------------------------------------
+
+interface StackFrame {
+  fnName: string;
+  file: string;
+  line: string;
+  col: string;
+}
+
+// Chrome/V8:  "    at Name (file:line:col)"  or  "    at file:line:col"
+const CHROME_WITH_FN = /^\s+at (.+?) \((.+?):(\d+):(\d+)\).*$/;
+const CHROME_NO_FN = /^\s+at (.+?):(\d+):(\d+).*$/;
+
+function parseFrame(raw: string): StackFrame | null {
+  // Chrome/V8 with function name
+  const mFn = CHROME_WITH_FN.exec(raw);
+  if (mFn) return { fnName: mFn[1], file: mFn[2], line: mFn[3], col: mFn[4] };
+
+  // Chrome/V8 without function name
+  const mNo = CHROME_NO_FN.exec(raw);
+  if (mNo) return { fnName: '', file: mNo[1], line: mNo[2], col: mNo[3] };
+
+  // Firefox/Safari: "Name@file:line:col"  (Name may be empty or complex)
+  // Use lastIndexOf('@') so closure names with '@' are handled correctly.
+  const atIdx = raw.lastIndexOf('@');
+  if (atIdx < 0) return null;
+
+  const fnName = raw.slice(0, atIdx);
+  const rest = raw.slice(atIdx + 1);
+
+  // Pull :col and :line off the right-hand end.
+  const col2 = rest.lastIndexOf(':');
+  if (col2 < 0) return null;
+  const col1 = rest.lastIndexOf(':', col2 - 1);
+  if (col1 < 0) return null;
+
+  const file = rest.slice(0, col1);
+  const line = rest.slice(col1 + 1, col2);
+  const col = rest.slice(col2 + 1);
+
+  if (!line || !col || isNaN(parseInt(line, 10))) return null;
+  return { fnName, file, line, col };
+}
 
 /**
- * Remap a V8 `error.stack` string using a source map.
+ * Remap an `error.stack` string using a source map.
  *
- * Frames referencing `sourceUrl` at a line > `prefixLines` are resolved
- * back to the original tlang source position.  All other frames are kept
- * as-is so the native Node / browser frames remain visible.
+ * Both Chrome/V8 (`at name (file:line:col)`) and Firefox/Safari
+ * (`name@file:line:col`) stack formats are detected and normalised to
+ * Chrome format for consistent display in the playground console.
+ *
+ * `prefixLines` (default 0) can be set when a preamble (e.g. stdlib code)
+ * precedes the user code — frames at or below that line number are left
+ * unchanged. When using a module-based executor with no preamble, omit this.
  */
 export function remapStack(
   stack: string,
   map: ParsedSourceMap,
   sourceUrl: string,
-  prefixLines: number,
+  prefixLines = 0,
 ): string {
   const sourceName = map.sources[0] ?? sourceUrl;
   return stack
     .split('\n')
-    .map((line) => {
-      // Try "at Name (file:line:col)" first, then "at file:line:col".
-      const mFn = FRAME_WITH_FN.exec(line);
-      const mNo = !mFn ? FRAME_NO_FN.exec(line) : null;
+    .map((raw) => {
+      const frame = parseFrame(raw);
+      if (!frame || !frame.file.includes(sourceUrl)) return raw;
 
-      if (!mFn && !mNo) return line;
+      const genLine = parseInt(frame.line, 10);
+      const genCol = parseInt(frame.col, 10);
 
-      const [indent, fnName, file, rawLine, rawCol, suffix] = mFn
-        ? [mFn[1], mFn[2], mFn[3], mFn[4], mFn[5], mFn[6]]
-        : [mNo![1], '', mNo![2], mNo![3], mNo![4], mNo![5]];
+      // Preamble frames (stdlib, bindings) have no tlang source — keep raw.
+      if (genLine <= prefixLines) return raw;
 
-      if (!file.includes(sourceUrl)) return line;
-
-      const genLine = parseInt(rawLine, 10);
-      const genCol = parseInt(rawCol, 10);
-
-      // Lines inside the preamble (stdlib, bindings) have no tlang source.
-      if (genLine <= prefixLines) return line;
-
-      // Adjust for the preamble offset, then look up in the source map.
-      const adjustedLine = genLine - prefixLines;
-      const orig = originalPositionFor(map, adjustedLine, genCol);
-      if (!orig) return line;
+      // The map is already shifted by prefixLines — look up genLine directly,
+      // no additional adjustment needed.
+      const orig = originalPositionFor(map, genLine, genCol);
+      if (!orig) return raw;
 
       const loc = `${sourceName}:${orig.line}:${orig.column}`;
-      return fnName
-        ? `${indent}${fnName} (${loc})${suffix}`
-        : `${indent}${loc}${suffix}`;
+      return frame.fnName ? `    at ${frame.fnName} (${loc})` : `    at ${loc}`;
     })
     .join('\n');
 }

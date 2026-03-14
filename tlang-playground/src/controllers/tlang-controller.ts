@@ -11,10 +11,13 @@ import {
   type ParsedSourceMap,
   parseSourceMap,
   remapStack,
-  shiftSourceMapLines,
 } from '../utils/source-map';
 
 type CodemirrorSeverity = 'hint' | 'info' | 'warning' | 'error';
+
+interface StdlibModule {
+  __exec: (code: string, console: object) => unknown;
+}
 
 export interface LocalDiagnostic {
   from: number;
@@ -39,11 +42,16 @@ export class TlangController {
   private cachedJS: string | null = null;
   private cachedJSAST: string | null = null;
   private cachedSourceMap: ParsedSourceMap | null = null;
-  private prefixLines = 0;
   private optimizationOptions: JsOptimizationOptions = {
     constantFolding: true,
     anfTransform: undefined,
   };
+
+  /**
+   * Cached Promise for the stdlib Blob URL module.  Resolved once and reused
+   * for every subsequent run so the stdlib is only compiled/loaded once.
+   */
+  private stdlibModulePromise: Promise<StdlibModule> | null = null;
 
   constructor(
     initialSource: string,
@@ -82,7 +90,6 @@ export class TlangController {
     this.cachedJS = null;
     this.cachedJSAST = null;
     this.cachedSourceMap = null;
-    this.prefixLines = 0;
 
     this.tlang = this.createTlang(source, runner);
     this.tlang.setOptimizations(this.optimizationOptions);
@@ -119,13 +126,13 @@ export class TlangController {
     }
   }
 
-  run(runner: Runner) {
+  async run(runner: Runner) {
     this.logToConsole('group');
     let beforeOpenGroups = this.getConsoleOpenGroups();
 
     try {
       if (runner === 'JavaScript') {
-        this.runCompiled();
+        await this.runCompiled();
       } else {
         this.runInterpreted();
       }
@@ -157,37 +164,45 @@ export class TlangController {
       .length;
   }
 
-  private runCompiled() {
-    const bindings = {
-      console: this.tlangConsole,
-    };
+  /**
+   * Load (or return the cached) stdlib ES module.
+   *
+   * The stdlib is wrapped in a Blob URL module that exports `__exec`.
+   * `eval()` inside a module function has lexical access to the module scope,
+   * so user code eval'd through `__exec` sees all stdlib names with zero
+   * preamble offset — source maps work without any line shifting.
+   */
+  private getStdlibModule(): Promise<StdlibModule> {
+    if (!this.stdlibModulePromise) {
+      const stdlib = getStandardLibraryCompiled();
+      const moduleCode =
+        stdlib +
+        '\nexport function __exec(code, ___console) {\n' +
+        '  const console = ___console;\n' +
+        '  return eval(code);\n' +
+        '}';
+      const blob = new Blob([moduleCode], { type: 'text/javascript' });
+      const url = URL.createObjectURL(blob);
+      this.stdlibModulePromise = import(url) as Promise<StdlibModule>;
+    }
+    return this.stdlibModulePromise;
+  }
 
-    const bindingsDestructuring = `let {${Object.keys(bindings).join(',')}} = ___js_bindings;`;
-    const stdlib = getStandardLibraryCompiled();
-
-    // Compute the number of newlines in the preamble that precedes user code.
-    // This is needed to shift the source map so generated-line numbers match
-    // the actual lines inside the new Function body.
-    const prefix = `${bindingsDestructuring}${stdlib}\n{`;
-    const prefixLines = (prefix.match(/\n/g) ?? []).length;
-    this.prefixLines = prefixLines;
-
-    let sourceMappingComment = '\n//# sourceURL=tlang-script';
+  private async runCompiled() {
+    const mod = await this.getStdlibModule();
 
     const rawMap = this.tlang.getSourceMap?.();
-    if (rawMap) {
-      const shifted = shiftSourceMapLines(rawMap, prefixLines);
-      this.cachedSourceMap = parseSourceMap(shifted);
-      const encoded = btoa(shifted);
-      sourceMappingComment += `\n//# sourceMappingURL=data:application/json;base64,${encoded}`;
+    if (rawMap && !this.cachedSourceMap) {
+      this.cachedSourceMap = parseSourceMap(rawMap);
     }
 
-    const fn = new Function(
-      '___js_bindings',
-      `${prefix}${this.tlang.getJavaScript()}};${sourceMappingComment}`,
-    );
+    let code = this.tlang.getJavaScript();
+    code += '\n//# sourceURL=playground.tlang';
+    if (rawMap) {
+      code += `\n//# sourceMappingURL=data:application/json;base64,${btoa(rawMap)}`;
+    }
 
-    fn(bindings);
+    mod.__exec(code, this.tlangConsole);
   }
 
   /** Remap an error's stack trace using the current source map, if available. */
@@ -196,8 +211,7 @@ export class TlangController {
     const remappedStack = remapStack(
       error.stack,
       this.cachedSourceMap,
-      'tlang-script',
-      this.prefixLines,
+      'playground.tlang',
     );
     const remapped = new Error(error.message);
     remapped.stack = remappedStack;
