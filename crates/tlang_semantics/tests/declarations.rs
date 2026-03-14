@@ -43,7 +43,7 @@ fn test_analyze_variable_declaration() {
                 LineColumn { line: 0, column: 4 },
                 LineColumn { line: 0, column: 5 }
             ),
-            scope_start: 10,
+            scope_start: 0,
             declared: true,
             temp: false,
             builtin: false,
@@ -91,7 +91,7 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
-            scope_start: 19,
+            scope_start: 1,
             declared: true,
             temp: false,
             builtin: false,
@@ -133,7 +133,7 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
-            scope_start: 19,
+            scope_start: 1,
             declared: true,
             temp: false,
             builtin: false,
@@ -159,7 +159,7 @@ fn test_block_scope() {
                     column: 18
                 }
             ),
-            scope_start: 52,
+            scope_start: 3,
             declared: true,
             temp: false,
             builtin: false,
@@ -203,7 +203,7 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
-            scope_start: 19,
+            scope_start: 1,
             declared: true,
             temp: false,
             builtin: false,
@@ -229,7 +229,7 @@ fn test_block_scope() {
                     column: 18
                 }
             ),
-            scope_start: 52,
+            scope_start: 3,
             declared: true,
             temp: false,
             builtin: false,
@@ -255,7 +255,7 @@ fn test_block_scope() {
                     column: 22
                 }
             ),
-            scope_start: 93,
+            scope_start: 5,
             declared: true,
             temp: false,
             builtin: false,
@@ -290,7 +290,7 @@ fn test_should_collect_function_definitions() {
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
-            scope_start: 26,
+            scope_start: 2,
             declared: true,
             temp: false,
             builtin: false,
@@ -325,7 +325,7 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
-            scope_start: 28,
+            scope_start: 2,
             declared: true,
             temp: false,
             builtin: false,
@@ -360,7 +360,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
-            scope_start: 38,
+            scope_start: 2,
             declared: true,
             temp: false,
             builtin: false,
@@ -398,7 +398,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                         column: 12
                     }
                 ),
-                scope_start: 28,
+                scope_start: 0,
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -418,7 +418,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                         column: 13
                     }
                 ),
-                scope_start: 91,
+                scope_start: 1,
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -462,7 +462,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
                         column: 10
                     }
                 ),
-                scope_start: 100,
+                scope_start: 5,
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -482,7 +482,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
                         column: 10
                     }
                 ),
-                scope_start: 141,
+                scope_start: 6,
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -523,7 +523,7 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                         column: 10
                     }
                 ),
-                scope_start: 15,
+                scope_start: 0,
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -543,7 +543,7 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                         column: 11
                     }
                 ),
-                scope_start: 39,
+                scope_start: 1,
                 declared: true,
                 temp: false,
                 builtin: false,
