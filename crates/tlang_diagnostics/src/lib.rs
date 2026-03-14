@@ -10,10 +10,16 @@ use tlang_semantics::diagnostic::{Diagnostic, Severity};
 use tlang_span::Span;
 
 fn label_range(span: &Span, source_len: usize) -> Range<usize> {
-    let start = usize::min(span.start as usize, source_len);
+    let mut start = usize::min(span.start as usize, source_len);
     let mut end = usize::min(span.end as usize, source_len);
 
-    if end <= start && start < source_len {
+    // Special-case spans that point exactly at EOF (start == end == source_len):
+    // back up one byte so the diagnostic still points at a visible location.
+    if start == source_len && source_len > 0 {
+        start = source_len - 1;
+        end = source_len;
+    } else if end <= start && start < source_len {
+        // For non-EOF spans, ensure the range is non-empty by extending it by one byte.
         end = start + 1;
     }
 
