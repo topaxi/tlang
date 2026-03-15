@@ -104,6 +104,33 @@ test.describe('Tlang Playground', () => {
     await expect(page.locator('t-console-message')).not.toHaveCount(0);
   });
 
+  test('runs regex.tlang (with Unicode comments) via JS backend without errors', async ({
+    page,
+  }) => {
+    // regex.tlang contains Unicode box-drawing characters (U+2500) in section
+    // header comments.  These caused btoa() to throw "String contains an
+    // invalid character" when building the source-map data URL.  This test is
+    // the regression guard for that bug.
+    await page
+      .locator('.toolbar__example')
+      .locator('select')
+      .selectOption('regex.tlang');
+    await page
+      .locator('.toolbar__runner')
+      .locator('select')
+      .selectOption('JavaScript');
+    await page.locator('t-button').filter({ hasText: 'Run' }).click();
+
+    // No error messages should appear.
+    await expect(
+      page.locator('t-console-message[type="error"]'),
+    ).toHaveCount(0);
+
+    // Expected output from the email-validation section.
+    const messages = page.locator('t-console-message[type="log"]');
+    await expect(messages.filter({ hasText: 'true' }).first()).toBeVisible();
+  });
+
   test('can toggle constant folding optimization', async ({ page }) => {
     await openOptimizationSettings(page);
 

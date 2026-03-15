@@ -190,7 +190,14 @@ export class TlangController {
     let code = this.tlang.getJavaScript();
     code += '\n//# sourceURL=playground.tlang';
     if (rawMap) {
-      code += `\n//# sourceMappingURL=data:application/json;base64,${btoa(rawMap)}`;
+      // btoa() only accepts Latin-1; encode as UTF-8 bytes first so that
+      // source files containing non-ASCII characters (e.g. Unicode comments)
+      // don't throw "String contains an invalid character".
+      const utf8Bytes = new TextEncoder().encode(rawMap);
+      const latin1 = Array.from(utf8Bytes, (b) => String.fromCharCode(b)).join(
+        '',
+      );
+      code += `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(latin1)}`;
     }
 
     mod.__exec(code, this.tlangConsole);
