@@ -78,14 +78,8 @@ fn test_should_error_on_undefined_functions() {
     assert_eq!(
         diagnostics,
         vec![
-            Diagnostic::error(
-                "Use of undeclared function `b` with arity 0",
-                Span::lc((0, 0), (0, 1)),
-            ),
-            Diagnostic::error(
-                "Use of undeclared function `b` with arity 1",
-                Span::lc((1, 1), (1, 2)),
-            )
+            Diagnostic::error("Use of undeclared function `b/0`", Span::lc((0, 0), (0, 1)),),
+            Diagnostic::error("Use of undeclared function `b/1`", Span::lc((1, 1), (1, 2)),)
         ]
     );
 }

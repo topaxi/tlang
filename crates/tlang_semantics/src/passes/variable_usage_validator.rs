@@ -267,19 +267,22 @@ impl VariableUsageValidator {
             ctx.add_diagnostic(
                 diagnostic::error_at!(
                     span,
-                    "Use of undeclared function `{name}` with arity {arity}, did you mean the {} `{}`?",
+                    "Use of undeclared function `{name}/{arity}`, did you mean the {} `{}`?",
                     suggestion.symbol_type,
                     suggestion.name
                 )
                 .with_label(
-                    format!("{} `{}` is defined here", suggestion.symbol_type, suggestion.name),
+                    format!(
+                        "{} `{}` is defined here",
+                        suggestion.symbol_type, suggestion.name
+                    ),
                     suggestion.defined_at,
                 ),
             );
         } else {
             ctx.add_diagnostic(diagnostic::error_at!(
                 span,
-                "Use of undeclared function `{name}` with arity {arity}",
+                "Use of undeclared function `{name}/{arity}`",
             ));
         }
     }
