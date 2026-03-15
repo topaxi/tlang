@@ -82,7 +82,7 @@ pub fn render_parse_issues(source_name: &str, source: &str, issues: &[ParseIssue
     for issue in issues {
         let report = parse_issue_report(file_id, source.len(), issue);
         // SimpleFiles never returns an error; the expect is unreachable.
-        term::emit(&mut writer, &config, &files, &report)
+        term::emit_to_write_style(&mut writer, &config, &files, &report)
             .expect("codespan diagnostic rendering should succeed");
     }
 
@@ -109,7 +109,7 @@ pub fn render_semantic_diagnostics(
     for diagnostic in diagnostics {
         let report = diagnostic_report(file_id, source.len(), diagnostic);
         // SimpleFiles never returns an error; the expect is unreachable.
-        term::emit(&mut writer, &config, &files, &report)
+        term::emit_to_write_style(&mut writer, &config, &files, &report)
             .expect("codespan diagnostic rendering should succeed");
     }
 
