@@ -1,6 +1,5 @@
 // Regex example — demonstrates re"..." tagged string literals and the
-// Regex struct's methods: test, exec, replace, with_flags, with_flag,
-// without_flag.
+// Regex struct's methods: test, exec, replace_all, replace_first, flags.
 
 // ── Basic matching ────────────────────────────────────────────────────────────
 
@@ -40,25 +39,20 @@ log("=== Flag methods ===");
 
 let base = re"hello";
 
-// with_flags replaces flags entirely
-let ci = base.with_flags("i");
+// flags() returns a new regex with exactly the given flags
+let ci = base.flags("i");
 ci.test("HELLO") |> log();  // true
-ci.source         |> log();  // hello
-ci.flags          |> log();  // i
+ci.source        |> log();  // hello
+ci.flags         |> log();  // i
 
-// with_flag adds a single flag without duplicating existing ones
-let ci_m = ci.with_flag("m");
+// combine flags in one call
+let ci_m = base.flags("im");
 ci_m.flags |> log();  // im
 
-// removing a flag
-let m_only = ci_m.without_flag("i");
-m_only.flags       |> log();  // m
-m_only.test("HELLO") |> log();  // false (case-sensitive again)
+// ── Chaining flag calls ───────────────────────────────────────────────────────
 
-// ── Chaining flag method calls ────────────────────────────────────────────────
-
-log("=== Chained flag method calls ===");
-let re_chain = re"foo".with_flag("i").with_flag("m");
+log("=== Chained flag calls ===");
+let re_chain = re"foo".flags("im");
 re_chain.flags         |> log();  // im
 re_chain.test("FOO")   |> log();  // true
 
@@ -79,4 +73,4 @@ len(nums) |> log();  // 3
 // ── Stringify ────────────────────────────────────────────────────────────────
 
 log("=== Stringify ===");
-re"foo|bar".with_flags("gi") |> log();  // /foo|bar/gi
+re"foo|bar".flags("gi") |> log();  // /foo|bar/gi

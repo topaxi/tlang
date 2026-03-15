@@ -42,7 +42,7 @@ fn build_regex(state: &mut VMState, this: TlangValue) -> Regex {
 
 #[allow(clippy::missing_panics_doc)]
 pub fn define_regex_shape(state: &mut VMState) {
-    let mut method_map = HashMap::with_capacity(8);
+    let mut method_map = HashMap::with_capacity(5);
 
     method_map.insert(
         "test".to_string(),
@@ -138,55 +138,17 @@ pub fn define_regex_shape(state: &mut VMState) {
     );
 
     method_map.insert(
-        "with_flags".to_string(),
-        state.new_native_method("Regex::with_flags", |state, this, args| {
+        "flags".to_string(),
+        state.new_native_method("Regex::flags", |state, this, args| {
             let source = get_regex_pattern(state, this);
             let flags = state
                 .get_object(args[0])
                 .and_then(|o| o.as_str())
                 .unwrap_or_else(|| {
-                    state.panic("Regex::with_flags expects a string argument".to_string())
+                    state.panic("Regex::flags expects a string argument".to_string())
                 })
                 .to_string();
             NativeFnReturn::Return(state.new_regex(source, flags))
-        }),
-    );
-
-    method_map.insert(
-        "with_flag".to_string(),
-        state.new_native_method("Regex::with_flag", |state, this, args| {
-            let source = get_regex_pattern(state, this);
-            let mut flags = get_regex_flags(state, this);
-            let flag = state
-                .get_object(args[0])
-                .and_then(|o| o.as_str())
-                .unwrap_or_else(|| {
-                    state.panic("Regex::with_flag expects a string argument".to_string())
-                })
-                .to_string();
-            for ch in flag.chars() {
-                if !flags.contains(ch) {
-                    flags.push(ch);
-                }
-            }
-            NativeFnReturn::Return(state.new_regex(source, flags))
-        }),
-    );
-
-    method_map.insert(
-        "without_flag".to_string(),
-        state.new_native_method("Regex::without_flag", |state, this, args| {
-            let source = get_regex_pattern(state, this);
-            let flags = get_regex_flags(state, this);
-            let flag = state
-                .get_object(args[0])
-                .and_then(|o| o.as_str())
-                .unwrap_or_else(|| {
-                    state.panic("Regex::without_flag expects a string argument".to_string())
-                })
-                .to_string();
-            let new_flags: String = flags.chars().filter(|c| !flag.contains(*c)).collect();
-            NativeFnReturn::Return(state.new_regex(source, new_flags))
         }),
     );
 
@@ -317,36 +279,10 @@ mod tests {
     }
 
     #[test]
-    fn test_with_flags() {
+    fn test_flags_method() {
         let mut state = setup();
         let re = regex(&mut state, "foo", "");
-        let re2 = call_method_str(&mut state, re, "with_flags", "im");
+        let re2 = call_method_str(&mut state, re, "flags", "im");
         assert_eq!(flags_of(&state, re2), "im");
-    }
-
-    #[test]
-    fn test_with_flag_adds() {
-        let mut state = setup();
-        let re = regex(&mut state, "foo", "i");
-        let re2 = call_method_str(&mut state, re, "with_flag", "m");
-        let f = flags_of(&state, re2);
-        assert!(f.contains('i') && f.contains('m'));
-    }
-
-    #[test]
-    fn test_with_flag_no_duplicate() {
-        let mut state = setup();
-        let re = regex(&mut state, "foo", "i");
-        let re2 = call_method_str(&mut state, re, "with_flag", "i");
-        assert_eq!(flags_of(&state, re2).matches('i').count(), 1);
-    }
-
-    #[test]
-    fn test_without_flag() {
-        let mut state = setup();
-        let re = regex(&mut state, "foo", "im");
-        let re2 = call_method_str(&mut state, re, "without_flag", "m");
-        let f = flags_of(&state, re2);
-        assert!(f.contains('i') && !f.contains('m'));
     }
 }

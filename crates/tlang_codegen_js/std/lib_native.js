@@ -108,20 +108,7 @@ class __TlangRegex {
     return str.replace(re, replacement);
   }
 
-  with_flags(flags) {
-    return new __TlangRegex(this.source, flags);
-  }
-
-  with_flag(flag) {
-    let flags = this.flags;
-    for (const ch of flag) {
-      if (!flags.includes(ch)) flags += ch;
-    }
-    return new __TlangRegex(this.source, flags);
-  }
-
-  without_flag(flag) {
-    const flags = [...this.flags].filter((c) => !flag.includes(c)).join('');
+  flags(flags) {
     return new __TlangRegex(this.source, flags);
   }
 
