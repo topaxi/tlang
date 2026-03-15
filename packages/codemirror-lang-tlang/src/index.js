@@ -1,6 +1,7 @@
 import { parser } from './parser.js';
 import { foldNodeProp, foldInside, indentNodeProp } from '@codemirror/language';
 import { styleTags, tags as t } from '@lezer/highlight';
+import { parseMixed } from '@lezer/common';
 
 let parserWithMetadata = parser.configure({
   props: [
@@ -39,6 +40,7 @@ let parserWithMetadata = parser.configure({
       WildcardExpression: t.special(t.variableName),
       Number: t.number,
       String: t.string,
+      TaggedString: t.regexp,
       LineComment: t.lineComment,
       BlockComment: t.blockComment,
       ArithOp: t.arithmeticOperator,
@@ -131,6 +133,28 @@ export const tlangCompletion = tlangLanguage.data.of({
 
 import { LanguageSupport } from '@codemirror/language';
 
-export function tlangLanguageSupport() {
-  return new LanguageSupport(tlangLanguage, [tlangCompletion]);
+/** @param {import('@codemirror/language').Language} [reLanguage] */
+function makeTaggedStringWrap(reLanguage) {
+  if (!reLanguage) return undefined;
+  const reParser = reLanguage.parser;
+  return parseMixed((node, input) => {
+    if (node.type.name !== 'TaggedString') return null;
+    const text = input.read(node.from, node.to);
+    const quotePos = text.search(/["']/);
+    if (quotePos < 0) return null;
+    if (text.slice(0, quotePos) !== 're') return null;
+    const quote = text[quotePos];
+    const from = node.from + quotePos + 1;
+    const to = text.endsWith(quote) ? node.to - 1 : node.to;
+    return { parser: reParser, overlay: [{ from, to }] };
+  });
+}
+
+/**
+ * @param {{ reLanguage?: import('@codemirror/language').Language }} [options]
+ */
+export function tlangLanguageSupport(options = {}) {
+  const wrap = makeTaggedStringWrap(options.reLanguage);
+  const lang = wrap ? tlangLanguage.configure({ wrap }) : tlangLanguage;
+  return new LanguageSupport(lang, [tlangCompletion]);
 }

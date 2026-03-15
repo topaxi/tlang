@@ -1,7 +1,7 @@
 ---
 source: tests/runner/src/main.rs
 description: "Backend: interpreter"
-expression: apply_redactions(&output)
+expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/enums/option.tlang
 ---
 true
@@ -11,7 +11,7 @@ true
 10
 
 
-thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:518:9:
+thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:527:9:
 Called unwrap on None
   at native function Option::unwrap
   at root 195

@@ -20,6 +20,7 @@ pub fn init_stdlib(state: &mut VMState) {
     tlang_stdlib::option::define_option_shape(state);
     tlang_stdlib::result::define_result_shape(state);
     tlang_stdlib::collections::define_list_shape(state);
+    tlang_stdlib::regex::define_regex_shape(state);
     tlang_stdlib::protocols::define_builtin_protocols(state);
 }
 
@@ -361,6 +362,10 @@ impl Interpreter {
             token::Literal::Boolean(value) => TlangValue::Bool(*value),
             token::Literal::String(value) => state.new_string(value.to_string()),
             token::Literal::Char(value) => state.new_string(value.to_string()),
+            token::Literal::TaggedString(tag, value) => match tag.as_ref() {
+                "re" => state.new_regex(value.to_string(), String::new()),
+                _ => state.panic(format!("Unknown string tag: {tag}")),
+            },
             token::Literal::None => unreachable!(),
         }
     }

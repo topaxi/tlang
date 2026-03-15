@@ -238,6 +238,15 @@ impl VMState {
         )))
     }
 
+    pub fn new_regex(&mut self, source: String, flags: String) -> TlangValue {
+        let source_val = self.new_string(source);
+        let flags_val = self.new_string(flags);
+        self.new_object(TlangObjectKind::Struct(TlangStruct::new(
+            self.heap.builtin_shapes.regex,
+            vec![source_val, flags_val],
+        )))
+    }
+
     pub fn new_string(&mut self, value: String) -> TlangValue {
         self.new_object(TlangObjectKind::String(value))
     }
@@ -664,6 +673,12 @@ impl VMState {
     fn stringify_struct(&self, s: &TlangStruct) -> String {
         if s.shape() == self.heap.builtin_shapes.list {
             return self.stringify_struct_as_list(s);
+        }
+
+        if s.shape() == self.heap.builtin_shapes.regex {
+            let source = self.stringify(s[0]);
+            let flags = self.stringify(s[1]);
+            return format!("/{source}/{flags}");
         }
 
         let shape = self

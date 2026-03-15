@@ -90,6 +90,8 @@
 ; Literals
 (number) @number
 (string) @string
+(tagged_string (tagged_string_tag) @string.special.symbol)
+(tagged_string (string) @string)
 (boolean_literal) @boolean
 
 ; Comments

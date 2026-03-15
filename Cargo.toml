@@ -21,6 +21,7 @@ indoc = "2"
 insta = { version = "1", features = ["redactions", "ron"] }
 inventory = "0.3"
 pretty_assertions = { version = "1", features = ["unstable"] }
+regex = "1"
 serde = { version = "1", features = ["derive", "rc"] }
 ron = "0.12"
 

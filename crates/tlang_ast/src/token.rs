@@ -82,6 +82,7 @@ pub enum Literal {
     Float(f64),
     String(Box<str>),
     Char(Box<str>),
+    TaggedString(Box<str>, Box<str>),
     None,
 }
 
@@ -92,6 +93,7 @@ impl Clone for Literal {
         match self {
             Literal::String(value) => Literal::String(value.clone()),
             Literal::Char(value) => Literal::Char(value.clone()),
+            Literal::TaggedString(tag, value) => Literal::TaggedString(tag.clone(), value.clone()),
             _ => unsafe { std::ptr::read(self) },
         }
     }

@@ -472,30 +472,55 @@ impl Lexer<'_> {
                     }
                 }
             }
-            ch if Self::is_alphanumeric(ch) => match self.read_identifier() {
-                "true" => self.token(
-                    TokenKind::Literal(Literal::Boolean(true)),
-                    start_pos,
-                    start_lc,
-                ),
-                "false" => self.token(
-                    TokenKind::Literal(Literal::Boolean(false)),
-                    start_pos,
-                    start_lc,
-                ),
-                identifier if is_keyword(identifier) => {
-                    let kw = Keyword::from(identifier);
-                    self.token(TokenKind::Keyword(kw), start_pos, start_lc)
-                }
-                identifier => {
-                    let identifier_string = identifier.to_string();
-                    self.token(
-                        TokenKind::Identifier(identifier_string),
+            ch if Self::is_alphanumeric(ch) => {
+                // Clone the identifier immediately to release the borrow on `self`,
+                // which is needed to access `self.current_char` for tagged string detection.
+                let identifier = self.read_identifier().to_string();
+                match identifier.as_str() {
+                    "true" => self.token(
+                        TokenKind::Literal(Literal::Boolean(true)),
                         start_pos,
                         start_lc,
-                    )
+                    ),
+                    "false" => self.token(
+                        TokenKind::Literal(Literal::Boolean(false)),
+                        start_pos,
+                        start_lc,
+                    ),
+                    identifier if is_keyword(identifier) => {
+                        let kw = Keyword::from(identifier);
+                        self.token(TokenKind::Keyword(kw), start_pos, start_lc)
+                    }
+                    identifier => {
+                        // Check if the identifier is immediately followed by a quote
+                        // (no whitespace), which makes it a tagged string literal.
+                        if matches!(self.current_char, '"' | '\'') {
+                            let tag = identifier.to_string();
+                            let quote = self.current_char;
+                            self.advance(); // consume the opening quote
+                            let content = match self.read_string_literal(quote) {
+                                Ok(s) => s,
+                                Err(_) => {
+                                    return self.token(TokenKind::Unknown, start_pos, start_lc);
+                                }
+                            };
+                            return self.token(
+                                TokenKind::Literal(Literal::TaggedString(
+                                    tag.into_boxed_str(),
+                                    content.into_boxed_str(),
+                                )),
+                                start_pos,
+                                start_lc,
+                            );
+                        }
+                        self.token(
+                            TokenKind::Identifier(identifier.to_string()),
+                            start_pos,
+                            start_lc,
+                        )
+                    }
                 }
-            },
+            }
             _ => self.token(TokenKind::Unknown, start_pos, start_lc),
         }
     }

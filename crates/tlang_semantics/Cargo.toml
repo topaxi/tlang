@@ -11,6 +11,7 @@ serde = ["dep:serde", "tlang_symbols/serde"]
 tlang_ast = { path = "../tlang_ast" }
 tlang_span = { path = "../tlang_span" }
 tlang_symbols = { path = "../tlang_symbols" }
+regex-syntax = "0.8"
 serde = { workspace = true, optional = true }
 log = { workspace = true }
 

@@ -126,6 +126,8 @@ fn builtin_type_for_literal(lit: &Literal) -> Option<&'static str> {
         Literal::Float(_) => Some(builtin_types::F64),
         Literal::String(_) => Some(builtin_types::STRING),
         Literal::Char(_) => Some(builtin_types::CHAR),
+        // Tagged strings carry no built-in type information at the parameter level.
+        Literal::TaggedString(_, _) => None,
         Literal::None => None,
     }
 }

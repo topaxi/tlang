@@ -11,6 +11,7 @@ pub struct BuiltinShapes {
     pub list_iterator: ShapeKey,
     pub option: ShapeKey,
     pub result: ShapeKey,
+    pub regex: ShapeKey,
 
     store: Slab<TlangShape>,
 }
@@ -29,18 +30,20 @@ impl BuiltinShapes {
     pub const RESULT_VARIANT_ERR: usize = 1;
 
     pub fn new() -> Self {
-        let mut store = Slab::with_capacity(3);
+        let mut store = Slab::with_capacity(5);
 
         let option = Self::create_option_shape(&mut store);
         let result = Self::create_result_shape(&mut store);
         let list = Self::create_list_shape(&mut store);
         let list_iterator = Self::create_list_iterator_shape(&mut store);
+        let regex = Self::create_regex_shape(&mut store);
 
         Self {
             list,
             list_iterator,
             option,
             result,
+            regex,
             store,
         }
     }
@@ -91,6 +94,14 @@ impl BuiltinShapes {
         ShapeKey::new_native(store.insert(TlangShape::new_struct_shape(
             "ListIterator".to_string(),
             vec!["list".to_string(), "index".to_string()],
+            HashMap::new(),
+        )))
+    }
+
+    fn create_regex_shape(store: &mut Slab<TlangShape>) -> ShapeKey {
+        ShapeKey::new_native(store.insert(TlangShape::new_struct_shape(
+            "Regex".to_string(),
+            vec!["source".to_string(), "flags".to_string()],
             HashMap::new(),
         )))
     }
@@ -156,6 +167,20 @@ impl BuiltinShapes {
     pub fn get_result_shape_mut(&mut self) -> &mut TlangEnumShape {
         self.get_shape_mut(self.result)
             .and_then(|s| s.get_enum_shape_mut())
+            .unwrap()
+    }
+
+    /// # Panics
+    pub fn get_regex_shape(&self) -> &TlangStructShape {
+        self.get_shape(self.regex)
+            .and_then(|s| s.get_struct_shape())
+            .unwrap()
+    }
+
+    /// # Panics
+    pub fn get_regex_shape_mut(&mut self) -> &mut TlangStructShape {
+        self.get_shape_mut(self.regex)
+            .and_then(|s| s.get_struct_shape_mut())
             .unwrap()
     }
 }

@@ -1,0 +1,40 @@
+// Regex tagged string literals
+// Demonstrates: re"..." syntax for regular expressions
+
+fn test_basic() {
+    re"foo|bar".test("foo") |> log();
+    re"foo|bar".test("bar") |> log();
+    re"foo|bar".test("baz") |> log();
+}
+
+fn test_case_insensitive() {
+    re"hello".test("Hello World") |> log();
+}
+
+fn test_exec() {
+    let result = re"(\d+)".exec("abc123def");
+    match result {
+        Option::Some(m) => log(m),
+        Option::None => log("no match"),
+    }
+    let no_match = re"\d+".exec("no digits here");
+    match no_match {
+        Option::Some(m) => log(m),
+        Option::None => log("no match"),
+    }
+}
+
+fn test_replace() {
+    re"\s+".replace("hello   world", " ") |> log();
+}
+
+fn test_source() {
+    let r = re"foo|bar";
+    r.source |> log();
+}
+
+test_basic();
+test_case_insensitive();
+test_exec();
+test_replace();
+test_source();

@@ -12,6 +12,7 @@ tlang_macros = { path = "../../tlang_macros" }
 tlang_memory = { path = "../tlang_memory" }
 inventory = { workspace = true }
 log = { workspace = true }
+regex = { workspace = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 rand = { version = "0.9" }

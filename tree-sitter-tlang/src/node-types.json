@@ -116,6 +116,10 @@
       {
         "type": "string",
         "named": true
+      },
+      {
+        "type": "tagged_string",
+        "named": true
       }
     ]
   },
@@ -1589,6 +1593,32 @@
     }
   },
   {
+    "type": "tagged_string",
+    "named": true,
+    "fields": {
+      "content": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "tag": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "tagged_string_tag",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "type_annotation",
     "named": true,
     "fields": {},
@@ -1946,6 +1976,10 @@
   {
     "type": "struct",
     "named": false
+  },
+  {
+    "type": "tagged_string_tag",
+    "named": true
   },
   {
     "type": "true",

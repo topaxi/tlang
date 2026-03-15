@@ -179,7 +179,7 @@ ApplyStatement {
 
 pattern {
   WildcardPattern { kw<"_"> } |
-  LiteralPattern { "-"? Number | String | BooleanLiteral } |
+  LiteralPattern { "-"? Number | String | TaggedString | BooleanLiteral } |
   EnumPattern |
   StructPattern |
   ArrayPattern |
@@ -227,6 +227,7 @@ Block {
 expression[@isGroup=Expression] {
   Number |
   String |
+  TaggedString |
   VariableName |
   PathExpression { (Namespace "::")+ PathName } |
   BooleanLiteral |
@@ -396,6 +397,12 @@ semi { ";" | insertSemi }
     '"' (![\\\n"] | "\\" _)* '"'? |
     "'" (![\\\n'] | "\\" _)* "'"?
   }
+
+  TaggedString {
+    identifier ('"' (![\\\n"] | "\\" _)* '"'? | "'" (![\\\n'] | "\\" _)* "'"?)
+  }
+
+  @precedence { TaggedString, identifier }
 
 //!operatorTokens
 

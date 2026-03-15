@@ -247,8 +247,7 @@ impl Heap {
     }
 
     pub fn get_struct_field_index(&self, shape: ShapeKey, field: &str) -> Option<usize> {
-        self.shapes
-            .get(&shape)
+        self.get_shape_by_key(shape)
             .and_then(|s| s.get_struct_shape())
             .and_then(|shape| shape.get_field_index(field))
     }

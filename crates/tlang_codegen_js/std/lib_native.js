@@ -81,3 +81,29 @@ string ??= {};
  * @param {number} idx
  */
 string.char_code_at = (str, idx) => str.charCodeAt(idx);
+
+class __TlangRegex {
+  constructor(source, flags) {
+    this.source = source;
+    this.flags = flags;
+    this.__re = new RegExp(source, flags);
+  }
+
+  test(str) {
+    return this.__re.test(str);
+  }
+
+  exec(str) {
+    const m = this.__re.exec(str);
+    if (m === null) return Option.None;
+    return { tag: Option.Some, [0]: m[0] };
+  }
+
+  replace(str, replacement) {
+    return str.replace(this.__re, replacement);
+  }
+
+  toString() {
+    return `/${this.source}/${this.flags}`;
+  }
+}

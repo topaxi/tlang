@@ -1868,7 +1868,37 @@
         },
         {
           "type": "SYMBOL",
+          "name": "tagged_string"
+        },
+        {
+          "type": "SYMBOL",
           "name": "boolean_literal"
+        }
+      ]
+    },
+    "tagged_string": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "tag",
+          "content": {
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "identifier"
+            },
+            "named": true,
+            "value": "tagged_string_tag"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "content",
+          "content": {
+            "type": "SYMBOL",
+            "name": "string"
+          }
         }
       ]
     },
@@ -3657,6 +3687,10 @@
     [
       "path_expression",
       "type_path"
+    ],
+    [
+      "_expression",
+      "tagged_string"
     ]
   ],
   "precedences": [],

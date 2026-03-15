@@ -113,9 +113,23 @@ impl<'ast> Visitor<'ast> for StringLiteralValidator {
             Literal::String(string_content) | Literal::Char(string_content) => {
                 self.validate_escape_sequences(string_content, span, ctx);
             }
-            _ => {
-                // No validation needed for other literal types
-            }
+            Literal::TaggedString(tag, pattern) => match tag.as_ref() {
+                "re" => {
+                    if let Err(e) = regex_syntax::ast::parse::Parser::new().parse(pattern) {
+                        ctx.add_diagnostic(diagnostic::warn_at!(
+                            span,
+                            "Invalid regex pattern in re\"...\": {e}",
+                        ));
+                    }
+                }
+                _ => {
+                    ctx.add_diagnostic(diagnostic::warn_at!(
+                        span,
+                        "Unknown string tag '{tag}'; currently only 're' is supported",
+                    ));
+                }
+            },
+            _ => {}
         }
     }
 }

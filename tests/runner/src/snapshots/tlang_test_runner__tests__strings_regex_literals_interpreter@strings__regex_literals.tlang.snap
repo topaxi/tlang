@@ -1,0 +1,14 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/strings/regex_literals.tlang
+---
+true
+true
+false
+false
+123
+no match
+hello world
+foo|bar
