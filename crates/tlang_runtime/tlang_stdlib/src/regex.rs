@@ -40,7 +40,12 @@ fn build_regex(state: &mut VMState, this: TlangValue) -> Regex {
     Regex::new(&pattern).unwrap_or_else(|e| state.panic(format!("Invalid regex: {e}")))
 }
 
-#[allow(clippy::missing_panics_doc)]
+pub(crate) fn regex_test(state: &mut VMState, regex_val: TlangValue, haystack: &str) -> bool {
+    let re = build_regex(state, regex_val);
+    re.is_match(haystack)
+}
+
+#[allow(clippy::missing_panics_doc, clippy::too_many_lines)]
 pub fn define_regex_shape(state: &mut VMState) {
     let mut method_map = HashMap::with_capacity(5);
 

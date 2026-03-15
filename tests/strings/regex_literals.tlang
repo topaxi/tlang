@@ -32,8 +32,20 @@ fn test_stringify() {
     re"foo|bar".flags("gi") |> log();
 }
 
+fn test_match_operator() {
+    // =~ returns true when the pattern matches
+    log("foo" =~ re"foo|bar");
+    log("baz" =~ re"foo|bar");
+    // !~ is the negation
+    log("foo" !~ re"foo|bar");
+    log("baz" !~ re"foo|bar");
+    // case-insensitive flag
+    log("Hello" =~ re"hello".flags("i"));
+}
+
 test_basic();
 test_case_insensitive();
 test_exec();
 test_replace();
 test_stringify();
+test_match_operator();

@@ -82,7 +82,7 @@ string ??= {};
  */
 string.char_code_at = (str, idx) => str.charCodeAt(idx);
 
-class $TlangRegex {
+const $TlangRegex = class Regex {
   #source;
   #flags;
   #__re = null;
@@ -132,4 +132,4 @@ class $TlangRegex {
   [Symbol.for('nodejs.util.inspect.custom')]() {
     return this.toString();
   }
-}
+};

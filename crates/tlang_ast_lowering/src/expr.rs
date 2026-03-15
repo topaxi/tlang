@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use log::debug;
 use tlang_ast as ast;
-use tlang_ast::node::{BinaryOpExpression, BinaryOpKind};
+use tlang_ast::node::{BinaryOpExpression, BinaryOpKind, UnaryOp};
 use tlang_hir as hir;
 
 use crate::LoweringContext;
@@ -282,6 +282,7 @@ impl LoweringContext {
             BinaryOpKind::BitwiseOr => hir::BinaryOpKind::BitwiseOr,
             BinaryOpKind::BitwiseXor => hir::BinaryOpKind::BitwiseXor,
             BinaryOpKind::Pipeline => return self.lower_pipeline_operator(node),
+            BinaryOpKind::Match | BinaryOpKind::NotMatch => return self.lower_match_operator(node),
         };
 
         let lhs = self.lower_expr(&node.lhs);
@@ -330,6 +331,42 @@ impl LoweringContext {
                 }))
             }
             _ => unreachable!("Validate AST before lowering"),
+        }
+    }
+
+    // a =~ b  →  Match::match(b, a)   (RHS = pattern = self)
+    // a !~ b  →  !Match::match(b, a)
+    fn lower_match_operator(&mut self, node: &BinaryOpExpression) -> hir::ExprKind {
+        let span = node.lhs.span;
+        let lhs = self.lower_expr(&node.lhs);
+        let rhs = self.lower_expr(&node.rhs);
+
+        let callee_path = hir::Path::new(
+            vec![
+                hir::PathSegment::from_str("Match", span),
+                hir::PathSegment::from_str("matches", span),
+            ],
+            span,
+        );
+        let callee = hir::Expr {
+            hir_id: self.unique_id(),
+            kind: hir::ExprKind::Path(Box::new(callee_path)),
+            span,
+        };
+        let call = hir::Expr {
+            hir_id: self.unique_id(),
+            kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
+                hir_id: self.unique_id(),
+                callee,
+                arguments: vec![rhs, lhs],
+            })),
+            span,
+        };
+
+        if node.op == BinaryOpKind::NotMatch {
+            hir::ExprKind::Unary(UnaryOp::Not, Box::new(call))
+        } else {
+            call.kind
         }
     }
 }

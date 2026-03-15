@@ -674,6 +674,8 @@ pub enum BinaryOpKind {
     BitwiseOr,
     BitwiseXor,
     Pipeline,
+    Match,
+    NotMatch,
 }
 
 pub type BinaryOp = Spanned<BinaryOpKind>;

@@ -12,3 +12,8 @@ false
 no match
 hello world
 /foo|bar/gi
+true
+false
+false
+true
+true

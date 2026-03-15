@@ -2,6 +2,7 @@ use tlang_memory::value::object::{TlangObjectKind, TlangStruct};
 use tlang_memory::{NativeFnReturn, TlangValue, VMState};
 
 use crate::option::{OPTION_VARIANT_NONE, OPTION_VARIANT_SOME};
+use crate::regex::regex_test;
 use crate::result::{RESULT_VARIANT_ERR, RESULT_VARIANT_OK};
 
 /// # Panics
@@ -9,6 +10,7 @@ use crate::result::{RESULT_VARIANT_ERR, RESULT_VARIANT_OK};
 pub fn define_builtin_protocols(state: &mut VMState) {
     state.register_protocol("Truthy".to_string(), vec!["truthy".to_string()]);
     state.register_protocol("Functor".to_string(), vec!["map".to_string()]);
+    state.register_protocol("Match".to_string(), vec!["matches".to_string()]);
     state.register_protocol("Iterable".to_string(), vec!["iter".to_string()]);
     state.register_protocol("Iterator".to_string(), vec!["next".to_string()]);
 
@@ -208,4 +210,18 @@ pub fn define_builtin_protocols(state: &mut VMState) {
         NativeFnReturn::Return(some)
     });
     state.register_protocol_impl("Iterator", "ListIterator", "next", list_iterator_next);
+
+    // Match::match for Regex
+    let regex_match = state.new_native_fn("Match::Regex::matches", |state, args| {
+        let regex_val = args[0];
+        let haystack = state
+            .get_object(args[1])
+            .and_then(|o| o.as_str())
+            .unwrap_or_else(|| {
+                state.panic("Match::matches expects a string as second argument".to_string())
+            })
+            .to_string();
+        NativeFnReturn::Return(TlangValue::Bool(regex_test(state, regex_val, &haystack)))
+    });
+    state.register_protocol_impl("Match", "Regex", "matches", regex_match);
 }

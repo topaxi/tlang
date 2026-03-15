@@ -1549,6 +1549,8 @@ impl<'src> Parser<'src> {
                 | TokenKind::EqualSign
                 | TokenKind::EqualEqual
                 | TokenKind::NotEqual
+                | TokenKind::Matches
+                | TokenKind::NotMatches
                 | TokenKind::LessThan
                 | TokenKind::LessThanOrEqual
                 | TokenKind::GreaterThan
@@ -1573,6 +1575,8 @@ impl<'src> Parser<'src> {
             TokenKind::EqualSign => BinaryOpKind::Assign,
             TokenKind::EqualEqual => BinaryOpKind::Eq,
             TokenKind::NotEqual => BinaryOpKind::NotEq,
+            TokenKind::Matches => BinaryOpKind::Match,
+            TokenKind::NotMatches => BinaryOpKind::NotMatch,
             TokenKind::LessThan => BinaryOpKind::Less,
             TokenKind::LessThanOrEqual => BinaryOpKind::LessEq,
             TokenKind::GreaterThan => BinaryOpKind::Greater,
@@ -1607,6 +1611,8 @@ impl<'src> Parser<'src> {
             },
             BinaryOpKind::Eq
             | BinaryOpKind::NotEq
+            | BinaryOpKind::Match
+            | BinaryOpKind::NotMatch
             | BinaryOpKind::Less
             | BinaryOpKind::LessEq
             | BinaryOpKind::Greater

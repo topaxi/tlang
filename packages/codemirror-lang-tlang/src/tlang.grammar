@@ -412,7 +412,7 @@ semi { ";" | insertSemi }
 
   UpdateOp { $[+\-/%*] "=" | "**=" }
 
-  CompareOp { "<=" | ">=" | "==" | "!=" | "<" | ">" }
+  CompareOp { "<=" | ">=" | "==" | "!=" | "=~" | "!~" | "<" | ">" }
 
 //!literalTokens
 

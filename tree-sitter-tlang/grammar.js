@@ -406,7 +406,7 @@ module.exports = grammar({
         [PREC.BITWISE, choice('&', '|', '^'), 'left'],
         [PREC.TIMES, choice('*', '/', '%'), 'left'],
         [PREC.PLUS, choice('+', '-'), 'left'],
-        [PREC.REL, choice('==', '!=', '<', '<=', '>', '>='), 'left'],
+        [PREC.REL, choice('==', '!=', '=~', '!~', '<', '<=', '>', '>='), 'left'],
         [PREC.AND, choice('&&', 'and'), 'left'],
         [PREC.OR, choice('||', 'or'), 'left'],
         [PREC.PIPELINE, '|>', 'left'],

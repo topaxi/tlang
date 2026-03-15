@@ -70,3 +70,30 @@ collect_numbers("a1 b22 c333", [])
 
 log("=== Stringify ===");
 re"foo|bar".flags("gi") |> log();  // /foo|bar/gi
+
+// ── Match operators (=~ and !~) ───────────────────────────────────────────────
+
+log("=== Match operators ===");
+
+// =~  returns true when the RHS pattern matches the LHS value
+log("hello world" =~ re"\w+");         // true
+log("12345" =~ re"^\d+$");             // true
+log("hello" =~ re"^\d+$");            // false
+
+// !~  is the negation of =~
+log("hello" !~ re"^\d+$");            // true
+log("12345" !~ re"^\d+$");            // false
+
+// Works with flags too
+log("Hello" =~ re"hello".flags("i")); // true
+
+// Useful in guards / if-expressions
+let classify = fn(s) {
+    if s =~ re"^\d+$" { "number" }
+    else if s =~ re"^[a-zA-Z]+$" { "word" }
+    else { "other" }
+};
+
+classify("42") |> log();       // number
+classify("hello") |> log();    // word
+classify("hello42") |> log();  // other

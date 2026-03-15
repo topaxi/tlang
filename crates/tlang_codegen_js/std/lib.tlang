@@ -44,6 +44,14 @@ impl Functor for Result {
   fn map(Result::Err(e), _) { Result::Err(e) }
 }
 
+protocol Match {
+  fn matches(self, value)
+}
+
+impl Match for Regex {
+  fn matches(self, value) { self.test(value) }
+}
+
 protocol Iterable {
   fn iter(self)
 }
