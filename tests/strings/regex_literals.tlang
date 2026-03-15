@@ -25,7 +25,7 @@ fn test_exec() {
 }
 
 fn test_replace() {
-    re"\s+".replace("hello   world", " ") |> log();
+    re"\s+".replace_all("hello   world", " ") |> log();
 }
 
 fn test_source() {

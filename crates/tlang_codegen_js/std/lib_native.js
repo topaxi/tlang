@@ -83,7 +83,7 @@ string ??= {};
 string.char_code_at = (str, idx) => str.charCodeAt(idx);
 
 class __TlangRegex {
-  constructor(source, flags) {
+  constructor(source, flags = '') {
     this.source = source;
     this.flags = flags;
     this.__re = new RegExp(source, flags);
@@ -99,8 +99,30 @@ class __TlangRegex {
     return { tag: Option.Some, [0]: m[0] };
   }
 
-  replace(str, replacement) {
+  replace_all(str, replacement) {
     return str.replace(this.__re, replacement);
+  }
+
+  replace_first(str, replacement) {
+    const re = new RegExp(this.source, this.flags.replace('g', ''));
+    return str.replace(re, replacement);
+  }
+
+  with_flags(flags) {
+    return new __TlangRegex(this.source, flags);
+  }
+
+  with_flag(flag) {
+    let flags = this.flags;
+    for (const ch of flag) {
+      if (!flags.includes(ch)) flags += ch;
+    }
+    return new __TlangRegex(this.source, flags);
+  }
+
+  without_flag(flag) {
+    const flags = [...this.flags].filter((c) => !flag.includes(c)).join('');
+    return new __TlangRegex(this.source, flags);
   }
 
   toString() {

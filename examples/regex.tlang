@@ -1,0 +1,82 @@
+// Regex example — demonstrates re"..." tagged string literals and the
+// Regex struct's methods: test, exec, replace, with_flags, with_flag,
+// without_flag.
+
+// ── Basic matching ────────────────────────────────────────────────────────────
+
+let email_re = re"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}";
+
+log("=== Email validation ===");
+email_re.test("user@example.com") |> log();  // true
+email_re.test("not-an-email")     |> log();  // false
+email_re.test("a@b.co")           |> log();  // true
+
+// ── Exec (first match) ────────────────────────────────────────────────────────
+
+log("=== First number in string ===");
+let number_re = re"\d+";
+
+fn extract_first_number(s) {
+    match number_re.exec(s) {
+        Option::Some(n) => n,
+        Option::None    => "none",
+    }
+}
+
+extract_first_number("order #42 shipped") |> log();  // 42
+extract_first_number("no digits here")    |> log();  // none
+
+// ── Replace (replace_all) ─────────────────────────────────────────────────────
+
+log("=== Whitespace normalisation ===");
+re"\s+".replace_all("hello   world !", " ") |> log();  // hello world !
+
+log("=== Redact credit card numbers ===");
+re"\d{4}".replace_all("card: 1234 5678 9012 3456", "****") |> log();
+
+// ── Flag manipulation ─────────────────────────────────────────────────────────
+
+log("=== Flag methods ===");
+
+let base = re"hello";
+
+// with_flags replaces flags entirely
+let ci = base.with_flags("i");
+ci.test("HELLO") |> log();  // true
+ci.source         |> log();  // hello
+ci.flags          |> log();  // i
+
+// with_flag adds a single flag without duplicating existing ones
+let ci_m = ci.with_flag("m");
+ci_m.flags |> log();  // im
+
+// removing a flag
+let m_only = ci_m.without_flag("i");
+m_only.flags       |> log();  // m
+m_only.test("HELLO") |> log();  // false (case-sensitive again)
+
+// ── Chaining flag method calls ────────────────────────────────────────────────
+
+log("=== Chained flag method calls ===");
+let re_chain = re"foo".with_flag("i").with_flag("m");
+re_chain.flags         |> log();  // im
+re_chain.test("FOO")   |> log();  // true
+
+// ── All numbers in a string (recursive exec + replace_first) ─────────────────
+
+log("=== Extract all numbers ===");
+fn collect_numbers(text, acc) {
+    match number_re.exec(text) {
+        Option::None    => acc,
+        Option::Some(n) =>
+            collect_numbers(number_re.replace_first(text, ""), [n, ...acc]),
+    }
+}
+
+let nums = collect_numbers("a1 b22 c333", []);
+len(nums) |> log();  // 3
+
+// ── Stringify ────────────────────────────────────────────────────────────────
+
+log("=== Stringify ===");
+re"foo|bar".with_flags("gi") |> log();  // /foo|bar/gi
