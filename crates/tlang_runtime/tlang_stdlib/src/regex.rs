@@ -140,6 +140,10 @@ pub fn define_regex_shape(state: &mut VMState) {
     method_map.insert(
         "flags".to_string(),
         state.new_native_method("Regex::flags", |state, this, args| {
+            if args.is_empty() {
+                let flags = get_regex_flags(state, this);
+                return NativeFnReturn::Return(state.new_string(flags));
+            }
             let source = get_regex_pattern(state, this);
             let flags = state
                 .get_object(args[0])

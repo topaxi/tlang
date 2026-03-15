@@ -83,15 +83,17 @@ string ??= {};
 string.char_code_at = (str, idx) => str.charCodeAt(idx);
 
 class __TlangRegex {
+  #source;
+  #flags;
   #__re = null;
 
   constructor(source, flags = '') {
-    this.source = source;
-    this.flags = flags;
+    this.#source = source;
+    this.#flags = flags;
   }
 
   get #re() {
-    return (this.#__re ??= new RegExp(this.source, this.flags));
+    return (this.#__re ??= new RegExp(this.#source, this.#flags));
   }
 
   test(str) {
@@ -105,19 +107,29 @@ class __TlangRegex {
   }
 
   replace_all(str, replacement) {
-    return str.replace(this.#re, replacement);
+    const flags = this.#flags.includes('g') ? this.#flags : this.#flags + 'g';
+    return str.replace(new RegExp(this.#source, flags), replacement);
   }
 
   replace_first(str, replacement) {
-    const re = new RegExp(this.source, this.flags.replace('g', ''));
+    const re = new RegExp(this.#source, this.#flags.replace('g', ''));
     return str.replace(re, replacement);
   }
 
-  flags(flags) {
-    return new __TlangRegex(this.source, flags);
+  flags(newFlags) {
+    if (newFlags === undefined) return this.#flags;
+    return new __TlangRegex(this.#source, newFlags);
   }
 
   toString() {
-    return `/${this.source}/${this.flags}`;
+    return `/${this.#source}/${this.#flags}`;
+  }
+
+  toJSON() {
+    return this.toString();
+  }
+
+  get [Symbol.for('nodejs.util.inspect.custom')]() {
+    return () => this.toString();
   }
 }

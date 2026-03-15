@@ -101,7 +101,7 @@ impl BuiltinShapes {
     fn create_regex_shape(store: &mut Slab<TlangShape>) -> ShapeKey {
         ShapeKey::new_native(store.insert(TlangShape::new_struct_shape(
             "Regex".to_string(),
-            vec!["source".to_string(), "flags".to_string()],
+            vec![],
             HashMap::new(),
         )))
     }

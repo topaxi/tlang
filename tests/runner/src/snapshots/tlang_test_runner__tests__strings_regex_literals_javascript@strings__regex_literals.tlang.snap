@@ -11,4 +11,4 @@ false
 123
 no match
 hello world
-foo|bar
+/foo|bar/gi

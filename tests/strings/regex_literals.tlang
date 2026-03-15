@@ -28,13 +28,12 @@ fn test_replace() {
     re"\s+".replace_all("hello   world", " ") |> log();
 }
 
-fn test_source() {
-    let r = re"foo|bar";
-    r.source |> log();
+fn test_stringify() {
+    re"foo|bar".flags("gi") |> log();
 }
 
 test_basic();
 test_case_insensitive();
 test_exec();
 test_replace();
-test_source();
+test_stringify();

@@ -43,14 +43,13 @@ log("=== Flag methods ===");
 
 let base = re"hello";
 
-// flags() returns a new regex with exactly the given flags
+// flags() with no args returns the current flags string
 let ci = base.flags("i");
 ci.test("HELLO") |> log();  // true
-ci.source        |> log();  // hello
-ci.flags         |> log();  // i
+ci.flags()       |> log();  // i
 
 let ci_m = base.flags("im");
-ci_m.flags |> log();  // im
+ci_m.flags() |> log();  // im
 
 // ── All numbers in a string (recursive exec + replace_first) ─────────────────
 
