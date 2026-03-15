@@ -1,6 +1,6 @@
 ((tagged_string
   tag: (tagged_string_tag) @_tag
-  (#eq? @_tag "re")
   content: (string) @injection.content)
+ (#eq? @_tag "re")
  (#set! injection.language "regex")
- (#set! injection.include-children))
+ (#offset! @injection.content 0 1 0 -1))
