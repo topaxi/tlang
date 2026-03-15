@@ -334,8 +334,8 @@ impl LoweringContext {
         }
     }
 
-    // a =~ b  →  Match::match(b, a)   (RHS = pattern = self)
-    // a !~ b  →  !Match::match(b, a)
+    // a =~ b  →  Match::matches(b, a)   (RHS = pattern = self)
+    // a !~ b  →  !Match::matches(b, a)
     fn lower_match_operator(&mut self, node: &BinaryOpExpression) -> hir::ExprKind {
         let span = node.lhs.span;
         let lhs = self.lower_expr(&node.lhs);
@@ -347,7 +347,8 @@ impl LoweringContext {
                 hir::PathSegment::from_str("matches", span),
             ],
             span,
-        );
+        )
+        .with_res(hir::Res::new_protocol_method());
         let callee = hir::Expr {
             hir_id: self.unique_id(),
             kind: hir::ExprKind::Path(Box::new(callee_path)),

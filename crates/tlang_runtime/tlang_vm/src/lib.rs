@@ -40,6 +40,9 @@ impl VM {
             ("Iterable::iter", SymbolType::ProtocolMethod(1)),
             ("Iterator", SymbolType::Protocol),
             ("Iterator::next", SymbolType::ProtocolMethod(1)),
+            ("Match", SymbolType::Protocol),
+            ("Match::matches", SymbolType::ProtocolMethod(2)),
+            ("Regex", SymbolType::Struct),
             ("math::pi", SymbolType::Variable),
         ]
     }

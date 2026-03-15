@@ -179,6 +179,17 @@ impl Res {
         Res::new(hir_id, BindingKind::Variant)
     }
 
+    /// Creates a `Res` for a protocol method reference synthesised during HIR
+    /// lowering.  Protocol methods use `BindingKind::Enum` (no slot/hir_id)
+    /// so they are not picked up as normal value bindings by the resolver.
+    pub fn new_protocol_method() -> Self {
+        Res {
+            hir_id: None,
+            binding_kind: BindingKind::Enum,
+            slot: Slot::None,
+        }
+    }
+
     pub fn new_builtin_fn(slot_index: usize) -> Self {
         Res {
             hir_id: None,
