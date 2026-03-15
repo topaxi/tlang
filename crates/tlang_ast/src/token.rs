@@ -15,6 +15,8 @@ pub enum TokenKind {
     Slash,
     EqualEqual,
     NotEqual,
+    Matches,
+    NotMatches,
     GreaterThan,
     GreaterThanOrEqual,
     LessThan,

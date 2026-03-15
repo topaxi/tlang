@@ -122,9 +122,9 @@ test.describe('Tlang Playground', () => {
     await page.locator('t-button').filter({ hasText: 'Run' }).click();
 
     // No error messages should appear.
-    await expect(
-      page.locator('t-console-message[type="error"]'),
-    ).toHaveCount(0);
+    await expect(page.locator('t-console-message[type="error"]')).toHaveCount(
+      0,
+    );
 
     // Expected output from the email-validation section.
     const messages = page.locator('t-console-message[type="log"]');

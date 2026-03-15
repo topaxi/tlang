@@ -391,6 +391,10 @@ impl Lexer<'_> {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::FatArrow, start_pos, start_lc)
+                } else if self.next_char == '~' {
+                    self.advance();
+                    self.advance();
+                    self.token(TokenKind::Matches, start_pos, start_lc)
                 } else {
                     self.advance();
                     self.token(TokenKind::EqualSign, start_pos, start_lc)
@@ -401,6 +405,10 @@ impl Lexer<'_> {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::NotEqual, start_pos, start_lc)
+                } else if self.next_char == '~' {
+                    self.advance();
+                    self.advance();
+                    self.token(TokenKind::NotMatches, start_pos, start_lc)
                 } else {
                     self.advance();
                     self.token(TokenKind::ExclamationMark, start_pos, start_lc)
