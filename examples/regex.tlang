@@ -18,7 +18,7 @@ let number_re = re"\d+";
 fn extract_first_number(s) {
     match number_re.exec(s) {
         Option::Some(n) => n,
-        Option::None    => "none",
+        Option::None => "none",
     }
 }
 
@@ -28,10 +28,14 @@ extract_first_number("no digits here")    |> log();  // none
 // ── Replace (replace_all) ─────────────────────────────────────────────────────
 
 log("=== Whitespace normalisation ===");
-re"\s+".replace_all("hello   world !", " ") |> log();  // hello world !
+"hello   world !"
+|> re"\s+".replace_all(" ")
+|> log();  // hello world !
 
 log("=== Redact credit card numbers ===");
-re"\d{4}".replace_all("card: 1234 5678 9012 3456", "****") |> log();
+"card: 1234 5678 9012 3456"
+|> re"\d{4}".replace_all("****")
+|> log();
 
 // ── Flag manipulation ─────────────────────────────────────────────────────────
 
@@ -45,30 +49,23 @@ ci.test("HELLO") |> log();  // true
 ci.source        |> log();  // hello
 ci.flags         |> log();  // i
 
-// combine flags in one call
 let ci_m = base.flags("im");
 ci_m.flags |> log();  // im
-
-// ── Chaining flag calls ───────────────────────────────────────────────────────
-
-log("=== Chained flag calls ===");
-let re_chain = re"foo".flags("im");
-re_chain.flags         |> log();  // im
-re_chain.test("FOO")   |> log();  // true
 
 // ── All numbers in a string (recursive exec + replace_first) ─────────────────
 
 log("=== Extract all numbers ===");
 fn collect_numbers(text, acc) {
     match number_re.exec(text) {
-        Option::None    => acc,
+        Option::None => acc,
         Option::Some(n) =>
-            collect_numbers(number_re.replace_first(text, ""), [n, ...acc]),
+            rec collect_numbers(number_re.replace_first(text, ""), [n, ...acc]),
     }
 }
 
-let nums = collect_numbers("a1 b22 c333", []);
-len(nums) |> log();  // 3
+collect_numbers("a1 b22 c333", [])
+|> len()
+|> log();  // 3
 
 // ── Stringify ────────────────────────────────────────────────────────────────
 

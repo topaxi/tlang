@@ -83,24 +83,29 @@ string ??= {};
 string.char_code_at = (str, idx) => str.charCodeAt(idx);
 
 class __TlangRegex {
+  #__re = null;
+
   constructor(source, flags = '') {
     this.source = source;
     this.flags = flags;
-    this.__re = new RegExp(source, flags);
+  }
+
+  get #re() {
+    return (this.#__re ??= new RegExp(this.source, this.flags));
   }
 
   test(str) {
-    return this.__re.test(str);
+    return this.#re.test(str);
   }
 
   exec(str) {
-    const m = this.__re.exec(str);
+    const m = this.#re.exec(str);
     if (m === null) return Option.None;
-    return { tag: Option.Some, [0]: m[0] };
+    return Option.Some(m[0]);
   }
 
   replace_all(str, replacement) {
-    return str.replace(this.__re, replacement);
+    return str.replace(this.#re, replacement);
   }
 
   replace_first(str, replacement) {
