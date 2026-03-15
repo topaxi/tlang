@@ -82,7 +82,7 @@ string ??= {};
  */
 string.char_code_at = (str, idx) => str.charCodeAt(idx);
 
-class __TlangRegex {
+class $TlangRegex {
   #source;
   #flags;
   #__re = null;
@@ -118,7 +118,7 @@ class __TlangRegex {
 
   flags(newFlags) {
     if (newFlags === undefined) return this.#flags;
-    return new __TlangRegex(this.#source, newFlags);
+    return new $TlangRegex(this.#source, newFlags);
   }
 
   toString() {

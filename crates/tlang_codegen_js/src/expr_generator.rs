@@ -68,7 +68,7 @@ impl<'a> InnerCodegen<'a> {
             Literal::String(value) | Literal::Char(value) => self.str_expr(value),
             Literal::TaggedString(tag, value) => match tag.as_ref() {
                 "re" => {
-                    let callee = self.ident_expr("__TlangRegex");
+                    let callee = self.ident_expr("$TlangRegex");
                     let args = vec![Argument::from(self.str_expr(value))];
                     self.ast
                         .expression_new(SPAN, callee, NONE, self.ast.vec_from_iter(args))
