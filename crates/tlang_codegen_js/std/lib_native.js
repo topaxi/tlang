@@ -108,7 +108,7 @@ class __TlangRegex {
 
   replace_all(str, replacement) {
     const flags = this.#flags.includes('g') ? this.#flags : this.#flags + 'g';
-    return str.replace(new RegExp(this.#source, flags), replacement);
+    return str.replaceAll(new RegExp(this.#source, flags), replacement);
   }
 
   replace_first(str, replacement) {
