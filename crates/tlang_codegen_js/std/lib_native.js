@@ -129,7 +129,7 @@ class __TlangRegex {
     return this.toString();
   }
 
-  get [Symbol.for('nodejs.util.inspect.custom')]() {
-    return () => this.toString();
+  [Symbol.for('nodejs.util.inspect.custom')]() {
+    return this.toString();
   }
 }
