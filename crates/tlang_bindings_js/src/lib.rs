@@ -1,3 +1,4 @@
+#[cfg(feature = "console_error_panic_hook")]
 extern crate console_error_panic_hook;
 
 use wasm_bindgen::prelude::*;
@@ -19,6 +20,8 @@ unsafe extern "C" {
 pub fn init() {
     unsafe { __wasm_call_ctors() };
 
+    #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
+
     console_log::init_with_level(log::Level::Debug).expect("error initializing log");
 }
