@@ -1,5 +1,5 @@
 use tlang_macros::native_fn;
-use tlang_memory::{TlangValue, VMState};
+use tlang_memory::{NativeFnReturn, TlangValue, VMState};
 
 fn stringify(state: &mut VMState, values: &[TlangValue]) -> String {
     values
@@ -19,6 +19,14 @@ pub fn log(state: &mut VMState, args: &[TlangValue]) -> TlangValue {
 pub fn panic(state: &mut VMState, args: &[TlangValue]) -> TlangValue {
     let stringified = stringify(state, args);
     state.panic(format!("Panic!: {stringified}"));
+}
+
+#[native_fn]
+pub fn compose(state: &mut VMState, f: TlangValue, g: TlangValue) -> TlangValue {
+    state.new_native_fn("compose$result", move |state, args| {
+        let g_result = state.call(g, args);
+        NativeFnReturn::Return(state.call(f, &[g_result]))
+    })
 }
 
 #[cfg(test)]

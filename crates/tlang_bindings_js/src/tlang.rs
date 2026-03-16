@@ -45,7 +45,7 @@ pub fn get_standard_library_source() -> String {
 
 #[wasm_bindgen(js_name = "getStandardLibraryNativeJs")]
 pub fn get_standard_library_native_js() -> String {
-    CodegenJS::get_standard_library_native_js().to_string()
+    CodegenJS::get_standard_library_native_js()
 }
 
 #[derive(Deserialize, Serialize, Tsify)]

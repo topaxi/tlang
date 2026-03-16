@@ -1,0 +1,13 @@
+enum Result {
+  Ok(value),
+  Err(error),
+}
+
+fn Result.is_ok(Result::Ok(_)) { true }
+fn Result.is_ok(_) { false }
+
+fn Result.is_err(Result::Err(_)) { true }
+fn Result.is_err(_) { false }
+
+fn Result.unwrap(Result::Ok(x)) { x }
+fn Result.unwrap(_) { panic("Called unwrap on Err") }

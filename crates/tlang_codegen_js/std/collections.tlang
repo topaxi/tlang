@@ -1,0 +1,2 @@
+// len(a[]) -> usize
+fn len(list) { list.length }

@@ -31,6 +31,22 @@ pub fn max(state: &mut VMState, lhs: TlangValue, rhs: TlangValue) -> TlangValue 
     }
 }
 
+#[native_fn]
+pub fn min(state: &mut VMState, lhs: TlangValue, rhs: TlangValue) -> TlangValue {
+    match (lhs.as_primitive(), rhs.as_primitive()) {
+        (TlangPrimitive::UInt(i1), TlangPrimitive::UInt(i2)) => TlangValue::from(i1.min(i2)),
+        (TlangPrimitive::Int(i1), TlangPrimitive::Int(i2)) => TlangValue::from(i1.min(i2)),
+        (TlangPrimitive::Float(f1), TlangPrimitive::Float(f2)) => TlangValue::from(f1.min(f2)),
+        (TlangPrimitive::UInt(i), TlangPrimitive::Float(f)) => TlangValue::from((i as f64).min(f)),
+        (TlangPrimitive::Int(i), TlangPrimitive::Float(f)) => TlangValue::from((i as f64).min(f)),
+        (TlangPrimitive::Float(f), TlangPrimitive::UInt(i)) => TlangValue::from(f.min(i as f64)),
+        (TlangPrimitive::Float(f), TlangPrimitive::Int(i)) => TlangValue::from(f.min(i as f64)),
+        (value1, value2) => state.panic(format!(
+            "Expected float or int, got {value1:?} and {value2:?}"
+        )),
+    }
+}
+
 #[cfg(not(target_family = "wasm"))]
 #[native_fn]
 pub fn random(_: &mut VMState) -> TlangValue {
@@ -51,7 +67,7 @@ pub fn random_int(state: &mut VMState, max: TlangValue) -> TlangValue {
 mod tests {
     use tlang_memory::{TlangValue, VMState};
 
-    use super::{floor, max, sqrt};
+    use super::{floor, max, min, sqrt};
 
     #[test]
     fn test_floor_float() {
@@ -121,5 +137,40 @@ mod tests {
         let mut state = VMState::new();
         let result = max(&mut state, TlangValue::F64(4.0), TlangValue::I64(2));
         assert!(matches!(result, TlangValue::F64(f) if (f - 4.0).abs() < 1e-10));
+    }
+
+    #[test]
+    fn test_min_int_first_smaller() {
+        let mut state = VMState::new();
+        let result = min(&mut state, TlangValue::I64(5), TlangValue::I64(10));
+        assert_eq!(result, TlangValue::I64(5));
+    }
+
+    #[test]
+    fn test_min_int_second_smaller() {
+        let mut state = VMState::new();
+        let result = min(&mut state, TlangValue::I64(7), TlangValue::I64(3));
+        assert_eq!(result, TlangValue::I64(3));
+    }
+
+    #[test]
+    fn test_min_float() {
+        let mut state = VMState::new();
+        let result = min(&mut state, TlangValue::F64(1.5), TlangValue::F64(2.5));
+        assert!(matches!(result, TlangValue::F64(f) if (f - 1.5).abs() < 1e-10));
+    }
+
+    #[test]
+    fn test_min_int_and_float() {
+        let mut state = VMState::new();
+        let result = min(&mut state, TlangValue::I64(3), TlangValue::F64(3.5));
+        assert!(matches!(result, TlangValue::F64(f) if (f - 3.0).abs() < 1e-10));
+    }
+
+    #[test]
+    fn test_min_float_and_int() {
+        let mut state = VMState::new();
+        let result = min(&mut state, TlangValue::F64(4.0), TlangValue::I64(2));
+        assert!(matches!(result, TlangValue::F64(f) if (f - 2.0).abs() < 1e-10));
     }
 }

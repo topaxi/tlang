@@ -1,5 +1,8 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
+use tlang_symbols::SymbolType;
+
+use crate::common::CodegenOptions;
 
 mod common;
 
@@ -344,18 +347,25 @@ fn test_function_list_match_with_wildcard() {
 
 #[test]
 fn test_function_reuse_param_name_with_pattern() {
-    let output = compile!(indoc! {"
-        // quicksort(a[]) -> a[]
-        fn quicksort([]) { [] }
-        fn quicksort(list) {
-          let pivotIndex = random_int(len(list));
-          let pivot = list[pivotIndex];
-          let list = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex+1)];
-          let smaller = list |> filter(fn(y) { y <= pivot });
-          let greater = list |> filter(fn(y) { y > pivot });
-          [...quicksort(smaller), pivot, ...quicksort(greater)]
-        }
-    "});
+    let mut options = CodegenOptions::default();
+    options
+        .builtin_symbols
+        .push(("filter", SymbolType::Function(2)));
+    let output = compile!(
+        indoc! {"
+            // quicksort(a[]) -> a[]
+            fn quicksort([]) { [] }
+            fn quicksort(list) {
+              let pivotIndex = random_int(len(list));
+              let pivot = list[pivotIndex];
+              let list = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex+1)];
+              let smaller = list |> filter(fn(y) { y <= pivot });
+              let greater = list |> filter(fn(y) { y > pivot });
+              [...quicksort(smaller), pivot, ...quicksort(greater)]
+            }
+        "},
+        options
+    );
     let expected_output = indoc! {"
         // quicksort(a[]) -> a[]
         function quicksort(list) {

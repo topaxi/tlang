@@ -1,0 +1,31 @@
+protocol Functor {
+  fn map(self, f)
+}
+// Backwards compatibility and convenience
+let map = Functor::map;
+
+impl Functor for Option {
+  fn map(Option::Some(x), f) { Option::Some(f(x)) }
+  fn map(Option::None, _) { Option::None }
+}
+
+impl Functor for Result {
+  fn map(Result::Ok(x), f) { Result::Ok(f(x)) }
+  fn map(Result::Err(e), _) { Result::Err(e) }
+}
+
+protocol Match {
+  fn matches(self, value)
+}
+
+impl Match for Regex {
+  fn matches(self, value) { self.test(value) }
+}
+
+protocol Iterable {
+  fn iter(self)
+}
+
+protocol Iterator {
+  fn next(self)
+}

@@ -2,6 +2,8 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_symbols::SymbolType;
 
+use crate::common::CodegenOptions;
+
 mod common;
 
 #[test]
@@ -75,13 +77,23 @@ fn test_pipeline_operator_to_function_call_with_wildcards() {
 
 #[test]
 fn test_pipeline_operator_long_chaining() {
-    let output = compile!(indoc! {"
-        [1,2,3]
-        |> map(fn (x) { x ** 2 })
-        |> filter(fn (x) { x % 2 == 0 })
-        |> foldl(fn (acc, x) { acc + x }, 0)
-        |> log();
-    "});
+    let mut options = CodegenOptions::default();
+    options
+        .builtin_symbols
+        .push(("filter", SymbolType::Function(2)));
+    options
+        .builtin_symbols
+        .push(("foldl", SymbolType::Function(3)));
+    let output = compile!(
+        indoc! {"
+            [1,2,3]
+            |> map(fn (x) { x ** 2 })
+            |> filter(fn (x) { x % 2 == 0 })
+            |> foldl(fn (acc, x) { acc + x }, 0)
+            |> log();
+        "},
+        options
+    );
     let expected_output = indoc! {"
         console.log(foldl(filter(map([
             1,

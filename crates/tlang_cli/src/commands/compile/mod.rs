@@ -68,7 +68,7 @@ fn compile_standard_library() -> Result<String, ParserError> {
     let mut js = JsTarget.compile(&source, &mut module)?;
 
     js.push('\n');
-    js.push_str(CodegenJS::get_standard_library_native_js());
+    js.push_str(&CodegenJS::get_standard_library_native_js());
 
     Ok(js)
 }
