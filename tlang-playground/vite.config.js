@@ -14,27 +14,37 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id, _meta) {
+          if (id.includes('examples') && id.endsWith('.tlang?raw')) {
+            return 'examples';
+          }
+
+          let cmt;
+          if (
+            (cmt =
+              /@codemirror\/theme-(?<theme>\w+)|codemirror-theme-(?<theme>\w+)/.exec(
+                id,
+              ))
+          ) {
+            return `codemirror/theme/${cmt.groups.theme}`;
+          }
+
+          let cml;
+          if (
+            (cml =
+              /@codemirror\/lang-(?<lang>\w+)|codemirror-lang-(?<lang>\w+)/.exec(
+                id,
+              ))
+          ) {
+            return `codemirror/lang/${cml.groups.lang}`;
+          }
+
           let codemirrorShared = [
             'node_modules/codemirror',
             'node_modules/@codemirror/state',
             'node_modules/@codemirror/lint',
-            'node_modules/codemirror-theme-catppuccin',
           ];
-
-          if (id.endsWith('.tlang?raw')) {
-            return 'examples';
-          }
-
           if (codemirrorShared.some((path) => id.includes(path))) {
             return 'codemirror';
-          }
-
-          if (id.includes('@codemirror/lang-javascript')) {
-            return 'codemirror-javascript';
-          }
-
-          if (id.includes('codemirror-lang-tlang')) {
-            return 'codemirror-tlang';
           }
         },
       },
