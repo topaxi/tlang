@@ -40,23 +40,6 @@ define_struct! {
     struct List {}
 
     impl List {
-        fn iter(this) {
-            vm.new_object(TlangObjectKind::Struct(TlangStruct::new(
-                vm.heap.builtin_shapes.list_iterator,
-                vec![this, TlangValue::from(0i64)],
-            )))
-        }
-
-        fn map(this, func) {
-            let list = vm.get_struct(this).unwrap();
-            let values: Vec<TlangValue> = list.values().to_vec();
-            let mut result = Vec::with_capacity(values.len());
-            for item in values {
-                result.push(vm.call(func, &[item]));
-            }
-            vm.new_list(result)
-        }
-
         fn slice(this, start, end) {
             let list = vm.get_struct(this).unwrap();
             let start_idx = start.as_usize();
@@ -66,7 +49,7 @@ define_struct! {
     }
 
     impl Functor for List {
-        fn map(this, func) {
+        apply fn map(this, func) {
             let list = vm.get_struct(this).unwrap();
             let values: Vec<TlangValue> = list.values().to_vec();
             let mut result = Vec::with_capacity(values.len());
@@ -78,7 +61,7 @@ define_struct! {
     }
 
     impl Iterable for List {
-        fn iter(this) {
+        apply fn iter(this) {
             vm.new_object(TlangObjectKind::Struct(TlangStruct::new(
                 vm.heap.builtin_shapes.list_iterator,
                 vec![this, TlangValue::from(0i64)],

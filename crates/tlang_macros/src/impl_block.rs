@@ -7,6 +7,9 @@ pub(crate) struct ImplMethod {
     pub name: Ident,
     pub params: Vec<Ident>, // first param is `this`
     pub body: TokenStream2,
+    /// When `true` inside a protocol impl block, also registers the method
+    /// as a direct `NativeMethodDef` on the type (mirrors tlang's `apply`).
+    pub apply: bool,
 }
 
 pub(crate) struct ImplBlock {
@@ -67,6 +70,14 @@ pub(crate) fn parse_impl_blocks(
 }
 
 pub(crate) fn parse_impl_method(input: ParseStream) -> syn::Result<ImplMethod> {
+    // Optional `apply` keyword: `apply fn method(...)` registers the method
+    // both as a protocol impl and as a direct shape method.
+    let apply = if input.peek(Ident) && input.fork().parse::<Ident>()?.to_string() == "apply" {
+        input.parse::<Ident>()?; // consume `apply`
+        true
+    } else {
+        false
+    };
     input.parse::<Token![fn]>()?;
     let name: Ident = input.parse()?;
 
@@ -85,7 +96,12 @@ pub(crate) fn parse_impl_method(input: ParseStream) -> syn::Result<ImplMethod> {
     braced!(body_content in input);
     let body: TokenStream2 = body_content.parse()?;
 
-    Ok(ImplMethod { name, params, body })
+    Ok(ImplMethod {
+        name,
+        params,
+        body,
+        apply,
+    })
 }
 
 /// Generate `pub fn` wrappers + `inventory::submit!` calls for all impl blocks.
@@ -107,11 +123,11 @@ pub(crate) fn generate_impl_methods(
 
             let type_prefix = type_name_str.to_lowercase();
 
-            let native_wrapper_name = if let Some(protocol) = &impl_block.protocol {
+            let wrapper_name = if let Some(protocol) = &impl_block.protocol {
                 let protocol_str = protocol.to_string().to_lowercase();
-                format_ident!("{type_prefix}_{protocol_str}_{method_name}")
+                format_ident!("{type_prefix}_{protocol_str}_{method_name}_wrapper")
             } else {
-                format_ident!("{type_prefix}_{method_name}")
+                format_ident!("{type_prefix}_{method_name}_wrapper")
             };
 
             if let Some(protocol) = &impl_block.protocol {
@@ -127,17 +143,24 @@ pub(crate) fn generate_impl_methods(
                     })
                     .collect();
 
-                let wrapper_name = format_ident!("{native_wrapper_name}_protocol_impl");
+                // When `apply` is set, also register as a direct shape method
+                // using the same wrapper (mirrors tlang's `apply` keyword).
+                let apply_method_submit = if method.apply {
+                    quote! {
+                        inventory::submit! {
+                            crate::NativeMethodDef::new(
+                                #type_name_str,
+                                #method_name_str,
+                                #wrapper_name,
+                                0,
+                            )
+                        }
+                    }
+                } else {
+                    quote! {}
+                };
 
                 method_fns.push(quote! {
-                    fn #native_wrapper_name(
-                        vm: &mut tlang_memory::VMState,
-                        this: tlang_memory::TlangValue,
-                        #(#extra_params: tlang_memory::TlangValue),*
-                    ) -> tlang_memory::TlangValue {
-                        #body
-                    }
-
                     pub fn #wrapper_name(
                         state: &mut tlang_memory::VMState,
                         args: &[tlang_memory::TlangValue],
@@ -147,7 +170,8 @@ pub(crate) fn generate_impl_methods(
                         }
                         let this = args[0];
                         #(#arg_extractions)*
-                        #native_wrapper_name(state, this, #(#extra_params),*).into()
+                        let vm = state;
+                        (|| -> tlang_memory::TlangValue { #body })().into()
                     }
 
                     inventory::submit! {
@@ -159,6 +183,8 @@ pub(crate) fn generate_impl_methods(
                             0,
                         )
                     }
+
+                    #apply_method_submit
                 });
             } else {
                 let arg_extractions: Vec<_> = extra_params
@@ -171,24 +197,15 @@ pub(crate) fn generate_impl_methods(
                     })
                     .collect();
 
-                let wrapper_name = format_ident!("{native_wrapper_name}_native_method");
-
                 method_fns.push(quote! {
-                    fn #native_wrapper_name(
-                        vm: &mut tlang_memory::VMState,
-                        this: tlang_memory::TlangValue,
-                        #(#extra_params: tlang_memory::TlangValue),*
-                    ) -> tlang_memory::TlangValue {
-                        #body
-                    }
-
                     pub fn #wrapper_name(
                         state: &mut tlang_memory::VMState,
                         args: &[tlang_memory::TlangValue],
                     ) -> tlang_memory::NativeFnReturn {
                         let this = args[0];
                         #(#arg_extractions)*
-                        #native_wrapper_name(state, this, #(#extra_params),*).into()
+                        let vm = state;
+                        (|| -> tlang_memory::TlangValue { #body })().into()
                     }
 
                     inventory::submit! {
