@@ -1,11 +1,14 @@
-use std::collections::HashMap;
-
 use regex::Regex;
-use tlang_memory::{NativeFnReturn, TlangValue, VMState};
+use tlang_macros::{define_struct, native_method, protocol_impl};
+use tlang_memory::{TlangValue, VMState};
 
 /// Field indices for the Regex struct.
 pub const REGEX_FIELD_SOURCE: usize = 0;
 pub const REGEX_FIELD_FLAGS: usize = 1;
+
+define_struct! {
+    struct Regex { source, flags }
+}
 
 fn get_regex_pattern(state: &VMState, this: TlangValue) -> String {
     let s = state.get_struct(this).expect("expected Regex struct");
@@ -29,8 +32,6 @@ fn build_regex(state: &mut VMState, this: TlangValue) -> Regex {
     let source = get_regex_pattern(state, this);
     let flags = get_regex_flags(state, this);
 
-    // Build a flags-prefixed pattern so the regex crate respects them.
-    // Supported flags: i (case-insensitive), m (multi-line), s (dot-all), x (verbose).
     let pattern = if flags.is_empty() {
         source
     } else {
@@ -45,139 +46,136 @@ pub(crate) fn regex_test(state: &mut VMState, regex_val: TlangValue, haystack: &
     re.is_match(haystack)
 }
 
-#[allow(clippy::missing_panics_doc, clippy::too_many_lines)]
-pub fn define_regex_shape(state: &mut VMState) {
-    let mut method_map = HashMap::with_capacity(5);
+#[native_method("Regex")]
+fn test(vm: &mut VMState, this: TlangValue, haystack_val: TlangValue) -> TlangValue {
+    let haystack = vm
+        .get_object(haystack_val)
+        .and_then(|o| o.as_str())
+        .unwrap_or_else(|| vm.panic("Regex::test expects a string argument".to_string()))
+        .to_string();
 
-    method_map.insert(
-        "test".to_string(),
-        state.new_native_method("Regex::test", |state, this, args| {
-            let haystack = state
-                .get_object(args[0])
-                .and_then(|o| o.as_str())
-                .unwrap_or_else(|| state.panic("Regex::test expects a string argument".to_string()))
-                .to_string();
-
-            let re = build_regex(state, this);
-            NativeFnReturn::Return(TlangValue::Bool(re.is_match(&haystack)))
-        }),
-    );
-
-    method_map.insert(
-        "exec".to_string(),
-        state.new_native_method("Regex::exec", |state, this, args| {
-            let haystack = state
-                .get_object(args[0])
-                .and_then(|o| o.as_str())
-                .unwrap_or_else(|| state.panic("Regex::exec expects a string argument".to_string()))
-                .to_string();
-
-            let re = build_regex(state, this);
-            let result = if let Some(m) = re.find(&haystack) {
-                let matched = state.new_string(m.as_str().to_string());
-                let some_shape = state.heap.builtin_shapes.option;
-                state.new_enum(
-                    some_shape,
-                    crate::option::OPTION_VARIANT_SOME,
-                    vec![matched],
-                )
-            } else {
-                state.new_enum(
-                    state.heap.builtin_shapes.option,
-                    crate::option::OPTION_VARIANT_NONE,
-                    vec![],
-                )
-            };
-            NativeFnReturn::Return(result)
-        }),
-    );
-
-    method_map.insert(
-        "replace_all".to_string(),
-        state.new_native_method("Regex::replace_all", |state, this, args| {
-            let haystack = state
-                .get_object(args[0])
-                .and_then(|o| o.as_str())
-                .unwrap_or_else(|| {
-                    state.panic("Regex::replace_all expects a string first argument".to_string())
-                })
-                .to_string();
-
-            let replacement = state
-                .get_object(args[1])
-                .and_then(|o| o.as_str())
-                .unwrap_or_else(|| {
-                    state.panic("Regex::replace_all expects a string second argument".to_string())
-                })
-                .to_string();
-
-            let re = build_regex(state, this);
-            let result = re.replace_all(&haystack, replacement.as_str()).to_string();
-            NativeFnReturn::Return(state.new_string(result))
-        }),
-    );
-
-    method_map.insert(
-        "replace_first".to_string(),
-        state.new_native_method("Regex::replace_first", |state, this, args| {
-            let haystack = state
-                .get_object(args[0])
-                .and_then(|o| o.as_str())
-                .unwrap_or_else(|| {
-                    state.panic("Regex::replace_first expects a string first argument".to_string())
-                })
-                .to_string();
-
-            let replacement = state
-                .get_object(args[1])
-                .and_then(|o| o.as_str())
-                .unwrap_or_else(|| {
-                    state.panic("Regex::replace_first expects a string second argument".to_string())
-                })
-                .to_string();
-
-            let re = build_regex(state, this);
-            let result = re.replace(&haystack, replacement.as_str()).to_string();
-            NativeFnReturn::Return(state.new_string(result))
-        }),
-    );
-
-    method_map.insert(
-        "flags".to_string(),
-        state.new_native_method("Regex::flags", |state, this, args| {
-            if args.is_empty() {
-                let flags = get_regex_flags(state, this);
-                return NativeFnReturn::Return(state.new_string(flags));
-            }
-            let source = get_regex_pattern(state, this);
-            let flags = state
-                .get_object(args[0])
-                .and_then(|o| o.as_str())
-                .unwrap_or_else(|| {
-                    state.panic("Regex::flags expects a string argument".to_string())
-                })
-                .to_string();
-            NativeFnReturn::Return(state.new_regex(source, flags))
-        }),
-    );
-
-    state
-        .heap
-        .builtin_shapes
-        .get_regex_shape_mut()
-        .set_methods(method_map);
+    let re = build_regex(vm, this);
+    TlangValue::Bool(re.is_match(&haystack))
 }
+
+#[native_method("Regex")]
+fn exec(vm: &mut VMState, this: TlangValue, haystack_val: TlangValue) -> TlangValue {
+    let haystack = vm
+        .get_object(haystack_val)
+        .and_then(|o| o.as_str())
+        .unwrap_or_else(|| vm.panic("Regex::exec expects a string argument".to_string()))
+        .to_string();
+
+    let re = build_regex(vm, this);
+    if let Some(m) = re.find(&haystack) {
+        let matched = vm.new_string(m.as_str().to_string());
+        let some_shape = vm.heap.builtin_shapes.option;
+        vm.new_enum(some_shape, crate::option::OPTION_SOME, vec![matched])
+    } else {
+        vm.new_enum(
+            vm.heap.builtin_shapes.option,
+            crate::option::OPTION_NONE,
+            vec![],
+        )
+    }
+}
+
+#[native_method("Regex")]
+fn replace_all(
+    vm: &mut VMState,
+    this: TlangValue,
+    haystack_val: TlangValue,
+    replacement_val: TlangValue,
+) -> TlangValue {
+    let haystack = vm
+        .get_object(haystack_val)
+        .and_then(|o| o.as_str())
+        .unwrap_or_else(|| {
+            vm.panic("Regex::replace_all expects a string first argument".to_string())
+        })
+        .to_string();
+
+    let replacement = vm
+        .get_object(replacement_val)
+        .and_then(|o| o.as_str())
+        .unwrap_or_else(|| {
+            vm.panic("Regex::replace_all expects a string second argument".to_string())
+        })
+        .to_string();
+
+    let re = build_regex(vm, this);
+    let result = re.replace_all(&haystack, replacement.as_str()).to_string();
+    vm.new_string(result)
+}
+
+#[native_method("Regex")]
+fn replace_first(
+    vm: &mut VMState,
+    this: TlangValue,
+    haystack_val: TlangValue,
+    replacement_val: TlangValue,
+) -> TlangValue {
+    let haystack = vm
+        .get_object(haystack_val)
+        .and_then(|o| o.as_str())
+        .unwrap_or_else(|| {
+            vm.panic("Regex::replace_first expects a string first argument".to_string())
+        })
+        .to_string();
+
+    let replacement = vm
+        .get_object(replacement_val)
+        .and_then(|o| o.as_str())
+        .unwrap_or_else(|| {
+            vm.panic("Regex::replace_first expects a string second argument".to_string())
+        })
+        .to_string();
+
+    let re = build_regex(vm, this);
+    let result = re.replace(&haystack, replacement.as_str()).to_string();
+    vm.new_string(result)
+}
+
+#[native_method("Regex")]
+fn flags(vm: &mut VMState, this: TlangValue, new_flags: TlangValue) -> TlangValue {
+    if new_flags.is_nil() {
+        let f = get_regex_flags(vm, this);
+        return vm.new_string(f);
+    }
+    let source = get_regex_pattern(vm, this);
+    let f = vm
+        .get_object(new_flags)
+        .and_then(|o| o.as_str())
+        .unwrap_or_else(|| vm.panic("Regex::flags expects a string argument".to_string()))
+        .to_string();
+    vm.new_regex(source, f)
+}
+
+#[protocol_impl("Match", "Regex")]
+fn matches(vm: &mut VMState, regex_val: TlangValue, haystack_val: TlangValue) -> TlangValue {
+    let haystack = vm
+        .get_object(haystack_val)
+        .and_then(|o| o.as_str())
+        .unwrap_or_else(|| {
+            vm.panic("Match::matches expects a string as second argument".to_string())
+        })
+        .to_string();
+    TlangValue::Bool(regex_test(vm, regex_val, &haystack))
+}
+
+/// Legacy entry point — now a no-op.
+#[deprecated(note = "Use VMState::collect_native_inventory() instead")]
+pub fn define_regex_shape(_state: &mut VMState) {}
 
 #[cfg(test)]
 mod tests {
     use tlang_memory::{TlangValue, VMState};
 
-    use super::{REGEX_FIELD_FLAGS, REGEX_FIELD_SOURCE, define_regex_shape};
+    use super::{REGEX_FIELD_FLAGS, REGEX_FIELD_SOURCE};
 
     fn setup() -> VMState {
         let mut state = VMState::new();
-        crate::option::define_option_shape(&mut state);
-        define_regex_shape(&mut state);
+        state.collect_native_inventory();
         state
     }
 

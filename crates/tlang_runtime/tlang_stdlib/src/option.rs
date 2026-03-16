@@ -1,95 +1,78 @@
-use std::collections::HashMap;
+use tlang_macros::{define_enum, native_fn, native_method, protocol_impl};
+use tlang_memory::{TlangValue, VMState};
 
-use tlang_macros::native_fn;
-use tlang_memory::{NativeFnReturn, TlangValue, VMState};
+define_enum! {
+    enum Option {
+        Some(value),
+        None,
+    }
+}
 
-pub const OPTION_VARIANT_SOME: usize = 0;
-pub const OPTION_VARIANT_NONE: usize = 1;
+// Re-export under the old names for backward compatibility.
+pub const OPTION_VARIANT_SOME: usize = OPTION_SOME;
+pub const OPTION_VARIANT_NONE: usize = OPTION_NONE;
 
 #[native_fn(name = "Option::Some")]
 pub fn new_option_some(state: &mut VMState, value: TlangValue) -> TlangValue {
-    state.new_enum(
-        state.heap.builtin_shapes.option,
-        OPTION_VARIANT_SOME,
-        vec![value],
-    )
+    state.new_enum(state.heap.builtin_shapes.option, OPTION_SOME, vec![value])
 }
 
-#[allow(clippy::missing_panics_doc)]
-pub fn define_option_shape(state: &mut VMState) {
-    let mut method_map = HashMap::with_capacity(5);
-
-    method_map.insert(
-        "is_some".to_string(),
-        state.new_native_method("Option::is_some", |state, this, _args| {
-            let this = state.get_enum(this).unwrap();
-
-            NativeFnReturn::Return(TlangValue::from(this.variant == OPTION_VARIANT_SOME))
-        }),
-    );
-
-    method_map.insert(
-        "is_none".to_string(),
-        state.new_native_method("Option::is_none", |state, this, _args| {
-            let this = state.get_enum(this).unwrap();
-
-            NativeFnReturn::Return(TlangValue::from(this.variant == OPTION_VARIANT_NONE))
-        }),
-    );
-
-    method_map.insert(
-        "unwrap".to_string(),
-        state.new_native_method("Option::unwrap", |state, this, _args| {
-            let this = state.get_enum(this).unwrap();
-
-            if this.variant == OPTION_VARIANT_NONE {
-                state.panic("Called unwrap on None".to_string());
-            }
-
-            NativeFnReturn::Return(this.field_values[0])
-        }),
-    );
-
-    method_map.insert(
-        "map".to_string(),
-        state.new_native_method("Option::map", |state, this, args| {
-            let func = args[0];
-            let this = state.get_enum(this).unwrap();
-
-            if this.variant == OPTION_VARIANT_NONE {
-                let none = state.new_enum(
-                    state.heap.builtin_shapes.option,
-                    OPTION_VARIANT_NONE,
-                    vec![],
-                );
-                return NativeFnReturn::Return(none);
-            }
-
-            let inner = this.field_values[0];
-            let mapped = state.call(func, &[inner]);
-            let some = state.new_enum(
-                state.heap.builtin_shapes.option,
-                OPTION_VARIANT_SOME,
-                vec![mapped],
-            );
-            NativeFnReturn::Return(some)
-        }),
-    );
-
-    state
-        .heap
-        .builtin_shapes
-        .get_option_shape_mut()
-        .set_methods(method_map);
-
-    let none_value = state.new_enum(
-        state.heap.builtin_shapes.option,
-        OPTION_VARIANT_NONE,
-        vec![],
-    );
-
-    state.set_global("Option::None".to_string(), none_value);
+#[native_method("Option")]
+fn is_some(vm: &mut VMState, this: TlangValue) -> TlangValue {
+    TlangValue::from(vm.get_enum(this).unwrap().variant == OPTION_SOME)
 }
+
+#[native_method("Option")]
+fn is_none(vm: &mut VMState, this: TlangValue) -> TlangValue {
+    TlangValue::from(vm.get_enum(this).unwrap().variant == OPTION_NONE)
+}
+
+#[native_method("Option")]
+fn unwrap(vm: &mut VMState, this: TlangValue) -> TlangValue {
+    let e = vm.get_enum(this).unwrap();
+
+    if e.variant == OPTION_NONE {
+        vm.panic("Called unwrap on None".to_string());
+    }
+
+    e.field_values[0]
+}
+
+#[native_method("Option")]
+fn map(vm: &mut VMState, this: TlangValue, func: TlangValue) -> TlangValue {
+    let e = vm.get_enum(this).unwrap();
+
+    if e.variant == OPTION_NONE {
+        return vm.new_enum(vm.heap.builtin_shapes.option, OPTION_NONE, vec![]);
+    }
+
+    let inner = e.field_values[0];
+    let mapped = vm.call(func, &[inner]);
+    vm.new_enum(vm.heap.builtin_shapes.option, OPTION_SOME, vec![mapped])
+}
+
+#[protocol_impl("Truthy", "Option")]
+fn truthy(vm: &mut VMState, this: TlangValue) -> TlangValue {
+    TlangValue::Bool(vm.get_enum(this).unwrap().variant == OPTION_SOME)
+}
+
+#[protocol_impl("Functor", "Option", method = "map")]
+fn functor_map(vm: &mut VMState, this: TlangValue, func: TlangValue) -> TlangValue {
+    let e = vm.get_enum(this).unwrap();
+
+    if e.variant == OPTION_NONE {
+        return vm.new_enum(vm.heap.builtin_shapes.option, OPTION_NONE, vec![]);
+    }
+
+    let inner = e.field_values[0];
+    let mapped = vm.call(func, &[inner]);
+    vm.new_enum(vm.heap.builtin_shapes.option, OPTION_SOME, vec![mapped])
+}
+
+/// Legacy entry point — now a no-op since shapes, methods, and globals
+/// (including `Option::None`) are registered via inventory.
+#[deprecated(note = "Use VMState::collect_native_inventory() instead")]
+pub fn define_option_shape(_state: &mut VMState) {}
 
 #[cfg(test)]
 mod tests {
@@ -97,13 +80,9 @@ mod tests {
 
     use crate::option::{OPTION_VARIANT_NONE, OPTION_VARIANT_SOME};
 
-    use super::define_option_shape;
-    use crate::protocols::define_builtin_protocols;
-
     fn vm_state() -> VMState {
         let mut state = VMState::new();
-        define_option_shape(&mut state);
-        define_builtin_protocols(&mut state);
+        state.collect_native_inventory();
         state
     }
 

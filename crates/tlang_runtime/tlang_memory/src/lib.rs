@@ -82,3 +82,170 @@ impl NativeFnDef {
 }
 
 inventory::collect!(NativeFnDef);
+
+// ── Native protocol descriptor ─────────────────────────────────────────────
+
+pub struct NativeProtocolDef {
+    name: &'static str,
+    methods: &'static [(&'static str, u16)], // (method_name, arity)
+}
+
+impl NativeProtocolDef {
+    pub const fn new(name: &'static str, methods: &'static [(&'static str, u16)]) -> Self {
+        Self { name, methods }
+    }
+
+    pub const fn name(&self) -> &'static str {
+        self.name
+    }
+
+    pub const fn methods(&self) -> &'static [(&'static str, u16)] {
+        self.methods
+    }
+}
+
+inventory::collect!(NativeProtocolDef);
+
+// ── Native method descriptor ───────────────────────────────────────────────
+
+pub struct NativeMethodDef {
+    type_name: &'static str,
+    method_name: &'static str,
+    function: fn(&mut VMState, &[TlangValue]) -> NativeFnReturn,
+    priority: u8,
+}
+
+impl NativeMethodDef {
+    pub const fn new(
+        type_name: &'static str,
+        method_name: &'static str,
+        function: fn(&mut VMState, &[TlangValue]) -> NativeFnReturn,
+        priority: u8,
+    ) -> Self {
+        Self {
+            type_name,
+            method_name,
+            function,
+            priority,
+        }
+    }
+
+    pub const fn type_name(&self) -> &'static str {
+        self.type_name
+    }
+
+    pub const fn method_name(&self) -> &'static str {
+        self.method_name
+    }
+
+    pub const fn fn_ptr(&self) -> fn(&mut VMState, &[TlangValue]) -> NativeFnReturn {
+        self.function
+    }
+
+    pub const fn priority(&self) -> u8 {
+        self.priority
+    }
+}
+
+inventory::collect!(NativeMethodDef);
+
+// ── Native protocol-impl descriptor ────────────────────────────────────────
+
+pub struct NativeProtocolImplDef {
+    protocol: &'static str,
+    type_name: &'static str,
+    method: &'static str,
+    function: fn(&mut VMState, &[TlangValue]) -> NativeFnReturn,
+    priority: u8,
+}
+
+impl NativeProtocolImplDef {
+    pub const fn new(
+        protocol: &'static str,
+        type_name: &'static str,
+        method: &'static str,
+        function: fn(&mut VMState, &[TlangValue]) -> NativeFnReturn,
+        priority: u8,
+    ) -> Self {
+        Self {
+            protocol,
+            type_name,
+            method,
+            function,
+            priority,
+        }
+    }
+
+    pub const fn protocol(&self) -> &'static str {
+        self.protocol
+    }
+
+    pub const fn type_name(&self) -> &'static str {
+        self.type_name
+    }
+
+    pub const fn method(&self) -> &'static str {
+        self.method
+    }
+
+    pub const fn fn_ptr(&self) -> fn(&mut VMState, &[TlangValue]) -> NativeFnReturn {
+        self.function
+    }
+
+    pub const fn priority(&self) -> u8 {
+        self.priority
+    }
+}
+
+inventory::collect!(NativeProtocolImplDef);
+
+// ── Native enum descriptor ─────────────────────────────────────────────────
+
+pub struct NativeEnumVariantDef {
+    pub name: &'static str,
+    pub fields: &'static [&'static str],
+}
+
+pub struct NativeEnumDef {
+    name: &'static str,
+    variants: &'static [NativeEnumVariantDef],
+}
+
+impl NativeEnumDef {
+    pub const fn new(name: &'static str, variants: &'static [NativeEnumVariantDef]) -> Self {
+        Self { name, variants }
+    }
+
+    pub const fn name(&self) -> &'static str {
+        self.name
+    }
+
+    pub const fn variants(&self) -> &'static [NativeEnumVariantDef] {
+        self.variants
+    }
+}
+
+inventory::collect!(NativeEnumDef);
+
+// ── Native struct descriptor ───────────────────────────────────────────────
+
+pub struct NativeStructDef {
+    name: &'static str,
+    fields: &'static [&'static str],
+}
+
+impl NativeStructDef {
+    pub const fn new(name: &'static str, fields: &'static [&'static str]) -> Self {
+        Self { name, fields }
+    }
+
+    pub const fn name(&self) -> &'static str {
+        self.name
+    }
+
+    pub const fn fields(&self) -> &'static [&'static str] {
+        self.fields
+    }
+}
+
+inventory::collect!(NativeStructDef);

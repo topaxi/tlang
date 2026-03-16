@@ -14,14 +14,26 @@ use tlang_memory::value::object::TlangEnum;
 use tlang_memory::{NativeFnReturn, Resolver, VMState, execution, scope};
 
 pub use tlang_memory::NativeFnDef;
+pub use tlang_memory::{
+    NativeEnumDef, NativeEnumVariantDef, NativeMethodDef, NativeProtocolDef, NativeProtocolImplDef,
+    NativeStructDef,
+};
 
 #[cfg(feature = "stdlib")]
-pub fn init_stdlib(state: &mut VMState) {
-    tlang_stdlib::option::define_option_shape(state);
-    tlang_stdlib::result::define_result_shape(state);
-    tlang_stdlib::collections::define_list_shape(state);
-    tlang_stdlib::regex::define_regex_shape(state);
-    tlang_stdlib::protocols::define_builtin_protocols(state);
+pub fn init_stdlib(_state: &mut VMState) {
+    // All stdlib registration is now handled by inventory-driven
+    // `VMState::collect_native_inventory()` called from `VM::new()`.
+    //
+    // This reference ensures the tlang_stdlib crate (and its submodules) are
+    // linked in so that inventory::submit! items are collected by the linker.
+    #[allow(deprecated)]
+    let _ = (
+        tlang_stdlib::option::define_option_shape as fn(&mut VMState),
+        tlang_stdlib::result::define_result_shape as fn(&mut VMState),
+        tlang_stdlib::collections::define_list_shape as fn(&mut VMState),
+        tlang_stdlib::regex::define_regex_shape as fn(&mut VMState),
+        tlang_stdlib::protocols::define_builtin_protocols as fn(&mut VMState),
+    );
 }
 
 #[cfg(not(feature = "stdlib"))]

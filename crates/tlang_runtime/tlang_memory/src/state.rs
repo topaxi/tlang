@@ -484,6 +484,155 @@ impl VMState {
         self.program.get_protocol_for_method(method_name)
     }
 
+    // ── Inventory-driven registration helpers ───────────────────────────
+
+    /// Register a native enum shape from an inventory descriptor.
+    pub fn register_native_enum(&mut self, def: &crate::NativeEnumDef) {
+        use crate::shape::TlangEnumVariant;
+
+        // Skip if already registered (e.g. pre-created in BuiltinShapes::new()).
+        if self.heap.builtin_shapes.lookup(def.name()).is_some() {
+            return;
+        }
+
+        let variants = def
+            .variants()
+            .iter()
+            .map(|v| {
+                let field_map = v
+                    .fields
+                    .iter()
+                    .enumerate()
+                    .map(|(i, f)| (f.to_string(), i))
+                    .collect();
+                TlangEnumVariant::new(v.name.to_string(), field_map)
+            })
+            .collect();
+
+        self.heap
+            .builtin_shapes
+            .insert_enum_shape(def.name().to_string(), variants);
+    }
+
+    /// Register a native struct shape from an inventory descriptor.
+    pub fn register_native_struct(&mut self, def: &crate::NativeStructDef) {
+        // Skip if already registered.
+        if self.heap.builtin_shapes.lookup(def.name()).is_some() {
+            return;
+        }
+
+        let fields = def.fields().iter().map(|f| f.to_string()).collect();
+
+        self.heap
+            .builtin_shapes
+            .insert_struct_shape(def.name().to_string(), fields);
+    }
+
+    /// Register a native method on a shape from an inventory descriptor.
+    pub fn register_native_method(&mut self, def: &crate::NativeMethodDef) {
+        let fn_ptr = def.fn_ptr();
+        let method = self.new_native_method(
+            &format!("{}::{}", def.type_name(), def.method_name()),
+            move |state, this, args| {
+                fn_ptr(state, &{
+                    let mut v = Vec::with_capacity(1 + args.len());
+                    v.push(this);
+                    v.extend_from_slice(args);
+                    v
+                })
+            },
+        );
+
+        if let Some(shape_key) = self.heap.builtin_shapes.lookup(def.type_name())
+            && let Some(shape) = self.heap.builtin_shapes.get_shape_mut(shape_key)
+        {
+            shape.add_method(def.method_name().to_string(), method);
+        }
+    }
+
+    /// Register a native protocol impl from an inventory descriptor.
+    pub fn register_native_protocol_impl(&mut self, def: &crate::NativeProtocolImplDef) {
+        let fn_value = self.new_native_fn(
+            &format!("{}::{}::{}", def.protocol(), def.type_name(), def.method()),
+            def.fn_ptr(),
+        );
+        self.register_protocol_impl(def.protocol(), def.type_name(), def.method(), fn_value);
+    }
+
+    /// Collect and register all inventory-submitted native definitions.
+    ///
+    /// This handles enum/struct shapes, protocols, methods (with priority-based
+    /// dedup), protocol implementations, native functions, and auto-registers
+    /// zero-field enum variant globals (e.g. `Option::None`).
+    pub fn collect_native_inventory(&mut self) {
+        use crate::{
+            NativeEnumDef, NativeFnDef, NativeMethodDef, NativeProtocolDef, NativeProtocolImplDef,
+            NativeStructDef,
+        };
+
+        // 1. Register enum/struct shapes (skips pre-created ones).
+        for def in inventory::iter::<NativeEnumDef> {
+            self.register_native_enum(def);
+        }
+        for def in inventory::iter::<NativeStructDef> {
+            self.register_native_struct(def);
+        }
+
+        // 2. Register protocols.
+        for def in inventory::iter::<NativeProtocolDef> {
+            self.register_protocol(
+                def.name().to_string(),
+                def.methods().iter().map(|(m, _)| m.to_string()).collect(),
+            );
+        }
+
+        // 3. Register native functions (sorted by name for deterministic order).
+        let mut fn_defs: Vec<&NativeFnDef> = inventory::iter::<NativeFnDef>.into_iter().collect();
+        fn_defs.sort_by_key(|def| def.name());
+        for native_fn_def in &fn_defs {
+            let name = native_fn_def.name();
+            let fn_object = self.new_native_fn(&name, native_fn_def.fn_ptr());
+            debug!("Defining global native function: {name}");
+            self.set_global(name, fn_object);
+        }
+
+        // 4. Register methods (highest priority wins per type+method key).
+        let mut method_defs: Vec<&NativeMethodDef> =
+            inventory::iter::<NativeMethodDef>.into_iter().collect();
+        method_defs.sort_by_key(|d| (d.type_name(), d.method_name(), d.priority()));
+        method_defs
+            .dedup_by(|a, b| a.type_name() == b.type_name() && a.method_name() == b.method_name());
+        for def in &method_defs {
+            self.register_native_method(def);
+        }
+
+        // 5. Register protocol impls (highest priority wins).
+        let mut impl_defs: Vec<&NativeProtocolImplDef> = inventory::iter::<NativeProtocolImplDef>
+            .into_iter()
+            .collect();
+        impl_defs.sort_by_key(|d| (d.protocol(), d.type_name(), d.method(), d.priority()));
+        impl_defs.dedup_by(|a, b| {
+            a.protocol() == b.protocol()
+                && a.type_name() == b.type_name()
+                && a.method() == b.method()
+        });
+        for def in &impl_defs {
+            self.register_native_protocol_impl(def);
+        }
+
+        // 6. Auto-register zero-field enum variants as globals (e.g. Option::None).
+        for def in inventory::iter::<NativeEnumDef> {
+            if let Some(shape_key) = self.heap.builtin_shapes.lookup(def.name()) {
+                for (idx, variant) in def.variants().iter().enumerate() {
+                    if variant.fields.is_empty() {
+                        let value = self.new_enum(shape_key, idx, vec![]);
+                        self.set_global(format!("{}::{}", def.name(), variant.name), value);
+                    }
+                }
+            }
+        }
+    }
+
     pub fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
         self.program.get_closure_decl(id)
     }

@@ -1,4 +1,8 @@
 pub use tlang_memory::NativeFnDef;
+pub use tlang_memory::{
+    NativeEnumDef, NativeEnumVariantDef, NativeMethodDef, NativeProtocolDef, NativeProtocolImplDef,
+    NativeStructDef,
+};
 
 pub mod collections;
 pub mod globals;

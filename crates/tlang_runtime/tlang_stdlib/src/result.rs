@@ -1,97 +1,85 @@
-use std::collections::HashMap;
+use tlang_macros::{define_enum, native_fn, native_method, protocol_impl};
+use tlang_memory::{TlangValue, VMState};
 
-use tlang_macros::native_fn;
-use tlang_memory::{NativeFnReturn, TlangValue, VMState};
+define_enum! {
+    enum Result {
+        Ok(value),
+        Err(error),
+    }
+}
 
-pub const RESULT_VARIANT_OK: usize = 0;
-pub const RESULT_VARIANT_ERR: usize = 1;
+// Re-export under the old names for backward compatibility.
+pub const RESULT_VARIANT_OK: usize = RESULT_OK;
+pub const RESULT_VARIANT_ERR: usize = RESULT_ERR;
 
 #[native_fn(name = "Result::Ok")]
 pub fn new_result_ok(state: &mut VMState, value: TlangValue) -> TlangValue {
-    state.new_enum(
-        state.heap.builtin_shapes.result,
-        RESULT_VARIANT_OK,
-        vec![value],
-    )
+    state.new_enum(state.heap.builtin_shapes.result, RESULT_OK, vec![value])
 }
 
 #[native_fn(name = "Result::Err")]
 pub fn new_result_err(state: &mut VMState, err: TlangValue) -> TlangValue {
-    state.new_enum(
-        state.heap.builtin_shapes.result,
-        RESULT_VARIANT_ERR,
-        vec![err],
-    )
+    state.new_enum(state.heap.builtin_shapes.result, RESULT_ERR, vec![err])
 }
 
-#[allow(clippy::missing_panics_doc)]
-pub fn define_result_shape(state: &mut VMState) {
-    let mut method_map = HashMap::with_capacity(5);
-
-    method_map.insert(
-        "is_ok".to_string(),
-        state.new_native_method("Result::is_ok", |state, this, _args| {
-            let this = state.get_enum(this).unwrap();
-
-            NativeFnReturn::Return(TlangValue::from(this.variant == RESULT_VARIANT_OK))
-        }),
-    );
-
-    method_map.insert(
-        "is_err".to_string(),
-        state.new_native_method("Result::is_err", |state, this, _args| {
-            let this = state.get_enum(this).unwrap();
-
-            NativeFnReturn::Return(TlangValue::from(this.variant == RESULT_VARIANT_ERR))
-        }),
-    );
-
-    method_map.insert(
-        "map".to_string(),
-        state.new_native_method("Result::map", |state, this, args| {
-            let func = args[0];
-            let this = state.get_enum(this).unwrap();
-
-            if this.variant == RESULT_VARIANT_ERR {
-                let err_val = this.field_values[0];
-                let err = state.new_enum(
-                    state.heap.builtin_shapes.result,
-                    RESULT_VARIANT_ERR,
-                    vec![err_val],
-                );
-                return NativeFnReturn::Return(err);
-            }
-
-            let inner = this.field_values[0];
-            let mapped = state.call(func, &[inner]);
-            let ok = state.new_enum(
-                state.heap.builtin_shapes.result,
-                RESULT_VARIANT_OK,
-                vec![mapped],
-            );
-            NativeFnReturn::Return(ok)
-        }),
-    );
-
-    method_map.insert(
-        "unwrap".to_string(),
-        state.new_native_method("Result::unwrap", |state, this, _args| {
-            let this = state.get_enum(this).unwrap();
-
-            if this.variant == RESULT_VARIANT_ERR {
-                state.panic("Called unwrap on Err".to_string());
-            } else {
-                NativeFnReturn::Return(this.field_values[0])
-            }
-        }),
-    );
-
-    state
-        .heap
-        .builtin_shapes
-        .get_result_shape_mut()
-        .set_methods(method_map);
+#[native_method("Result")]
+fn is_ok(vm: &mut VMState, this: TlangValue) -> TlangValue {
+    TlangValue::from(vm.get_enum(this).unwrap().variant == RESULT_OK)
 }
+
+#[native_method("Result")]
+fn is_err(vm: &mut VMState, this: TlangValue) -> TlangValue {
+    TlangValue::from(vm.get_enum(this).unwrap().variant == RESULT_ERR)
+}
+
+#[native_method("Result")]
+fn map(vm: &mut VMState, this: TlangValue, func: TlangValue) -> TlangValue {
+    let e = vm.get_enum(this).unwrap();
+
+    if e.variant == RESULT_ERR {
+        let err_val = e.field_values[0];
+        return vm.new_enum(vm.heap.builtin_shapes.result, RESULT_ERR, vec![err_val]);
+    }
+
+    let inner = e.field_values[0];
+    let mapped = vm.call(func, &[inner]);
+    vm.new_enum(vm.heap.builtin_shapes.result, RESULT_OK, vec![mapped])
+}
+
+#[native_method("Result")]
+fn unwrap(vm: &mut VMState, this: TlangValue) -> TlangValue {
+    let e = vm.get_enum(this).unwrap();
+
+    if e.variant == RESULT_ERR {
+        vm.panic("Called unwrap on Err".to_string());
+    }
+
+    e.field_values[0]
+}
+
+#[protocol_impl("Truthy", "Result")]
+fn truthy(vm: &mut VMState, this: TlangValue) -> TlangValue {
+    TlangValue::Bool(vm.get_enum(this).unwrap().variant == RESULT_OK)
+}
+
+#[protocol_impl("Functor", "Result", method = "map")]
+fn functor_map(vm: &mut VMState, this: TlangValue, func: TlangValue) -> TlangValue {
+    let e = vm.get_enum(this).unwrap();
+
+    if e.variant == RESULT_ERR {
+        let err_val = e.field_values[0];
+        return vm.new_enum(vm.heap.builtin_shapes.result, RESULT_ERR, vec![err_val]);
+    }
+
+    let inner = e.field_values[0];
+    let mapped = vm.call(func, &[inner]);
+    vm.new_enum(vm.heap.builtin_shapes.result, RESULT_OK, vec![mapped])
+}
+
+/// Legacy entry point — now a no-op since shapes and methods are registered
+/// via inventory.
+#[deprecated(note = "Use VMState::collect_native_inventory() instead")]
+pub fn define_result_shape(_state: &mut VMState) {}
 
 #[cfg(test)]
 mod tests {
@@ -99,13 +87,9 @@ mod tests {
 
     use crate::result::{RESULT_VARIANT_ERR, RESULT_VARIANT_OK};
 
-    use super::define_result_shape;
-    use crate::protocols::define_builtin_protocols;
-
     fn vm_state() -> VMState {
         let mut state = VMState::new();
-        define_result_shape(&mut state);
-        define_builtin_protocols(&mut state);
+        state.collect_native_inventory();
         state
     }
 
