@@ -50,7 +50,7 @@ pub(crate) fn parse_native_method_attr(attr: TokenStream) -> NativeMethodMeta {
 
 pub(crate) fn generate_native_method(
     input_fn: &syn::ItemFn,
-    meta: NativeMethodMeta,
+    meta: &NativeMethodMeta,
 ) -> TokenStream {
     use syn::{FnArg, PatType};
 

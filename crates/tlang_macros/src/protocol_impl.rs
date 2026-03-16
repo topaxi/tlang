@@ -66,7 +66,7 @@ pub(crate) fn parse_protocol_impl_attr(attr: TokenStream) -> ProtocolImplMeta {
 
 pub(crate) fn generate_protocol_impl(
     input_fn: &syn::ItemFn,
-    meta: ProtocolImplMeta,
+    meta: &ProtocolImplMeta,
 ) -> TokenStream {
     use syn::{FnArg, PatType};
 
