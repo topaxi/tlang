@@ -351,9 +351,12 @@ module.exports = grammar({
     _literal: ($) => choice($.number, $.string, $.tagged_string, $.boolean_literal),
 
     tagged_string: ($) =>
-      seq(
-        field('tag', alias($.identifier, $.tagged_string_tag)),
-        field('content', $.string),
+      prec.dynamic(
+        1,
+        seq(
+          field('tag', alias($.identifier, $.tagged_string_tag)),
+          field('content', $.string),
+        ),
       ),
 
     boolean_literal: (_) => choice('true', 'false'),

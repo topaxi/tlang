@@ -1877,30 +1877,34 @@
       ]
     },
     "tagged_string": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "FIELD",
-          "name": "tag",
-          "content": {
-            "type": "ALIAS",
+      "type": "PREC_DYNAMIC",
+      "value": 1,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "tag",
+            "content": {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "identifier"
+              },
+              "named": true,
+              "value": "tagged_string_tag"
+            }
+          },
+          {
+            "type": "FIELD",
+            "name": "content",
             "content": {
               "type": "SYMBOL",
-              "name": "identifier"
-            },
-            "named": true,
-            "value": "tagged_string_tag"
+              "name": "string"
+            }
           }
-        },
-        {
-          "type": "FIELD",
-          "name": "content",
-          "content": {
-            "type": "SYMBOL",
-            "name": "string"
-          }
-        }
-      ]
+        ]
+      }
     },
     "boolean_literal": {
       "type": "CHOICE",
@@ -2479,6 +2483,14 @@
                     {
                       "type": "STRING",
                       "value": "!="
+                    },
+                    {
+                      "type": "STRING",
+                      "value": "=~"
+                    },
+                    {
+                      "type": "STRING",
+                      "value": "!~"
                     },
                     {
                       "type": "STRING",

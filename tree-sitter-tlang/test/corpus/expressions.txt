@@ -114,6 +114,67 @@ x == y
       right: (identifier))))
 
 ================================================================================
+Match operators
+================================================================================
+
+x =~ re"\d+"
+x !~ re"^\d+$"
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (tagged_string
+        tag: (tagged_string_tag)
+        content: (string))))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (tagged_string
+        tag: (tagged_string_tag)
+        content: (string)))))
+
+================================================================================
+Tagged string literal
+================================================================================
+
+re"\d+"
+
+---
+
+(source_file
+  (expression_statement
+    (tagged_string
+      tag: (tagged_string_tag)
+      content: (string))))
+
+================================================================================
+Pipeline with tagged string
+================================================================================
+
+"hello" |> re"\s+".replace_all(" ") |> log()
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (string)
+        right: (call_expression
+          callee: (member_expression
+            object: (tagged_string
+              tag: (tagged_string_tag)
+              content: (string))
+            property: (property_name (identifier)))
+          arguments: (argument_list (string))))
+      right: (call_expression
+        callee: (identifier)
+        arguments: (argument_list)))))
+
+================================================================================
 Pipeline operator
 ================================================================================
 
