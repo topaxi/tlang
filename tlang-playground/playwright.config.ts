@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const isCi = !!process.env['CI'];
 const isGithubActions = !!process.env['GITHUB_ACTIONS'];
+const baseURL = 'http://localhost:4173/tlang';
 
 export default defineConfig({
   testDir: './e2e',
@@ -15,7 +16,7 @@ export default defineConfig({
   },
   reporter: isGithubActions ? 'github' : 'line',
   use: {
-    baseURL: 'http://localhost:4173/tlang',
+    baseURL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -26,7 +27,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run test:e2e:webserver',
-    url: 'http://localhost:4173/tlang',
+    url: baseURL,
     reuseExistingServer: !isCi,
     timeout: isCi ? 10_000 : 60_000,
   },
