@@ -50,3 +50,12 @@ wasm-bindgen-test = "0.3"
 
 [lints]
 workspace = true
+
+[package.metadata.wasm-pack.profile.dev.wasm-bindgen]
+split-linked-modules = true
+
+[package.metadata.wasm-pack.profile.profiling.wasm-bindgen]
+split-linked-modules = true
+
+[package.metadata.wasm-pack.profile.release.wasm-bindgen]
+split-linked-modules = true
