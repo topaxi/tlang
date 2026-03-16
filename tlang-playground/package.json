@@ -9,7 +9,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "CI=1 playwright test"
+    "test:e2e": "CI=1 playwright test",
+    "pretest:e2e:webserver": "test -d dist || npm run build",
+    "test:e2e:webserver": "node e2e/serve.js"
   },
   "sideEffects": [
     "src/components/**/*"

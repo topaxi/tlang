@@ -25,7 +25,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'node e2e/serve.js',
+    command: 'npm run test:e2e:webserver',
     url: 'http://localhost:4173/tlang',
     reuseExistingServer: !isCi,
     timeout: isCi ? 10_000 : 60_000,
