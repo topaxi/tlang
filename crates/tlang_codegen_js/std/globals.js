@@ -1,4 +1,4 @@
-/* eslint-disable no-undef, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 function panic(msg) {
   throw new Error(msg);
 }

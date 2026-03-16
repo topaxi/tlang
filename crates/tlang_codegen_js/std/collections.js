@@ -1,3 +1,4 @@
+/* eslint-disable no-undef, @typescript-eslint/no-unused-vars */
 $Functor ??= {};
 $Functor.List ??= {};
 $Functor.List.map ??= function (self, f) {
