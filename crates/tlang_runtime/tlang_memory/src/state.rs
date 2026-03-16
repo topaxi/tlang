@@ -597,9 +597,17 @@ impl VMState {
         }
 
         // 4. Register methods (highest priority wins per type+method key).
+        // Sort by (key ASC, priority DESC) so dedup_by (which keeps the first of each group)
+        // retains the highest-priority entry.
         let mut method_defs: Vec<&NativeMethodDef> =
             inventory::iter::<NativeMethodDef>.into_iter().collect();
-        method_defs.sort_by_key(|d| (d.type_name(), d.method_name(), d.priority()));
+        method_defs.sort_by_key(|d| {
+            (
+                d.type_name(),
+                d.method_name(),
+                std::cmp::Reverse(d.priority()),
+            )
+        });
         method_defs
             .dedup_by(|a, b| a.type_name() == b.type_name() && a.method_name() == b.method_name());
         for def in &method_defs {
@@ -610,7 +618,14 @@ impl VMState {
         let mut impl_defs: Vec<&NativeProtocolImplDef> = inventory::iter::<NativeProtocolImplDef>
             .into_iter()
             .collect();
-        impl_defs.sort_by_key(|d| (d.protocol(), d.type_name(), d.method(), d.priority()));
+        impl_defs.sort_by_key(|d| {
+            (
+                d.protocol(),
+                d.type_name(),
+                d.method(),
+                std::cmp::Reverse(d.priority()),
+            )
+        });
         impl_defs.dedup_by(|a, b| {
             a.protocol() == b.protocol()
                 && a.type_name() == b.type_name()
