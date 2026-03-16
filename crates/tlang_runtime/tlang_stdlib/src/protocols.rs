@@ -31,8 +31,3 @@ pub fn map(state: &mut VMState, iterable: TlangValue, func: TlangValue) -> Tlang
         type_name,
     ))
 }
-
-/// Legacy entry point — now a no-op since protocols and implementations are
-/// registered via inventory.
-#[deprecated(note = "Use VMState::collect_native_inventory() instead")]
-pub fn define_builtin_protocols(_state: &mut VMState) {}

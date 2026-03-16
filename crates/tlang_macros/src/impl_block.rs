@@ -166,7 +166,8 @@ pub(crate) fn generate_impl_methods(
                     .enumerate()
                     .map(|(i, ident)| {
                         let idx = i + 1; // args[0] is `this`
-                        quote! { let #ident = args[#idx]; }
+                        // Use .get() so trailing args can be omitted (treated as Nil).
+                        quote! { let #ident = args.get(#idx).copied().unwrap_or(tlang_memory::TlangValue::Nil); }
                     })
                     .collect();
 

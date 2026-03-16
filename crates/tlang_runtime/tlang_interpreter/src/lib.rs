@@ -21,19 +21,13 @@ pub use tlang_memory::{
 
 #[cfg(feature = "stdlib")]
 pub fn init_stdlib(_state: &mut VMState) {
-    // All stdlib registration is now handled by inventory-driven
+    // All stdlib registration is handled by inventory-driven
     // `VMState::collect_native_inventory()` called from `VM::new()`.
     //
-    // This reference ensures the tlang_stdlib crate (and its submodules) are
-    // linked in so that inventory::submit! items are collected by the linker.
-    #[allow(deprecated)]
-    let _ = (
-        tlang_stdlib::option::define_option_shape as fn(&mut VMState),
-        tlang_stdlib::result::define_result_shape as fn(&mut VMState),
-        tlang_stdlib::collections::define_list_shape as fn(&mut VMState),
-        tlang_stdlib::regex::define_regex_shape as fn(&mut VMState),
-        tlang_stdlib::protocols::define_builtin_protocols as fn(&mut VMState),
-    );
+    // Referencing force_link ensures the linker includes all stdlib module
+    // object files. Without this, `inventory::submit!` items from modules
+    // with no other directly-referenced symbols would be silently dropped.
+    let _ = tlang_stdlib::force_link as *const () as usize;
 }
 
 #[cfg(not(feature = "stdlib"))]
