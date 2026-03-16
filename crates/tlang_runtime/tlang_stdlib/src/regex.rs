@@ -35,7 +35,7 @@ fn build_regex(state: &mut VMState, this: TlangValue) -> Regex {
     Regex::new(&pattern).unwrap_or_else(|e| state.panic(format!("Invalid regex: {e}")))
 }
 
-pub(crate) fn regex_match(state: &mut VMState, regex_val: TlangValue, haystack: &str) -> bool {
+pub fn regex_match(state: &mut VMState, regex_val: TlangValue, haystack: &str) -> bool {
     let re = build_regex(state, regex_val);
     re.is_match(haystack)
 }

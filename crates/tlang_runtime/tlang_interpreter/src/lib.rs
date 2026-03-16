@@ -24,10 +24,12 @@ pub fn init_stdlib(_state: &mut VMState) {
     // All stdlib registration is handled by inventory-driven
     // `VMState::collect_native_inventory()` called from `VM::new()`.
     //
-    // Referencing force_link ensures the linker includes all stdlib module
+    // Calling force_link ensures the linker includes all stdlib module
     // object files. Without this, `inventory::submit!` items from modules
     // with no other directly-referenced symbols would be silently dropped.
-    let _ = tlang_stdlib::force_link as *const () as usize;
+    // Note: calling (not just taking a pointer) is necessary so the optimizer
+    // does not elide the reference entirely in WASM release builds.
+    tlang_stdlib::force_link();
 }
 
 #[cfg(not(feature = "stdlib"))]

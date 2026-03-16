@@ -72,7 +72,7 @@ pub(crate) fn parse_impl_blocks(
 pub(crate) fn parse_impl_method(input: ParseStream) -> syn::Result<ImplMethod> {
     // Optional `apply` keyword: `apply fn method(...)` registers the method
     // both as a protocol impl and as a direct shape method.
-    let apply = if input.peek(Ident) && input.fork().parse::<Ident>()?.to_string() == "apply" {
+    let apply = if input.peek(Ident) && input.fork().parse::<Ident>()? == "apply" {
         input.parse::<Ident>()?; // consume `apply`
         true
     } else {
