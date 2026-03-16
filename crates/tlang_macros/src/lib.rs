@@ -4,6 +4,7 @@ use syn::parse_macro_input;
 mod define_enum;
 mod define_protocol;
 mod define_struct;
+mod impl_block;
 mod native_fn;
 mod native_method;
 mod protocol_impl;
