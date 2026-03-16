@@ -1,9 +1,24 @@
+use tlang_macros::native_fn;
 use tlang_memory::value::object::{TlangObjectKind, TlangStruct};
 use tlang_memory::{NativeFnReturn, TlangValue, VMState};
 
 use crate::option::{OPTION_VARIANT_NONE, OPTION_VARIANT_SOME};
 use crate::regex::regex_test;
 use crate::result::{RESULT_VARIANT_ERR, RESULT_VARIANT_OK};
+
+#[allow(clippy::missing_panics_doc)]
+#[native_fn(name = "map")]
+pub fn map(state: &mut VMState, iterable: TlangValue, func: TlangValue) -> TlangValue {
+    let type_name = state.type_name_of(iterable);
+    if let Some(fn_value) = state.get_protocol_impl("Functor", type_name, "map") {
+        return state.call(fn_value, &[iterable, func]);
+    }
+
+    state.panic(format!(
+        "No implementation of `Functor::map` for type `{}`",
+        type_name,
+    ))
+}
 
 /// # Panics
 #[allow(clippy::too_many_lines)]

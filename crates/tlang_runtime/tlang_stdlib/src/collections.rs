@@ -14,20 +14,6 @@ pub fn len(state: &mut VMState, iterable: TlangValue) -> TlangValue {
 }
 
 #[allow(clippy::missing_panics_doc)]
-#[native_fn(name = "map")]
-pub fn map(state: &mut VMState, iterable: TlangValue, func: TlangValue) -> TlangValue {
-    let type_name = state.type_name_of(iterable);
-    if let Some(fn_value) = state.get_protocol_impl("Functor", type_name, "map") {
-        return state.call(fn_value, &[iterable, func]);
-    }
-
-    state.panic(format!(
-        "No implementation of `Functor::map` for type `{}`",
-        type_name,
-    ))
-}
-
-#[allow(clippy::missing_panics_doc)]
 pub fn define_list_shape(state: &mut VMState) {
     define_list_iterator_shape(state);
 
