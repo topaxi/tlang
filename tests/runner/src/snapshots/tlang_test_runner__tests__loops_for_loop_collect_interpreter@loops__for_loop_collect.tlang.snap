@@ -1,7 +1,7 @@
 ---
 source: tests/runner/src/main.rs
 description: "Backend: interpreter"
-expression: apply_redactions(&output)
+expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/loops/for_loop_collect.tlang
 ---
 [2, 4, 6, 8, 10]

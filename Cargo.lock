@@ -1869,6 +1869,7 @@ name = "tlang_macros"
 version = "0.1.0"
 dependencies = [
  "inventory",
+ "proc-macro2",
  "quote",
  "syn",
 ]

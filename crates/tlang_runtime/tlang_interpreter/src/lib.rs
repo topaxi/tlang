@@ -14,14 +14,14 @@ use tlang_memory::value::object::TlangEnum;
 use tlang_memory::{NativeFnReturn, Resolver, VMState, execution, scope};
 
 pub use tlang_memory::NativeFnDef;
+pub use tlang_memory::{
+    NativeEnumDef, NativeEnumVariantDef, NativeMethodDef, NativeProtocolDef, NativeProtocolImplDef,
+    NativeStructDef,
+};
 
 #[cfg(feature = "stdlib")]
-pub fn init_stdlib(state: &mut VMState) {
-    tlang_stdlib::option::define_option_shape(state);
-    tlang_stdlib::result::define_result_shape(state);
-    tlang_stdlib::collections::define_list_shape(state);
-    tlang_stdlib::regex::define_regex_shape(state);
-    tlang_stdlib::protocols::define_builtin_protocols(state);
+pub fn init_stdlib(_state: &mut VMState) {
+    tlang_stdlib::init();
 }
 
 #[cfg(not(feature = "stdlib"))]

@@ -1,111 +1,80 @@
-use std::collections::HashMap;
+use tlang_macros::{define_enum, native_fn};
+use tlang_memory::{TlangValue, VMState};
 
-use tlang_macros::native_fn;
-use tlang_memory::{NativeFnReturn, TlangValue, VMState};
+define_enum! {
+    enum Result {
+        Ok(value),
+        Err(error),
+    }
 
-pub const RESULT_VARIANT_OK: usize = 0;
-pub const RESULT_VARIANT_ERR: usize = 1;
+    impl Result {
+        fn is_ok(this) {
+            TlangValue::from(vm.get_enum(this).unwrap().variant == RESULT_OK)
+        }
+
+        fn is_err(this) {
+            TlangValue::from(vm.get_enum(this).unwrap().variant == RESULT_ERR)
+        }
+
+        fn map(this, func) {
+            let e = vm.get_enum(this).unwrap();
+            if e.variant == RESULT_ERR {
+                let err_val = e.field_values[0];
+                return vm.new_enum(vm.heap.builtin_shapes.result, RESULT_ERR, vec![err_val]);
+            }
+            let inner = e.field_values[0];
+            let mapped = vm.call(func, &[inner]);
+            vm.new_enum(vm.heap.builtin_shapes.result, RESULT_OK, vec![mapped])
+        }
+
+        fn unwrap(this) {
+            let e = vm.get_enum(this).unwrap();
+            if e.variant == RESULT_ERR {
+                vm.panic("Called unwrap on Err".to_string());
+            }
+            e.field_values[0]
+        }
+    }
+
+    impl Truthy for Result {
+        fn truthy(this) {
+            TlangValue::Bool(vm.get_enum(this).unwrap().variant == RESULT_OK)
+        }
+    }
+
+    impl Functor for Result {
+        fn map(this, func) {
+            let e = vm.get_enum(this).unwrap();
+            if e.variant == RESULT_ERR {
+                let err_val = e.field_values[0];
+                return vm.new_enum(vm.heap.builtin_shapes.result, RESULT_ERR, vec![err_val]);
+            }
+            let inner = e.field_values[0];
+            let mapped = vm.call(func, &[inner]);
+            vm.new_enum(vm.heap.builtin_shapes.result, RESULT_OK, vec![mapped])
+        }
+    }
+}
 
 #[native_fn(name = "Result::Ok")]
 pub fn new_result_ok(state: &mut VMState, value: TlangValue) -> TlangValue {
-    state.new_enum(
-        state.heap.builtin_shapes.result,
-        RESULT_VARIANT_OK,
-        vec![value],
-    )
+    state.new_enum(state.heap.builtin_shapes.result, RESULT_OK, vec![value])
 }
 
 #[native_fn(name = "Result::Err")]
 pub fn new_result_err(state: &mut VMState, err: TlangValue) -> TlangValue {
-    state.new_enum(
-        state.heap.builtin_shapes.result,
-        RESULT_VARIANT_ERR,
-        vec![err],
-    )
-}
-
-#[allow(clippy::missing_panics_doc)]
-pub fn define_result_shape(state: &mut VMState) {
-    let mut method_map = HashMap::with_capacity(5);
-
-    method_map.insert(
-        "is_ok".to_string(),
-        state.new_native_method("Result::is_ok", |state, this, _args| {
-            let this = state.get_enum(this).unwrap();
-
-            NativeFnReturn::Return(TlangValue::from(this.variant == RESULT_VARIANT_OK))
-        }),
-    );
-
-    method_map.insert(
-        "is_err".to_string(),
-        state.new_native_method("Result::is_err", |state, this, _args| {
-            let this = state.get_enum(this).unwrap();
-
-            NativeFnReturn::Return(TlangValue::from(this.variant == RESULT_VARIANT_ERR))
-        }),
-    );
-
-    method_map.insert(
-        "map".to_string(),
-        state.new_native_method("Result::map", |state, this, args| {
-            let func = args[0];
-            let this = state.get_enum(this).unwrap();
-
-            if this.variant == RESULT_VARIANT_ERR {
-                let err_val = this.field_values[0];
-                let err = state.new_enum(
-                    state.heap.builtin_shapes.result,
-                    RESULT_VARIANT_ERR,
-                    vec![err_val],
-                );
-                return NativeFnReturn::Return(err);
-            }
-
-            let inner = this.field_values[0];
-            let mapped = state.call(func, &[inner]);
-            let ok = state.new_enum(
-                state.heap.builtin_shapes.result,
-                RESULT_VARIANT_OK,
-                vec![mapped],
-            );
-            NativeFnReturn::Return(ok)
-        }),
-    );
-
-    method_map.insert(
-        "unwrap".to_string(),
-        state.new_native_method("Result::unwrap", |state, this, _args| {
-            let this = state.get_enum(this).unwrap();
-
-            if this.variant == RESULT_VARIANT_ERR {
-                state.panic("Called unwrap on Err".to_string());
-            } else {
-                NativeFnReturn::Return(this.field_values[0])
-            }
-        }),
-    );
-
-    state
-        .heap
-        .builtin_shapes
-        .get_result_shape_mut()
-        .set_methods(method_map);
+    state.new_enum(state.heap.builtin_shapes.result, RESULT_ERR, vec![err])
 }
 
 #[cfg(test)]
 mod tests {
     use tlang_memory::{TlangValue, VMState};
 
-    use crate::result::{RESULT_VARIANT_ERR, RESULT_VARIANT_OK};
-
-    use super::define_result_shape;
-    use crate::protocols::define_builtin_protocols;
+    use crate::result::{RESULT_ERR, RESULT_OK};
 
     fn vm_state() -> VMState {
         let mut state = VMState::new();
-        define_result_shape(&mut state);
-        define_builtin_protocols(&mut state);
+        state.collect_native_inventory();
         state
     }
 
@@ -114,12 +83,10 @@ mod tests {
         let mut state = vm_state();
         let result_shape = state.heap.builtin_shapes.result;
 
-        // Result::Ok(truthy value) should be truthy
-        let obj = state.new_enum(result_shape, RESULT_VARIANT_OK, vec![TlangValue::I64(42)]);
+        let obj = state.new_enum(result_shape, RESULT_OK, vec![TlangValue::I64(42)]);
         assert!(state.is_truthy(obj), "Result::Ok(42) should be truthy");
 
-        // Result::Ok(falsy value) should be truthy too
-        let obj = state.new_enum(result_shape, RESULT_VARIANT_OK, vec![TlangValue::I64(0)]);
+        let obj = state.new_enum(result_shape, RESULT_OK, vec![TlangValue::I64(0)]);
         assert!(state.is_truthy(obj), "Result::Ok(0) should be truthy");
     }
 
@@ -128,8 +95,7 @@ mod tests {
         let mut state = vm_state();
         let result_shape = state.heap.builtin_shapes.result;
 
-        // Result::Err should be falsy (variant 1 = Err)
-        let obj = state.new_enum(result_shape, RESULT_VARIANT_ERR, vec![TlangValue::I64(42)]);
+        let obj = state.new_enum(result_shape, RESULT_ERR, vec![TlangValue::I64(42)]);
         assert!(!state.is_truthy(obj), "Result::Err should be falsy");
     }
 }

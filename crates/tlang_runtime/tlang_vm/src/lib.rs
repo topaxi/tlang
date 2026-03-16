@@ -4,7 +4,7 @@ use log::debug;
 use tlang_hir as hir;
 use tlang_interpreter::Interpreter;
 use tlang_memory::prelude::*;
-use tlang_memory::{NativeFnDef, VMState};
+use tlang_memory::{NativeFnDef, NativeProtocolDef, VMState};
 use tlang_symbols::SymbolType;
 
 pub struct VM {
@@ -29,22 +29,30 @@ impl VM {
             .collect()
     }
 
-    const fn builtin_const_symbols() -> &'static [(&'static str, SymbolType)] {
+    const fn builtin_static_symbols() -> &'static [(&'static str, SymbolType)] {
         &[
             ("Option", SymbolType::Enum),
             ("Option::None", SymbolType::EnumVariant(0)),
             ("Result", SymbolType::Enum),
-            ("Functor", SymbolType::Protocol),
-            ("Functor::map", SymbolType::ProtocolMethod(2)),
-            ("Iterable", SymbolType::Protocol),
-            ("Iterable::iter", SymbolType::ProtocolMethod(1)),
-            ("Iterator", SymbolType::Protocol),
-            ("Iterator::next", SymbolType::ProtocolMethod(1)),
-            ("Match", SymbolType::Protocol),
-            ("Match::matches", SymbolType::ProtocolMethod(2)),
             ("Regex", SymbolType::Struct),
             ("math::pi", SymbolType::Variable),
         ]
+    }
+
+    fn builtin_protocol_symbols() -> Vec<(String, SymbolType)> {
+        let mut symbols = Vec::new();
+
+        for def in inventory::iter::<NativeProtocolDef> {
+            symbols.push((def.name().to_string(), SymbolType::Protocol));
+            for &(method, arity) in def.methods() {
+                symbols.push((
+                    format!("{}::{}", def.name(), method),
+                    SymbolType::ProtocolMethod(arity),
+                ));
+            }
+        }
+
+        symbols
     }
 
     pub fn builtin_symbols() -> Vec<(String, SymbolType, Option<usize>)> {
@@ -73,7 +81,7 @@ impl VM {
             .collect();
 
         // Const symbols: value-producing ones each get a slot
-        let const_syms: Vec<(String, SymbolType, Option<usize>)> = Self::builtin_const_symbols()
+        let const_syms: Vec<(String, SymbolType, Option<usize>)> = Self::builtin_static_symbols()
             .iter()
             .map(|(name, ty)| {
                 let slot = match ty {
@@ -88,10 +96,18 @@ impl VM {
             })
             .collect();
 
+        // Protocol symbols: derived from inventory (no slots)
+        let protocol_syms: Vec<(String, SymbolType, Option<usize>)> =
+            Self::builtin_protocol_symbols()
+                .into_iter()
+                .map(|(name, ty)| (name, ty, None))
+                .collect();
+
         module_syms
             .into_iter()
             .chain(fn_syms)
             .chain(const_syms)
+            .chain(protocol_syms)
             .collect()
     }
 
@@ -111,17 +127,10 @@ impl VM {
                 .filter_map(|(name, _, slot)| slot.map(|i| (name.as_str(), i))),
         );
 
-        Self::init_stdlib(&mut state);
+        tlang_interpreter::init_stdlib(&mut state);
 
-        // Register inventory native functions sorted by name (same order as builtin_symbols).
-        let mut fn_defs: Vec<&NativeFnDef> = inventory::iter::<NativeFnDef>.into_iter().collect();
-        fn_defs.sort_by_key(|def| def.name());
-        for native_fn_def in &fn_defs {
-            let name = native_fn_def.name();
-            let fn_object = state.new_native_fn(&name, native_fn_def.fn_ptr());
-            debug!("Defining global native function: {name}");
-            state.set_global(name, fn_object);
-        }
+        // Collect and register all inventory-submitted native definitions.
+        state.collect_native_inventory();
 
         state.set_global(
             "math::pi".to_string(),
@@ -130,14 +139,6 @@ impl VM {
 
         VM { state }
     }
-
-    #[cfg(feature = "stdlib")]
-    fn init_stdlib(state: &mut VMState) {
-        tlang_interpreter::init_stdlib(state);
-    }
-
-    #[cfg(not(feature = "stdlib"))]
-    fn init_stdlib(_state: &mut VMState) {}
 
     pub fn state(&self) -> &VMState {
         &self.state

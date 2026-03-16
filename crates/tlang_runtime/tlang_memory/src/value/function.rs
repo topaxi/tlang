@@ -25,3 +25,9 @@ impl NativeFnReturn {
         }
     }
 }
+
+impl From<TlangValue> for NativeFnReturn {
+    fn from(value: TlangValue) -> Self {
+        NativeFnReturn::Return(value)
+    }
+}

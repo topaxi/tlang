@@ -14,6 +14,7 @@ pub struct BuiltinShapes {
     pub regex: ShapeKey,
 
     store: Slab<TlangShape>,
+    shapes_by_name: HashMap<String, ShapeKey>,
 }
 
 impl Default for BuiltinShapes {
@@ -23,12 +24,6 @@ impl Default for BuiltinShapes {
 }
 
 impl BuiltinShapes {
-    pub const OPTION_VARIANT_SOME: usize = 0;
-    pub const OPTION_VARIANT_NONE: usize = 1;
-
-    pub const RESULT_VARIANT_OK: usize = 0;
-    pub const RESULT_VARIANT_ERR: usize = 1;
-
     pub fn new() -> Self {
         let mut store = Slab::with_capacity(5);
 
@@ -38,6 +33,13 @@ impl BuiltinShapes {
         let list_iterator = Self::create_list_iterator_shape(&mut store);
         let regex = Self::create_regex_shape(&mut store);
 
+        let mut shapes_by_name = HashMap::with_capacity(5);
+        shapes_by_name.insert("Option".to_string(), option);
+        shapes_by_name.insert("Result".to_string(), result);
+        shapes_by_name.insert("List".to_string(), list);
+        shapes_by_name.insert("ListIterator".to_string(), list_iterator);
+        shapes_by_name.insert("Regex".to_string(), regex);
+
         Self {
             list,
             list_iterator,
@@ -45,6 +47,7 @@ impl BuiltinShapes {
             result,
             regex,
             store,
+            shapes_by_name,
         }
     }
 
@@ -182,5 +185,39 @@ impl BuiltinShapes {
         self.get_shape_mut(self.regex)
             .and_then(|s| s.get_struct_shape_mut())
             .unwrap()
+    }
+
+    // ── Name-based lookup & registration ────────────────────────────────
+
+    /// Look up a shape by its type name (e.g. "Option", "List").
+    pub fn lookup(&self, name: &str) -> Option<ShapeKey> {
+        self.shapes_by_name.get(name).copied()
+    }
+
+    /// Register a shape under a name, making it discoverable via `lookup`.
+    pub fn register(&mut self, key: ShapeKey, name: &str) {
+        self.shapes_by_name.insert(name.to_string(), key);
+    }
+
+    /// Insert a new struct shape into the store and register it by name.
+    pub fn insert_struct_shape(&mut self, name: String, fields: Vec<String>) -> ShapeKey {
+        let key = ShapeKey::new_native(self.store.insert(TlangShape::new_struct_shape(
+            name.clone(),
+            fields,
+            HashMap::new(),
+        )));
+        self.shapes_by_name.insert(name, key);
+        key
+    }
+
+    /// Insert a new enum shape into the store and register it by name.
+    pub fn insert_enum_shape(&mut self, name: String, variants: Vec<TlangEnumVariant>) -> ShapeKey {
+        let key = ShapeKey::new_native(self.store.insert(TlangShape::new_enum_shape(
+            name.clone(),
+            variants,
+            HashMap::new(),
+        )));
+        self.shapes_by_name.insert(name, key);
+        key
     }
 }
