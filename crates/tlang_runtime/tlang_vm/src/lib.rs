@@ -127,7 +127,7 @@ impl VM {
                 .filter_map(|(name, _, slot)| slot.map(|i| (name.as_str(), i))),
         );
 
-        Self::init_stdlib(&mut state);
+        tlang_interpreter::init_stdlib(&mut state);
 
         // Collect and register all inventory-submitted native definitions.
         state.collect_native_inventory();
@@ -139,14 +139,6 @@ impl VM {
 
         VM { state }
     }
-
-    #[cfg(feature = "stdlib")]
-    fn init_stdlib(state: &mut VMState) {
-        tlang_interpreter::init_stdlib(state);
-    }
-
-    #[cfg(not(feature = "stdlib"))]
-    fn init_stdlib(_state: &mut VMState) {}
 
     pub fn state(&self) -> &VMState {
         &self.state
