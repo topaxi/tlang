@@ -44,6 +44,11 @@ pub(crate) fn regex_match(state: &mut VMState, regex_val: TlangValue, haystack: 
 /// Constructs a `Regex` from a tagged string literal.  The parser desugars
 /// `re"prefix{x}suffix"` into `re(["prefix", "suffix"], [x])`, so the function
 /// interleaves the parts and stringified values to build the full pattern.
+///
+/// # Panics
+///
+/// Panics if `parts` is not a list, `values` is not a list, or any element of
+/// `parts` is not a string.
 #[native_fn(name = "re")]
 pub fn re(state: &mut VMState, parts: TlangValue, values: TlangValue) -> TlangValue {
     let parts_list = state
