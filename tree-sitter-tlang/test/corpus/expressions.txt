@@ -128,13 +128,17 @@ x !~ re"^\d+$"
       left: (identifier)
       right: (tagged_string
         tag: (tagged_string_tag)
-        content: (string))))
+        (tagged_string_start)
+        (tagged_string_content)
+        (tagged_string_end))))
   (expression_statement
     (binary_expression
       left: (identifier)
       right: (tagged_string
         tag: (tagged_string_tag)
-        content: (string)))))
+        (tagged_string_start)
+        (tagged_string_content)
+        (tagged_string_end)))))
 
 ================================================================================
 Tagged string literal
@@ -148,7 +152,9 @@ re"\d+"
   (expression_statement
     (tagged_string
       tag: (tagged_string_tag)
-      content: (string))))
+      (tagged_string_start)
+      (tagged_string_content)
+      (tagged_string_end))))
 
 ================================================================================
 Pipeline with tagged string
@@ -167,12 +173,86 @@ Pipeline with tagged string
           callee: (member_expression
             object: (tagged_string
               tag: (tagged_string_tag)
-              content: (string))
+              (tagged_string_start)
+              (tagged_string_content)
+              (tagged_string_end))
             property: (property_name (identifier)))
           arguments: (argument_list (string))))
       right: (call_expression
         callee: (identifier)
         arguments: (argument_list)))))
+
+================================================================================
+Tagged string with interpolation
+================================================================================
+
+html"<div>{name}</div>"
+
+---
+
+(source_file
+  (expression_statement
+    (tagged_string
+      tag: (tagged_string_tag)
+      (tagged_string_start)
+      (tagged_string_content)
+      (interpolation (identifier))
+      (tagged_string_content)
+      (tagged_string_end))))
+
+================================================================================
+Tagged string with multiple interpolations
+================================================================================
+
+sql"SELECT {cols} FROM {table}"
+
+---
+
+(source_file
+  (expression_statement
+    (tagged_string
+      tag: (tagged_string_tag)
+      (tagged_string_start)
+      (tagged_string_content)
+      (interpolation (identifier))
+      (tagged_string_content)
+      (interpolation (identifier))
+      (tagged_string_end))))
+
+================================================================================
+Tagged string with expression interpolation
+================================================================================
+
+html"{x + 1}"
+
+---
+
+(source_file
+  (expression_statement
+    (tagged_string
+      tag: (tagged_string_tag)
+      (tagged_string_start)
+      (interpolation
+        (binary_expression
+          left: (identifier)
+          right: (number)))
+      (tagged_string_end))))
+
+================================================================================
+Tagged string with regex quantifier (no interpolation)
+================================================================================
+
+re"\d{2,5}"
+
+---
+
+(source_file
+  (expression_statement
+    (tagged_string
+      tag: (tagged_string_tag)
+      (tagged_string_start)
+      (tagged_string_content)
+      (tagged_string_end))))
 
 ================================================================================
 Pipeline operator

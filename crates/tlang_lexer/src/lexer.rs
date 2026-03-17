@@ -1,6 +1,6 @@
 use tlang_ast::{
     keyword::{Keyword, is_keyword},
-    token::{Literal, Token, TokenKind},
+    token::{Literal, TaggedStringPart, Token, TokenKind},
 };
 use tlang_span::{LineColumn, Span};
 
@@ -32,6 +32,15 @@ impl Lexer<'_> {
             next_char,
             chars,
         }
+    }
+
+    /// Set the initial line/column/byte offset for span tracking.
+    /// Used by sub-parsers to produce spans relative to the original source.
+    pub fn with_offset(mut self, line: u32, column: u32, byte_offset: u32) -> Self {
+        self.current_line = line;
+        self.current_column = column;
+        self.byte_offset = byte_offset;
+        self
     }
 
     pub fn set_line_offset(&mut self, line: u32) {
@@ -214,6 +223,170 @@ impl Lexer<'_> {
 
         // Convert to char, checking for valid Unicode scalar value
         char::from_u32(code_point).ok_or_else(|| "Invalid Unicode code point".to_string())
+    }
+
+    /// Read the content of a tagged string literal, splitting it into literal text
+    /// segments and raw-source interpolation segments.
+    ///
+    /// Interpolation is triggered by `{` followed by an identifier-start character
+    /// (`[a-zA-Z_]`). This avoids ambiguity with regex quantifiers like `{2,5}`.
+    ///
+    /// Escaping:
+    /// - `{{` → literal `{`
+    /// - `\{` → literal `{`
+    /// - `}}` → literal `}`
+    /// - `\}` → literal `}`
+    ///
+    /// Inside interpolation bodies, braces are balanced and string literals are
+    /// skipped so nested tagged strings like `html"<div>{ html"<span/>" }</div>"`
+    /// work correctly.
+    fn read_tagged_string_content(&mut self, quote: char) -> Result<Vec<TaggedStringPart>, String> {
+        let mut parts = Vec::new();
+        let mut current_literal = String::new();
+
+        while self.current_char != quote && self.current_char != '\0' {
+            if self.current_char == '\\' {
+                self.advance(); // consume backslash
+                match self.current_char {
+                    '{' | '}' => {
+                        current_literal.push(self.current_char);
+                        self.advance();
+                    }
+                    '"' => {
+                        current_literal.push('"');
+                        self.advance();
+                    }
+                    '\'' => {
+                        current_literal.push('\'');
+                        self.advance();
+                    }
+                    '\\' => {
+                        current_literal.push('\\');
+                        self.advance();
+                    }
+                    'n' => {
+                        current_literal.push('\n');
+                        self.advance();
+                    }
+                    't' => {
+                        current_literal.push('\t');
+                        self.advance();
+                    }
+                    'r' => {
+                        current_literal.push('\r');
+                        self.advance();
+                    }
+                    '0' => {
+                        current_literal.push('\0');
+                        self.advance();
+                    }
+                    ch => {
+                        // Unknown escape → keep as-is (e.g. \d for regex)
+                        current_literal.push('\\');
+                        current_literal.push(ch);
+                        self.advance();
+                    }
+                }
+            } else if self.current_char == '{' {
+                if self.next_char == '{' {
+                    // `{{` → literal `{`
+                    current_literal.push('{');
+                    self.advance(); // consume first `{`
+                    self.advance(); // consume second `{`
+                } else if self.next_char.is_ascii_alphabetic() || self.next_char == '_' {
+                    // Start of interpolation
+                    parts.push(TaggedStringPart::Literal(
+                        std::mem::take(&mut current_literal).into_boxed_str(),
+                    ));
+                    self.advance(); // consume `{`
+                    let raw = self.read_interpolation_body(quote)?;
+                    parts.push(TaggedStringPart::Interpolation(raw.into_boxed_str()));
+                    // `}` already consumed by read_interpolation_body
+                } else {
+                    // Not an interpolation (e.g. `{2,5}` regex quantifier)
+                    current_literal.push('{');
+                    self.advance();
+                }
+            } else if self.current_char == '}' && self.next_char == '}' {
+                // `}}` → literal `}`
+                current_literal.push('}');
+                self.advance();
+                self.advance();
+            } else {
+                current_literal.push(self.current_char);
+                self.advance();
+            }
+        }
+
+        if self.current_char == quote {
+            self.advance(); // consume closing quote
+            // Always push trailing literal part
+            parts.push(TaggedStringPart::Literal(current_literal.into_boxed_str()));
+            Ok(parts)
+        } else {
+            Err("Unterminated tagged string literal".to_string())
+        }
+    }
+
+    /// Read the raw source text of an interpolation body between `{` and `}`.
+    /// The opening `{` must already be consumed. The closing `}` is consumed.
+    /// Handles nested braces and skips over string literals to avoid confusion
+    /// with the outer tagged string's closing quote.
+    fn read_interpolation_body(&mut self, _outer_quote: char) -> Result<String, String> {
+        let mut raw = String::new();
+        let mut depth: u32 = 1;
+
+        while depth > 0 && self.current_char != '\0' {
+            match self.current_char {
+                '{' => {
+                    depth += 1;
+                    raw.push('{');
+                    self.advance();
+                }
+                '}' => {
+                    depth -= 1;
+                    if depth > 0 {
+                        raw.push('}');
+                        self.advance();
+                    } else {
+                        self.advance(); // consume final `}`
+                    }
+                }
+                '"' | '\'' => {
+                    // Skip over a nested string literal (including tagged strings)
+                    let string_quote = self.current_char;
+                    raw.push(string_quote);
+                    self.advance();
+                    while self.current_char != string_quote && self.current_char != '\0' {
+                        if self.current_char == '\\' {
+                            raw.push('\\');
+                            self.advance();
+                            if self.current_char != '\0' {
+                                raw.push(self.current_char);
+                                self.advance();
+                            }
+                        } else {
+                            raw.push(self.current_char);
+                            self.advance();
+                        }
+                    }
+                    if self.current_char == string_quote {
+                        raw.push(string_quote);
+                        self.advance();
+                    }
+                }
+                _ => {
+                    raw.push(self.current_char);
+                    self.advance();
+                }
+            }
+        }
+
+        if depth != 0 {
+            return Err("Unterminated interpolation in tagged string".to_string());
+        }
+
+        Ok(raw)
     }
 
     fn line_column(&self) -> LineColumn {
@@ -506,8 +679,8 @@ impl Lexer<'_> {
                             let tag = identifier.to_string();
                             let quote = self.current_char;
                             self.advance(); // consume the opening quote
-                            let content = match self.read_string_literal(quote) {
-                                Ok(s) => s,
+                            let parts = match self.read_tagged_string_content(quote) {
+                                Ok(p) => p,
                                 Err(_) => {
                                     return self.token(TokenKind::Unknown, start_pos, start_lc);
                                 }
@@ -515,7 +688,7 @@ impl Lexer<'_> {
                             return self.token(
                                 TokenKind::Literal(Literal::TaggedString(
                                     tag.into_boxed_str(),
-                                    content.into_boxed_str(),
+                                    parts,
                                 )),
                                 start_pos,
                                 start_lc,

@@ -12,7 +12,6 @@ use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
 use tlang_memory::value::TlangArithmetic;
 use tlang_memory::value::object::TlangEnum;
 use tlang_memory::{NativeFnReturn, Resolver, VMState, execution, scope};
-use tlang_span::HirId;
 
 pub use tlang_memory::NativeFnDef;
 pub use tlang_memory::{
@@ -244,13 +243,7 @@ impl Interpreter {
                     ))
                 }))
             }
-            hir::ExprKind::Literal(value) => {
-                if let token::Literal::TaggedString(tag, string_value) = value.as_ref() {
-                    self.eval_tagged_string(state, expr.hir_id, tag.as_ref(), string_value.as_ref())
-                } else {
-                    EvalResult::Value(self.eval_literal(state, value))
-                }
-            }
+            hir::ExprKind::Literal(value) => EvalResult::Value(self.eval_literal(state, value)),
             hir::ExprKind::List(values) => self.eval_list_expr(state, values),
             hir::ExprKind::Dict(entries) => self.eval_dict_expr(state, entries),
             hir::ExprKind::IndexAccess(lhs, rhs) => self.eval_index_access(state, lhs, rhs),
@@ -370,24 +363,10 @@ impl Interpreter {
             token::Literal::String(value) => state.new_string(value.to_string()),
             token::Literal::Char(value) => state.new_string(value.to_string()),
             token::Literal::TaggedString(_, _) => {
-                unreachable!("TaggedString must be dispatched via eval_tagged_string")
+                unreachable!("TaggedString is expanded to a Call by the parser")
             }
             token::Literal::None => unreachable!(),
         }
-    }
-
-    fn eval_tagged_string(
-        &self,
-        state: &mut VMState,
-        hir_id: HirId,
-        tag: &str,
-        value: &str,
-    ) -> EvalResult {
-        let parts = state.get_or_create_tagged_parts(hir_id, value);
-        let tag_fn = state
-            .get_global(tag)
-            .unwrap_or_else(|| state.panic(format!("TaggedString: unknown tag function `{tag}`")));
-        EvalResult::Value(state.call(tag_fn, &[parts]))
     }
 
     fn eval_unary(&self, state: &mut VMState, op: UnaryOp, expr: &hir::Expr) -> EvalResult {

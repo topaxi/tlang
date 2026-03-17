@@ -643,7 +643,9 @@ impl HirPretty {
             Literal::UnsignedInteger(u) => self.push_string(u.to_string()),
             Literal::Integer(i) => self.push_string(i.to_string()),
             Literal::Float(f) => self.push_string(f.to_string()),
-            Literal::TaggedString(tag, s) => self.push_string(format!("{tag}{s:?}")),
+            Literal::TaggedString(_, _) => {
+                unreachable!("TaggedString is expanded to a Call by the parser")
+            }
             Literal::None => self.push_string("nil".to_string()),
         }
     }

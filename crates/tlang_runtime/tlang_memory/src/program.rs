@@ -26,11 +26,6 @@ pub struct Program {
     pub(crate) protocol_method_to_protocol: HashMap<String, String>,
     /// Protocol implementations: (protocol_name, type_name, method_name) → fn value
     pub(crate) protocol_impls: HashMap<(String, String, String), TlangValue>,
-    /// Singleton parts lists for tagged string literals, keyed by the HirId of the
-    /// `ExprKind::Literal(TaggedString)` expression node.  Mirrors the JS tagged
-    /// template literal guarantee that the strings array is the same object at every
-    /// call to the same template site.
-    pub(crate) tagged_string_parts: HashMap<HirId, TlangValue>,
 }
 
 impl Program {
@@ -46,7 +41,6 @@ impl Program {
             protocols: HashMap::new(),
             protocol_method_to_protocol: HashMap::new(),
             protocol_impls: HashMap::new(),
-            tagged_string_parts: HashMap::new(),
         }
     }
 
@@ -121,20 +115,6 @@ impl Program {
             .copied()
             .chain(self.globals.values().copied())
             .chain(self.protocol_impls.values().copied())
-            .chain(self.tagged_string_parts.values().copied())
-    }
-
-    /// Returns the cached parts list for the given tagged string call site, or inserts
-    /// a new one created by `make` and returns it.
-    pub fn get_or_insert_tagged_parts(
-        &mut self,
-        call_site: HirId,
-        make: impl FnOnce() -> TlangValue,
-    ) -> TlangValue {
-        *self
-            .tagged_string_parts
-            .entry(call_site)
-            .or_insert_with(make)
     }
 
     pub fn register_protocol(&mut self, name: String, methods: Vec<String>) {

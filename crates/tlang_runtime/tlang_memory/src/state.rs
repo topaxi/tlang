@@ -671,18 +671,6 @@ impl VMState {
         }
     }
 
-    /// Returns the singleton parts list for the given tagged-string call site,
-    /// allocating and caching it on first use.
-    pub fn get_or_create_tagged_parts(&mut self, call_site: HirId, value: &str) -> TlangValue {
-        if let Some(&cached) = self.program.tagged_string_parts.get(&call_site) {
-            return cached;
-        }
-        let s = self.new_string(value.to_string());
-        let parts = self.new_list(vec![s]);
-        self.program.tagged_string_parts.insert(call_site, parts);
-        parts
-    }
-
     // ── ExecutionContext delegates ───────────────────────────────────────────
 
     /// # Panics

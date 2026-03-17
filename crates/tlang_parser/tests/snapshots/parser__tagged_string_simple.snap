@@ -1,0 +1,163 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse! (r#\"re\"\\d+\";\"#)"
+---
+Module(
+  id: 2,
+  statements: [
+    Stmt(
+      id: 3,
+      kind: Expr(Expr(
+        id: 8,
+        kind: Call(CallExpression(
+          callee: Expr(
+            id: 5,
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "re",
+                  span: Span(
+                    start: 0,
+                    end: 7,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 7,
+                    ),
+                  ),
+                ),
+              ],
+              res: Unresolved,
+              span: Span(
+                start: 0,
+                end: 7,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 7,
+                ),
+              ),
+            )),
+            leading_comments: [],
+            trailing_comments: [],
+            span: Span(
+              start: 0,
+              end: 7,
+              start_lc: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 7,
+              ),
+            ),
+          ),
+          arguments: [
+            Expr(
+              id: 6,
+              kind: List([
+                Expr(
+                  id: 4,
+                  kind: Literal(String("\\d+")),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: 0,
+                    end: 0,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                  ),
+                ),
+              ]),
+              leading_comments: [],
+              trailing_comments: [],
+              span: Span(
+                start: 0,
+                end: 7,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 7,
+                ),
+              ),
+            ),
+            Expr(
+              id: 7,
+              kind: List([]),
+              leading_comments: [],
+              trailing_comments: [],
+              span: Span(
+                start: 0,
+                end: 7,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 7,
+                ),
+              ),
+            ),
+          ],
+        )),
+        leading_comments: [],
+        trailing_comments: [],
+        span: Span(
+          start: 0,
+          end: 7,
+          start_lc: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end_lc: LineColumn(
+            line: 0,
+            column: 7,
+          ),
+        ),
+      )),
+      span: Span(
+        start: 0,
+        end: 8,
+        start_lc: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end_lc: LineColumn(
+          line: 0,
+          column: 8,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: 0,
+    end: 8,
+    start_lc: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end_lc: LineColumn(
+      line: 0,
+      column: 8,
+    ),
+  ),
+)

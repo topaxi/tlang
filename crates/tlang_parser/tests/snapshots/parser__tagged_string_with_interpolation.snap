@@ -1,0 +1,231 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse! (r#\"html\"<div>{name}</div>\";\"#)"
+---
+Module(
+  id: 2,
+  statements: [
+    Stmt(
+      id: 3,
+      kind: Expr(Expr(
+        id: 10,
+        kind: Call(CallExpression(
+          callee: Expr(
+            id: 7,
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "html",
+                  span: Span(
+                    start: 0,
+                    end: 23,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 23,
+                    ),
+                  ),
+                ),
+              ],
+              res: Unresolved,
+              span: Span(
+                start: 0,
+                end: 23,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 23,
+                ),
+              ),
+            )),
+            leading_comments: [],
+            trailing_comments: [],
+            span: Span(
+              start: 0,
+              end: 23,
+              start_lc: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 23,
+              ),
+            ),
+          ),
+          arguments: [
+            Expr(
+              id: 8,
+              kind: List([
+                Expr(
+                  id: 4,
+                  kind: Literal(String("<div>")),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: 0,
+                    end: 0,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                  ),
+                ),
+                Expr(
+                  id: 6,
+                  kind: Literal(String("</div>")),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: 0,
+                    end: 0,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                  ),
+                ),
+              ]),
+              leading_comments: [],
+              trailing_comments: [],
+              span: Span(
+                start: 0,
+                end: 23,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 23,
+                ),
+              ),
+            ),
+            Expr(
+              id: 9,
+              kind: List([
+                Expr(
+                  id: 5,
+                  kind: Path(Path(
+                    segments: [
+                      Ident(
+                        name: "name",
+                        span: Span(
+                          start: 0,
+                          end: 4,
+                          start_lc: LineColumn(
+                            line: 0,
+                            column: 0,
+                          ),
+                          end_lc: LineColumn(
+                            line: 0,
+                            column: 4,
+                          ),
+                        ),
+                      ),
+                    ],
+                    res: Unresolved,
+                    span: Span(
+                      start: 0,
+                      end: 4,
+                      start_lc: LineColumn(
+                        line: 0,
+                        column: 0,
+                      ),
+                      end_lc: LineColumn(
+                        line: 0,
+                        column: 4,
+                      ),
+                    ),
+                  )),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: 0,
+                    end: 4,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 4,
+                    ),
+                  ),
+                ),
+              ]),
+              leading_comments: [],
+              trailing_comments: [],
+              span: Span(
+                start: 0,
+                end: 23,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 23,
+                ),
+              ),
+            ),
+          ],
+        )),
+        leading_comments: [],
+        trailing_comments: [],
+        span: Span(
+          start: 0,
+          end: 23,
+          start_lc: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end_lc: LineColumn(
+            line: 0,
+            column: 23,
+          ),
+        ),
+      )),
+      span: Span(
+        start: 0,
+        end: 24,
+        start_lc: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end_lc: LineColumn(
+          line: 0,
+          column: 24,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: 0,
+    end: 24,
+    start_lc: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end_lc: LineColumn(
+      line: 0,
+      column: 24,
+    ),
+  ),
+)

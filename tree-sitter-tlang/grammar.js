@@ -35,6 +35,12 @@ module.exports = grammar({
 
   extras: ($) => [/\s/, $.line_comment, $.block_comment],
 
+  externals: ($) => [
+    $.tagged_string_start,
+    $.tagged_string_content,
+    $.tagged_string_end,
+  ],
+
   supertypes: ($) => [$._statement, $._expression, $._pattern, $._literal],
 
   inline: ($) => [$._statement, $._declaration, $._literal],
@@ -52,8 +58,6 @@ module.exports = grammar({
     [$.enum_pattern, $.struct_pattern],
     // Foo::Bar could be start of path_expression or type_path (for struct_expression)
     [$.path_expression, $.type_path],
-    // identifier followed by string: could be expression or tagged_string tag
-    [$._expression, $.tagged_string],
   ],
 
   rules: {
@@ -355,9 +359,16 @@ module.exports = grammar({
         1,
         seq(
           field('tag', alias($.identifier, $.tagged_string_tag)),
-          field('content', $.string),
+          $.tagged_string_start,
+          repeat(
+            choice($.tagged_string_content, $.interpolation),
+          ),
+          $.tagged_string_end,
         ),
       ),
+
+    interpolation: ($) =>
+      seq('{', $._expression, '}'),
 
     boolean_literal: (_) => choice('true', 'false'),
 

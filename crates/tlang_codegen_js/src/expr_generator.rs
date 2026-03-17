@@ -1,6 +1,6 @@
 use oxc_ast::NONE;
 use oxc_ast::ast::*;
-use oxc_span::{Atom, GetSpanMut, SPAN};
+use oxc_span::{GetSpanMut, SPAN};
 use tlang_ast::node::{self as ast, Ident};
 use tlang_ast::token::Literal;
 use tlang_hir as hir;
@@ -66,23 +66,8 @@ impl<'a> InnerCodegen<'a> {
             Literal::Float(value) => self.num_expr(*value),
             Literal::Boolean(value) => self.bool_expr(*value),
             Literal::String(value) | Literal::Char(value) => self.str_expr(value),
-            Literal::TaggedString(tag, value) => {
-                let tag_expr = self.ident_expr(tag.as_ref());
-                let raw = Atom::from(self.alloc_str(value.as_ref()));
-                let element = self.ast.template_element(
-                    SPAN,
-                    TemplateElementValue {
-                        raw,
-                        cooked: Some(raw),
-                    },
-                    true,
-                    true, // escape backslashes so \d etc. survive the template literal
-                );
-                let quasis = self.ast.vec_from_iter([element]);
-                let expressions = self.ast.vec();
-                let quasi = self.ast.template_literal(SPAN, quasis, expressions);
-                self.ast
-                    .expression_tagged_template(SPAN, tag_expr, NONE, quasi)
+            Literal::TaggedString(_, _) => {
+                unreachable!("TaggedString is expanded to a Call by the parser")
             }
             Literal::None => self.undefined_expr(),
         }

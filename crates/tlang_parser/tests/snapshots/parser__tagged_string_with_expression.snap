@@ -1,0 +1,269 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse! (r#\"tag\"{x + 1}\";\"#)"
+---
+Module(
+  id: 2,
+  statements: [
+    Stmt(
+      id: 3,
+      kind: Expr(Expr(
+        id: 12,
+        kind: Call(CallExpression(
+          callee: Expr(
+            id: 9,
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "tag",
+                  span: Span(
+                    start: 0,
+                    end: 12,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 12,
+                    ),
+                  ),
+                ),
+              ],
+              res: Unresolved,
+              span: Span(
+                start: 0,
+                end: 12,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 12,
+                ),
+              ),
+            )),
+            leading_comments: [],
+            trailing_comments: [],
+            span: Span(
+              start: 0,
+              end: 12,
+              start_lc: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 12,
+              ),
+            ),
+          ),
+          arguments: [
+            Expr(
+              id: 10,
+              kind: List([
+                Expr(
+                  id: 4,
+                  kind: Literal(String("")),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: 0,
+                    end: 0,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                  ),
+                ),
+                Expr(
+                  id: 8,
+                  kind: Literal(String("")),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: 0,
+                    end: 0,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                  ),
+                ),
+              ]),
+              leading_comments: [],
+              trailing_comments: [],
+              span: Span(
+                start: 0,
+                end: 12,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 12,
+                ),
+              ),
+            ),
+            Expr(
+              id: 11,
+              kind: List([
+                Expr(
+                  id: 7,
+                  kind: BinaryOp(BinaryOpExpression(
+                    op: Add,
+                    lhs: Expr(
+                      id: 5,
+                      kind: Path(Path(
+                        segments: [
+                          Ident(
+                            name: "x",
+                            span: Span(
+                              start: 0,
+                              end: 1,
+                              start_lc: LineColumn(
+                                line: 0,
+                                column: 0,
+                              ),
+                              end_lc: LineColumn(
+                                line: 0,
+                                column: 1,
+                              ),
+                            ),
+                          ),
+                        ],
+                        res: Unresolved,
+                        span: Span(
+                          start: 0,
+                          end: 1,
+                          start_lc: LineColumn(
+                            line: 0,
+                            column: 0,
+                          ),
+                          end_lc: LineColumn(
+                            line: 0,
+                            column: 1,
+                          ),
+                        ),
+                      )),
+                      leading_comments: [],
+                      trailing_comments: [],
+                      span: Span(
+                        start: 0,
+                        end: 1,
+                        start_lc: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                        end_lc: LineColumn(
+                          line: 0,
+                          column: 1,
+                        ),
+                      ),
+                    ),
+                    rhs: Expr(
+                      id: 6,
+                      kind: Literal(UnsignedInteger(1)),
+                      leading_comments: [],
+                      trailing_comments: [],
+                      span: Span(
+                        start: 4,
+                        end: 5,
+                        start_lc: LineColumn(
+                          line: 0,
+                          column: 4,
+                        ),
+                        end_lc: LineColumn(
+                          line: 0,
+                          column: 5,
+                        ),
+                      ),
+                    ),
+                  )),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: 0,
+                    end: 5,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 5,
+                    ),
+                  ),
+                ),
+              ]),
+              leading_comments: [],
+              trailing_comments: [],
+              span: Span(
+                start: 0,
+                end: 12,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 12,
+                ),
+              ),
+            ),
+          ],
+        )),
+        leading_comments: [],
+        trailing_comments: [],
+        span: Span(
+          start: 0,
+          end: 12,
+          start_lc: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end_lc: LineColumn(
+            line: 0,
+            column: 12,
+          ),
+        ),
+      )),
+      span: Span(
+        start: 0,
+        end: 13,
+        start_lc: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end_lc: LineColumn(
+          line: 0,
+          column: 13,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: 0,
+    end: 13,
+    start_lc: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end_lc: LineColumn(
+      line: 0,
+      column: 13,
+    ),
+  ),
+)

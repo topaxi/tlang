@@ -961,6 +961,21 @@
     }
   },
   {
+    "type": "interpolation",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "_expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "list_expression",
     "named": true,
     "fields": {},
@@ -1604,16 +1619,6 @@
     "type": "tagged_string",
     "named": true,
     "fields": {
-      "content": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "string",
-            "named": true
-          }
-        ]
-      },
       "tag": {
         "multiple": false,
         "required": true,
@@ -1624,6 +1629,28 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "tagged_string_content",
+          "named": true
+        },
+        {
+          "type": "tagged_string_end",
+          "named": true
+        },
+        {
+          "type": "tagged_string_start",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -1992,6 +2019,18 @@
   {
     "type": "struct",
     "named": false
+  },
+  {
+    "type": "tagged_string_content",
+    "named": true
+  },
+  {
+    "type": "tagged_string_end",
+    "named": true
+  },
+  {
+    "type": "tagged_string_start",
+    "named": true
   },
   {
     "type": "tagged_string_tag",

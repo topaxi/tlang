@@ -91,7 +91,11 @@
 (number) @number
 (string) @string
 (tagged_string (tagged_string_tag) @string.special.symbol)
-(tagged_string (string) @string)
+(tagged_string (tagged_string_start) @string)
+(tagged_string (tagged_string_content) @string)
+(tagged_string (tagged_string_end) @string)
+(interpolation "{" @punctuation.special)
+(interpolation "}" @punctuation.special)
 (boolean_literal) @boolean
 
 ; Comments

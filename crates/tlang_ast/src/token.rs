@@ -75,6 +75,16 @@ pub enum TokenKind {
     Eof,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub enum TaggedStringPart {
+    /// A literal text segment of the tagged string.
+    Literal(Box<str>),
+    /// Raw source text of an interpolation expression (between `{` and `}`).
+    /// Parsed into a full expression by the parser.
+    Interpolation(Box<str>),
+}
+
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum Literal {
@@ -84,7 +94,7 @@ pub enum Literal {
     Float(f64),
     String(Box<str>),
     Char(Box<str>),
-    TaggedString(Box<str>, Box<str>),
+    TaggedString(Box<str>, Vec<TaggedStringPart>),
     None,
 }
 
@@ -95,7 +105,7 @@ impl Clone for Literal {
         match self {
             Literal::String(value) => Literal::String(value.clone()),
             Literal::Char(value) => Literal::Char(value.clone()),
-            Literal::TaggedString(tag, value) => Literal::TaggedString(tag.clone(), value.clone()),
+            Literal::TaggedString(tag, parts) => Literal::TaggedString(tag.clone(), parts.clone()),
             _ => unsafe { std::ptr::read(self) },
         }
     }

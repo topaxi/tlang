@@ -41,20 +41,32 @@ pub(crate) fn regex_match(state: &mut VMState, regex_val: TlangValue, haystack: 
 }
 
 /// Global `re(parts)` function — constructs a Regex from a tagged string literal.
-/// The interpreter evaluates `re"pattern"` by calling this function with a singleton
-/// parts list `["pattern"]` (keyed by HIR call-site id), mirroring the JS tagged
-/// template convention.  Future interpolation support will pass values as additional
-/// arguments.
+/// Constructs a `Regex` from a tagged string literal.  The parser desugars
+/// `re"prefix{x}suffix"` into `re(["prefix", "suffix"], [x])`, so the function
+/// interleaves the parts and stringified values to build the full pattern.
 #[native_fn(name = "re")]
-pub fn re(state: &mut VMState, parts: TlangValue) -> TlangValue {
-    let source_val = state
+pub fn re(state: &mut VMState, parts: TlangValue, values: TlangValue) -> TlangValue {
+    let parts_list = state
         .get_struct(parts)
-        .expect("re(): first argument must be a list")[0];
-    let pattern = state
-        .get_object(source_val)
-        .and_then(|o| o.as_str())
-        .expect("re(): list element must be a string")
-        .to_string();
+        .expect("re(): first argument must be a list")
+        .values();
+    let values_list = state
+        .get_struct(values)
+        .expect("re(): second argument must be a list")
+        .values();
+
+    let mut pattern = String::new();
+    for (i, &part) in parts_list.iter().enumerate() {
+        let s = state
+            .get_object(part)
+            .and_then(|o| o.as_str())
+            .expect("re(): parts element must be a string");
+        pattern.push_str(s);
+        if i < values_list.len() {
+            pattern.push_str(&state.stringify(values_list[i]));
+        }
+    }
+
     state.new_regex(pattern, String::new())
 }
 
