@@ -1,5 +1,5 @@
 use regex::Regex;
-use tlang_macros::define_struct;
+use tlang_macros::{define_struct, native_fn};
 use tlang_memory::{TlangValue, VMState};
 
 /// Field indices for the Regex struct.
@@ -38,6 +38,24 @@ fn build_regex(state: &mut VMState, this: TlangValue) -> Regex {
 pub(crate) fn regex_match(state: &mut VMState, regex_val: TlangValue, haystack: &str) -> bool {
     let re = build_regex(state, regex_val);
     re.is_match(haystack)
+}
+
+/// Global `re(parts)` function — constructs a Regex from a tagged string literal.
+/// The interpreter evaluates `re"pattern"` by calling this function with a singleton
+/// parts list `["pattern"]` (keyed by HIR call-site id), mirroring the JS tagged
+/// template convention.  Future interpolation support will pass values as additional
+/// arguments.
+#[native_fn(name = "re")]
+pub fn re(state: &mut VMState, parts: TlangValue) -> TlangValue {
+    let source_val = state
+        .get_struct(parts)
+        .expect("re(): first argument must be a list")[0];
+    let pattern = state
+        .get_object(source_val)
+        .and_then(|o| o.as_str())
+        .expect("re(): list element must be a string")
+        .to_string();
+    state.new_regex(pattern, String::new())
 }
 
 define_struct! {

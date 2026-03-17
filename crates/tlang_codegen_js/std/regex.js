@@ -1,3 +1,4 @@
+const re = (parts, ...values) => new $TlangRegex(parts[0]);
 const $TlangRegex = class Regex {
   #source;
   #flags;
