@@ -125,45 +125,45 @@ Module(
                       Ident(
                         name: "name",
                         span: Span(
-                          start: 0,
-                          end: 4,
+                          start: 11,
+                          end: 15,
                           start_lc: LineColumn(
                             line: 0,
-                            column: 0,
+                            column: 11,
                           ),
                           end_lc: LineColumn(
                             line: 0,
-                            column: 4,
+                            column: 15,
                           ),
                         ),
                       ),
                     ],
                     res: Unresolved,
                     span: Span(
-                      start: 0,
-                      end: 4,
+                      start: 11,
+                      end: 15,
                       start_lc: LineColumn(
                         line: 0,
-                        column: 0,
+                        column: 11,
                       ),
                       end_lc: LineColumn(
                         line: 0,
-                        column: 4,
+                        column: 15,
                       ),
                     ),
                   )),
                   leading_comments: [],
                   trailing_comments: [],
                   span: Span(
-                    start: 0,
-                    end: 4,
+                    start: 11,
+                    end: 15,
                     start_lc: LineColumn(
                       line: 0,
-                      column: 0,
+                      column: 11,
                     ),
                     end_lc: LineColumn(
                       line: 0,
-                      column: 4,
+                      column: 15,
                     ),
                   ),
                 ),

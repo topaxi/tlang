@@ -51,22 +51,23 @@ pub(crate) fn regex_match(state: &mut VMState, regex_val: TlangValue, haystack: 
 /// `parts` is not a string.
 #[native_fn(name = "re")]
 pub fn re(state: &mut VMState, parts: TlangValue, values: TlangValue) -> TlangValue {
-    let parts_list = state
+    let parts_list: Vec<TlangValue> = state
         .get_struct(parts)
-        .expect("re(): first argument must be a list")
-        .values();
-    let values_list = state
+        .map(|s| s.values().to_vec())
+        .unwrap_or_else(|| state.panic("re(): first argument must be a list".to_string()));
+    let values_list: Vec<TlangValue> = state
         .get_struct(values)
-        .expect("re(): second argument must be a list")
-        .values();
+        .map(|s| s.values().to_vec())
+        .unwrap_or_else(|| state.panic("re(): second argument must be a list".to_string()));
 
     let mut pattern = String::new();
     for (i, &part) in parts_list.iter().enumerate() {
         let s = state
             .get_object(part)
             .and_then(|o| o.as_str())
-            .expect("re(): parts element must be a string");
-        pattern.push_str(s);
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| state.panic("re(): parts element must be a string".to_string()));
+        pattern.push_str(&s);
         if i < values_list.len() {
             pattern.push_str(&state.stringify(values_list[i]));
         }

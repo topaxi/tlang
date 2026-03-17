@@ -451,7 +451,12 @@ fn test_tagged_string_with_interpolation() {
             "html".into(),
             vec![
                 TaggedStringPart::Literal("<div>".into()),
-                TaggedStringPart::Interpolation("name".into()),
+                TaggedStringPart::Interpolation {
+                    source: "name".into(),
+                    line: 0,
+                    column: 0,
+                    byte_offset: 0
+                },
                 TaggedStringPart::Literal("</div>".into()),
             ]
         ))
@@ -468,9 +473,19 @@ fn test_tagged_string_multiple_interpolations() {
             "sql".into(),
             vec![
                 TaggedStringPart::Literal("SELECT ".into()),
-                TaggedStringPart::Interpolation("cols".into()),
+                TaggedStringPart::Interpolation {
+                    source: "cols".into(),
+                    line: 0,
+                    column: 0,
+                    byte_offset: 0
+                },
                 TaggedStringPart::Literal(" FROM ".into()),
-                TaggedStringPart::Interpolation("table".into()),
+                TaggedStringPart::Interpolation {
+                    source: "table".into(),
+                    line: 0,
+                    column: 0,
+                    byte_offset: 0
+                },
                 TaggedStringPart::Literal("".into()),
             ]
         ))
@@ -528,7 +543,12 @@ fn test_tagged_string_nested_braces_in_interpolation() {
             "tag".into(),
             vec![
                 TaggedStringPart::Literal("".into()),
-                TaggedStringPart::Interpolation("if true { \"a\" } else { \"b\" }".into()),
+                TaggedStringPart::Interpolation {
+                    source: "if true { \"a\" } else { \"b\" }".into(),
+                    line: 0,
+                    column: 0,
+                    byte_offset: 0
+                },
                 TaggedStringPart::Literal("".into()),
             ]
         ))
@@ -546,7 +566,12 @@ fn test_tagged_string_nested_tagged_string_in_interpolation() {
             "html".into(),
             vec![
                 TaggedStringPart::Literal("<div>".into()),
-                TaggedStringPart::Interpolation("html\"<span/>\"".into()),
+                TaggedStringPart::Interpolation {
+                    source: "html\"<span/>\"".into(),
+                    line: 0,
+                    column: 0,
+                    byte_offset: 0
+                },
                 TaggedStringPart::Literal("</div>".into()),
             ]
         ))
@@ -563,7 +588,12 @@ fn test_tagged_string_interpolation_with_member_access() {
             "html".into(),
             vec![
                 TaggedStringPart::Literal("".into()),
-                TaggedStringPart::Interpolation("user.name".into()),
+                TaggedStringPart::Interpolation {
+                    source: "user.name".into(),
+                    line: 0,
+                    column: 0,
+                    byte_offset: 0
+                },
                 TaggedStringPart::Literal("".into()),
             ]
         ))

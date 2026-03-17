@@ -192,13 +192,31 @@ function computeOverlayRanges(nodeFrom, content, contentFrom) {
           });
         }
 
-        // Skip to matching closing brace (with depth tracking)
+        // Skip to matching closing brace, tracking depth and string literals
+        // so that braces inside strings (e.g. `html"{ foo("}")  }") don't
+        // confuse the depth counter.
         let depth = 1;
         i++; // skip opening {
         while (i < content.length && depth > 0) {
-          if (content[i] === '{') depth++;
-          else if (content[i] === '}') depth--;
-          if (depth > 0) i++;
+          const ic = content[i];
+          if (ic === '"' || ic === "'") {
+            // Skip over a string literal inside the interpolation
+            const strQuote = ic;
+            i++;
+            while (i < content.length && content[i] !== strQuote) {
+              if (content[i] === '\\') i++; // skip escaped char
+              i++;
+            }
+            if (i < content.length) i++; // skip closing quote
+          } else if (ic === '{') {
+            depth++;
+            i++;
+          } else if (ic === '}') {
+            depth--;
+            if (depth > 0) i++;
+          } else {
+            i++;
+          }
         }
         if (i < content.length) i++; // skip closing }
         rangeStart = i;

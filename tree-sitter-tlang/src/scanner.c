@@ -1,6 +1,7 @@
 #include "tree_sitter/parser.h"
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 
 // Token types produced by the external scanner.
@@ -52,6 +53,9 @@ void tree_sitter_tlang_external_scanner_deserialize(void *payload,
 
   if (length > 0) {
     scanner->depth = (uint8_t)buffer[0];
+    if (scanner->depth > MAX_DEPTH) {
+      scanner->depth = MAX_DEPTH;
+    }
     if (scanner->depth > 0 && length >= 1 + scanner->depth) {
       memcpy(scanner->quotes, buffer + 1, scanner->depth);
     }

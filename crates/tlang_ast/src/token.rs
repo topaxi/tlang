@@ -75,14 +75,35 @@ pub enum TokenKind {
     Eof,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum TaggedStringPart {
     /// A literal text segment of the tagged string.
     Literal(Box<str>),
     /// Raw source text of an interpolation expression (between `{` and `}`).
     /// Parsed into a full expression by the parser.
-    Interpolation(Box<str>),
+    /// `line`, `column`, and `byte_offset` are the source position of the
+    /// first character of the interpolation body (after the opening `{`).
+    Interpolation {
+        source: Box<str>,
+        line: u32,
+        column: u32,
+        byte_offset: u32,
+    },
+}
+
+impl PartialEq for TaggedStringPart {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (TaggedStringPart::Literal(a), TaggedStringPart::Literal(b)) => a == b,
+            // Compare only the source content; position fields are for span generation only.
+            (
+                TaggedStringPart::Interpolation { source: a, .. },
+                TaggedStringPart::Interpolation { source: b, .. },
+            ) => a == b,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]

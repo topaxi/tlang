@@ -1077,8 +1077,14 @@ impl<'src> Parser<'src> {
                         Literal(Box::new(Literal::String(text)))
                     ));
                 }
-                TaggedStringPart::Interpolation(raw_source) => {
-                    let expr = self.parse_interpolation_expr(&raw_source, span);
+                TaggedStringPart::Interpolation {
+                    source: raw_source,
+                    line,
+                    column,
+                    byte_offset,
+                } => {
+                    let expr =
+                        self.parse_interpolation_expr(&raw_source, line, column, byte_offset);
                     value_exprs.push(expr);
                 }
             }
@@ -1102,10 +1108,16 @@ impl<'src> Parser<'src> {
 
     /// Parse a raw interpolation source string as a full expression using a sub-parser.
     /// The sub-parser shares this parser's `NodeIdAllocator` to avoid ID collisions.
-    /// Spans are offset to match the tagged string's position in the original source.
-    fn parse_interpolation_expr(&mut self, source: &str, span: Span) -> Expr {
-        let lexer =
-            Lexer::new(source).with_offset(span.start_lc.line, span.start_lc.column, span.start);
+    /// `line`, `column`, and `byte_offset` are the position of the first character of
+    /// the interpolation body in the original source, so generated spans are correct.
+    fn parse_interpolation_expr(
+        &mut self,
+        source: &str,
+        line: u32,
+        column: u32,
+        byte_offset: u32,
+    ) -> Expr {
+        let lexer = Lexer::new(source).with_offset(line, column, byte_offset);
         let mut sub_parser = Parser::new(lexer).set_node_id_allocator(self.node_id_allocator);
 
         // Prime the sub-parser's token stream
@@ -1113,6 +1125,12 @@ impl<'src> Parser<'src> {
         sub_parser.next_token = sub_parser.lexer.next_token();
 
         let expr = sub_parser.parse_expression();
+
+        // Verify that all interpolation tokens were consumed (catches `{x y}` style errors)
+        if !matches!(sub_parser.current_token_kind(), TokenKind::Eof) {
+            let unexpected = sub_parser.current_token.clone();
+            sub_parser.push_unexpected_token_error("end of interpolation", unexpected);
+        }
 
         // Propagate node ID allocator state back to parent
         self.node_id_allocator = sub_parser.node_id_allocator;
