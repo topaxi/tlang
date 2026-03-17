@@ -233,7 +233,9 @@ impl Interpreter {
         state.set_current_span(expr.span);
 
         // Return cached constant pool value if available.
-        if let Some(cached) = state.get_constant(expr.hir_id) {
+        if state.is_constant_pool_expr(expr.hir_id)
+            && let Some(cached) = state.get_constant(expr.hir_id)
+        {
             return EvalResult::Value(cached);
         }
 

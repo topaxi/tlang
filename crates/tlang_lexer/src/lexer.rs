@@ -299,8 +299,17 @@ impl Lexer<'_> {
                         std::mem::take(&mut current_literal).into_boxed_str(),
                     ));
                     self.advance(); // consume `{`
+                    // Capture the position of the first char inside the interpolation body
+                    let interp_line = self.current_line;
+                    let interp_column = self.current_column;
+                    let interp_byte_offset = self.byte_position();
                     let raw = self.read_interpolation_body(quote)?;
-                    parts.push(TaggedStringPart::Interpolation(raw.into_boxed_str()));
+                    parts.push(TaggedStringPart::Interpolation {
+                        source: raw.into_boxed_str(),
+                        line: interp_line,
+                        column: interp_column,
+                        byte_offset: interp_byte_offset,
+                    });
                     // `}` already consumed by read_interpolation_body
                 } else {
                     // Not an interpolation (e.g. `{2,5}` regex quantifier)
