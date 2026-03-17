@@ -277,6 +277,7 @@ impl Tlang {
                 root_symbol_table,
                 symbol_tables,
             );
+            let constant_pool_ids = meta.constant_pool_ids.clone();
             let mut ctx = meta.into();
 
             match self.runner {
@@ -344,6 +345,8 @@ impl Tlang {
                 }
             }
 
+            self.interpreter
+                .register_constant_pool_ids(constant_pool_ids);
             self.build.hir = Some(module);
         }
     }

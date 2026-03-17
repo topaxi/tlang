@@ -28,6 +28,11 @@ pub struct Parser<'src> {
     errors: Vec<ParseIssue>,
 
     trailing_comments_buffer: Vec<Token>,
+
+    /// NodeIds of expressions that produce compile-time-constant values
+    /// (e.g. tagged string parts lists). Propagated through lowering into
+    /// the HIR constant pool for singleton caching at runtime.
+    constant_pool_node_ids: Vec<NodeId>,
 }
 
 impl<'src> Parser<'src> {
@@ -41,6 +46,7 @@ impl<'src> Parser<'src> {
             errors: Vec::new(),
             recoverable: false,
             trailing_comments_buffer: Vec::new(),
+            constant_pool_node_ids: Vec::new(),
         }
     }
 
@@ -69,6 +75,10 @@ impl<'src> Parser<'src> {
 
     pub fn node_id_allocator(&self) -> &NodeIdAllocator {
         &self.node_id_allocator
+    }
+
+    pub fn constant_pool_node_ids(&self) -> &[NodeId] {
+        &self.constant_pool_node_ids
     }
 
     pub fn set_node_id_allocator(mut self, allocator: NodeIdAllocator) -> Self {
@@ -631,7 +641,9 @@ impl<'src> Parser<'src> {
         let statements = self.parse_statements(false).0;
         self.end_span_from_previous_token(&mut span);
 
-        Module::new(module_id, statements, span)
+        let mut module = Module::new(module_id, statements, span);
+        module.constant_pool_node_ids = std::mem::take(&mut self.constant_pool_node_ids);
+        module
     }
 
     fn parse_block(&mut self) -> Block {
@@ -1075,6 +1087,7 @@ impl<'src> Parser<'src> {
         let callee_path = Path::from_ident(Ident::new(tag, span));
         let callee = node::expr!(self.unique_id(), Path(Box::new(callee_path))).with_span(span);
         let parts_list = node::expr!(self.unique_id(), List(string_parts)).with_span(span);
+        self.constant_pool_node_ids.push(parts_list.id);
         let values_list = node::expr!(self.unique_id(), List(value_exprs)).with_span(span);
 
         node::expr!(

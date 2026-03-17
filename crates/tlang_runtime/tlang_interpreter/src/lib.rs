@@ -12,7 +12,6 @@ use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
 use tlang_memory::value::TlangArithmetic;
 use tlang_memory::value::object::TlangEnum;
 use tlang_memory::{NativeFnReturn, Resolver, VMState, execution, scope};
-use tlang_span::HirId;
 
 pub use tlang_memory::NativeFnDef;
 pub use tlang_memory::{
@@ -233,6 +232,24 @@ impl Interpreter {
     pub fn eval_expr(&self, state: &mut VMState, expr: &hir::Expr) -> EvalResult {
         state.set_current_span(expr.span);
 
+        // Return cached constant pool value if available.
+        if let Some(cached) = state.get_constant(expr.hir_id) {
+            return EvalResult::Value(cached);
+        }
+
+        let result = self.eval_expr_inner(state, expr);
+
+        // Cache the result if this expression is in the constant pool.
+        if state.is_constant_pool_expr(expr.hir_id)
+            && let EvalResult::Value(value) = result
+        {
+            state.set_constant(expr.hir_id, value);
+        }
+
+        result
+    }
+
+    fn eval_expr_inner(&self, state: &mut VMState, expr: &hir::Expr) -> EvalResult {
         match &expr.kind {
             hir::ExprKind::Path(path) => {
                 EvalResult::Value(state.resolve_value(path).unwrap_or_else(|| {
@@ -245,7 +262,7 @@ impl Interpreter {
                 }))
             }
             hir::ExprKind::Literal(value) => EvalResult::Value(self.eval_literal(state, value)),
-            hir::ExprKind::List(values) => self.eval_list_expr(state, expr.hir_id, values),
+            hir::ExprKind::List(values) => self.eval_list_expr(state, values),
             hir::ExprKind::Dict(entries) => self.eval_dict_expr(state, entries),
             hir::ExprKind::IndexAccess(lhs, rhs) => self.eval_index_access(state, lhs, rhs),
             hir::ExprKind::FieldAccess(lhs, rhs) => self.eval_field_access(state, lhs, rhs),
@@ -1429,23 +1446,11 @@ impl Interpreter {
         EvalResult::Void
     }
 
-    fn eval_list_expr(
-        &self,
-        state: &mut VMState,
-        hir_id: HirId,
-        values: &[hir::Expr],
-    ) -> EvalResult {
-        // Check if this list has been cached (e.g., tagged string parts).
-        if let Some(cached) = state.get_cached_list(hir_id) {
-            return EvalResult::Value(cached);
-        }
-
+    fn eval_list_expr(&self, state: &mut VMState, values: &[hir::Expr]) -> EvalResult {
         let mut field_values = Vec::with_capacity(values.len());
-        let mut all_string_literals = true;
 
         for (i, expr) in values.iter().enumerate() {
             if let hir::ExprKind::Unary(UnaryOp::Spread, expr) = &expr.kind {
-                all_string_literals = false;
                 let value = eval_value!(state, self.eval_expr(state, expr));
 
                 if let TlangValue::Object(id) = value {
@@ -1474,20 +1479,11 @@ impl Interpreter {
                     state.panic(format!("Expected list, got {value:?}"));
                 }
             } else {
-                if !matches!(&expr.kind, hir::ExprKind::Literal(lit) if matches!(lit.as_ref(), token::Literal::String(_)))
-                {
-                    all_string_literals = false;
-                }
                 field_values.push(eval_value!(state, self.eval_expr(state, expr)));
             }
         }
 
         let list = state.new_list(field_values);
-
-        // Cache static string lists (tagged string parts) for singleton semantics.
-        if all_string_literals && !values.is_empty() {
-            state.cache_list(hir_id, list);
-        }
 
         EvalResult::Value(list)
     }
@@ -1944,8 +1940,11 @@ mod tests {
 
             let mut optimizer = HirOptimizer::default();
             debug!("LowerResultMeta = {:?}", meta);
+            let constant_pool_ids = meta.constant_pool_ids.clone();
             let mut ctx = meta.into();
             optimizer.optimize_hir(&mut module, &mut ctx);
+
+            self.state.register_constant_pool_ids(constant_pool_ids);
 
             module
         }

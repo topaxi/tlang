@@ -461,6 +461,12 @@ pub fn lower(ctx: &mut LoweringContext, tlang_ast: &ast::node::Module) -> hir::L
     let symbol_id_allocator = ctx.symbol_id_allocator;
     let hir_id_allocator = ctx.hir_id_allocator;
 
+    let constant_pool_ids = tlang_ast
+        .constant_pool_node_ids
+        .iter()
+        .filter_map(|node_id| ctx.node_id_to_hir_id.get(node_id).copied())
+        .collect();
+
     (
         module,
         hir::LowerResultMeta {
@@ -468,6 +474,7 @@ pub fn lower(ctx: &mut LoweringContext, tlang_ast: &ast::node::Module) -> hir::L
             symbol_tables,
             hir_id_allocator,
             symbol_id_allocator,
+            constant_pool_ids,
         },
     )
 }

@@ -75,10 +75,12 @@ fn main() {
     );
 
     let mut optimizer = HirOptimizer::default();
+    let constant_pool_ids = meta.constant_pool_ids.clone();
     let mut ctx = meta.into();
     optimizer.optimize_hir(&mut module, &mut ctx);
 
     let mut vm = VM::new();
     vm.state_mut().set_stress_gc(stress_gc);
+    vm.state_mut().register_constant_pool_ids(constant_pool_ids);
     vm.eval(&module);
 }

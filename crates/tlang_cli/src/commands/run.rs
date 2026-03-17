@@ -2,14 +2,16 @@ use std::{fs::File, io::Read, path::Path};
 
 use tlang_ast_lowering::lower_to_hir;
 use tlang_diagnostics::{render_parse_issues, render_semantic_diagnostics};
+use tlang_hir as hir;
 use tlang_hir_opt::HirOptimizer;
 use tlang_runtime::{memory::TlangValue, vm::VM};
 use tlang_semantics::SemanticAnalyzer;
 
 pub fn handle_run(input_file: &str) {
-    let module = compile(input_file);
+    let (module, constant_pool_ids) = compile(input_file);
 
     let mut vm = VM::new();
+    vm.state_mut().register_constant_pool_ids(constant_pool_ids);
     let result = vm.eval(&module);
 
     match result {
@@ -18,7 +20,7 @@ pub fn handle_run(input_file: &str) {
     }
 }
 
-fn compile(input_file: &str) -> tlang_hir::Module {
+fn compile(input_file: &str) -> (hir::Module, std::collections::HashSet<tlang_hir::HirId>) {
     let path = Path::new(input_file);
     let mut file = match File::open(path) {
         Err(why) => panic!("couldn't open {}: {}", path.display(), why),
@@ -86,8 +88,9 @@ fn compile(input_file: &str) -> tlang_hir::Module {
     );
 
     let mut optimizer = HirOptimizer::default();
+    let constant_pool_ids = meta.constant_pool_ids.clone();
     let mut ctx = meta.into();
     optimizer.optimize_hir(&mut module, &mut ctx);
 
-    module
+    (module, constant_pool_ids)
 }

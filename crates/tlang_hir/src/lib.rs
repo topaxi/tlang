@@ -6,3 +6,4 @@ pub mod visit;
 pub use visit::Visitor;
 
 pub use hir::*;
+pub use tlang_span::HirId;

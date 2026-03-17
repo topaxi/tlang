@@ -89,6 +89,13 @@ impl TlangInterpreter {
         let value = self.vm.eval(hir);
         tlang_value_to_js_value(self.vm.state(), value)
     }
+
+    pub(crate) fn register_constant_pool_ids(
+        &mut self,
+        ids: std::collections::HashSet<tlang_span::HirId>,
+    ) {
+        self.vm.state_mut().register_constant_pool_ids(ids);
+    }
 }
 
 fn tlang_value_to_js_value(state: &VMState, value: TlangValue) -> JsValue {

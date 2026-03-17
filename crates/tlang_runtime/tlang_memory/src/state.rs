@@ -671,14 +671,24 @@ impl VMState {
         }
     }
 
-    /// Returns the cached list for the given HirId, if it exists.
-    pub fn get_cached_list(&self, hir_id: HirId) -> Option<TlangValue> {
-        self.program.cached_lists.get(&hir_id).copied()
+    /// Register HirIds of compile-time-constant expressions for the constant pool.
+    pub fn register_constant_pool_ids(&mut self, ids: std::collections::HashSet<HirId>) {
+        self.program.constant_pool_ids.extend(ids);
     }
 
-    /// Caches a list value by HirId for singleton semantics (tagged string parts).
-    pub fn cache_list(&mut self, hir_id: HirId, value: TlangValue) {
-        self.program.cached_lists.insert(hir_id, value);
+    /// Returns `true` if the given HirId is a constant pool expression.
+    pub fn is_constant_pool_expr(&self, hir_id: HirId) -> bool {
+        self.program.constant_pool_ids.contains(&hir_id)
+    }
+
+    /// Returns the cached constant value for the given HirId, if it exists.
+    pub fn get_constant(&self, hir_id: HirId) -> Option<TlangValue> {
+        self.program.constant_pool.get(&hir_id).copied()
+    }
+
+    /// Stores a value in the constant pool, keyed by HirId.
+    pub fn set_constant(&mut self, hir_id: HirId, value: TlangValue) {
+        self.program.constant_pool.insert(hir_id, value);
     }
 
     // ── ExecutionContext delegates ───────────────────────────────────────────
