@@ -26,6 +26,11 @@ pub struct Program {
     pub(crate) protocol_method_to_protocol: HashMap<String, String>,
     /// Protocol implementations: (protocol_name, type_name, method_name) → fn value
     pub(crate) protocol_impls: HashMap<(String, String, String), TlangValue>,
+    /// Singleton cache for static string lists (tagged string parts), keyed by the
+    /// HirId of the list expression node. Mirrors the JS tagged template literal
+    /// guarantee that the strings array is the same object at every call to the
+    /// same template site.
+    pub(crate) cached_lists: HashMap<HirId, TlangValue>,
 }
 
 impl Program {
@@ -41,6 +46,7 @@ impl Program {
             protocols: HashMap::new(),
             protocol_method_to_protocol: HashMap::new(),
             protocol_impls: HashMap::new(),
+            cached_lists: HashMap::new(),
         }
     }
 
@@ -115,6 +121,7 @@ impl Program {
             .copied()
             .chain(self.globals.values().copied())
             .chain(self.protocol_impls.values().copied())
+            .chain(self.cached_lists.values().copied())
     }
 
     pub fn register_protocol(&mut self, name: String, methods: Vec<String>) {

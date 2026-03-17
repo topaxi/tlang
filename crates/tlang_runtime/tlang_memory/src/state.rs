@@ -671,6 +671,16 @@ impl VMState {
         }
     }
 
+    /// Returns the cached list for the given HirId, if it exists.
+    pub fn get_cached_list(&self, hir_id: HirId) -> Option<TlangValue> {
+        self.program.cached_lists.get(&hir_id).copied()
+    }
+
+    /// Caches a list value by HirId for singleton semantics (tagged string parts).
+    pub fn cache_list(&mut self, hir_id: HirId, value: TlangValue) {
+        self.program.cached_lists.insert(hir_id, value);
+    }
+
     // ── ExecutionContext delegates ───────────────────────────────────────────
 
     /// # Panics

@@ -12,6 +12,7 @@ use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
 use tlang_memory::value::TlangArithmetic;
 use tlang_memory::value::object::TlangEnum;
 use tlang_memory::{NativeFnReturn, Resolver, VMState, execution, scope};
+use tlang_span::HirId;
 
 pub use tlang_memory::NativeFnDef;
 pub use tlang_memory::{
@@ -244,7 +245,7 @@ impl Interpreter {
                 }))
             }
             hir::ExprKind::Literal(value) => EvalResult::Value(self.eval_literal(state, value)),
-            hir::ExprKind::List(values) => self.eval_list_expr(state, values),
+            hir::ExprKind::List(values) => self.eval_list_expr(state, expr.hir_id, values),
             hir::ExprKind::Dict(entries) => self.eval_dict_expr(state, entries),
             hir::ExprKind::IndexAccess(lhs, rhs) => self.eval_index_access(state, lhs, rhs),
             hir::ExprKind::FieldAccess(lhs, rhs) => self.eval_field_access(state, lhs, rhs),
@@ -1428,11 +1429,23 @@ impl Interpreter {
         EvalResult::Void
     }
 
-    fn eval_list_expr(&self, state: &mut VMState, values: &[hir::Expr]) -> EvalResult {
+    fn eval_list_expr(
+        &self,
+        state: &mut VMState,
+        hir_id: HirId,
+        values: &[hir::Expr],
+    ) -> EvalResult {
+        // Check if this list has been cached (e.g., tagged string parts).
+        if let Some(cached) = state.get_cached_list(hir_id) {
+            return EvalResult::Value(cached);
+        }
+
         let mut field_values = Vec::with_capacity(values.len());
+        let mut all_string_literals = true;
 
         for (i, expr) in values.iter().enumerate() {
             if let hir::ExprKind::Unary(UnaryOp::Spread, expr) = &expr.kind {
+                all_string_literals = false;
                 let value = eval_value!(state, self.eval_expr(state, expr));
 
                 if let TlangValue::Object(id) = value {
@@ -1461,11 +1474,22 @@ impl Interpreter {
                     state.panic(format!("Expected list, got {value:?}"));
                 }
             } else {
+                if !matches!(&expr.kind, hir::ExprKind::Literal(lit) if matches!(lit.as_ref(), token::Literal::String(_)))
+                {
+                    all_string_literals = false;
+                }
                 field_values.push(eval_value!(state, self.eval_expr(state, expr)));
             }
         }
 
-        EvalResult::Value(state.new_list(field_values))
+        let list = state.new_list(field_values);
+
+        // Cache static string lists (tagged string parts) for singleton semantics.
+        if all_string_literals && !values.is_empty() {
+            state.cache_list(hir_id, list);
+        }
+
+        EvalResult::Value(list)
     }
 
     /// Collects an iterable value into a list by calling `Iterable::iter` then
