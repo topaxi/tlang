@@ -204,7 +204,7 @@ function computeOverlayRanges(nodeFrom, content, contentFrom) {
             const strQuote = ic;
             i++;
             while (i < content.length && content[i] !== strQuote) {
-              if (content[i] === '\\') i++; // skip escaped char
+              if (content[i] === '\\' && i + 1 < content.length) i++; // skip escaped char
               i++;
             }
             if (i < content.length) i++; // skip closing quote

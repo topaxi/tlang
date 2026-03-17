@@ -599,3 +599,32 @@ fn test_tagged_string_interpolation_with_member_access() {
         ))
     );
 }
+
+#[test]
+fn test_tagged_string_interpolation_position_tracking() {
+    // Verify that interpolation byte offsets and line/column are tracked correctly.
+    // source: html"<div>{name}</div>"
+    //         0         1
+    //         0123456789012345678901234
+    // `{` is at byte 10, body `name` starts at byte 11, column 11 (0-indexed), line 0.
+    let mut lexer = Lexer::new(r#"html"<div>{name}</div>""#);
+    let token = lexer.next_token();
+    if let TokenKind::Literal(Literal::TaggedString(_, parts)) = token.kind {
+        match &parts[1] {
+            TaggedStringPart::Interpolation {
+                source,
+                line,
+                column,
+                byte_offset,
+            } => {
+                assert_eq!(source.as_ref(), "name");
+                assert_eq!(*line, 0);
+                assert_eq!(*column, 11);
+                assert_eq!(*byte_offset, 11);
+            }
+            _ => panic!("Expected Interpolation part"),
+        }
+    } else {
+        panic!("Expected TaggedString literal");
+    }
+}
