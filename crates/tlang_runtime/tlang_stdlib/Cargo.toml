@@ -15,7 +15,7 @@ log = { workspace = true }
 regex = { workspace = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-rand = { version = "0.9" }
+rand = { version = "0.10" }
 
 [lints]
 workspace = true
