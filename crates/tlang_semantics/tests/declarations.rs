@@ -1,10 +1,10 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::node::{ExprKind, StmtKind};
+use tlang_defs::{Def, DefId, DefKind};
 use tlang_parser::Parser;
 use tlang_semantics::analyzer::SemanticAnalyzer;
 use tlang_span::{LineColumn, NodeId, Span};
-use tlang_defs::{DefId, Def, DefKind};
 
 mod common;
 

@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use tlang_ast_lowering::lower_to_hir;
+use tlang_defs::DefKind;
 use tlang_hir::visit::{walk_pat, walk_stmt};
 use tlang_hir::{self as hir, Visitor};
 use tlang_hir_opt::HirOptimizer;
@@ -10,7 +11,6 @@ use tlang_hir_pretty::HirPrettyOptions;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 use tlang_span::HirId;
-use tlang_defs::DefKind;
 
 #[ctor::ctor]
 fn before_all() {

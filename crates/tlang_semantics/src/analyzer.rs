@@ -2,8 +2,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use log::debug;
 use tlang_ast::node::{Module, StructDeclaration};
+use tlang_defs::{DefIdAllocator, DefKind, DefScope};
 use tlang_span::NodeId;
-use tlang_defs::{DefIdAllocator, DefScope, DefKind};
 
 use crate::{
     diagnostic::Diagnostic,

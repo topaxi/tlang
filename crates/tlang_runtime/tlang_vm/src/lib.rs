@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
 use log::debug;
+use tlang_defs::DefKind;
 use tlang_hir as hir;
 use tlang_interpreter::Interpreter;
 use tlang_memory::prelude::*;
 use tlang_memory::{NativeFnDef, NativeProtocolDef, VMState};
-use tlang_defs::DefKind;
 
 pub struct VM {
     state: VMState,
@@ -97,11 +97,10 @@ impl VM {
             .collect();
 
         // Protocol symbols: derived from inventory (no slots)
-        let protocol_syms: Vec<(String, DefKind, Option<usize>)> =
-            Self::builtin_protocol_symbols()
-                .into_iter()
-                .map(|(name, ty)| (name, ty, None))
-                .collect();
+        let protocol_syms: Vec<(String, DefKind, Option<usize>)> = Self::builtin_protocol_symbols()
+            .into_iter()
+            .map(|(name, ty)| (name, ty, None))
+            .collect();
 
         module_syms
             .into_iter()

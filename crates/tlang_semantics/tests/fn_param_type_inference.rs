@@ -1,7 +1,7 @@
 use tlang_ast::node::{FunctionDeclaration, Res, StmtKind, TyKind};
+use tlang_defs::DefKind;
 use tlang_parser::Parser;
 use tlang_semantics::analyzer::SemanticAnalyzer;
-use tlang_defs::DefKind;
 
 mod common;
 

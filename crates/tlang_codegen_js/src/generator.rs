@@ -11,10 +11,10 @@ use oxc_span::SPAN;
 use crate::js_anf_transform::JsAnfTransform;
 use crate::scope::Scope;
 use oxc_estree::{ESTree, PrettyJSSerializer};
+use tlang_defs::DefKind;
 use tlang_hir as hir;
 use tlang_hir_opt::hir_opt::{HirOptContext, HirPass};
 use tlang_span::{HirId, HirIdAllocator, Span as TlangSpan};
-use tlang_defs::DefKind;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct FunctionContext {

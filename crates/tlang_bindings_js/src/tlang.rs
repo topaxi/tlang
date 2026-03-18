@@ -7,6 +7,7 @@ use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_codegen_js::js_anf_transform::JsAnfTransform;
 use tlang_codegen_js::js_hir_opt::JsHirOptimizer;
+use tlang_defs::{DefKind, DefScope};
 use tlang_diagnostics::{render_parse_issues, render_semantic_diagnostics};
 use tlang_hir as hir;
 use tlang_hir_opt::HirPass;
@@ -16,7 +17,6 @@ use tlang_parser::Parser;
 use tlang_parser::error::{ParseError, ParseIssue};
 use tlang_semantics::SemanticAnalyzer;
 use tlang_span::NodeId;
-use tlang_defs::{DefScope, DefKind};
 use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 

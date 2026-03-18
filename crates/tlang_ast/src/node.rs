@@ -5,10 +5,10 @@ use tlang_span::Spanned;
 
 use tlang_span::{NodeId, Span};
 
-use tlang_intern::{Symbol, get as intern_get, intern};
 use crate::keyword::kw;
 use crate::token::CommentToken;
 use crate::token::Literal;
+use tlang_intern::{Symbol, get as intern_get, intern};
 
 pub use crate::macros::*;
 

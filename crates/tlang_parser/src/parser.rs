@@ -1,4 +1,3 @@
-use tlang_intern::intern;
 use tlang_ast::keyword::{Keyword, kw};
 use tlang_ast::node::{
     self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
@@ -9,6 +8,7 @@ use tlang_ast::node::{
     StructField, Ty, TyKind, UnaryOp,
 };
 use tlang_ast::token::{CommentKind, CommentToken, Literal, TaggedStringPart, Token, TokenKind};
+use tlang_intern::intern;
 use tlang_lexer::Lexer;
 use tlang_span::{NodeId, NodeIdAllocator, Span};
 

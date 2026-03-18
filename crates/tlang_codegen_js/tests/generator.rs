@@ -251,10 +251,7 @@ fn test_list_literal() {
 
 #[test]
 fn test_partial_application() {
-    let output = compile!(
-        "let add1 = add(_, 1);",
-        vec![("add", DefKind::Function(2))]
-    );
+    let output = compile!("let add1 = add(_, 1);", vec![("add", DefKind::Function(2))]);
     let expected_output = indoc! {"
         let add1 = (_) => add(_, 1);
     "};

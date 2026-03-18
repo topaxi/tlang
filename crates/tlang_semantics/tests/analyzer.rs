@@ -1,5 +1,6 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
+use tlang_defs::{Def, DefId, DefKind};
 use tlang_parser::Parser;
 use tlang_semantics::{
     SemanticAnalysisContext, SemanticAnalysisPass,
@@ -8,7 +9,6 @@ use tlang_semantics::{
     passes::{DeclarationAnalyzer, VariableUsageValidator},
 };
 use tlang_span::{LineColumn, NodeId, Span};
-use tlang_defs::{DefId, Def, DefKind};
 
 mod common;
 
