@@ -1,6 +1,6 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
-use tlang_symbols::SymbolType;
+use tlang_defs::DefKind;
 
 use crate::common::CodegenOptions;
 
@@ -350,7 +350,7 @@ fn test_function_reuse_param_name_with_pattern() {
     let mut options = CodegenOptions::default();
     options
         .builtin_symbols
-        .push(("filter", SymbolType::Function(2)));
+        .push(("filter", DefKind::Function(2)));
     let output = compile!(
         indoc! {"
             // quicksort(a[]) -> a[]

@@ -11,12 +11,13 @@ oxc_sourcemap = "6"
 oxc_estree = { version = "0.119", features = ["serialize"] }
 oxc_span = "0.119"
 tlang_ast = { path = "../tlang_ast" }
+tlang_intern = { path = "../tlang_intern" }
 tlang_hir = { path = "../tlang_hir" }
 tlang_hir_opt = { path = "../tlang_hir_opt" }
 tlang_parser = { path = "../tlang_parser" }
 tlang_semantics = { path = "../tlang_semantics" }
 tlang_span = { path = "../tlang_span" }
-tlang_symbols = { path = "../tlang_symbols" }
+tlang_defs = { path = "../tlang_defs" }
 
 [dev-dependencies]
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }

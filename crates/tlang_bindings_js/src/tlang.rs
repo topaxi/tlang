@@ -16,7 +16,7 @@ use tlang_parser::Parser;
 use tlang_parser::error::{ParseError, ParseIssue};
 use tlang_semantics::SemanticAnalyzer;
 use tlang_span::NodeId;
-use tlang_symbols::{SymbolTable, SymbolType};
+use tlang_defs::{DefScope, DefKind};
 use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
@@ -204,7 +204,7 @@ impl Tlang {
         // runtime to panic with "Function not found".
         if !self.analyzer.has_builtin_symbol(name) {
             self.analyzer
-                .add_builtin_symbols(&[(name, SymbolType::Function(arity))]);
+                .add_builtin_symbols(&[(name, DefKind::Function(arity))]);
         }
     }
 
@@ -265,10 +265,10 @@ impl Tlang {
 
         if let Some(ast) = self.ast() {
             // Deep-clone the symbol tables so the lowering pass can mutate them
-            // (e.g. via `SymbolTable::shift()`) without corrupting the analyzer's
+            // (e.g. via `DefScope::shift()`) without corrupting the analyzer's
             // state across multiple lowering invocations (e.g. when toggling
             // optimisation options).
-            let symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>> = self
+            let symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>> = self
                 .analyzer
                 .symbol_tables()
                 .iter()

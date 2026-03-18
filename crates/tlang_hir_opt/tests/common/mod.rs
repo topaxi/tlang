@@ -10,7 +10,7 @@ use tlang_hir_pretty::HirPrettyOptions;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 use tlang_span::HirId;
-use tlang_symbols::SymbolType;
+use tlang_defs::DefKind;
 
 #[ctor::ctor]
 fn before_all() {
@@ -24,7 +24,7 @@ fn before_all() {
 pub fn compile(source: &str) -> hir::LowerResult {
     let (mut ast, parse_meta) = Parser::from_source(source).parse().unwrap();
     let mut semantic_analyzer = SemanticAnalyzer::default();
-    semantic_analyzer.add_builtin_symbols(&[("println", SymbolType::Function(u16::MAX))]);
+    semantic_analyzer.add_builtin_symbols(&[("println", DefKind::Function(u16::MAX))]);
     semantic_analyzer.analyze(&mut ast).unwrap();
     lower_to_hir(
         &ast,
@@ -45,32 +45,32 @@ pub fn compile_with_interpreter_builtins(source: &str) -> hir::LowerResult {
     // sorted by name first, then const symbols).  We only list the subset
     // needed by the tests in this file; the exact numbers don't matter as long
     // as they are unique and non-None.
-    let builtins: &[(&str, SymbolType, Option<usize>)] = &[
+    let builtins: &[(&str, DefKind, Option<usize>)] = &[
         // module symbols – no slot
-        ("math", SymbolType::Module, None),
+        ("math", DefKind::Module, None),
         // native functions (alphabetical, matching interpreter slot order)
-        ("filter", SymbolType::Function(2), Some(0)),
-        ("foldl", SymbolType::Function(3), Some(1)),
-        ("log", SymbolType::Function(u16::MAX), Some(2)),
-        ("map", SymbolType::Function(2), Some(3)),
+        ("filter", DefKind::Function(2), Some(0)),
+        ("foldl", DefKind::Function(3), Some(1)),
+        ("log", DefKind::Function(u16::MAX), Some(2)),
+        ("map", DefKind::Function(2), Some(3)),
         // enum/protocol type symbols – no slot
-        ("Option", SymbolType::Enum, None),
-        ("Result", SymbolType::Enum, None),
-        ("Functor", SymbolType::Protocol, None),
-        ("Functor::map", SymbolType::ProtocolMethod(2), None),
-        ("Iterable", SymbolType::Protocol, None),
-        ("Iterable::iter", SymbolType::ProtocolMethod(1), None),
-        ("Iterator", SymbolType::Protocol, None),
-        ("Iterator::next", SymbolType::ProtocolMethod(1), None),
+        ("Option", DefKind::Enum, None),
+        ("Result", DefKind::Enum, None),
+        ("Functor", DefKind::Protocol, None),
+        ("Functor::map", DefKind::ProtocolMethod(2), None),
+        ("Iterable", DefKind::Protocol, None),
+        ("Iterable::iter", DefKind::ProtocolMethod(1), None),
+        ("Iterator", DefKind::Protocol, None),
+        ("Iterator::next", DefKind::ProtocolMethod(1), None),
         // const value symbols – need slots
-        ("Option::Some", SymbolType::EnumVariant(1), Some(4)),
-        ("Option::None", SymbolType::EnumVariant(0), Some(5)),
-        ("Some", SymbolType::EnumVariant(1), Some(6)),
-        ("None", SymbolType::EnumVariant(0), Some(7)),
-        ("Result::Ok", SymbolType::EnumVariant(1), Some(8)),
-        ("Result::Err", SymbolType::EnumVariant(1), Some(9)),
-        ("Ok", SymbolType::EnumVariant(1), Some(10)),
-        ("Err", SymbolType::EnumVariant(1), Some(11)),
+        ("Option::Some", DefKind::EnumVariant(1), Some(4)),
+        ("Option::None", DefKind::EnumVariant(0), Some(5)),
+        ("Some", DefKind::EnumVariant(1), Some(6)),
+        ("None", DefKind::EnumVariant(0), Some(7)),
+        ("Result::Ok", DefKind::EnumVariant(1), Some(8)),
+        ("Result::Err", DefKind::EnumVariant(1), Some(9)),
+        ("Ok", DefKind::EnumVariant(1), Some(10)),
+        ("Err", DefKind::EnumVariant(1), Some(11)),
     ];
 
     let (mut ast, parse_meta) = Parser::from_source(source).parse().unwrap();

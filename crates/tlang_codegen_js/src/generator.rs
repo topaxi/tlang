@@ -14,7 +14,7 @@ use oxc_estree::{ESTree, PrettyJSSerializer};
 use tlang_hir as hir;
 use tlang_hir_opt::hir_opt::{HirOptContext, HirPass};
 use tlang_span::{HirId, HirIdAllocator, Span as TlangSpan};
-use tlang_symbols::SymbolType;
+use tlang_defs::DefKind;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct FunctionContext {
@@ -41,7 +41,7 @@ impl CodegenJS {
     pub fn new() -> Self {
         let protocol_names = Self::get_standard_library_symbols()
             .iter()
-            .filter(|(_, ty)| matches!(ty, SymbolType::Protocol))
+            .filter(|(_, ty)| matches!(ty, DefKind::Protocol))
             .map(|(name, _)| (*name).to_string())
             .collect();
 
@@ -85,44 +85,44 @@ impl CodegenJS {
         parts.join("\n")
     }
 
-    pub fn get_standard_library_symbols() -> &'static [(&'static str, SymbolType)] {
+    pub fn get_standard_library_symbols() -> &'static [(&'static str, DefKind)] {
         &[
-            ("Option", SymbolType::Enum),
-            ("Result", SymbolType::Enum),
-            ("Option::Some", SymbolType::EnumVariant(1)),
-            ("Option::None", SymbolType::EnumVariant(0)),
-            ("Result::Ok", SymbolType::EnumVariant(1)),
-            ("Result::Err", SymbolType::EnumVariant(1)),
-            ("Some", SymbolType::EnumVariant(1)),
-            ("None", SymbolType::EnumVariant(0)),
-            ("Ok", SymbolType::EnumVariant(1)),
-            ("Err", SymbolType::EnumVariant(1)),
-            ("Functor", SymbolType::Protocol),
-            ("Functor::map", SymbolType::ProtocolMethod(2)),
-            ("Match", SymbolType::Protocol),
-            ("Match::matches", SymbolType::ProtocolMethod(2)),
-            ("Regex", SymbolType::Struct),
-            ("Iterable", SymbolType::Protocol),
-            ("Iterable::iter", SymbolType::ProtocolMethod(1)),
-            ("Iterator", SymbolType::Protocol),
-            ("Iterator::next", SymbolType::ProtocolMethod(1)),
-            ("len", SymbolType::Function(1)),
-            ("log", SymbolType::Function(u16::MAX)),
-            ("math", SymbolType::Module),
-            ("math::pi", SymbolType::Variable),
-            ("math::max", SymbolType::Function(u16::MAX)),
-            ("math::min", SymbolType::Function(u16::MAX)),
-            ("math::floor", SymbolType::Function(1)),
-            ("math::random", SymbolType::Function(0)),
-            ("random_int", SymbolType::Function(1)),
-            ("math::sqrt", SymbolType::Function(1)),
-            ("compose", SymbolType::Function(2)),
-            ("re", SymbolType::Function(2)),
-            ("map", SymbolType::Function(2)),
-            ("panic", SymbolType::Function(1)),
-            ("string", SymbolType::Module),
-            ("string::from_char_code", SymbolType::Function(1)),
-            ("string::char_code_at", SymbolType::Function(2)),
+            ("Option", DefKind::Enum),
+            ("Result", DefKind::Enum),
+            ("Option::Some", DefKind::EnumVariant(1)),
+            ("Option::None", DefKind::EnumVariant(0)),
+            ("Result::Ok", DefKind::EnumVariant(1)),
+            ("Result::Err", DefKind::EnumVariant(1)),
+            ("Some", DefKind::EnumVariant(1)),
+            ("None", DefKind::EnumVariant(0)),
+            ("Ok", DefKind::EnumVariant(1)),
+            ("Err", DefKind::EnumVariant(1)),
+            ("Functor", DefKind::Protocol),
+            ("Functor::map", DefKind::ProtocolMethod(2)),
+            ("Match", DefKind::Protocol),
+            ("Match::matches", DefKind::ProtocolMethod(2)),
+            ("Regex", DefKind::Struct),
+            ("Iterable", DefKind::Protocol),
+            ("Iterable::iter", DefKind::ProtocolMethod(1)),
+            ("Iterator", DefKind::Protocol),
+            ("Iterator::next", DefKind::ProtocolMethod(1)),
+            ("len", DefKind::Function(1)),
+            ("log", DefKind::Function(u16::MAX)),
+            ("math", DefKind::Module),
+            ("math::pi", DefKind::Variable),
+            ("math::max", DefKind::Function(u16::MAX)),
+            ("math::min", DefKind::Function(u16::MAX)),
+            ("math::floor", DefKind::Function(1)),
+            ("math::random", DefKind::Function(0)),
+            ("random_int", DefKind::Function(1)),
+            ("math::sqrt", DefKind::Function(1)),
+            ("compose", DefKind::Function(2)),
+            ("re", DefKind::Function(2)),
+            ("map", DefKind::Function(2)),
+            ("panic", DefKind::Function(1)),
+            ("string", DefKind::Module),
+            ("string::from_char_code", DefKind::Function(1)),
+            ("string::char_code_at", DefKind::Function(2)),
         ]
     }
 
@@ -412,7 +412,7 @@ impl<'a> InnerCodegen<'a> {
     pub fn attach_leading_comments(
         &mut self,
         stmt: &mut Statement<'a>,
-        comments: &[tlang_ast::token::Token],
+        comments: &[tlang_ast::token::CommentToken],
     ) {
         use oxc_ast::{Comment, CommentKind, CommentPosition};
         use oxc_span::GetSpanMut;
@@ -429,15 +429,14 @@ impl<'a> InnerCodegen<'a> {
         }
 
         for comment_token in comments {
-            let kind = &comment_token.kind;
-            let (text, oxc_kind) = match kind {
-                tlang_ast::token::TokenKind::SingleLineComment(s) => {
-                    (format!("//{s}"), CommentKind::Line)
+            let (text, oxc_kind) = match comment_token.kind {
+                tlang_ast::token::CommentKind::SingleLine => {
+                    (format!("//{}", comment_token.text), CommentKind::Line)
                 }
-                tlang_ast::token::TokenKind::MultiLineComment(s) => {
-                    (format!("/*{s}*/"), CommentKind::MultiLineBlock)
-                }
-                _ => continue,
+                tlang_ast::token::CommentKind::MultiLine => (
+                    format!("/*{}*/", comment_token.text),
+                    CommentKind::MultiLineBlock,
+                ),
             };
 
             // Offset the comment span past the original source text so that the

@@ -65,10 +65,7 @@ impl<'a> InnerCodegen<'a> {
             Literal::UnsignedInteger(value) => self.num_expr(*value as f64),
             Literal::Float(value) => self.num_expr(*value),
             Literal::Boolean(value) => self.bool_expr(*value),
-            Literal::String(value) | Literal::Char(value) => self.str_expr(value),
-            Literal::TaggedString(_, _) => {
-                unreachable!("TaggedString is expanded to a Call by the parser")
-            }
+            Literal::String(id) | Literal::Char(id) => self.str_expr(tlang_intern::get(*id)),
             Literal::None => self.undefined_expr(),
         }
     }

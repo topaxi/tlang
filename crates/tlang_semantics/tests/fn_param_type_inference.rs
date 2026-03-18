@@ -1,7 +1,7 @@
 use tlang_ast::node::{FunctionDeclaration, Res, StmtKind, TyKind};
 use tlang_parser::Parser;
 use tlang_semantics::analyzer::SemanticAnalyzer;
-use tlang_symbols::SymbolType;
+use tlang_defs::DefKind;
 
 mod common;
 
@@ -13,7 +13,7 @@ fn analyze_fn_decls(source: &str) -> Vec<FunctionDeclaration> {
 
 fn analyze_fn_decls_with_builtins(
     source: &str,
-    builtins: &[(&str, SymbolType)],
+    builtins: &[(&str, DefKind)],
 ) -> Vec<FunctionDeclaration> {
     let mut parser = Parser::from_source(source);
     let (mut ast, _) = parser.parse().unwrap();

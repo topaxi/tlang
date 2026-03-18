@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
-use tlang_ast::token::Token;
 use tlang_parser::error::{ParseIssue, ParseIssueKind};
 use tlang_semantics::diagnostic::{Diagnostic, Severity};
 use tlang_span::{LineColumn, Span};
@@ -100,31 +99,16 @@ impl From<ParseIssue> for JsParseIssue {
 #[derive(Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi)]
 pub enum JsParseIssueKind {
-    UnexpectedToken(JsToken),
+    /// Debug representation of the unexpected token kind.
+    UnexpectedToken(String),
     UnexpectedEof,
 }
 
 impl From<ParseIssueKind> for JsParseIssueKind {
     fn from(kind: ParseIssueKind) -> Self {
         match kind {
-            ParseIssueKind::UnexpectedToken(token) => Self::UnexpectedToken(token.into()),
+            ParseIssueKind::UnexpectedToken(desc) => Self::UnexpectedToken(desc),
             ParseIssueKind::UnexpectedEof => Self::UnexpectedEof,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Tsify)]
-#[tsify(into_wasm_abi)]
-pub struct JsToken {
-    pub kind: String, // Simplified to string representation for now to avoid huge enum mirror
-    pub span: JsSpan,
-}
-
-impl From<Token> for JsToken {
-    fn from(token: Token) -> Self {
-        Self {
-            kind: format!("{:?}", token.kind),
-            span: token.span.into(),
         }
     }
 }

@@ -17,6 +17,7 @@ stdlib = ["dep:tlang_stdlib"]
 
 [dependencies]
 tlang_ast = { path = "../../tlang_ast" }
+tlang_intern = { path = "../../tlang_intern" }
 tlang_hir = { path = "../../tlang_hir" }
 tlang_macros = { path = "../../tlang_macros" }
 tlang_parser = { path = "../../tlang_parser" }

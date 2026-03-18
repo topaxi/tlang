@@ -1,3 +1,4 @@
+use tlang_intern::intern;
 use tlang_ast::keyword::{Keyword, kw};
 use tlang_ast::node::{
     self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
@@ -7,7 +8,7 @@ use tlang_ast::node::{
     Path, ProtocolDeclaration, ProtocolMethodSignature, Stmt, StmtKind, StructDeclaration,
     StructField, Ty, TyKind, UnaryOp,
 };
-use tlang_ast::token::{Literal, TaggedStringPart, Token, TokenKind};
+use tlang_ast::token::{CommentKind, CommentToken, Literal, TaggedStringPart, Token, TokenKind};
 use tlang_lexer::Lexer;
 use tlang_span::{NodeId, NodeIdAllocator, Span};
 
@@ -41,7 +42,7 @@ pub struct Parser<'src> {
 
     errors: Vec<ParseIssue>,
 
-    trailing_comments_buffer: Vec<Token>,
+    trailing_comments_buffer: Vec<CommentToken>,
 
     /// NodeIds of expressions that produce compile-time-constant values
     /// (e.g. tagged string parts lists). Propagated through lowering into
@@ -130,7 +131,7 @@ impl<'src> Parser<'src> {
     fn push_unexpected_token_error(&mut self, expected: &str, actual: Token) {
         let span = actual.span;
         let msg = format!("Expected {}, found {:?}", expected, actual.kind);
-        let kind = ParseIssueKind::UnexpectedToken(actual);
+        let kind = ParseIssueKind::UnexpectedToken(format!("{:?}", actual.kind));
 
         self.errors.push(ParseIssue { msg, kind, span });
     }
@@ -184,7 +185,7 @@ impl<'src> Parser<'src> {
         expect_token_matches!(
             self,
             &format!("{expected:?}"),
-            _kind if *_kind == expected
+            _kind if _kind == expected
         );
     }
 
@@ -193,7 +194,7 @@ impl<'src> Parser<'src> {
         expect_token_matches!(
             self,
             &format!("not {expected:?}"),
-            _kind if *_kind != expected
+            _kind if _kind != expected
         );
     }
 
@@ -210,11 +211,12 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_identifier(&mut self) -> Ident {
-        expect_token_matches!(self, TokenKind::Identifier(_));
+        expect_token_matches!(self, TokenKind::Identifier);
 
         let current_token = self.advance();
+        let name = self.lexer.span_text(current_token.span);
 
-        Ident::new(current_token.get_identifier().unwrap(), current_token.span)
+        Ident::new(name, current_token.span)
     }
 
     fn at_eof(&self) -> bool {
@@ -222,41 +224,34 @@ impl<'src> Parser<'src> {
     }
 
     fn advance(&mut self) -> Token {
-        if self.at_eof() {
-            // In error recovery we scan ahead and look for the expected token.
-            // If we reach the end of the file, we don't want to continue scanning and
-            // break our `while let Some(_) = self.current_token` loop.
-            let consumed_token = self.current_token.clone();
-            self.next_token = Token::new(TokenKind::Eof, consumed_token.span);
+        let consumed = self.current_token;
 
-            return consumed_token;
+        if self.at_eof() {
+            self.next_token = Token::new(TokenKind::Eof, consumed.span);
+            return consumed;
         }
 
-        let next_token = std::mem::replace(&mut self.next_token, self.lexer.next_token());
-        let consumed_token = std::mem::replace(&mut self.current_token, next_token);
-        self.previous_span = consumed_token.span;
+        self.current_token = self.next_token;
+        self.next_token = self.lexer.next_token();
+        self.previous_span = consumed.span;
         debug!("Advanced to {:?}", self.current_token);
-        consumed_token
+        consumed
     }
 
     #[inline(always)]
-    fn current_token_kind(&self) -> &TokenKind {
-        &self.current_token.kind
+    fn current_token_kind(&self) -> TokenKind {
+        self.current_token.kind
     }
 
     #[inline(always)]
-    pub fn peek_token_kind(&self) -> &TokenKind {
-        &self.next_token.kind
+    pub fn peek_token_kind(&self) -> TokenKind {
+        self.next_token.kind
     }
 
     fn save_state(&self) -> (Lexer<'src>, Token, Token) {
         debug!("Saving state at {:?}", self.current_token);
 
-        (
-            self.lexer.clone(),
-            self.current_token.clone(),
-            self.next_token.clone(),
-        )
+        (self.lexer.clone(), self.current_token, self.next_token)
     }
 
     fn restore_state(&mut self, state: (Lexer<'src>, Token, Token)) {
@@ -267,13 +262,31 @@ impl<'src> Parser<'src> {
         self.next_token = state.2;
     }
 
-    fn parse_comments(&mut self) -> Vec<Token> {
-        let mut comments: Vec<Token> = Vec::new();
+    fn parse_comments(&mut self) -> Vec<CommentToken> {
+        let mut comments: Vec<CommentToken> = Vec::new();
         while matches!(
             self.current_token_kind(),
-            TokenKind::SingleLineComment(_) | TokenKind::MultiLineComment(_)
+            TokenKind::SingleLineComment | TokenKind::MultiLineComment
         ) {
-            comments.push(self.advance());
+            let token = self.advance();
+            let (kind, text) = match token.kind {
+                TokenKind::SingleLineComment => {
+                    let full = self.lexer.span_text(token.span);
+                    // Strip the leading "//"
+                    (CommentKind::SingleLine, &full[2..])
+                }
+                TokenKind::MultiLineComment => {
+                    let full = self.lexer.span_text(token.span);
+                    // Strip the leading "/*" and trailing "*/"
+                    (CommentKind::MultiLine, &full[2..full.len() - 2])
+                }
+                _ => unreachable!(),
+            };
+            comments.push(CommentToken {
+                kind,
+                text: text.into(),
+                span: token.span,
+            });
         }
         comments
     }
@@ -303,12 +316,12 @@ impl<'src> Parser<'src> {
         }
 
         let mut span = self.create_span_from_current_token();
-        let mut node = match &self.current_token.kind {
+        let mut node = match self.current_token.kind {
             TokenKind::Keyword(Keyword::Let) => self.parse_variable_declaration(),
             TokenKind::Keyword(Keyword::Fn)
                 // If the next token is an identifier, we assume a function declaration.
                 // If it's not, we assume a function expression which is handled as a primary expression.
-                if matches!(self.peek_token_kind(), TokenKind::Identifier(_)) =>
+                if matches!(self.peek_token_kind(), TokenKind::Identifier) =>
             {
                 self.parse_function_declaration()
             }
@@ -557,8 +570,8 @@ impl<'src> Parser<'src> {
             self.current_token_kind(),
             TokenKind::Keyword(Keyword::Fn)
                 | TokenKind::Keyword(Keyword::Apply)
-                | TokenKind::SingleLineComment(_)
-                | TokenKind::MultiLineComment(_)
+                | TokenKind::SingleLineComment
+                | TokenKind::MultiLineComment
         ) {
             if matches!(
                 self.current_token_kind(),
@@ -787,7 +800,7 @@ impl<'src> Parser<'src> {
             expect_token_matches!(
                 self,
                 "identifier, literal, wildcard or rest parameter",
-                TokenKind::Identifier(_)
+                TokenKind::Identifier
                     | TokenKind::Literal(_)
                     | TokenKind::Keyword(Keyword::Underscore)
                     | TokenKind::DotDotDot
@@ -888,7 +901,7 @@ impl<'src> Parser<'src> {
         // If immediately closed or the first token is a identifier followed by a colon or comma,
         // we assume we are parsing a dict.
         let is_dict = matches!(self.current_token_kind(), TokenKind::RBrace)
-            || (matches!(self.current_token_kind(), TokenKind::Identifier(_))
+            || (matches!(self.current_token_kind(), TokenKind::Identifier)
                 && matches!(self.peek_token_kind(), TokenKind::Colon | TokenKind::Comma));
         if is_dict {
             let elements = self.parse_dict_elements();
@@ -1020,7 +1033,7 @@ impl<'src> Parser<'src> {
 
     fn parse_signed_numeric_literal(&mut self) -> Expr {
         let invert = matches!(self.advance().kind, TokenKind::Minus);
-        let literal = self.advance().take_literal().unwrap();
+        let literal = self.advance().literal().unwrap();
 
         if invert {
             node::expr!(self.unique_id(), Literal(Box::new(literal.invert_sign())))
@@ -1054,13 +1067,25 @@ impl<'src> Parser<'src> {
 
     fn parse_literal_expression(&mut self) -> Expr {
         let span = self.create_span_from_current_token();
-        let literal = self.advance().take_literal().unwrap();
-
-        if let Literal::TaggedString(tag, parts) = literal {
-            return self.expand_tagged_string(&tag, parts, span);
-        }
+        let literal = self.advance().literal().unwrap();
 
         node::expr!(self.unique_id(), Literal(Box::new(literal))).with_span(span)
+    }
+
+    fn parse_tagged_string_expression(&mut self) -> Expr {
+        let span = self.create_span_from_current_token();
+        let token = self.current_token;
+        let TokenKind::TaggedStringStart(quote) = token.kind else {
+            unreachable!()
+        };
+        // Extract tag name from the span: span covers "tag<quote>content<quote>",
+        // but the tag is just the identifier before the opening quote.
+        let full = self.lexer.span_text(token.span);
+        let tag = &full[..full.len() - quote.len_utf8()];
+        self.advance();
+        // Parts were eagerly read by the lexer and buffered.
+        let parts = self.lexer.take_tagged_string_parts().unwrap_or_default();
+        self.expand_tagged_string(tag, parts, span)
     }
 
     /// Expand a tagged string literal into a function call expression:
@@ -1082,7 +1107,7 @@ impl<'src> Parser<'src> {
                     // may contain domain-specific escapes like \d in regex patterns.
                     string_parts.push(node::expr!(
                         self.unique_id(),
-                        Literal(Box::new(Literal::String(text)))
+                        Literal(Box::new(Literal::String(intern(&text))))
                     ));
                 }
                 TaggedStringPart::Interpolation {
@@ -1136,8 +1161,8 @@ impl<'src> Parser<'src> {
 
         // Verify that all interpolation tokens were consumed (catches `{x y}` style errors)
         if !matches!(sub_parser.current_token_kind(), TokenKind::Eof) {
-            let unexpected = sub_parser.current_token.clone();
-            sub_parser.push_unexpected_token_error("end of interpolation", unexpected);
+            sub_parser
+                .push_unexpected_token_error("end of interpolation", sub_parser.current_token);
         }
 
         // Propagate node ID allocator state back to parent
@@ -1199,8 +1224,9 @@ impl<'src> Parser<'src> {
                         | Keyword::Underscore
                         | Keyword::_Self
                 )
-                | TokenKind::Identifier(_)
+                | TokenKind::Identifier
                 | TokenKind::Literal(_)
+                | TokenKind::TaggedStringStart(_)
         );
 
         let mut span = self.create_span_from_current_token();
@@ -1230,8 +1256,9 @@ impl<'src> Parser<'src> {
             TokenKind::Keyword(Keyword::Match) => self.parse_match_expression(),
             TokenKind::Keyword(Keyword::Underscore) => self.parse_wildcard(),
             TokenKind::Literal(_) => self.parse_literal_expression(),
+            TokenKind::TaggedStringStart(_) => self.parse_tagged_string_expression(),
             TokenKind::Keyword(Keyword::_Self) => self.parse_self_expression(),
-            TokenKind::Identifier(_) => self.parse_identifier_expr(),
+            TokenKind::Identifier => self.parse_identifier_expr(),
             _ => {
                 if self.recoverable() {
                     // `expect_token_matches!` above already pushed an error and advanced
@@ -1242,7 +1269,7 @@ impl<'src> Parser<'src> {
                         Literal(Box::new(Literal::UnsignedInteger(0)))
                     )
                 } else {
-                    self.panic_unexpected_token("primary expression", self.current_token.clone());
+                    self.panic_unexpected_token("primary expression", self.current_token);
                 }
             }
         };
@@ -1258,7 +1285,7 @@ impl<'src> Parser<'src> {
         let identifier_span = self.create_span_from_current_token();
 
         let token = self.advance();
-        let identifier = token.get_identifier().unwrap();
+        let identifier = self.lexer.span_text(token.span);
 
         let mut path = Path::from_ident(Ident::new(identifier, identifier_span));
         let mut span = path.span;
@@ -1362,10 +1389,10 @@ impl<'src> Parser<'src> {
         parameters
     }
 
-    fn is_type_annotation_token(token: &TokenKind) -> bool {
+    fn is_type_annotation_token(token: TokenKind) -> bool {
         matches!(
             token,
-            TokenKind::Identifier(_)
+            TokenKind::Identifier
                 | TokenKind::GreaterThan
                 | TokenKind::LessThan
                 | TokenKind::PathSeparator
@@ -1373,10 +1400,10 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_type_annotation(&mut self) -> Ty {
-        expect_token_matches!(self, "type annotation", TokenKind::Identifier(_));
+        expect_token_matches!(self, "type annotation", TokenKind::Identifier);
 
         match self.current_token_kind() {
-            TokenKind::Identifier(_) => {
+            TokenKind::Identifier => {
                 let identifier = self.parse_path();
                 let parameters = self.parse_type_annotation_parameters();
 
@@ -1426,7 +1453,7 @@ impl<'src> Parser<'src> {
     fn parse_function_expression(&mut self) -> Expr {
         let mut span = self.create_span_from_current_token();
         self.consume_keyword_token(Keyword::Fn);
-        let name = if matches!(self.current_token_kind(), TokenKind::Identifier(_)) {
+        let name = if matches!(self.current_token_kind(), TokenKind::Identifier) {
             self.parse_single_identifier()
         } else {
             node::expr!(
@@ -1478,7 +1505,7 @@ impl<'src> Parser<'src> {
                     elements.push((ident, pattern));
                 } else {
                     elements.push((
-                        ident.clone(),
+                        ident,
                         node::pat!(self.unique_id(), Identifier(Box::new(ident))),
                     ));
                 }
@@ -1527,8 +1554,8 @@ impl<'src> Parser<'src> {
         while matches!(
             self.current_token_kind(),
             TokenKind::Keyword(Keyword::Fn)
-                | TokenKind::SingleLineComment(_)
-                | TokenKind::MultiLineComment(_)
+                | TokenKind::SingleLineComment
+                | TokenKind::MultiLineComment
         ) {
             // We have to check if it is the same function declaration as the previous one.
             // Parse ahead to get the identifier of the function, which might be an Identifier,
@@ -1552,7 +1579,7 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            if matches!(self.current_token_kind(), TokenKind::Identifier(_)) {
+            if matches!(self.current_token_kind(), TokenKind::Identifier) {
                 let node = self.parse_function_name();
 
                 if name.is_some()
@@ -1578,7 +1605,7 @@ impl<'src> Parser<'src> {
                         // We found something else, which we can't use as the name of the function.
                         // Stop parsing function declarations and rewind the lexer and panic.
                         self.restore_state(saved_state);
-                        self.panic_unexpected_token("identifier", self.current_token.clone());
+                        self.panic_unexpected_token("identifier", self.current_token);
                     }
                 }
             }
@@ -1648,7 +1675,7 @@ impl<'src> Parser<'src> {
         Some(expression)
     }
 
-    fn is_binary_op(token: &TokenKind) -> bool {
+    fn is_binary_op(token: TokenKind) -> bool {
         matches!(
             token,
             TokenKind::Plus
@@ -1676,7 +1703,7 @@ impl<'src> Parser<'src> {
         )
     }
 
-    fn map_binary_op(token: &TokenKind) -> BinaryOpKind {
+    fn map_binary_op(token: TokenKind) -> BinaryOpKind {
         match token {
             TokenKind::Plus => BinaryOpKind::Add,
             TokenKind::Minus => BinaryOpKind::Sub,
@@ -1769,7 +1796,7 @@ impl<'src> Parser<'src> {
         expect_token_matches!(self, "literal", TokenKind::Literal(_));
 
         match self.current_token_kind() {
-            TokenKind::Literal(_) => self.advance().take_literal().unwrap(),
+            TokenKind::Literal(_) => self.advance().literal().unwrap(),
             _ => unreachable!("Expected literal"),
         }
     }
@@ -1787,7 +1814,7 @@ impl<'src> Parser<'src> {
             self,
             "literal, identifier or list extraction",
             TokenKind::Literal(_)
-                | TokenKind::Identifier(_)
+                | TokenKind::Identifier
                 | TokenKind::Keyword(Keyword::Underscore | Keyword::_Self)
                 | TokenKind::LBracket
         );
@@ -1808,7 +1835,7 @@ impl<'src> Parser<'src> {
             }
             // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
             // Simple identifiers will be used as is and mapped to a function parameter.
-            TokenKind::Identifier(_) => match self.peek_token_kind() {
+            TokenKind::Identifier => match self.peek_token_kind() {
                 TokenKind::PathSeparator => self.parse_enum_extraction(),
                 TokenKind::LParen | TokenKind::LBrace => self.parse_enum_extraction(),
                 _ => self.parse_identifier_pattern(),

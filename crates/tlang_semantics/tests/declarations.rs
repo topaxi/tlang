@@ -4,7 +4,7 @@ use tlang_ast::node::{ExprKind, StmtKind};
 use tlang_parser::Parser;
 use tlang_semantics::analyzer::SemanticAnalyzer;
 use tlang_span::{LineColumn, NodeId, Span};
-use tlang_symbols::{SymbolId, SymbolInfo, SymbolType};
+use tlang_defs::{DefId, Def, DefKind};
 
 mod common;
 
@@ -13,7 +13,7 @@ macro_rules! analyze {
         let mut parser = Parser::from_source($source);
         let (mut ast, _) = parser.parse().unwrap();
         let mut analyzer = SemanticAnalyzer::default();
-        analyzer.add_builtin_symbols(&[("panic", SymbolType::Function(1))]);
+        analyzer.add_builtin_symbols(&[("panic", DefKind::Function(1))]);
         match analyzer.analyze(&mut ast) {
             Ok(_) => (analyzer, ast),
             Err(diagnostics) => panic!("Expected no diagnostics, got {:#?}", diagnostics),
@@ -33,12 +33,12 @@ fn test_analyze_variable_declaration() {
 
     assert_eq!(
         symbol_info,
-        vec![SymbolInfo {
+        vec![Def {
             node_id: Some(NodeId::new(3)),
             hir_id: None,
-            id: SymbolId::new(2),
+            id: DefId::new(2),
             name: "a".into(),
-            symbol_type: SymbolType::Variable,
+            kind: DefKind::Variable,
             defined_at: Span::lc(
                 LineColumn { line: 0, column: 4 },
                 LineColumn { line: 0, column: 5 }
@@ -75,12 +75,12 @@ fn test_block_scope() {
 
     assert_eq!(
         program_symbols.borrow().get_by_name("a"),
-        vec![SymbolInfo {
+        vec![Def {
             node_id: Some(NodeId::new(3)),
             hir_id: None,
-            id: SymbolId::new(2),
+            id: DefId::new(2),
             name: "a".into(),
-            symbol_type: SymbolType::Variable,
+            kind: DefKind::Variable,
             defined_at: Span::lc(
                 LineColumn {
                     line: 1,
@@ -117,12 +117,12 @@ fn test_block_scope() {
 
     assert_eq!(
         block1_symbols.borrow().get_by_name("a"),
-        vec![SymbolInfo {
+        vec![Def {
             node_id: Some(NodeId::new(3)),
             hir_id: None,
-            id: SymbolId::new(2),
+            id: DefId::new(2),
             name: "a".into(),
-            symbol_type: SymbolType::Variable,
+            kind: DefKind::Variable,
             defined_at: Span::lc(
                 LineColumn {
                     line: 1,
@@ -143,12 +143,12 @@ fn test_block_scope() {
     );
     assert_eq!(
         block1_symbols.borrow().get_by_name("b"),
-        vec![SymbolInfo {
+        vec![Def {
             node_id: Some(NodeId::new(8)),
             hir_id: None,
-            id: SymbolId::new(3),
+            id: DefId::new(3),
             name: "b".into(),
-            symbol_type: SymbolType::Variable,
+            kind: DefKind::Variable,
             defined_at: Span::lc(
                 LineColumn {
                     line: 3,
@@ -187,12 +187,12 @@ fn test_block_scope() {
 
     assert_eq!(
         block2_symbols.borrow().get_by_name("a"),
-        vec![SymbolInfo {
+        vec![Def {
             node_id: Some(NodeId::new(3)),
             hir_id: None,
-            id: SymbolId::new(2),
+            id: DefId::new(2),
             name: "a".into(),
-            symbol_type: SymbolType::Variable,
+            kind: DefKind::Variable,
             defined_at: Span::lc(
                 LineColumn {
                     line: 1,
@@ -213,12 +213,12 @@ fn test_block_scope() {
     );
     assert_eq!(
         block2_symbols.borrow().get_by_name("b"),
-        vec![SymbolInfo {
+        vec![Def {
             node_id: Some(NodeId::new(8)),
             hir_id: None,
-            id: SymbolId::new(3),
+            id: DefId::new(3),
             name: "b".into(),
-            symbol_type: SymbolType::Variable,
+            kind: DefKind::Variable,
             defined_at: Span::lc(
                 LineColumn {
                     line: 3,
@@ -239,12 +239,12 @@ fn test_block_scope() {
     );
     assert_eq!(
         block2_symbols.borrow().get_by_name("c"),
-        vec![SymbolInfo {
+        vec![Def {
             node_id: Some(NodeId::new(13)),
             hir_id: None,
-            id: SymbolId::new(4),
+            id: DefId::new(4),
             name: "c".into(),
-            symbol_type: SymbolType::Variable,
+            kind: DefKind::Variable,
             defined_at: Span::lc(
                 LineColumn {
                     line: 5,
@@ -280,12 +280,12 @@ fn test_should_collect_function_definitions() {
 
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
-        vec![SymbolInfo {
+        vec![Def {
             node_id: Some(NodeId::new(11)),
             hir_id: None,
-            id: SymbolId::new(2),
+            id: DefId::new(2),
             name: "add".into(),
-            symbol_type: SymbolType::Function(2),
+            kind: DefKind::Function(2),
             defined_at: Span::lc(
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
@@ -315,12 +315,12 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
 
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
-        vec![SymbolInfo {
+        vec![Def {
             node_id: Some(NodeId::new(12)),
             hir_id: None,
-            id: SymbolId::new(2),
+            id: DefId::new(2),
             name: "add".into(),
-            symbol_type: SymbolType::Function(1),
+            kind: DefKind::Function(1),
             defined_at: Span::lc(
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
@@ -350,12 +350,12 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
 
     assert_eq!(
         program_symbols.borrow().get_by_name("sum"),
-        vec![SymbolInfo {
+        vec![Def {
             node_id: Some(NodeId::new(15)),
             hir_id: None,
-            id: SymbolId::new(2),
+            id: DefId::new(2),
             name: "sum".into(),
-            symbol_type: SymbolType::Function(1),
+            kind: DefKind::Function(1),
             defined_at: Span::lc(
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
@@ -385,12 +385,12 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
     assert_eq!(
         program_symbols.borrow().get_by_name("factorial"),
         vec![
-            SymbolInfo {
+            Def {
                 node_id: Some(NodeId::new(9)),
                 hir_id: None,
-                id: SymbolId::new(2),
+                id: DefId::new(2),
                 name: "factorial".into(),
-                symbol_type: SymbolType::Function(2),
+                kind: DefKind::Function(2),
                 defined_at: Span::lc(
                     LineColumn { line: 0, column: 3 },
                     LineColumn {
@@ -405,12 +405,12 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                 used: false,
                 global_slot: None,
             },
-            SymbolInfo {
+            Def {
                 node_id: Some(NodeId::new(24)),
                 hir_id: None,
-                id: SymbolId::new(5),
+                id: DefId::new(5),
                 name: "factorial".into(),
-                symbol_type: SymbolType::Function(2),
+                kind: DefKind::Function(2),
                 defined_at: Span::lc(
                     LineColumn { line: 1, column: 4 },
                     LineColumn {
@@ -449,12 +449,12 @@ fn should_collect_function_arguments_with_enum_extraction() {
     assert_eq!(
         program_symbols.borrow().get_by_name("unwrap"),
         vec![
-            SymbolInfo {
+            Def {
                 node_id: Some(NodeId::new(15)),
                 hir_id: None,
-                id: SymbolId::new(5),
+                id: DefId::new(5),
                 name: "unwrap".into(),
-                symbol_type: SymbolType::Function(1),
+                kind: DefKind::Function(1),
                 defined_at: Span::lc(
                     LineColumn { line: 5, column: 4 },
                     LineColumn {
@@ -469,12 +469,12 @@ fn should_collect_function_arguments_with_enum_extraction() {
                 used: false,
                 global_slot: None,
             },
-            SymbolInfo {
+            Def {
                 node_id: Some(NodeId::new(22)),
                 hir_id: None,
-                id: SymbolId::new(7),
+                id: DefId::new(7),
                 name: "unwrap".into(),
-                symbol_type: SymbolType::Function(1),
+                kind: DefKind::Function(1),
                 defined_at: Span::lc(
                     LineColumn { line: 6, column: 4 },
                     LineColumn {
@@ -510,12 +510,12 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
     assert_eq!(
         program_symbols.borrow().get_by_name("used_fn"),
         vec![
-            SymbolInfo {
+            Def {
                 node_id: Some(NodeId::new(5)),
                 hir_id: None,
-                id: SymbolId::new(2),
+                id: DefId::new(2),
                 name: "used_fn".into(),
-                symbol_type: SymbolType::Function(0),
+                kind: DefKind::Function(0),
                 defined_at: Span::lc(
                     LineColumn { line: 0, column: 3 },
                     LineColumn {
@@ -530,12 +530,12 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                 used: true,
                 global_slot: None,
             },
-            SymbolInfo {
+            Def {
                 node_id: Some(NodeId::new(9)),
                 hir_id: None,
-                id: SymbolId::new(4),
+                id: DefId::new(4),
                 name: "used_fn".into(),
-                symbol_type: SymbolType::Function(1),
+                kind: DefKind::Function(1),
                 defined_at: Span::lc(
                     LineColumn { line: 1, column: 4 },
                     LineColumn {

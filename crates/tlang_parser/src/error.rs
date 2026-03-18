@@ -3,7 +3,6 @@ use std::fmt::{Display, Formatter};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
-use tlang_ast::token::Token;
 use tlang_span::Span;
 
 #[derive(Debug, Clone)]
@@ -60,6 +59,7 @@ impl Display for ParseIssue {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum ParseIssueKind {
-    UnexpectedToken(Token),
+    /// Debug representation of the unexpected token kind.
+    UnexpectedToken(String),
     UnexpectedEof,
 }

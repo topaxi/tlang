@@ -2,7 +2,7 @@ use tlang_ast as ast;
 use tlang_ast::node::Ident;
 use tlang_hir::{self as hir};
 use tlang_span::NodeId;
-use tlang_symbols::SymbolType;
+use tlang_defs::DefKind;
 
 use crate::LoweringContext;
 
@@ -18,13 +18,13 @@ impl LoweringContext {
             0,
             iterator_binding_hir_id,
             iterator_binding_name.as_str(),
-            SymbolType::Variable,
+            DefKind::Variable,
             Default::default(),
         );
         let iterator_binding_pat = hir::Pat {
             kind: hir::PatKind::Identifier(
                 iterator_binding_hir_id,
-                Box::new(iterator_binding_name.clone()),
+                Box::new(iterator_binding_name),
             ),
             span: Default::default(),
         };
@@ -46,7 +46,7 @@ impl LoweringContext {
             self.define_symbol_after(
                 accumulator_binding_hir_id,
                 accumulator_binding_name.as_str(),
-                SymbolType::Variable,
+                DefKind::Variable,
                 Default::default(),
                 |s| s.hir_id == Some(iterator_binding_hir_id),
             );
@@ -57,7 +57,7 @@ impl LoweringContext {
                     Box::new(hir::Pat {
                         kind: hir::PatKind::Identifier(
                             accumulator_binding_hir_id,
-                            Box::new(accumulator_binding_name.clone()),
+                            Box::new(accumulator_binding_name),
                         ),
                         span: Default::default(),
                     }),
@@ -118,7 +118,7 @@ impl LoweringContext {
 
             let loop_block = this.with_scope(for_loop.id, |this| {
                 let mut iterator_binding_path = hir::Path::new(
-                    vec![hir::PathSegment::new(iterator_binding_name.clone())],
+                    vec![hir::PathSegment::new(iterator_binding_name)],
                     Default::default(),
                 );
                 iterator_binding_path
@@ -129,7 +129,7 @@ impl LoweringContext {
                     .set_binding_kind(hir::BindingKind::Local);
 
                 let mut accumulator_binding_path = hir::Path::new(
-                    vec![hir::PathSegment::new(accumulator_binding_name.clone())],
+                    vec![hir::PathSegment::new(accumulator_binding_name)],
                     Default::default(),
                 );
                 accumulator_binding_path

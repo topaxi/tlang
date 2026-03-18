@@ -18,7 +18,6 @@ export {
   type JsLineColumn,
   type JsSeverity,
   type JsParseIssueKind,
-  type JsToken,
 } from 'tlang_bindings_js';
 
 export const standardLibrarySource = getStandardLibrarySource();

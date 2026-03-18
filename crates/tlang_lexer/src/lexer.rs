@@ -1,4 +1,5 @@
 use tlang_ast::{
+    intern::intern,
     keyword::{Keyword, is_keyword},
     token::{Literal, TaggedStringPart, Token, TokenKind},
 };
@@ -14,10 +15,13 @@ pub struct Lexer<'src> {
     current_column: u32,
     current_char: char,
     next_char: char,
+    /// Tagged string parts read eagerly when a tagged string start is detected.
+    /// The parser consumes this via `take_tagged_string_parts()`.
+    pending_tagged_parts: Option<Vec<TaggedStringPart>>,
 }
 
-impl Lexer<'_> {
-    pub fn new(source: &str) -> Lexer<'_> {
+impl<'src> Lexer<'src> {
+    pub fn new(source: &'src str) -> Lexer<'src> {
         let mut chars = source.chars();
         let current_char = chars.next().unwrap_or('\0');
         let next_char = chars.next().unwrap_or('\0');
@@ -31,6 +35,7 @@ impl Lexer<'_> {
             current_char,
             next_char,
             chars,
+            pending_tagged_parts: None,
         }
     }
 
@@ -59,8 +64,21 @@ impl Lexer<'_> {
         self.current_column
     }
 
-    pub fn source(&self) -> &str {
+    pub fn source(&self) -> &'src str {
         self.source
+    }
+
+    /// Take the eagerly-read tagged string parts buffered by the last
+    /// `TaggedStringStart` token. Returns `None` if no parts are pending.
+    pub fn take_tagged_string_parts(&mut self) -> Option<Vec<TaggedStringPart>> {
+        self.pending_tagged_parts.take()
+    }
+
+    /// Extract the source text covered by a span, adjusting for the byte offset.
+    pub fn span_text(&self, span: Span) -> &'src str {
+        let start = (span.start - self.byte_offset) as usize;
+        let end = (span.end - self.byte_offset) as usize;
+        &self.source[start..end]
     }
 
     fn advance(&mut self) {
@@ -117,13 +135,13 @@ impl Lexer<'_> {
         ch.is_ascii_alphanumeric() || ch == '_'
     }
 
-    fn read_identifier(&mut self) -> &str {
+    fn read_identifier(&mut self) -> &'src str {
         let start = self.position;
         self.advance_while(Self::is_alphanumeric);
         &self.source[start..self.position]
     }
 
-    fn read_string_literal(&mut self, quote: char) -> Result<String, String> {
+    fn read_string_literal(&mut self, quote: char) -> Result<Literal, String> {
         let mut result = String::new();
 
         while self.current_char != quote && self.current_char != '\0' {
@@ -188,7 +206,12 @@ impl Lexer<'_> {
 
         if self.current_char == quote {
             self.advance(); // consume the closing quote
-            Ok(result)
+            let id = intern(&result);
+            if quote == '"' {
+                Ok(Literal::String(id))
+            } else {
+                Ok(Literal::Char(id))
+            }
         } else {
             Err("Unterminated string literal".to_string())
         }
@@ -240,7 +263,13 @@ impl Lexer<'_> {
     /// Inside interpolation bodies, braces are balanced and string literals are
     /// skipped so nested tagged strings like `html"<div>{ html"<span/>" }</div>"`
     /// work correctly.
-    fn read_tagged_string_content(&mut self, quote: char) -> Result<Vec<TaggedStringPart>, String> {
+    ///
+    /// This method is public so the parser can call it lazily after encountering
+    /// a `TaggedStringStart` token.
+    pub fn read_tagged_string_parts(
+        &mut self,
+        quote: char,
+    ) -> Result<Vec<TaggedStringPart>, String> {
         let mut parts = Vec::new();
         let mut current_literal = String::new();
 
@@ -462,23 +491,19 @@ impl Lexer<'_> {
                 if self.next_char == '/' {
                     self.advance();
                     self.advance();
-                    let start_position = self.position;
                     self.advance_while(|ch| ch != '\n');
-                    let comment = self.source[start_position..self.position].to_string();
-                    self.token(TokenKind::SingleLineComment(comment), start_pos, start_lc)
+                    self.token(TokenKind::SingleLineComment, start_pos, start_lc)
                 } else if self.next_char == '*' {
                     self.advance();
                     self.advance();
-                    let start_position = self.position;
                     while !(self.source[self.position..].starts_with("*/")
                         || self.position >= self.source.len())
                     {
                         self.advance();
                     }
-                    let comment = self.source[start_position..self.position].to_string();
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::MultiLineComment(comment), start_pos, start_lc)
+                    self.token(TokenKind::MultiLineComment, start_pos, start_lc)
                 } else {
                     self.advance();
                     self.token(TokenKind::Slash, start_pos, start_lc)
@@ -640,22 +665,7 @@ impl Lexer<'_> {
                 let quote = ch;
                 self.advance();
                 match self.read_string_literal(quote) {
-                    Ok(literal) => {
-                        let literal = literal.into();
-                        if quote == '"' {
-                            self.token(
-                                TokenKind::Literal(Literal::String(literal)),
-                                start_pos,
-                                start_lc,
-                            )
-                        } else {
-                            self.token(
-                                TokenKind::Literal(Literal::Char(literal)),
-                                start_pos,
-                                start_lc,
-                            )
-                        }
-                    }
+                    Ok(literal) => self.token(TokenKind::Literal(literal), start_pos, start_lc),
                     Err(_error) => {
                         // Only for unterminated strings, return an Unknown token
                         self.token(TokenKind::Unknown, start_pos, start_lc)
@@ -663,10 +673,8 @@ impl Lexer<'_> {
                 }
             }
             ch if Self::is_alphanumeric(ch) => {
-                // Clone the identifier immediately to release the borrow on `self`,
-                // which is needed to access `self.current_char` for tagged string detection.
-                let identifier = self.read_identifier().to_string();
-                match identifier.as_str() {
+                let identifier = self.read_identifier();
+                match identifier {
                     "true" => self.token(
                         TokenKind::Literal(Literal::Boolean(true)),
                         start_pos,
@@ -681,33 +689,32 @@ impl Lexer<'_> {
                         let kw = Keyword::from(identifier);
                         self.token(TokenKind::Keyword(kw), start_pos, start_lc)
                     }
-                    identifier => {
+                    _identifier => {
                         // Check if the identifier is immediately followed by a quote
                         // (no whitespace), which makes it a tagged string literal.
                         if matches!(self.current_char, '"' | '\'') {
-                            let tag = identifier.to_string();
                             let quote = self.current_char;
                             self.advance(); // consume the opening quote
-                            let parts = match self.read_tagged_string_content(quote) {
+                            // Create the token BEFORE reading content so the span
+                            // covers only "tag<quote>" (not the string content).
+                            let tag_token = self.token(
+                                TokenKind::TaggedStringStart(quote),
+                                start_pos,
+                                start_lc,
+                            );
+                            // Eagerly read the tagged string content so the lexer
+                            // is positioned past the closing quote before the parser
+                            // pre-loads the next token via lookahead.
+                            let parts = match self.read_tagged_string_parts(quote) {
                                 Ok(p) => p,
                                 Err(_) => {
                                     return self.token(TokenKind::Unknown, start_pos, start_lc);
                                 }
                             };
-                            return self.token(
-                                TokenKind::Literal(Literal::TaggedString(
-                                    tag.into_boxed_str(),
-                                    parts,
-                                )),
-                                start_pos,
-                                start_lc,
-                            );
+                            self.pending_tagged_parts = Some(parts);
+                            return tag_token;
                         }
-                        self.token(
-                            TokenKind::Identifier(identifier.to_string()),
-                            start_pos,
-                            start_lc,
-                        )
+                        self.token(TokenKind::Identifier, start_pos, start_lc)
                     }
                 }
             }

@@ -9,6 +9,7 @@ serde = ["dep:serde", "tlang_span/serde", "tlang_ast/serde"]
 
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
+tlang_intern = { path = "../tlang_intern" }
 tlang_lexer = { path = "../tlang_lexer" }
 tlang_span = { path = "../tlang_span" }
 log = { workspace = true }

@@ -2,7 +2,7 @@ use tlang_codegen_js::generator::CodegenJS;
 use tlang_codegen_js::js_hir_opt::JsHirOptimizer;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
-use tlang_symbols::SymbolType;
+use tlang_defs::DefKind;
 
 #[ctor::ctor]
 fn before_all() {
@@ -14,7 +14,7 @@ fn before_all() {
 }
 
 pub struct CodegenOptions<'a> {
-    pub builtin_symbols: Vec<(&'a str, SymbolType)>,
+    pub builtin_symbols: Vec<(&'a str, DefKind)>,
     pub optimize: bool,
 }
 
@@ -35,8 +35,8 @@ impl CodegenOptions<'_> {
     }
 }
 
-impl<'a> From<Vec<(&'a str, SymbolType)>> for CodegenOptions<'a> {
-    fn from(builtin_symbols: Vec<(&'a str, SymbolType)>) -> Self {
+impl<'a> From<Vec<(&'a str, DefKind)>> for CodegenOptions<'a> {
+    fn from(builtin_symbols: Vec<(&'a str, DefKind)>) -> Self {
         Self {
             builtin_symbols,
             ..Default::default()

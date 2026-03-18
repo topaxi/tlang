@@ -4,7 +4,7 @@ use log::debug;
 use tlang_ast as ast;
 use tlang_ast::node::{FunctionDeclaration, Ident, LetDeclaration};
 use tlang_hir as hir;
-use tlang_symbols::SymbolType;
+use tlang_defs::DefKind;
 
 use crate::LoweringContext;
 
@@ -66,7 +66,7 @@ impl LoweringContext {
             ast::node::StmtKind::StructDeclaration(decl) => {
                 let decl = hir::StructDeclaration {
                     hir_id: self.lower_node_id(node.id),
-                    name: decl.name.clone(),
+                    name: decl.name,
                     fields: decl
                         .fields
                         .iter()
@@ -194,7 +194,7 @@ impl LoweringContext {
             self.define_symbol_after(
                 dyn_fn_decl.hir_id,
                 &first_declaration.name(),
-                SymbolType::Variable, // TODO, add symbol type for dyn dispatch functions
+                DefKind::Variable, // TODO, add symbol type for dyn dispatch functions
                 first_declaration.span.start,
                 |symbol| symbol.node_id == last_decl_id,
             );
@@ -232,13 +232,13 @@ impl LoweringContext {
     ) -> hir::Stmt {
         let decl = hir::EnumDeclaration {
             hir_id: self.lower_node_id(node.id),
-            name: decl.name.clone(),
+            name: decl.name,
             variants: decl
                 .variants
                 .iter()
                 .map(|variant| hir::EnumVariant {
                     hir_id: self.lower_node_id(variant.id),
-                    name: variant.name.clone(),
+                    name: variant.name,
                     parameters: variant
                         .parameters
                         .iter()
@@ -272,7 +272,7 @@ impl LoweringContext {
                     .iter()
                     .map(|param| {
                         let name = match &param.pattern.kind {
-                            ast::node::PatKind::Identifier(ident) => ident.as_ref().clone(),
+                            ast::node::PatKind::Identifier(ident) => *ident.as_ref(),
                             ast::node::PatKind::_Self => Ident::new("self", param.pattern.span),
                             _ => Ident::new("_", param.pattern.span),
                         };
@@ -286,7 +286,7 @@ impl LoweringContext {
                     .collect();
                 hir::ProtocolMethodSignature {
                     hir_id: self.unique_id(),
-                    name: method.name.clone(),
+                    name: method.name,
                     parameters: params,
                     return_type: self.lower_ty(method.return_type_annotation.as_ref()),
                     span: method.span,
@@ -296,7 +296,7 @@ impl LoweringContext {
 
         let protocol = hir::ProtocolDeclaration {
             hir_id: self.lower_node_id(node.id),
-            name: decl.name.clone(),
+            name: decl.name,
             methods,
         };
 
@@ -361,7 +361,7 @@ impl LoweringContext {
     fn lower_struct_field(&mut self, field: &ast::node::StructField) -> hir::StructField {
         hir::StructField {
             hir_id: self.lower_node_id(field.id),
-            name: field.name.clone(),
+            name: field.name,
             ty: self.lower_ty(Some(&field.ty)),
         }
     }
@@ -392,9 +392,9 @@ impl LoweringContext {
             .enumerate()
             .map(|(i, param_name)| {
                 if let Some(param_name) = param_name {
-                    param_name.clone()
+                    *param_name
                 } else if let Some(Some(ident)) = all_param_names.get(i) {
-                    ident.clone()
+                    *ident
                 } else {
                     Ident::new(&format!("arg{i}"), Default::default())
                 }
@@ -414,7 +414,7 @@ impl LoweringContext {
 
                 hir::FunctionParameter {
                     hir_id: self.unique_id(),
-                    name: ident.clone(),
+                    name: *ident,
                     type_annotation,
                     span: ident.span,
                 }
@@ -433,7 +433,7 @@ impl LoweringContext {
         self.define_symbol(
             hir_id,
             &first_declaration.name(),
-            SymbolType::FunctionSelfRef(params.len() as u16),
+            DefKind::FunctionSelfRef(params.len() as u16),
             first_declaration.span.start,
         );
 
@@ -441,7 +441,7 @@ impl LoweringContext {
             self.define_symbol(
                 param.hir_id,
                 param.name.as_str(),
-                SymbolType::Parameter,
+                DefKind::Parameter,
                 param.span.start,
             );
         }
@@ -459,7 +459,7 @@ impl LoweringContext {
                     .map(|param| {
                         let mut path = hir::Path::new(
                             vec![hir::PathSegment {
-                                ident: param.name.clone(),
+                                ident: param.name,
                             }],
                             span,
                         );
@@ -475,7 +475,7 @@ impl LoweringContext {
             self.expr(tlang_span::Span::default(), argument_list)
         } else {
             let first_param = params.first().unwrap();
-            let ident = first_param.name.clone();
+            let ident = first_param.name;
             let mut path = hir::Path::new(vec![hir::PathSegment { ident }], span);
 
             path.res.set_hir_id(first_param.hir_id);
@@ -491,7 +491,7 @@ impl LoweringContext {
     fn create_match_arms(
         &mut self,
         decls: &[FunctionDeclaration],
-        leading_comments: &[ast::token::Token],
+        leading_comments: &[ast::token::CommentToken],
     ) -> Vec<hir::MatchArm> {
         let mut idents = HashMap::new();
         decls
@@ -517,7 +517,7 @@ impl LoweringContext {
         &mut self,
         decls: &[FunctionDeclaration],
         all_param_names: &[Option<Ident>],
-        leading_comments: &[ast::token::Token],
+        leading_comments: &[ast::token::CommentToken],
     ) -> hir::FunctionDeclaration {
         if decls.len() == 1 {
             return self.lower_fn_decl(&decls[0]);

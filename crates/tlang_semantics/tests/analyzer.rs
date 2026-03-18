@@ -8,11 +8,11 @@ use tlang_semantics::{
     passes::{DeclarationAnalyzer, VariableUsageValidator},
 };
 use tlang_span::{LineColumn, NodeId, Span};
-use tlang_symbols::{SymbolId, SymbolInfo, SymbolType};
+use tlang_defs::{DefId, Def, DefKind};
 
 mod common;
 
-fn create_analyzer(builtin_symbols: &[(&str, SymbolType)]) -> SemanticAnalyzer {
+fn create_analyzer(builtin_symbols: &[(&str, DefKind)]) -> SemanticAnalyzer {
     let mut analyzer = SemanticAnalyzer::default();
     analyzer.add_builtin_symbols(builtin_symbols);
     analyzer
@@ -112,12 +112,12 @@ fn test_should_allow_shadowing_of_single_variable() {
     assert_eq!(
         program_symbols.borrow().get_by_name("a"),
         vec![
-            SymbolInfo {
+            Def {
                 node_id: Some(NodeId::new(3)),
                 hir_id: None,
-                id: SymbolId::new(1),
+                id: DefId::new(1),
                 name: "a".into(),
-                symbol_type: SymbolType::Variable,
+                kind: DefKind::Variable,
                 defined_at: Span::lc((0, 4), (0, 5)),
                 scope_start: 0,
                 declared: true,
@@ -126,12 +126,12 @@ fn test_should_allow_shadowing_of_single_variable() {
                 used: false,
                 global_slot: None,
             },
-            SymbolInfo {
+            Def {
                 node_id: Some(NodeId::new(6)),
                 hir_id: None,
-                id: SymbolId::new(2),
+                id: DefId::new(2),
                 name: "a".into(),
-                symbol_type: SymbolType::Variable,
+                kind: DefKind::Variable,
                 defined_at: Span::lc((1, 5), (1, 6)),
                 scope_start: 1,
                 declared: true,
@@ -161,14 +161,14 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             .borrow()
             .get_by_name("a")
             .iter()
-            .find(|s| s.id == SymbolId::new(1))
+            .find(|s| s.id == DefId::new(1))
             .cloned(),
-        Some(SymbolInfo {
+        Some(Def {
             node_id: Some(NodeId::new(3)),
             hir_id: None,
-            id: SymbolId::new(1),
+            id: DefId::new(1),
             name: "a".into(),
-            symbol_type: SymbolType::Variable,
+            kind: DefKind::Variable,
             defined_at: Span::lc((0, 4), (0, 5)),
             scope_start: 0,
             declared: true,
@@ -183,14 +183,14 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             .borrow()
             .get_by_name("a")
             .iter()
-            .find(|s| s.id == SymbolId::new(2))
+            .find(|s| s.id == DefId::new(2))
             .cloned(),
-        Some(SymbolInfo {
+        Some(Def {
             node_id: Some(NodeId::new(6)),
             hir_id: None,
-            id: SymbolId::new(2),
+            id: DefId::new(2),
             name: "a".into(),
-            symbol_type: SymbolType::Variable,
+            kind: DefKind::Variable,
             defined_at: Span::lc((1, 5), (1, 6)),
             scope_start: 1,
             declared: true,
@@ -399,8 +399,8 @@ fn should_handle_fn_guard_variables() {
         binary_search([1, 2, 3, 4, 5], 3);
     "},
         [
-            ("len", SymbolType::Function(1)),
-            ("floor", SymbolType::Function(1))
+            ("len", DefKind::Function(1)),
+            ("floor", DefKind::Function(1))
         ]
     );
     assert_eq!(diagnostics, vec![]);

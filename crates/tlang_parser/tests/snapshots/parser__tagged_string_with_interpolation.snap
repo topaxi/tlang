@@ -18,14 +18,14 @@ Module(
                   name: "html",
                   span: Span(
                     start: 0,
-                    end: 23,
+                    end: 5,
                     start_lc: LineColumn(
                       line: 0,
                       column: 0,
                     ),
                     end_lc: LineColumn(
                       line: 0,
-                      column: 23,
+                      column: 5,
                     ),
                   ),
                 ),
@@ -33,14 +33,14 @@ Module(
               res: Unresolved,
               span: Span(
                 start: 0,
-                end: 23,
+                end: 5,
                 start_lc: LineColumn(
                   line: 0,
                   column: 0,
                 ),
                 end_lc: LineColumn(
                   line: 0,
-                  column: 23,
+                  column: 5,
                 ),
               ),
             )),
@@ -48,14 +48,14 @@ Module(
             trailing_comments: [],
             span: Span(
               start: 0,
-              end: 23,
+              end: 5,
               start_lc: LineColumn(
                 line: 0,
                 column: 0,
               ),
               end_lc: LineColumn(
                 line: 0,
-                column: 23,
+                column: 5,
               ),
             ),
           ),
@@ -104,14 +104,14 @@ Module(
               trailing_comments: [],
               span: Span(
                 start: 0,
-                end: 23,
+                end: 5,
                 start_lc: LineColumn(
                   line: 0,
                   column: 0,
                 ),
                 end_lc: LineColumn(
                   line: 0,
-                  column: 23,
+                  column: 5,
                 ),
               ),
             ),
@@ -172,14 +172,14 @@ Module(
               trailing_comments: [],
               span: Span(
                 start: 0,
-                end: 23,
+                end: 5,
                 start_lc: LineColumn(
                   line: 0,
                   column: 0,
                 ),
                 end_lc: LineColumn(
                   line: 0,
-                  column: 23,
+                  column: 5,
                 ),
               ),
             ),
@@ -189,14 +189,14 @@ Module(
         trailing_comments: [],
         span: Span(
           start: 0,
-          end: 23,
+          end: 5,
           start_lc: LineColumn(
             line: 0,
             column: 0,
           ),
           end_lc: LineColumn(
             line: 0,
-            column: 23,
+            column: 5,
           ),
         ),
       )),

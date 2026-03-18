@@ -250,7 +250,7 @@ impl ConstantFolder {
 
     fn try_eval_expr(&self, expr: &Expr) -> Option<Literal> {
         if let Some(lit) = self.folded_exprs.get(&expr.hir_id) {
-            return Some(lit.clone());
+            return Some(*lit);
         }
 
         match &expr.kind {
@@ -261,7 +261,7 @@ impl ConstantFolder {
 
                 self.try_eval_binary_op(*op, &lhs_val, &rhs_val)
             }
-            ExprKind::Literal(box lit) => Some(lit.clone()),
+            ExprKind::Literal(box lit) => Some(*lit),
             _ => None,
         }
     }
@@ -274,7 +274,7 @@ impl<'hir> Visitor<'hir> for ConstantFolder {
         if let Some(lit) = self.try_eval_expr(expr)
             && self.folded_exprs.get(&expr.hir_id) != Some(&lit)
         {
-            expr.kind = ExprKind::Literal(Box::new(lit.clone()));
+            expr.kind = ExprKind::Literal(Box::new(lit));
             self.folded_exprs.insert(expr.hir_id, lit);
             self.changed = true;
         }

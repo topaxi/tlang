@@ -62,7 +62,7 @@ impl LoweringContext {
                 field,
             }) => {
                 let expr = self.lower_expr(base);
-                hir::ExprKind::FieldAccess(Box::new(expr), field.clone())
+                hir::ExprKind::FieldAccess(Box::new(expr), *field)
             }
             ast::node::ExprKind::IndexExpression(box ast::node::IndexAccessExpression {
                 base,
@@ -81,7 +81,7 @@ impl LoweringContext {
             }
             ast::node::ExprKind::IfElse(if_else_expr) => self.lower_if_else(if_else_expr),
             ast::node::ExprKind::Literal(box literal) => {
-                hir::ExprKind::Literal(Box::new(literal.clone()))
+                hir::ExprKind::Literal(Box::new(*literal))
             }
             // Note: TaggedString literals are expanded into Call expressions by the parser.
             // If a TaggedString survives to HIR lowering, it means the parser didn't handle it.

@@ -2,7 +2,7 @@ use log::{debug, warn};
 use tlang_hir::visit::walk_expr;
 use tlang_hir::{self as hir, Visitor};
 use tlang_span::HirId;
-use tlang_symbols::SymbolType;
+use tlang_defs::DefKind;
 
 use crate::HirPass;
 use crate::hir_opt::HirOptContext;
@@ -51,11 +51,11 @@ impl IdentifierResolver {
             .get_by_name(&name)
             .into_iter()
             .filter(|s| s.declared)
-            .find(|s| matches!(s.symbol_type, SymbolType::Enum | SymbolType::Struct));
+            .find(|s| matches!(s.kind, DefKind::Enum | DefKind::Struct));
 
         if let Some(symbol_info) = symbol_info {
             debug!("Type path '{}' resolved to {:?}", name, symbol_info);
-            path.res.set_binding_kind(symbol_info.symbol_type.into());
+            path.res.set_binding_kind(symbol_info.kind.into());
             if let Some(hir_id) = symbol_info.hir_id {
                 path.res.set_hir_id(hir_id);
             }
@@ -126,7 +126,7 @@ impl IdentifierResolver {
             });
 
         if let Some(symbol_info) = symbol_info {
-            path.res.set_binding_kind(symbol_info.symbol_type.into());
+            path.res.set_binding_kind(symbol_info.kind.into());
 
             if let Some(hir_id) = symbol_info.hir_id {
                 debug!(

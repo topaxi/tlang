@@ -16,7 +16,7 @@ pub use tlang_span::{HirId, LineColumn, NodeId, Span};
 
 #[derive(Debug, Default, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-pub enum SymbolType {
+pub enum DefKind {
     Module,
     #[default]
     Variable,
@@ -30,48 +30,48 @@ pub enum SymbolType {
     ProtocolMethod(u16),
 }
 
-impl SymbolType {
+impl DefKind {
     pub fn arity(self) -> Option<u16> {
         match self {
-            SymbolType::Function(arity)
-            | SymbolType::FunctionSelfRef(arity)
-            | SymbolType::ProtocolMethod(arity) => Some(arity),
+            DefKind::Function(arity)
+            | DefKind::FunctionSelfRef(arity)
+            | DefKind::ProtocolMethod(arity) => Some(arity),
             _ => None,
         }
     }
 }
 
-impl Display for SymbolType {
+impl Display for DefKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            SymbolType::Module => write!(f, "module"),
-            SymbolType::Variable => write!(f, "variable"),
-            SymbolType::Function(_)
-            | SymbolType::FunctionSelfRef(_)
-            | SymbolType::ProtocolMethod(_) => write!(f, "function"),
-            SymbolType::Parameter => write!(f, "parameter"),
-            SymbolType::Enum => write!(f, "enum"),
-            SymbolType::EnumVariant(_) => write!(f, "enum variant"),
-            SymbolType::Struct => write!(f, "struct"),
-            SymbolType::Protocol => write!(f, "protocol"),
+            DefKind::Module => write!(f, "module"),
+            DefKind::Variable => write!(f, "variable"),
+            DefKind::Function(_)
+            | DefKind::FunctionSelfRef(_)
+            | DefKind::ProtocolMethod(_) => write!(f, "function"),
+            DefKind::Parameter => write!(f, "parameter"),
+            DefKind::Enum => write!(f, "enum"),
+            DefKind::EnumVariant(_) => write!(f, "enum variant"),
+            DefKind::Struct => write!(f, "struct"),
+            DefKind::Protocol => write!(f, "protocol"),
         }
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
-pub struct SymbolIdTag;
+pub struct DefIdTag;
 
-pub type SymbolId = tlang_span::id::Id<SymbolIdTag>;
-pub type SymbolIdAllocator = tlang_span::id::IdAllocator<SymbolIdTag>;
+pub type DefId = tlang_span::id::Id<DefIdTag>;
+pub type DefIdAllocator = tlang_span::id::IdAllocator<DefIdTag>;
 
 // TODO: Make fields private and provide getters/setters if needed. Not done as tests rely too much
-//       on constructing `SymbolInfo` directly.
+//       on constructing `Def` directly.
 #[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct SymbolInfo {
-    pub id: SymbolId,
+pub struct Def {
+    pub id: DefId,
     pub name: Box<str>,
-    pub symbol_type: SymbolType,
+    pub kind: DefKind,
     pub defined_at: Span,
     pub scope_start: u32,
     pub node_id: Option<NodeId>,
@@ -86,18 +86,18 @@ pub struct SymbolInfo {
     pub global_slot: Option<usize>,
 }
 
-impl SymbolInfo {
+impl Def {
     pub fn new(
-        id: SymbolId,
+        id: DefId,
         name: &str,
-        symbol_type: SymbolType,
+        kind: DefKind,
         defined_at: Span,
         scope_start: u32,
     ) -> Self {
-        SymbolInfo {
+        Def {
             id,
             name: name.into(),
-            symbol_type,
+            kind,
             defined_at,
             scope_start,
             node_id: None,
@@ -111,12 +111,12 @@ impl SymbolInfo {
     }
 
     pub fn new_builtin(
-        id: SymbolId,
+        id: DefId,
         name: &str,
-        symbol_type: SymbolType,
+        kind: DefKind,
         global_slot: Option<usize>,
     ) -> Self {
-        let mut symbol_info = SymbolInfo::new(id, name, symbol_type, Span::default(), 0);
+        let mut symbol_info = Def::new(id, name, kind, Span::default(), 0);
         symbol_info.builtin = true;
         symbol_info.global_slot = global_slot;
         symbol_info
@@ -155,53 +155,53 @@ impl SymbolInfo {
     }
 
     pub fn is_fn(&self, arity: usize) -> bool {
-        matches!(self.symbol_type, SymbolType::Function(a) | SymbolType::FunctionSelfRef(a) | SymbolType::ProtocolMethod(a) if a as usize == arity || a == u16::MAX)
+        matches!(self.kind, DefKind::Function(a) | DefKind::FunctionSelfRef(a) | DefKind::ProtocolMethod(a) if a as usize == arity || a == u16::MAX)
     }
 
     pub fn is_any_fn(&self) -> bool {
         matches!(
-            self.symbol_type,
-            SymbolType::Function(_)
-                | SymbolType::FunctionSelfRef(_)
-                | SymbolType::ProtocolMethod(_)
+            self.kind,
+            DefKind::Function(_)
+                | DefKind::FunctionSelfRef(_)
+                | DefKind::ProtocolMethod(_)
         )
     }
 
     /// Whether the symbol is the function binding within the function body itself.
     pub fn is_fn_self_binding(&self) -> bool {
-        matches!(self.symbol_type, SymbolType::FunctionSelfRef(_))
+        matches!(self.kind, DefKind::FunctionSelfRef(_))
     }
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct SymbolTable {
+pub struct DefScope {
     #[cfg_attr(feature = "serde", serde(skip_serializing))]
-    parent: Option<Rc<RefCell<SymbolTable>>>,
-    symbols: Vec<SymbolInfo>,
+    parent: Option<Rc<RefCell<DefScope>>>,
+    symbols: Vec<Def>,
 }
 
 // TODO: Should we keep track of the symbol id within the symbol table?
-impl SymbolTable {
-    pub fn new(parent: Rc<RefCell<SymbolTable>>) -> Self {
-        SymbolTable {
+impl DefScope {
+    pub fn new(parent: Rc<RefCell<DefScope>>) -> Self {
+        DefScope {
             parent: Some(parent),
             ..Default::default()
         }
     }
 
-    pub fn parent(&self) -> Option<Rc<RefCell<SymbolTable>>> {
+    pub fn parent(&self) -> Option<Rc<RefCell<DefScope>>> {
         self.parent.clone()
     }
 
-    pub fn set_parent(&mut self, parent: Rc<RefCell<SymbolTable>>) {
+    pub fn set_parent(&mut self, parent: Rc<RefCell<DefScope>>) {
         self.parent = Some(parent);
     }
 
     fn get_slot_index<'a>(
         &'a self,
-        symbols: &'a [SymbolInfo],
-        predicate: impl Fn(&SymbolInfo) -> bool,
+        symbols: &'a [Def],
+        predicate: impl Fn(&Def) -> bool,
     ) -> Option<usize> {
         let mut set = HashSet::new();
 
@@ -212,7 +212,7 @@ impl SymbolTable {
             .position(&predicate)
     }
 
-    pub fn get_slot(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Option<(usize, usize)> {
+    pub fn get_slot(&self, predicate: impl Fn(&Def) -> bool) -> Option<(usize, usize)> {
         if let Some(index) = self.get_slot_index(&self.symbols, &predicate) {
             return Some((index, 0));
         }
@@ -234,24 +234,24 @@ impl SymbolTable {
         None
     }
 
-    pub fn get_local(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Option<&SymbolInfo> {
+    pub fn get_local(&self, predicate: impl Fn(&Def) -> bool) -> Option<&Def> {
         self.symbols.iter().find(|s| predicate(s))
     }
 
     fn get_local_mut(
         &mut self,
-        predicate: impl Fn(&SymbolInfo) -> bool,
-    ) -> Option<&mut SymbolInfo> {
+        predicate: impl Fn(&Def) -> bool,
+    ) -> Option<&mut Def> {
         self.symbols.iter_mut().find(|s| predicate(s))
     }
 
-    pub fn set_declared(&mut self, id: SymbolId, declared: bool) {
+    pub fn set_declared(&mut self, id: DefId, declared: bool) {
         if let Some(s) = self.get_local_mut(|s| s.id == id) {
             s.set_declared(declared);
         }
     }
 
-    fn get_locals(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Vec<&SymbolInfo> {
+    fn get_locals(&self, predicate: impl Fn(&Def) -> bool) -> Vec<&Def> {
         self.symbols
             .iter()
             .filter(|s| s.declared)
@@ -259,11 +259,11 @@ impl SymbolTable {
             .collect()
     }
 
-    fn get_locals_by_name(&self, name: &str) -> Vec<&SymbolInfo> {
+    fn get_locals_by_name(&self, name: &str) -> Vec<&Def> {
         self.get_locals(|s| *s.name == *name)
     }
 
-    pub fn get_by_name(&self, name: &str) -> Vec<SymbolInfo> {
+    pub fn get_by_name(&self, name: &str) -> Vec<Def> {
         let locals = self.get_locals_by_name(name);
 
         if !locals.is_empty() {
@@ -277,14 +277,14 @@ impl SymbolTable {
         }
     }
 
-    pub fn get_by_name_and_arity(&self, name: &str, arity: usize) -> Vec<SymbolInfo> {
+    pub fn get_by_name_and_arity(&self, name: &str, arity: usize) -> Vec<Def> {
         let locals = self
             .get_locals_by_name(name)
             .into_iter()
             .filter(|s| {
-                if let SymbolType::Function(a)
-                | SymbolType::FunctionSelfRef(a)
-                | SymbolType::ProtocolMethod(a) = s.symbol_type
+                if let DefKind::Function(a)
+                | DefKind::FunctionSelfRef(a)
+                | DefKind::ProtocolMethod(a) = s.kind
                 {
                     a == u16::MAX || // Builtin n-ary function
                     a as usize == arity
@@ -307,7 +307,7 @@ impl SymbolTable {
         }
     }
 
-    pub fn get_closest_by_name(&self, name: &str, span: Span) -> Option<SymbolInfo> {
+    pub fn get_closest_by_name(&self, name: &str, span: Span) -> Option<Def> {
         let closest = self
             .get_by_name(name)
             .iter()
@@ -340,7 +340,7 @@ impl SymbolTable {
         let fn_symbols: Vec<_> = symbols
             .iter()
             .filter(|s| *s.name == *name && s.is_any_fn())
-            .filter_map(|s| s.symbol_type.arity())
+            .filter_map(|s| s.kind.arity())
             .filter(|a| hashset.insert(*a))
             .collect();
 
@@ -363,13 +363,13 @@ impl SymbolTable {
         self.symbols.remove(0);
     }
 
-    pub fn insert(&mut self, symbol_info: SymbolInfo) {
+    pub fn insert(&mut self, symbol_info: Def) {
         debug!("Inserting symbol: {symbol_info:?}");
 
         self.symbols.push(symbol_info);
     }
 
-    pub fn insert_at(&mut self, index: usize, symbol_info: SymbolInfo) {
+    pub fn insert_at(&mut self, index: usize, symbol_info: Def) {
         debug!("Inserting symbol at index {index}: {symbol_info:?}");
 
         self.symbols.insert(index, symbol_info);
@@ -377,8 +377,8 @@ impl SymbolTable {
 
     pub fn insert_after(
         &mut self,
-        symbol_info: SymbolInfo,
-        predicate: impl Fn(&SymbolInfo) -> bool,
+        symbol_info: Def,
+        predicate: impl Fn(&Def) -> bool,
     ) {
         debug!("Inserting symbol after predicate: {symbol_info:?}");
 
@@ -389,7 +389,7 @@ impl SymbolTable {
         }
     }
 
-    pub fn mark_as_used(&mut self, id: SymbolId) {
+    pub fn mark_as_used(&mut self, id: DefId) {
         if let Some(symbol_info) = self.get_local_mut(|s| s.id == id) {
             if symbol_info.used {
                 return;
@@ -398,15 +398,15 @@ impl SymbolTable {
             if symbol_info.is_any_fn() {
                 debug!(
                     "Marking {} `{}/{}` with {:?} as used",
-                    symbol_info.symbol_type,
+                    symbol_info.kind,
                     symbol_info.name,
-                    symbol_info.symbol_type.arity().unwrap_or_default(),
+                    symbol_info.kind.arity().unwrap_or_default(),
                     id
                 );
             } else {
                 debug!(
                     "Marking {} `{}` with {:?} as used",
-                    symbol_info.symbol_type, symbol_info.name, id
+                    symbol_info.kind, symbol_info.name, id
                 );
             }
 
@@ -416,19 +416,19 @@ impl SymbolTable {
         }
     }
 
-    pub fn get_all_declared_local_symbols(&self) -> impl Iterator<Item = SymbolInfo> {
+    pub fn get_all_declared_local_symbols(&self) -> impl Iterator<Item = Def> {
         self.symbols.iter().filter(|s| s.declared).cloned()
     }
 
-    pub fn get_all_local_symbols(&self) -> &[SymbolInfo] {
+    pub fn get_all_local_symbols(&self) -> &[Def] {
         &self.symbols
     }
 
-    pub fn get_all_local_symbols_mut(&mut self) -> &mut Vec<SymbolInfo> {
+    pub fn get_all_local_symbols_mut(&mut self) -> &mut Vec<Def> {
         &mut self.symbols
     }
 
-    pub fn get_all_declared_symbols(&self) -> Vec<SymbolInfo> {
+    pub fn get_all_declared_symbols(&self) -> Vec<Def> {
         let mut names = self.get_all_declared_local_symbols().collect::<Vec<_>>();
         if let Some(parent) = &self.parent {
             names.extend(parent.borrow().get_all_declared_symbols());
@@ -446,16 +446,16 @@ impl SymbolTable {
 
     /// Helper method to determine if a symbol gets a slot allocated.
     /// This centralizes the filtering logic used in both `get_slot` and `locals`.
-    fn symbol_gets_slot(&self, s: &SymbolInfo) -> bool {
+    fn symbol_gets_slot(&self, s: &Def) -> bool {
         // Builtins use global slots assigned at interpreter startup, not local scope slots.
         !s.builtin
             // Enum and struct definitions do not generate a slot
-            && !matches!(s.symbol_type, SymbolType::Enum | SymbolType::Struct)
+            && !matches!(s.kind, DefKind::Enum | DefKind::Struct)
             // Protocol definitions do not generate a slot
-            && !matches!(s.symbol_type, SymbolType::Protocol)
+            && !matches!(s.kind, DefKind::Protocol)
             // Protocol method implementations do not generate a slot
-            && !matches!(s.symbol_type, SymbolType::ProtocolMethod(_))
+            && !matches!(s.kind, DefKind::ProtocolMethod(_))
             // And tagged enum variant definitions do not generate a slot
-            && !matches!(s.symbol_type, SymbolType::EnumVariant(len) if len > 0)
+            && !matches!(s.kind, DefKind::EnumVariant(len) if len > 0)
     }
 }
