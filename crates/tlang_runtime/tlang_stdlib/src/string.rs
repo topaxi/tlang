@@ -129,9 +129,9 @@ pub fn char_code_at(state: &mut VMState, string: TlangValue, index: TlangValue) 
 
 #[cfg(test)]
 mod tests {
-    use tlang_memory::VMState;
+    use tlang_memory::{TlangValue, VMState};
 
-    use super::{from_char_code, new_string_buf};
+    use super::*;
 
     fn setup() -> VMState {
         let mut state = VMState::new();
@@ -191,6 +191,28 @@ mod tests {
         let initial = state.new_string("hello".to_string());
         let buf = new_string_buf(&mut state, &[initial]);
         assert_eq!(state.get_string_buf(buf), Some("hello"));
+    }
+
+    #[test]
+    fn test_string_buf_mutation() {
+        let mut state = setup();
+        let initial = state.new_string("hello".to_string());
+        let buf = new_string_buf(&mut state, &[initial]);
+        let space = state.new_string(" ".to_string());
+        let world = state.new_string("world".to_string());
+        stringbuf_push_char_wrapper(&mut state, &[buf, space]);
+        stringbuf_push_wrapper(&mut state, &[buf, world]);
+        assert_eq!(state.get_string_buf(buf), Some("hello world"));
+        assert_eq!(
+            stringbuf_len_wrapper(&mut state, &[buf]).value(),
+            Some(&TlangValue::from(11u64))
+        );
+        assert_eq!(
+            stringbuf_is_empty_wrapper(&mut state, &[buf]).value(),
+            Some(&TlangValue::from(false))
+        );
+        stringbuf_clear_wrapper(&mut state, &[buf]);
+        assert_eq!(state.get_string_buf(buf), Some(""));
     }
 
     #[test]
