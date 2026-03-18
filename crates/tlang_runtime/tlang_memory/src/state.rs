@@ -247,6 +247,24 @@ impl VMState {
         )))
     }
 
+    pub fn new_string_buf(&mut self, initial: String) -> TlangValue {
+        let inner = self.new_string(initial);
+        self.new_object(TlangObjectKind::Struct(TlangStruct::new(
+            self.heap.builtin_shapes.string_buf,
+            vec![inner],
+        )))
+    }
+
+    /// Returns the current string contents of a StringBuf value, or `None` if
+    /// the value is not a StringBuf.
+    pub fn get_string_buf(&self, value: TlangValue) -> Option<&str> {
+        let s = self.heap.get_struct(value)?;
+        if s.shape() != self.heap.builtin_shapes.string_buf {
+            return None;
+        }
+        self.heap.get_object(s[0])?.as_str()
+    }
+
     pub fn new_string(&mut self, value: String) -> TlangValue {
         self.new_object(TlangObjectKind::String(value))
     }
@@ -829,7 +847,17 @@ impl VMState {
             TlangObjectKind::String(s) => !s.is_empty(),
             TlangObjectKind::Slice(s) => !s.is_empty(),
             TlangObjectKind::Cell(c) => self.is_truthy(c.value),
-            TlangObjectKind::Struct(s) => !s.is_empty(),
+            TlangObjectKind::Struct(s) => {
+                if s.shape() == self.heap.builtin_shapes.string_buf {
+                    return self
+                        .heap
+                        .get_object(s[0])
+                        .and_then(|o| o.as_str())
+                        .map(|str| !str.is_empty())
+                        .unwrap_or(false);
+                }
+                !s.is_empty()
+            }
             TlangObjectKind::Enum(e) => {
                 e.field_values.is_empty()
                     || e.field_values.clone().iter().all(|v| self.is_truthy(*v))
@@ -871,6 +899,15 @@ impl VMState {
             let source = self.stringify(s[0]);
             let flags = self.stringify(s[1]);
             return format!("/{source}/{flags}");
+        }
+
+        if s.shape() == self.heap.builtin_shapes.string_buf {
+            return self
+                .heap
+                .get_object(s[0])
+                .and_then(|o| o.as_str())
+                .unwrap_or("")
+                .to_string();
         }
 
         let shape = self

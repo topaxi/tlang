@@ -12,6 +12,7 @@ pub struct BuiltinShapes {
     pub option: ShapeKey,
     pub result: ShapeKey,
     pub regex: ShapeKey,
+    pub string_buf: ShapeKey,
 
     store: Slab<TlangShape>,
     shapes_by_name: HashMap<String, ShapeKey>,
@@ -25,20 +26,22 @@ impl Default for BuiltinShapes {
 
 impl BuiltinShapes {
     pub fn new() -> Self {
-        let mut store = Slab::with_capacity(5);
+        let mut store = Slab::with_capacity(6);
 
         let option = Self::create_option_shape(&mut store);
         let result = Self::create_result_shape(&mut store);
         let list = Self::create_list_shape(&mut store);
         let list_iterator = Self::create_list_iterator_shape(&mut store);
         let regex = Self::create_regex_shape(&mut store);
+        let string_buf = Self::create_string_buf_shape(&mut store);
 
-        let mut shapes_by_name = HashMap::with_capacity(5);
+        let mut shapes_by_name = HashMap::with_capacity(6);
         shapes_by_name.insert("Option".to_string(), option);
         shapes_by_name.insert("Result".to_string(), result);
         shapes_by_name.insert("List".to_string(), list);
         shapes_by_name.insert("ListIterator".to_string(), list_iterator);
         shapes_by_name.insert("Regex".to_string(), regex);
+        shapes_by_name.insert("StringBuf".to_string(), string_buf);
 
         Self {
             list,
@@ -46,6 +49,7 @@ impl BuiltinShapes {
             option,
             result,
             regex,
+            string_buf,
             store,
             shapes_by_name,
         }
@@ -104,6 +108,14 @@ impl BuiltinShapes {
     fn create_regex_shape(store: &mut Slab<TlangShape>) -> ShapeKey {
         ShapeKey::new_native(store.insert(TlangShape::new_struct_shape(
             "Regex".to_string(),
+            vec![],
+            HashMap::new(),
+        )))
+    }
+
+    fn create_string_buf_shape(store: &mut Slab<TlangShape>) -> ShapeKey {
+        ShapeKey::new_native(store.insert(TlangShape::new_struct_shape(
+            "StringBuf".to_string(),
             vec![],
             HashMap::new(),
         )))
@@ -183,6 +195,20 @@ impl BuiltinShapes {
     /// # Panics
     pub fn get_regex_shape_mut(&mut self) -> &mut TlangStructShape {
         self.get_shape_mut(self.regex)
+            .and_then(|s| s.get_struct_shape_mut())
+            .unwrap()
+    }
+
+    /// # Panics
+    pub fn get_string_buf_shape(&self) -> &TlangStructShape {
+        self.get_shape(self.string_buf)
+            .and_then(|s| s.get_struct_shape())
+            .unwrap()
+    }
+
+    /// # Panics
+    pub fn get_string_buf_shape_mut(&mut self) -> &mut TlangStructShape {
+        self.get_shape_mut(self.string_buf)
             .and_then(|s| s.get_struct_shape_mut())
             .unwrap()
     }

@@ -314,7 +314,10 @@ impl<'a> InnerCodegen<'a> {
 }
 
 fn is_builtin_type(type_name: &str) -> bool {
-    matches!(type_name, "List" | "Option" | "Result" | "ListIterator")
+    matches!(
+        type_name,
+        "List" | "Option" | "Result" | "ListIterator" | "string::StringBuf"
+    )
 }
 
 fn js_prototype_for_type(type_name: &str) -> String {
