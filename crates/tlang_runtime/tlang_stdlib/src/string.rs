@@ -15,12 +15,16 @@ fn get_inner(vm: &VMState, this: TlangValue) -> TlangValue {
 /// Global `string::StringBuf(initial?)` constructor.
 #[native_fn(name = "string::StringBuf")]
 pub fn new_string_buf(vm: &mut VMState, args: &[TlangValue]) -> TlangValue {
-    let initial = args
-        .first()
-        .and_then(|v| vm.get_object(*v))
-        .and_then(|o| o.as_str())
-        .unwrap_or("")
-        .to_string();
+    let initial = match args.len() {
+        0 => String::new(),
+        1 => vm
+            .get_object(args[0])
+            .and_then(|o| o.as_str())
+            .unwrap_or_else(|| vm.panic("string::StringBuf expects a string argument".to_string()))
+            .to_string(),
+        _ => vm.panic("string::StringBuf expects 0 or 1 argument".to_string()),
+    };
+
     vm.new_string_buf(initial)
 }
 
@@ -184,8 +188,8 @@ mod tests {
     #[test]
     fn test_new_string_buf_with_initial() {
         let mut state = setup();
-        let _buf = new_string_buf(&mut state, &[]);
-        let buf = state.new_string_buf("hello".to_string());
+        let initial = state.new_string("hello".to_string());
+        let buf = new_string_buf(&mut state, &[initial]);
         assert_eq!(state.get_string_buf(buf), Some("hello"));
     }
 
