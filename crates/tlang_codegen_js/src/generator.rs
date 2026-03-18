@@ -81,6 +81,7 @@ impl CodegenJS {
             include_str!("../std/collections.js"),
             include_str!("../std/string.js"),
             include_str!("../std/regex.js"),
+            include_str!("../std/string_buf.js"),
         ];
         parts.join("\n")
     }
@@ -123,6 +124,7 @@ impl CodegenJS {
             ("string", DefKind::Module),
             ("string::from_char_code", DefKind::Function(1)),
             ("string::char_code_at", DefKind::Function(2)),
+            ("StringBuf", DefKind::Struct),
         ]
     }
 
