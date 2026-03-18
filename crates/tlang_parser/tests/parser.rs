@@ -189,6 +189,36 @@ fn test_char_literal() {
 }
 
 #[test]
+fn test_tagged_string_simple() {
+    // re"\d+" → re(["\d+"], [])
+    assert_parser_snapshot!(r#"re"\d+";"#);
+}
+
+#[test]
+fn test_tagged_string_with_interpolation() {
+    // html"<div>{name}</div>" → html(["<div>", "</div>"], [name])
+    assert_parser_snapshot!(r#"html"<div>{name}</div>";"#);
+}
+
+#[test]
+fn test_tagged_string_multiple_interpolations() {
+    // sql"SELECT {cols} FROM {table}" → sql(["SELECT ", " FROM ", ""], [cols, table])
+    assert_parser_snapshot!(r#"sql"SELECT {cols} FROM {table}";"#);
+}
+
+#[test]
+fn test_tagged_string_with_expression() {
+    // tag"{x + 1}" → tag(["", ""], [x + 1])
+    assert_parser_snapshot!(r#"tag"{x + 1}";"#);
+}
+
+#[test]
+fn test_tagged_string_regex_quantifier() {
+    // re"\d{2,5}" — {2,5} is not interpolation (digit after {)
+    assert_parser_snapshot!(r#"re"\d{2,5}";"#);
+}
+
+#[test]
 fn test_call_return_value() {
     assert_parser_snapshot!("foo()();");
 }

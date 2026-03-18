@@ -115,6 +115,7 @@ impl From<Runner> for RunnerKind {
 #[derive(Default)]
 pub struct BuildArtifacts {
     parse_result: Option<Result<ast::Module, ParseError>>,
+    constant_pool_node_ids: Vec<tlang_span::NodeId>,
     hir: Option<hir::Module>,
     analyzed: bool,
 }
@@ -210,8 +211,15 @@ impl Tlang {
     fn parse(&mut self) -> Result<&ast::Module, &ParseError> {
         if self.build.parse_result.is_none() {
             let mut parser = Parser::from_source(&self.source).set_recoverable(true);
-
-            self.build.parse_result = Some(parser.parse());
+            match parser.parse() {
+                Ok((module, parse_meta)) => {
+                    self.build.constant_pool_node_ids = parse_meta.constant_pool_node_ids;
+                    self.build.parse_result = Some(Ok(module));
+                }
+                Err(e) => {
+                    self.build.parse_result = Some(Err(e));
+                }
+            }
         }
 
         self.build.parse_result.as_ref().unwrap().as_ref()
@@ -273,10 +281,12 @@ impl Tlang {
 
             let (mut module, meta) = tlang_ast_lowering::lower_to_hir(
                 ast,
+                &self.build.constant_pool_node_ids,
                 self.analyzer.symbol_id_allocator(),
                 root_symbol_table,
                 symbol_tables,
             );
+            let constant_pool_ids = meta.constant_pool_ids.clone();
             let mut ctx = meta.into();
 
             match self.runner {
@@ -344,6 +354,8 @@ impl Tlang {
                 }
             }
 
+            self.interpreter
+                .register_constant_pool_ids(constant_pool_ids);
             self.build.hir = Some(module);
         }
     }

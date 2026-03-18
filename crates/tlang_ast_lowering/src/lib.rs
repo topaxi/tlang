@@ -444,6 +444,7 @@ impl LoweringContext {
 
 pub fn lower_to_hir(
     tlang_ast: &ast::node::Module,
+    constant_pool_node_ids: &[NodeId],
     symbol_id_allocator: SymbolIdAllocator,
     root_symbol_table: Rc<RefCell<SymbolTable>>,
     symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
@@ -451,15 +452,25 @@ pub fn lower_to_hir(
     lower(
         &mut LoweringContext::new(symbol_id_allocator, root_symbol_table, symbol_tables),
         tlang_ast,
+        constant_pool_node_ids,
     )
 }
 
-pub fn lower(ctx: &mut LoweringContext, tlang_ast: &ast::node::Module) -> hir::LowerResult {
+pub fn lower(
+    ctx: &mut LoweringContext,
+    tlang_ast: &ast::node::Module,
+    constant_pool_node_ids: &[NodeId],
+) -> hir::LowerResult {
     let root_symbol_table = ctx.lower_node_id(tlang_span::NodeId::new(1));
     let module = ctx.lower_module(tlang_ast);
     let symbol_tables = ctx.symbol_tables();
     let symbol_id_allocator = ctx.symbol_id_allocator;
     let hir_id_allocator = ctx.hir_id_allocator;
+
+    let constant_pool_ids = constant_pool_node_ids
+        .iter()
+        .filter_map(|node_id| ctx.node_id_to_hir_id.get(node_id).copied())
+        .collect();
 
     (
         module,
@@ -468,6 +479,7 @@ pub fn lower(ctx: &mut LoweringContext, tlang_ast: &ast::node::Module) -> hir::L
             symbol_tables,
             hir_id_allocator,
             symbol_id_allocator,
+            constant_pool_ids,
         },
     )
 }

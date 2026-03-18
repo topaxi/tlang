@@ -2,14 +2,16 @@ use std::{fs::File, io::Read, path::Path};
 
 use tlang_ast_lowering::lower_to_hir;
 use tlang_diagnostics::{render_parse_issues, render_semantic_diagnostics};
+use tlang_hir as hir;
 use tlang_hir_opt::HirOptimizer;
 use tlang_runtime::{memory::TlangValue, vm::VM};
 use tlang_semantics::SemanticAnalyzer;
 
 pub fn handle_run(input_file: &str) {
-    let module = compile(input_file);
+    let (module, constant_pool_ids) = compile(input_file);
 
     let mut vm = VM::new();
+    vm.state_mut().register_constant_pool_ids(constant_pool_ids);
     let result = vm.eval(&module);
 
     match result {
@@ -18,7 +20,7 @@ pub fn handle_run(input_file: &str) {
     }
 }
 
-fn compile(input_file: &str) -> tlang_hir::Module {
+fn compile(input_file: &str) -> (hir::Module, std::collections::HashSet<tlang_hir::HirId>) {
     let path = Path::new(input_file);
     let mut file = match File::open(path) {
         Err(why) => panic!("couldn't open {}: {}", path.display(), why),
@@ -34,8 +36,8 @@ fn compile(input_file: &str) -> tlang_hir::Module {
     std::panic::set_hook(Box::new(|_| {}));
     let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| parser.parse()));
     std::panic::set_hook(prev_hook);
-    let mut ast = match parse_result {
-        Ok(Ok(ast)) => ast,
+    let (mut ast, parse_meta) = match parse_result {
+        Ok(Ok(result)) => result,
         Ok(Err(err)) => {
             eprint!(
                 "{}",
@@ -80,14 +82,16 @@ fn compile(input_file: &str) -> tlang_hir::Module {
 
     let (mut module, meta) = lower_to_hir(
         &ast,
+        &parse_meta.constant_pool_node_ids,
         semantic_analyzer.symbol_id_allocator(),
         semantic_analyzer.root_symbol_table(),
         semantic_analyzer.symbol_tables().clone(),
     );
 
     let mut optimizer = HirOptimizer::default();
+    let constant_pool_ids = meta.constant_pool_ids.clone();
     let mut ctx = meta.into();
     optimizer.optimize_hir(&mut module, &mut ctx);
 
-    module
+    (module, constant_pool_ids)
 }

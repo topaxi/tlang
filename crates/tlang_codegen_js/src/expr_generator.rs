@@ -66,15 +66,9 @@ impl<'a> InnerCodegen<'a> {
             Literal::Float(value) => self.num_expr(*value),
             Literal::Boolean(value) => self.bool_expr(*value),
             Literal::String(value) | Literal::Char(value) => self.str_expr(value),
-            Literal::TaggedString(tag, value) => match tag.as_ref() {
-                "re" => {
-                    let callee = self.ident_expr("$TlangRegex");
-                    let args = vec![Argument::from(self.str_expr(value))];
-                    self.ast
-                        .expression_new(SPAN, callee, NONE, self.ast.vec_from_iter(args))
-                }
-                _ => self.undefined_expr(),
-            },
+            Literal::TaggedString(_, _) => {
+                unreachable!("TaggedString is expanded to a Call by the parser")
+            }
             Literal::None => self.undefined_expr(),
         }
     }

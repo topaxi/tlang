@@ -1,6 +1,6 @@
 use pretty_assertions::assert_eq;
 use tlang_ast::keyword::Keyword;
-use tlang_ast::token::{Literal, TokenKind};
+use tlang_ast::token::{Literal, TaggedStringPart, TokenKind};
 
 use tlang_lexer::Lexer;
 
@@ -411,4 +411,220 @@ fn test_underscore_keyword() {
             TokenKind::Identifier("_test".into())
         ]
     );
+}
+
+// ── Tagged string tests ────────────────────────────────────────────────────────
+
+#[test]
+fn test_tagged_string_simple() {
+    let mut lexer = Lexer::new(r#"re"\d+""#);
+    let token = lexer.next_token();
+    assert_eq!(
+        token.kind,
+        TokenKind::Literal(Literal::TaggedString(
+            "re".into(),
+            vec![TaggedStringPart::Literal("\\d+".into())]
+        ))
+    );
+}
+
+#[test]
+fn test_tagged_string_no_interpolation() {
+    let mut lexer = Lexer::new(r#"html"<div>hello</div>""#);
+    let token = lexer.next_token();
+    assert_eq!(
+        token.kind,
+        TokenKind::Literal(Literal::TaggedString(
+            "html".into(),
+            vec![TaggedStringPart::Literal("<div>hello</div>".into())]
+        ))
+    );
+}
+
+#[test]
+fn test_tagged_string_with_interpolation() {
+    let mut lexer = Lexer::new(r#"html"<div>{name}</div>""#);
+    let token = lexer.next_token();
+    assert_eq!(
+        token.kind,
+        TokenKind::Literal(Literal::TaggedString(
+            "html".into(),
+            vec![
+                TaggedStringPart::Literal("<div>".into()),
+                TaggedStringPart::Interpolation {
+                    source: "name".into(),
+                    line: 0,
+                    column: 0,
+                    byte_offset: 0
+                },
+                TaggedStringPart::Literal("</div>".into()),
+            ]
+        ))
+    );
+}
+
+#[test]
+fn test_tagged_string_multiple_interpolations() {
+    let mut lexer = Lexer::new(r#"sql"SELECT {cols} FROM {table}""#);
+    let token = lexer.next_token();
+    assert_eq!(
+        token.kind,
+        TokenKind::Literal(Literal::TaggedString(
+            "sql".into(),
+            vec![
+                TaggedStringPart::Literal("SELECT ".into()),
+                TaggedStringPart::Interpolation {
+                    source: "cols".into(),
+                    line: 0,
+                    column: 0,
+                    byte_offset: 0
+                },
+                TaggedStringPart::Literal(" FROM ".into()),
+                TaggedStringPart::Interpolation {
+                    source: "table".into(),
+                    line: 0,
+                    column: 0,
+                    byte_offset: 0
+                },
+                TaggedStringPart::Literal("".into()),
+            ]
+        ))
+    );
+}
+
+#[test]
+fn test_tagged_string_regex_quantifier_not_interpolation() {
+    // {2,5} should NOT trigger interpolation (digit after {)
+    let mut lexer = Lexer::new(r#"re"\d{2,5}""#);
+    let token = lexer.next_token();
+    assert_eq!(
+        token.kind,
+        TokenKind::Literal(Literal::TaggedString(
+            "re".into(),
+            vec![TaggedStringPart::Literal("\\d{2,5}".into())]
+        ))
+    );
+}
+
+#[test]
+fn test_tagged_string_double_brace_escape() {
+    let mut lexer = Lexer::new(r#"html"{{escaped}}""#);
+    let token = lexer.next_token();
+    assert_eq!(
+        token.kind,
+        TokenKind::Literal(Literal::TaggedString(
+            "html".into(),
+            vec![TaggedStringPart::Literal("{escaped}".into())]
+        ))
+    );
+}
+
+#[test]
+fn test_tagged_string_backslash_brace_escape() {
+    let mut lexer = Lexer::new(r#"html"\{escaped\}""#);
+    let token = lexer.next_token();
+    assert_eq!(
+        token.kind,
+        TokenKind::Literal(Literal::TaggedString(
+            "html".into(),
+            vec![TaggedStringPart::Literal("{escaped}".into())]
+        ))
+    );
+}
+
+#[test]
+fn test_tagged_string_nested_braces_in_interpolation() {
+    // Expression with nested braces: { if true { "a" } else { "b" } }
+    let mut lexer = Lexer::new(r#"tag"{if true { "a" } else { "b" }}""#);
+    let token = lexer.next_token();
+    assert_eq!(
+        token.kind,
+        TokenKind::Literal(Literal::TaggedString(
+            "tag".into(),
+            vec![
+                TaggedStringPart::Literal("".into()),
+                TaggedStringPart::Interpolation {
+                    source: "if true { \"a\" } else { \"b\" }".into(),
+                    line: 0,
+                    column: 0,
+                    byte_offset: 0
+                },
+                TaggedStringPart::Literal("".into()),
+            ]
+        ))
+    );
+}
+
+#[test]
+fn test_tagged_string_nested_tagged_string_in_interpolation() {
+    // html"<div>{html"<span/>"}</div>"
+    let mut lexer = Lexer::new(r#"html"<div>{html"<span/>"}</div>""#);
+    let token = lexer.next_token();
+    assert_eq!(
+        token.kind,
+        TokenKind::Literal(Literal::TaggedString(
+            "html".into(),
+            vec![
+                TaggedStringPart::Literal("<div>".into()),
+                TaggedStringPart::Interpolation {
+                    source: "html\"<span/>\"".into(),
+                    line: 0,
+                    column: 0,
+                    byte_offset: 0
+                },
+                TaggedStringPart::Literal("</div>".into()),
+            ]
+        ))
+    );
+}
+
+#[test]
+fn test_tagged_string_interpolation_with_member_access() {
+    let mut lexer = Lexer::new(r#"html"{user.name}""#);
+    let token = lexer.next_token();
+    assert_eq!(
+        token.kind,
+        TokenKind::Literal(Literal::TaggedString(
+            "html".into(),
+            vec![
+                TaggedStringPart::Literal("".into()),
+                TaggedStringPart::Interpolation {
+                    source: "user.name".into(),
+                    line: 0,
+                    column: 0,
+                    byte_offset: 0
+                },
+                TaggedStringPart::Literal("".into()),
+            ]
+        ))
+    );
+}
+
+#[test]
+fn test_tagged_string_interpolation_position_tracking() {
+    // Verify that interpolation byte offsets and line/column are tracked correctly.
+    // source: html"<div>{name}</div>"
+    //         0         1
+    //         0123456789012345678901234
+    // `{` is at byte 10, body `name` starts at byte 11, column 11 (0-indexed), line 0.
+    let mut lexer = Lexer::new(r#"html"<div>{name}</div>""#);
+    let token = lexer.next_token();
+    if let TokenKind::Literal(Literal::TaggedString(_, parts)) = token.kind {
+        match &parts[1] {
+            TaggedStringPart::Interpolation {
+                source,
+                line,
+                column,
+                byte_offset,
+            } => {
+                assert_eq!(source.as_ref(), "name");
+                assert_eq!(*line, 0);
+                assert_eq!(*column, 11);
+                assert_eq!(*byte_offset, 11);
+            }
+            _ => panic!("Expected Interpolation part"),
+        }
+    } else {
+        panic!("Expected TaggedString literal");
+    }
 }

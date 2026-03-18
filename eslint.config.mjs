@@ -12,6 +12,7 @@ export default defineConfig([
       '**/target/',
       '.benchmark-main-worktree/',
       'crates/tlang_bindings_js/pkg/',
+      'crates/tlang_codegen_js/std/',
       'packages/codemirror-lang-tlang/src/parser.js',
       'packages/codemirror-lang-tlang/src/parser.terms.js',
       'tree-sitter-tlang/grammar.js',

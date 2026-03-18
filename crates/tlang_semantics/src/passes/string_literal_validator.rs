@@ -109,26 +109,19 @@ impl<'ast> Visitor<'ast> for StringLiteralValidator {
     type Context = SemanticAnalysisContext;
 
     fn visit_literal(&mut self, literal: &'ast Literal, span: Span, ctx: &mut Self::Context) {
+        // Skip synthetic literals (e.g., string parts from tagged string expansion)
+        if span == Span::default() {
+            return;
+        }
+
         match literal {
             Literal::String(string_content) | Literal::Char(string_content) => {
                 self.validate_escape_sequences(string_content, span, ctx);
             }
-            Literal::TaggedString(tag, pattern) => match tag.as_ref() {
-                "re" => {
-                    if let Err(e) = regex_syntax::ast::parse::Parser::new().parse(pattern) {
-                        ctx.add_diagnostic(diagnostic::warn_at!(
-                            span,
-                            "Invalid regex pattern in re\"...\": {e}",
-                        ));
-                    }
-                }
-                _ => {
-                    ctx.add_diagnostic(diagnostic::warn_at!(
-                        span,
-                        "Unknown string tag '{tag}'; currently only 're' is supported",
-                    ));
-                }
-            },
+            Literal::TaggedString(_, _) => {
+                // Tagged strings are expanded to Call expressions by the parser;
+                // this arm is unreachable during normal operation.
+            }
             _ => {}
         }
     }

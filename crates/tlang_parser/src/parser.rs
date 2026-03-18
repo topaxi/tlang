@@ -7,13 +7,27 @@ use tlang_ast::node::{
     Path, ProtocolDeclaration, ProtocolMethodSignature, Stmt, StmtKind, StructDeclaration,
     StructField, Ty, TyKind, UnaryOp,
 };
-use tlang_ast::token::{Literal, Token, TokenKind};
+use tlang_ast::token::{Literal, TaggedStringPart, Token, TokenKind};
 use tlang_lexer::Lexer;
 use tlang_span::{NodeId, NodeIdAllocator, Span};
 
 use crate::error::{ParseError, ParseIssue, ParseIssueKind};
 use crate::macros::expect_token_matches;
 use log::debug;
+
+/// Metadata produced alongside the parsed [`Module`] by [`Parser::parse`].
+///
+/// Mirrors the pattern of [`tlang_hir::LowerResultMeta`] for the lowering phase.
+#[derive(Debug)]
+pub struct ParseMeta {
+    /// NodeIds of expressions that produce compile-time-constant values
+    /// (e.g. tagged string parts lists). Pass these to `lower_to_hir` so they
+    /// are mapped to HIR ids and registered in the runtime constant pool.
+    pub constant_pool_node_ids: Vec<NodeId>,
+    /// State of the node-id allocator after parsing. Use this when chaining a
+    /// subsequent incremental parse to avoid NodeId collisions.
+    pub node_id_allocator: NodeIdAllocator,
+}
 
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
@@ -28,6 +42,11 @@ pub struct Parser<'src> {
     errors: Vec<ParseIssue>,
 
     trailing_comments_buffer: Vec<Token>,
+
+    /// NodeIds of expressions that produce compile-time-constant values
+    /// (e.g. tagged string parts lists). Propagated through lowering into
+    /// the HIR constant pool for singleton caching at runtime.
+    constant_pool_node_ids: Vec<NodeId>,
 }
 
 impl<'src> Parser<'src> {
@@ -41,6 +60,7 @@ impl<'src> Parser<'src> {
             errors: Vec::new(),
             recoverable: false,
             trailing_comments_buffer: Vec::new(),
+            constant_pool_node_ids: Vec::new(),
         }
     }
 
@@ -67,10 +87,6 @@ impl<'src> Parser<'src> {
         &self.errors
     }
 
-    pub fn node_id_allocator(&self) -> &NodeIdAllocator {
-        &self.node_id_allocator
-    }
-
     pub fn set_node_id_allocator(mut self, allocator: NodeIdAllocator) -> Self {
         self.node_id_allocator = allocator;
         self
@@ -84,14 +100,18 @@ impl<'src> Parser<'src> {
         Parser::new(Lexer::new(source))
     }
 
-    pub fn parse(&mut self) -> Result<Module, ParseError> {
+    pub fn parse(&mut self) -> Result<(Module, ParseMeta), ParseError> {
         self.current_token = self.lexer.next_token();
         self.next_token = self.lexer.next_token();
 
         let module = self.parse_module();
 
         if self.errors.is_empty() {
-            Ok(module)
+            let meta = ParseMeta {
+                constant_pool_node_ids: std::mem::take(&mut self.constant_pool_node_ids),
+                node_id_allocator: self.node_id_allocator,
+            };
+            Ok((module, meta))
         } else {
             Err(ParseError::new(self.errors.clone()))
         }
@@ -1033,8 +1053,100 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_literal_expression(&mut self) -> Expr {
+        let span = self.create_span_from_current_token();
         let literal = self.advance().take_literal().unwrap();
-        node::expr!(self.unique_id(), Literal(Box::new(literal)))
+
+        if let Literal::TaggedString(tag, parts) = literal {
+            return self.expand_tagged_string(&tag, parts, span);
+        }
+
+        node::expr!(self.unique_id(), Literal(Box::new(literal))).with_span(span)
+    }
+
+    /// Expand a tagged string literal into a function call expression:
+    /// `tag"text{expr}more"` → `tag(["text", "more"], [expr])`
+    fn expand_tagged_string(
+        &mut self,
+        tag: &str,
+        parts: Vec<TaggedStringPart>,
+        span: Span,
+    ) -> Expr {
+        let mut string_parts: Vec<Expr> = Vec::new();
+        let mut value_exprs: Vec<Expr> = Vec::new();
+
+        for part in parts {
+            match part {
+                TaggedStringPart::Literal(text) => {
+                    // Use Span::default() to mark these as synthetic (compiler-generated)
+                    // so the escape sequence validator skips them — tagged string content
+                    // may contain domain-specific escapes like \d in regex patterns.
+                    string_parts.push(node::expr!(
+                        self.unique_id(),
+                        Literal(Box::new(Literal::String(text)))
+                    ));
+                }
+                TaggedStringPart::Interpolation {
+                    source: raw_source,
+                    line,
+                    column,
+                    byte_offset,
+                } => {
+                    let expr =
+                        self.parse_interpolation_expr(&raw_source, line, column, byte_offset);
+                    value_exprs.push(expr);
+                }
+            }
+        }
+
+        let callee_path = Path::from_ident(Ident::new(tag, span));
+        let callee = node::expr!(self.unique_id(), Path(Box::new(callee_path))).with_span(span);
+        let parts_list = node::expr!(self.unique_id(), List(string_parts)).with_span(span);
+        self.constant_pool_node_ids.push(parts_list.id);
+        let values_list = node::expr!(self.unique_id(), List(value_exprs)).with_span(span);
+
+        node::expr!(
+            self.unique_id(),
+            Call(Box::new(CallExpression {
+                callee,
+                arguments: vec![parts_list, values_list],
+            }))
+        )
+        .with_span(span)
+    }
+
+    /// Parse a raw interpolation source string as a full expression using a sub-parser.
+    /// The sub-parser shares this parser's `NodeIdAllocator` to avoid ID collisions.
+    /// `line`, `column`, and `byte_offset` are the position of the first character of
+    /// the interpolation body in the original source, so generated spans are correct.
+    fn parse_interpolation_expr(
+        &mut self,
+        source: &str,
+        line: u32,
+        column: u32,
+        byte_offset: u32,
+    ) -> Expr {
+        let lexer = Lexer::new(source).with_offset(line, column, byte_offset);
+        let mut sub_parser = Parser::new(lexer).set_node_id_allocator(self.node_id_allocator);
+
+        // Prime the sub-parser's token stream
+        sub_parser.current_token = sub_parser.lexer.next_token();
+        sub_parser.next_token = sub_parser.lexer.next_token();
+
+        let expr = sub_parser.parse_expression();
+
+        // Verify that all interpolation tokens were consumed (catches `{x y}` style errors)
+        if !matches!(sub_parser.current_token_kind(), TokenKind::Eof) {
+            let unexpected = sub_parser.current_token.clone();
+            sub_parser.push_unexpected_token_error("end of interpolation", unexpected);
+        }
+
+        // Propagate node ID allocator state back to parent
+        self.node_id_allocator = sub_parser.node_id_allocator;
+
+        // Propagate any parse errors
+        self.errors.extend(sub_parser.errors);
+
+        expr
     }
 
     fn parse_self_expression(&mut self) -> Expr {

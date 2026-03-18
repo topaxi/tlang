@@ -46,8 +46,8 @@ impl<'a> From<Vec<(&'a str, SymbolType)>> for CodegenOptions<'a> {
 
 pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
     let mut parser = Parser::from_source(source);
-    let mut ast = match parser.parse() {
-        Ok(ast) => ast,
+    let (mut ast, parse_meta) = match parser.parse() {
+        Ok(result) => result,
         Err(errors) => panic!("{errors:#?}"),
     };
 
@@ -57,6 +57,7 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
         Ok(()) => {
             let (mut module, meta) = tlang_ast_lowering::lower_to_hir(
                 &ast,
+                &parse_meta.constant_pool_node_ids,
                 semantic_analyzer.symbol_id_allocator(),
                 semantic_analyzer.root_symbol_table(),
                 semantic_analyzer.symbol_tables().clone(),

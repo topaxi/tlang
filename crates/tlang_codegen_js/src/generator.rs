@@ -117,6 +117,7 @@ impl CodegenJS {
             ("random_int", SymbolType::Function(1)),
             ("math::sqrt", SymbolType::Function(1)),
             ("compose", SymbolType::Function(2)),
+            ("re", SymbolType::Function(2)),
             ("map", SymbolType::Function(2)),
             ("panic", SymbolType::Function(1)),
             ("string", SymbolType::Module),

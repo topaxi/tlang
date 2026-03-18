@@ -1,8 +1,11 @@
 #![cfg(feature = "binary")]
 #![allow(dead_code)]
 
+use std::collections::HashSet;
+
 use tlang_ast_lowering::lower_to_hir;
 use tlang_hir as hir;
+use tlang_hir::HirId;
 use tlang_interpreter::{EvalResult, Interpreter};
 use tlang_memory::{TlangValue, VMState};
 use tlang_parser::Parser;
@@ -18,37 +21,39 @@ fn before_all() {
         .try_init();
 }
 
-fn make_state() -> VMState {
+pub fn make_state() -> VMState {
     VM::new().into_state()
 }
 
-fn make_analyzer() -> SemanticAnalyzer {
+pub fn make_analyzer() -> SemanticAnalyzer {
     let mut analyzer = SemanticAnalyzer::default();
     analyzer.add_builtin_symbols_with_slots(&VM::builtin_symbols());
     analyzer
 }
 
-fn compile(source: &str, analyzer: &mut SemanticAnalyzer) -> hir::Module {
+pub fn compile(source: &str, analyzer: &mut SemanticAnalyzer) -> (hir::Module, HashSet<HirId>) {
     // Wrap in a block expression so the completion value is accessible.
     let wrapped = format!("{{ {source} }};");
     let mut parser = Parser::from_source(&wrapped);
-    let mut ast = parser.parse().expect("parse error");
+    let (mut ast, parse_meta) = parser.parse().expect("parse error");
     analyzer.analyze(&mut ast).expect("semantic error");
 
     let (mut module, meta) = lower_to_hir(
         &ast,
+        &parse_meta.constant_pool_node_ids,
         analyzer.symbol_id_allocator(),
         analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),
     );
 
     let mut optimizer = tlang_hir_opt::HirOptimizer::default();
+    let constant_pool_ids = meta.constant_pool_ids.clone();
     let mut ctx = meta.into();
     optimizer.optimize_hir(&mut module, &mut ctx);
-    module
+    (module, constant_pool_ids)
 }
 
-fn eval_block_expr(state: &mut VMState, module: &hir::Module) -> TlangValue {
+pub fn eval_block_expr(state: &mut VMState, module: &hir::Module) -> TlangValue {
     let hir::StmtKind::Expr(expr) = &module.block.stmts[0].kind else {
         panic!(
             "Expected Expr statement, got {:?}",
@@ -66,7 +71,8 @@ fn eval_block_expr(state: &mut VMState, module: &hir::Module) -> TlangValue {
 pub fn eval(source: &str) -> TlangValue {
     let mut state = make_state();
     let mut analyzer = make_analyzer();
-    let module = compile(source, &mut analyzer);
+    let (module, constant_pool_ids) = compile(source, &mut analyzer);
+    state.register_constant_pool_ids(constant_pool_ids);
     eval_block_expr(&mut state, &module)
 }
 
@@ -74,7 +80,8 @@ pub fn eval(source: &str) -> TlangValue {
 pub fn eval_to_string(source: &str) -> String {
     let mut state = make_state();
     let mut analyzer = make_analyzer();
-    let module = compile(source, &mut analyzer);
+    let (module, constant_pool_ids) = compile(source, &mut analyzer);
+    state.register_constant_pool_ids(constant_pool_ids);
     let value = eval_block_expr(&mut state, &module);
     state.stringify(value)
 }

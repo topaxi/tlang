@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::rc::Rc;
 
@@ -913,6 +913,10 @@ pub struct LowerResultMeta {
     pub symbol_tables: HashMap<HirId, Rc<RefCell<SymbolTable>>>,
     pub hir_id_allocator: HirIdAllocator,
     pub symbol_id_allocator: SymbolIdAllocator,
+    /// HirIds of expressions that produce compile-time-constant values
+    /// (e.g. tagged string parts lists). Used by the interpreter to cache
+    /// these values for singleton semantics.
+    pub constant_pool_ids: HashSet<HirId>,
 }
 
 pub type LowerResult = (Module, LowerResultMeta);

@@ -84,8 +84,8 @@ fn compile_to_hir(
     std::panic::set_hook(Box::new(|_| {}));
     let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| parser.parse()));
     std::panic::set_hook(prev_hook);
-    let mut ast = match parse_result {
-        Ok(Ok(ast)) => ast,
+    let (mut ast, parse_meta) = match parse_result {
+        Ok(Ok(result)) => result,
         Ok(Err(err)) => return Err(err.into()),
         Err(payload) => {
             let issues = parser.errors();
@@ -118,6 +118,7 @@ fn compile_to_hir(
 
     let (mut module, meta) = lower_to_hir(
         &ast,
+        &parse_meta.constant_pool_node_ids,
         semantic_analyzer.symbol_id_allocator(),
         semantic_analyzer.root_symbol_table(),
         semantic_analyzer.symbol_tables().clone(),

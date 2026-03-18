@@ -16,7 +16,7 @@ fn analyze_fn_decls_with_builtins(
     builtins: &[(&str, SymbolType)],
 ) -> Vec<FunctionDeclaration> {
     let mut parser = Parser::from_source(source);
-    let mut ast = parser.parse().unwrap();
+    let (mut ast, _) = parser.parse().unwrap();
     let mut analyzer = SemanticAnalyzer::default();
     analyzer.add_builtin_symbols(builtins);
     analyzer.analyze(&mut ast).unwrap();
@@ -253,7 +253,7 @@ fn test_literal_and_enum_mix_produces_union() {
 /// protocol method from the first impl block found.
 fn analyze_impl_methods(source: &str, method_name: &str) -> Vec<FunctionDeclaration> {
     let mut parser = Parser::from_source(source);
-    let mut ast = parser.parse().unwrap();
+    let (mut ast, _) = parser.parse().unwrap();
     let mut analyzer = SemanticAnalyzer::default();
     analyzer.analyze(&mut ast).unwrap();
 

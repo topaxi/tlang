@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use tlang_hir as hir;
@@ -26,6 +26,12 @@ pub struct Program {
     pub(crate) protocol_method_to_protocol: HashMap<String, String>,
     /// Protocol implementations: (protocol_name, type_name, method_name) → fn value
     pub(crate) protocol_impls: HashMap<(String, String, String), TlangValue>,
+    /// HirIds of expressions whose values are compile-time constants (e.g. tagged
+    /// string parts lists). These are evaluated once and cached for the program's
+    /// lifetime, giving singleton semantics (same object identity on every access).
+    pub(crate) constant_pool_ids: HashSet<HirId>,
+    /// Lazily populated cache of constant values, keyed by HirId.
+    pub(crate) constant_pool: HashMap<HirId, TlangValue>,
 }
 
 impl Program {
@@ -41,6 +47,8 @@ impl Program {
             protocols: HashMap::new(),
             protocol_method_to_protocol: HashMap::new(),
             protocol_impls: HashMap::new(),
+            constant_pool_ids: HashSet::new(),
+            constant_pool: HashMap::new(),
         }
     }
 
@@ -115,6 +123,7 @@ impl Program {
             .copied()
             .chain(self.globals.values().copied())
             .chain(self.protocol_impls.values().copied())
+            .chain(self.constant_pool.values().copied())
     }
 
     pub fn register_protocol(&mut self, name: String, methods: Vec<String>) {

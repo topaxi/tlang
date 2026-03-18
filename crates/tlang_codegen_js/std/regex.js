@@ -1,3 +1,10 @@
+const re = (parts, values) => {
+  let source = parts[0];
+  for (let i = 0; i < values.length; i++) {
+    source += String(values[i]) + parts[i + 1];
+  }
+  return new $TlangRegex(source);
+};
 const $TlangRegex = class Regex {
   #source;
   #flags;

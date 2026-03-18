@@ -232,6 +232,26 @@ impl Interpreter {
     pub fn eval_expr(&self, state: &mut VMState, expr: &hir::Expr) -> EvalResult {
         state.set_current_span(expr.span);
 
+        // Return cached constant pool value if available.
+        if state.is_constant_pool_expr(expr.hir_id)
+            && let Some(cached) = state.get_constant(expr.hir_id)
+        {
+            return EvalResult::Value(cached);
+        }
+
+        let result = self.eval_expr_inner(state, expr);
+
+        // Cache the result if this expression is in the constant pool.
+        if state.is_constant_pool_expr(expr.hir_id)
+            && let EvalResult::Value(value) = result
+        {
+            state.set_constant(expr.hir_id, value);
+        }
+
+        result
+    }
+
+    fn eval_expr_inner(&self, state: &mut VMState, expr: &hir::Expr) -> EvalResult {
         match &expr.kind {
             hir::ExprKind::Path(path) => {
                 EvalResult::Value(state.resolve_value(path).unwrap_or_else(|| {
@@ -362,10 +382,9 @@ impl Interpreter {
             token::Literal::Boolean(value) => TlangValue::Bool(*value),
             token::Literal::String(value) => state.new_string(value.to_string()),
             token::Literal::Char(value) => state.new_string(value.to_string()),
-            token::Literal::TaggedString(tag, value) => match tag.as_ref() {
-                "re" => state.new_regex(value.to_string(), String::new()),
-                _ => state.panic(format!("Unknown string tag: {tag}")),
-            },
+            token::Literal::TaggedString(_, _) => {
+                unreachable!("TaggedString is expanded to a Call by the parser")
+            }
             token::Literal::None => unreachable!(),
         }
     }
@@ -1466,7 +1485,9 @@ impl Interpreter {
             }
         }
 
-        EvalResult::Value(state.new_list(field_values))
+        let list = state.new_list(field_values);
+
+        EvalResult::Value(list)
     }
 
     /// Collects an iterable value into a list by calling `Iterable::iter` then
@@ -1892,17 +1913,17 @@ mod tests {
             }
         }
 
-        fn parse_src(&mut self, src: &str) -> tlang_ast::node::Module {
+        fn parse_src(&mut self, src: &str) -> (tlang_ast::node::Module, tlang_parser::ParseMeta) {
             let mut parser = tlang_parser::Parser::from_source(src)
                 .with_line_offset(self.last_span.end_lc.line + 1)
                 .with_byte_offset(self.last_span.end)
                 .set_node_id_allocator(self.node_id_allocator);
-            let module = parser.parse().unwrap();
+            let (module, parse_meta) = parser.parse().unwrap();
 
             self.last_span = module.span;
-            self.node_id_allocator = *parser.node_id_allocator();
+            self.node_id_allocator = parse_meta.node_id_allocator;
 
-            module
+            (module, parse_meta)
         }
 
         fn analyze(&mut self, module: &mut tlang_ast::node::Module) {
@@ -1911,26 +1932,37 @@ mod tests {
                 .unwrap();
         }
 
-        fn lower(&mut self, module: &tlang_ast::node::Module) -> hir::Module {
+        fn lower(
+            &mut self,
+            module: &tlang_ast::node::Module,
+            parse_meta: &tlang_parser::ParseMeta,
+        ) -> hir::Module {
             let mut lowering_context = tlang_ast_lowering::LoweringContext::new(
                 self.semantic_analyzer.symbol_id_allocator(),
                 self.semantic_analyzer.root_symbol_table(),
                 self.semantic_analyzer.symbol_tables().clone(),
             );
-            let (mut module, meta) = tlang_ast_lowering::lower(&mut lowering_context, module);
+            let (mut module, meta) = tlang_ast_lowering::lower(
+                &mut lowering_context,
+                module,
+                &parse_meta.constant_pool_node_ids,
+            );
 
             let mut optimizer = HirOptimizer::default();
             debug!("LowerResultMeta = {:?}", meta);
+            let constant_pool_ids = meta.constant_pool_ids.clone();
             let mut ctx = meta.into();
             optimizer.optimize_hir(&mut module, &mut ctx);
+
+            self.state.register_constant_pool_ids(constant_pool_ids);
 
             module
         }
 
         fn parse(&mut self, src: &str) -> hir::Module {
-            let mut ast = self.parse_src(src);
+            let (mut ast, parse_meta) = self.parse_src(src);
             self.analyze(&mut ast);
-            self.lower(&ast)
+            self.lower(&ast, &parse_meta)
         }
 
         fn eval_root(&mut self, src: &str) -> TlangValue {

@@ -1,5 +1,5 @@
 use regex::Regex;
-use tlang_macros::define_struct;
+use tlang_macros::{define_struct, native_fn};
 use tlang_memory::{TlangValue, VMState};
 
 /// Field indices for the Regex struct.
@@ -38,6 +38,42 @@ fn build_regex(state: &mut VMState, this: TlangValue) -> Regex {
 pub(crate) fn regex_match(state: &mut VMState, regex_val: TlangValue, haystack: &str) -> bool {
     let re = build_regex(state, regex_val);
     re.is_match(haystack)
+}
+
+/// Global `re(parts)` function — constructs a Regex from a tagged string literal.
+/// Constructs a `Regex` from a tagged string literal.  The parser desugars
+/// `re"prefix{x}suffix"` into `re(["prefix", "suffix"], [x])`, so the function
+/// interleaves the parts and stringified values to build the full pattern.
+///
+/// # Panics
+///
+/// Panics if `parts` is not a list, `values` is not a list, or any element of
+/// `parts` is not a string.
+#[native_fn(name = "re")]
+pub fn re(state: &mut VMState, parts: TlangValue, values: TlangValue) -> TlangValue {
+    let parts_list: Vec<TlangValue> = state
+        .get_struct(parts)
+        .map(|s| s.values().to_vec())
+        .unwrap_or_else(|| state.panic("re(): first argument must be a list".to_string()));
+    let values_list: Vec<TlangValue> = state
+        .get_struct(values)
+        .map(|s| s.values().to_vec())
+        .unwrap_or_else(|| state.panic("re(): second argument must be a list".to_string()));
+
+    let mut pattern = String::new();
+    for (i, &part) in parts_list.iter().enumerate() {
+        let s = state
+            .get_object(part)
+            .and_then(|o| o.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| state.panic("re(): parts element must be a string".to_string()));
+        pattern.push_str(&s);
+        if i < values_list.len() {
+            pattern.push_str(&state.stringify(values_list[i]));
+        }
+    }
+
+    state.new_regex(pattern, String::new())
 }
 
 define_struct! {

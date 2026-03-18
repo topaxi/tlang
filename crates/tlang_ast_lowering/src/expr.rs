@@ -83,6 +83,8 @@ impl LoweringContext {
             ast::node::ExprKind::Literal(box literal) => {
                 hir::ExprKind::Literal(Box::new(literal.clone()))
             }
+            // Note: TaggedString literals are expanded into Call expressions by the parser.
+            // If a TaggedString survives to HIR lowering, it means the parser didn't handle it.
             ast::node::ExprKind::Match(match_expr) => self.lower_match(match_expr),
             ast::node::ExprKind::Range(box ast::node::RangeExpression {
                 start,

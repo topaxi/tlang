@@ -40,8 +40,8 @@ fn main() {
 
     let mut parser = tlang_parser::Parser::from_source(&code);
     let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| parser.parse()));
-    let mut ast = match parse_result {
-        Ok(Ok(ast)) => ast,
+    let (mut ast, parse_meta) = match parse_result {
+        Ok(Ok(result)) => result,
         Ok(Err(err)) => {
             eprint!("{}", render_parse_issues(filename, &code, err.issues()));
             process::exit(1);
@@ -69,16 +69,19 @@ fn main() {
     }
     let (mut module, meta) = lower_to_hir(
         &ast,
+        &parse_meta.constant_pool_node_ids,
         analyzer.symbol_id_allocator(),
         analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),
     );
 
     let mut optimizer = HirOptimizer::default();
+    let constant_pool_ids = meta.constant_pool_ids.clone();
     let mut ctx = meta.into();
     optimizer.optimize_hir(&mut module, &mut ctx);
 
     let mut vm = VM::new();
     vm.state_mut().set_stress_gc(stress_gc);
+    vm.state_mut().register_constant_pool_ids(constant_pool_ids);
     vm.eval(&module);
 }
