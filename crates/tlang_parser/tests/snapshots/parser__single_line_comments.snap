@@ -73,8 +73,9 @@ Module(
         ),
       ),
       leading_comments: [
-        Token(
-          kind: SingleLineComment(" this is a comment"),
+        CommentToken(
+          kind: SingleLine,
+          text: " this is a comment",
           span: Span(
             start: 0,
             end: 20,

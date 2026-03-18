@@ -1682,6 +1682,7 @@ dependencies = [
  "log",
  "pretty_assertions",
  "serde",
+ "tlang_intern",
  "tlang_span",
 ]
 
@@ -1693,12 +1694,12 @@ dependencies = [
  "log",
  "pretty_assertions",
  "tlang_ast",
+ "tlang_defs",
  "tlang_hir",
  "tlang_hir_pretty",
  "tlang_parser",
  "tlang_semantics",
  "tlang_span",
- "tlang_symbols",
 ]
 
 [[package]]
@@ -1716,6 +1717,7 @@ dependencies = [
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_codegen_js",
+ "tlang_defs",
  "tlang_diagnostics",
  "tlang_hir",
  "tlang_hir_opt",
@@ -1725,7 +1727,6 @@ dependencies = [
  "tlang_runtime",
  "tlang_semantics",
  "tlang_span",
- "tlang_symbols",
  "tsify",
  "wasm-bindgen",
  "wasm-bindgen-test",
@@ -1770,12 +1771,22 @@ dependencies = [
  "pretty_assertions",
  "tlang_ast",
  "tlang_ast_lowering",
+ "tlang_defs",
  "tlang_hir",
  "tlang_hir_opt",
+ "tlang_intern",
  "tlang_parser",
  "tlang_semantics",
  "tlang_span",
- "tlang_symbols",
+]
+
+[[package]]
+name = "tlang_defs"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serde",
+ "tlang_span",
 ]
 
 [[package]]
@@ -1798,8 +1809,8 @@ dependencies = [
  "pretty_assertions",
  "serde",
  "tlang_ast",
+ "tlang_defs",
  "tlang_span",
- "tlang_symbols",
 ]
 
 [[package]]
@@ -1814,12 +1825,12 @@ dependencies = [
  "serde",
  "tlang_ast",
  "tlang_ast_lowering",
+ "tlang_defs",
  "tlang_hir",
  "tlang_hir_pretty",
  "tlang_parser",
  "tlang_semantics",
  "tlang_span",
- "tlang_symbols",
 ]
 
 [[package]]
@@ -1828,7 +1839,15 @@ version = "0.1.0"
 dependencies = [
  "tlang_ast",
  "tlang_hir",
+ "tlang_intern",
  "tlang_span",
+]
+
+[[package]]
+name = "tlang_intern"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -1846,6 +1865,7 @@ dependencies = [
  "tlang_ast_lowering",
  "tlang_hir",
  "tlang_hir_opt",
+ "tlang_intern",
  "tlang_macros",
  "tlang_memory",
  "tlang_parser",
@@ -1861,6 +1881,7 @@ version = "0.1.0"
 dependencies = [
  "pretty_assertions",
  "tlang_ast",
+ "tlang_intern",
  "tlang_span",
 ]
 
@@ -1899,6 +1920,7 @@ dependencies = [
  "pretty_assertions",
  "serde",
  "tlang_ast",
+ "tlang_intern",
  "tlang_lexer",
  "tlang_span",
 ]
@@ -1925,9 +1947,9 @@ dependencies = [
  "regex-syntax",
  "serde",
  "tlang_ast",
+ "tlang_defs",
  "tlang_parser",
  "tlang_span",
- "tlang_symbols",
 ]
 
 [[package]]
@@ -1950,15 +1972,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tlang_symbols"
-version = "0.1.0"
-dependencies = [
- "log",
- "serde",
- "tlang_span",
-]
-
-[[package]]
 name = "tlang_test_runner"
 version = "0.1.0"
 dependencies = [
@@ -1977,6 +1990,7 @@ dependencies = [
  "log",
  "pretty_assertions",
  "tlang_ast_lowering",
+ "tlang_defs",
  "tlang_diagnostics",
  "tlang_hir",
  "tlang_hir_opt",
@@ -1984,7 +1998,6 @@ dependencies = [
  "tlang_memory",
  "tlang_parser",
  "tlang_semantics",
- "tlang_symbols",
 ]
 
 [[package]]

@@ -3,19 +3,19 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use log::debug;
+use tlang_defs::DefScope;
 use tlang_hir as hir;
 use tlang_span::{HirId, HirIdAllocator};
-use tlang_symbols::SymbolTable;
 
 #[derive(Debug)]
 pub struct HirOptContext {
-    pub symbols: HashMap<HirId, Rc<RefCell<SymbolTable>>>,
+    pub symbols: HashMap<HirId, Rc<RefCell<DefScope>>>,
     pub hir_id_allocator: HirIdAllocator,
     pub current_scope: HirId,
 }
 
 impl HirOptContext {
-    pub fn current_symbol_table(&self) -> Option<Rc<RefCell<SymbolTable>>> {
+    pub fn current_symbol_table(&self) -> Option<Rc<RefCell<DefScope>>> {
         self.symbols.get(&self.current_scope).cloned()
     }
 }

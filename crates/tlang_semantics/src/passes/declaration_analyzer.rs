@@ -7,20 +7,20 @@ use tlang_ast::node::{
     StmtKind,
 };
 use tlang_ast::visit::{Visitor, walk_expr, walk_stmt};
+use tlang_defs::{Def, DefKind, DefScope};
 use tlang_span::{NodeId, Span};
-use tlang_symbols::{SymbolInfo, SymbolTable, SymbolType};
 
 use crate::analyzer::{SemanticAnalysisContext, SemanticAnalysisPass};
 
 /// The declaration analyzer is responsible for collecting all the declarations in a module.
 #[derive(Default)]
 pub struct DeclarationAnalyzer {
-    symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
-    symbol_type_context: Vec<SymbolType>,
+    symbol_table_stack: Vec<Rc<RefCell<DefScope>>>,
+    symbol_type_context: Vec<DefKind>,
 }
 
 impl DeclarationAnalyzer {
-    fn current_symbol_table(&self) -> &Rc<RefCell<SymbolTable>> {
+    fn current_symbol_table(&self) -> &Rc<RefCell<DefScope>> {
         self.symbol_table_stack.last().unwrap()
     }
 
@@ -28,18 +28,18 @@ impl DeclarationAnalyzer {
         &mut self,
         node_id: NodeId,
         ctx: &mut SemanticAnalysisContext,
-    ) -> Rc<RefCell<SymbolTable>> {
+    ) -> Rc<RefCell<DefScope>> {
         debug!("Entering new scope for node: {node_id}");
 
         let parent = self.current_symbol_table().clone();
-        let new_symbol_table = Rc::new(RefCell::new(SymbolTable::new(parent)));
+        let new_symbol_table = Rc::new(RefCell::new(DefScope::new(parent)));
         ctx.symbol_tables.insert(node_id, new_symbol_table.clone());
         self.symbol_table_stack.push(new_symbol_table.clone());
 
         new_symbol_table
     }
 
-    fn pop_symbol_table(&mut self) -> Rc<RefCell<SymbolTable>> {
+    fn pop_symbol_table(&mut self) -> Rc<RefCell<DefScope>> {
         debug!("Leaving scope");
 
         self.symbol_table_stack.pop().unwrap()
@@ -51,13 +51,12 @@ impl DeclarationAnalyzer {
         ctx: &mut SemanticAnalysisContext,
         node_id: NodeId,
         name: &str,
-        symbol_type: SymbolType,
+        kind: DefKind,
         defined_at: Span,
         scope_start: u32,
     ) {
         let id = ctx.symbol_id_allocator.next_id();
-        let symbol_info =
-            SymbolInfo::new(id, name, symbol_type, defined_at, scope_start).with_node_id(node_id);
+        let symbol_info = Def::new(id, name, kind, defined_at, scope_start).with_node_id(node_id);
 
         debug!("Declaring symbol: {symbol_info:#?}");
 
@@ -74,7 +73,7 @@ impl DeclarationAnalyzer {
                 ctx,
                 method.id,
                 &qualified_name,
-                SymbolType::ProtocolMethod(method.parameters.len() as u16),
+                DefKind::ProtocolMethod(method.parameters.len() as u16),
                 method.span,
                 method.span.end_lc.line,
             );
@@ -88,12 +87,12 @@ impl DeclarationAnalyzer {
                 ctx,
                 method.id,
                 &method_name,
-                SymbolType::FunctionSelfRef(method.parameters.len() as u16),
+                DefKind::FunctionSelfRef(method.parameters.len() as u16),
                 method.name.span,
                 method.name.span.end_lc.line,
             );
 
-            self.symbol_type_context.push(SymbolType::Parameter);
+            self.symbol_type_context.push(DefKind::Parameter);
             for param in &method.parameters {
                 self.collect_pattern(&param.pattern, param.span.end_lc.line, ctx);
             }
@@ -165,7 +164,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     ctx,
                     stmt.id,
                     decl.name.as_str(),
-                    SymbolType::Enum,
+                    DefKind::Enum,
                     stmt.span,
                     stmt.span.end_lc.line,
                 );
@@ -175,7 +174,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                         ctx,
                         element.id,
                         &(decl.name.to_string() + "::" + element.name.as_str()),
-                        SymbolType::EnumVariant(element.parameters.len() as u16),
+                        DefKind::EnumVariant(element.parameters.len() as u16),
                         element.span,
                         element.span.end_lc.line,
                     );
@@ -186,7 +185,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     ctx,
                     stmt.id,
                     decl.name.as_str(),
-                    SymbolType::Struct,
+                    DefKind::Struct,
                     stmt.span,
                     stmt.span.end_lc.line,
                 );
@@ -200,7 +199,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     ctx,
                     stmt.id,
                     decl.name.as_str(),
-                    SymbolType::Protocol,
+                    DefKind::Protocol,
                     stmt.span,
                     stmt.span.end_lc.line,
                 );
@@ -239,7 +238,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             ctx,
             declaration.id,
             &name_as_str,
-            SymbolType::Function(declaration.parameters.len() as u16),
+            DefKind::Function(declaration.parameters.len() as u16),
             declaration.name.span,
             declaration.span.end_lc.line,
         );
@@ -253,13 +252,13 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             ctx,
             declaration.id,
             &name_as_str,
-            SymbolType::FunctionSelfRef(declaration.parameters.len() as u16),
+            DefKind::FunctionSelfRef(declaration.parameters.len() as u16),
             declaration.name.span,
             declaration.name.span.end_lc.line,
         );
 
         // Handle parameters
-        self.symbol_type_context.push(SymbolType::Parameter);
+        self.symbol_type_context.push(DefKind::Parameter);
         for param in &declaration.parameters {
             self.visit_fn_param(param, ctx);
         }
@@ -294,13 +293,13 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     ctx,
                     decl.id,
                     &name_as_str,
-                    SymbolType::FunctionSelfRef(decl.parameters.len() as u16),
+                    DefKind::FunctionSelfRef(decl.parameters.len() as u16),
                     decl.name.span,
                     decl.name.span.end_lc.line,
                 );
 
                 // Use default function declaration walker for the rest
-                self.symbol_type_context.push(SymbolType::Parameter);
+                self.symbol_type_context.push(DefKind::Parameter);
                 for param in &decl.parameters {
                     self.visit_fn_param(param, ctx);
                 }
@@ -349,7 +348,7 @@ impl DeclarationAnalyzer {
                     self.symbol_type_context
                         .last()
                         .copied()
-                        .unwrap_or(SymbolType::Variable),
+                        .unwrap_or(DefKind::Variable),
                     pattern.span,
                     scope_start,
                 );
@@ -359,7 +358,7 @@ impl DeclarationAnalyzer {
                     ctx,
                     pattern.id,
                     kw::_Self,
-                    SymbolType::Variable,
+                    DefKind::Variable,
                     pattern.span,
                     scope_start,
                 );

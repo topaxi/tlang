@@ -7,9 +7,9 @@ use log::{debug, warn};
 use tlang_ast as ast;
 use tlang_ast::keyword::kw;
 use tlang_ast::node::{EnumPattern, FunctionDeclaration, Ident};
+use tlang_defs::{Def, DefIdAllocator, DefKind, DefScope};
 use tlang_hir as hir;
 use tlang_span::{HirId, HirIdAllocator, NodeId};
-use tlang_symbols::{SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType};
 
 mod expr;
 mod r#loop;
@@ -20,17 +20,17 @@ pub struct LoweringContext {
     node_id_to_hir_id: HashMap<NodeId, HirId>,
     fn_node_id_to_hir_id: HashMap<NodeId, HirId>,
     hir_id_allocator: HirIdAllocator,
-    symbol_id_allocator: SymbolIdAllocator,
-    symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
-    new_symbol_tables: HashMap<HirId, Rc<RefCell<SymbolTable>>>,
-    current_symbol_table: Rc<RefCell<SymbolTable>>,
+    symbol_id_allocator: DefIdAllocator,
+    symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>>,
+    new_symbol_tables: HashMap<HirId, Rc<RefCell<DefScope>>>,
+    current_symbol_table: Rc<RefCell<DefScope>>,
 }
 
 impl LoweringContext {
     pub fn new(
-        symbol_id_allocator: SymbolIdAllocator,
-        root_symbol_table: Rc<RefCell<SymbolTable>>,
-        symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
+        symbol_id_allocator: DefIdAllocator,
+        root_symbol_table: Rc<RefCell<DefScope>>,
+        symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>>,
     ) -> Self {
         Self {
             hir_id_allocator: HirIdAllocator::default(),
@@ -43,7 +43,7 @@ impl LoweringContext {
         }
     }
 
-    pub fn symbol_tables(&self) -> HashMap<HirId, Rc<RefCell<SymbolTable>>> {
+    pub fn symbol_tables(&self) -> HashMap<HirId, Rc<RefCell<DefScope>>> {
         debug!("Translating symbol tables to HirIds");
 
         let mut symbol_tables = self.new_symbol_tables.clone();
@@ -90,7 +90,7 @@ impl LoweringContext {
     }
 
     #[inline(always)]
-    pub(crate) fn scope(&self) -> Rc<RefCell<SymbolTable>> {
+    pub(crate) fn scope(&self) -> Rc<RefCell<DefScope>> {
         self.current_symbol_table.clone()
     }
 
@@ -127,13 +127,12 @@ impl LoweringContext {
 
     pub(crate) fn with_new_scope<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&mut Self, Rc<RefCell<SymbolTable>>) -> (HirId, R),
+        F: FnOnce(&mut Self, Rc<RefCell<DefScope>>) -> (HirId, R),
         R: hir::HirScope,
     {
         let previous_symbol_table = self.current_symbol_table.clone();
-        self.current_symbol_table = Rc::new(RefCell::new(SymbolTable::new(
-            previous_symbol_table.clone(),
-        )));
+        self.current_symbol_table =
+            Rc::new(RefCell::new(DefScope::new(previous_symbol_table.clone())));
         let (hir_id, result) = f(self, self.current_symbol_table.clone());
         self.new_symbol_tables
             .insert(hir_id, self.current_symbol_table.clone());
@@ -149,13 +148,13 @@ impl LoweringContext {
         &mut self,
         hir_id: HirId,
         name: &str,
-        symbol_type: SymbolType,
+        kind: DefKind,
         scope_start: u32,
     ) {
-        let symbol_info = SymbolInfo::new(
+        let symbol_info = Def::new(
             self.symbol_id_allocator.next_id(),
             name,
-            symbol_type,
+            kind,
             Default::default(),
             scope_start,
         )
@@ -170,13 +169,13 @@ impl LoweringContext {
         index: usize,
         hir_id: HirId,
         name: &str,
-        symbol_type: SymbolType,
+        kind: DefKind,
         scope_start: u32,
     ) {
-        let symbol_info = SymbolInfo::new(
+        let symbol_info = Def::new(
             self.symbol_id_allocator.next_id(),
             name,
-            symbol_type,
+            kind,
             Default::default(),
             scope_start,
         )
@@ -190,14 +189,14 @@ impl LoweringContext {
         &mut self,
         hir_id: HirId,
         name: &str,
-        symbol_type: SymbolType,
+        kind: DefKind,
         scope_start: u32,
-        predicate: impl Fn(&SymbolInfo) -> bool,
+        predicate: impl Fn(&Def) -> bool,
     ) {
-        let symbol_info = SymbolInfo::new(
+        let symbol_info = Def::new(
             self.symbol_id_allocator.next_id(),
             name,
-            symbol_type,
+            kind,
             Default::default(),
             scope_start,
         )
@@ -272,7 +271,7 @@ impl LoweringContext {
 
     fn lower_fn_param_pat(&mut self, node: &ast::node::FunctionParameter) -> Ident {
         match &node.pattern.kind {
-            ast::node::PatKind::Identifier(box ident) => ident.clone(),
+            ast::node::PatKind::Identifier(box ident) => *ident,
             ast::node::PatKind::_Self => Ident::new(kw::_Self, node.span),
             ast::node::PatKind::Wildcard => Ident::new(kw::Underscore, node.span),
             _ => {
@@ -339,7 +338,7 @@ impl LoweringContext {
     }
 
     fn lower_path_segment(&mut self, seg: &Ident) -> hir::PathSegment {
-        hir::PathSegment { ident: seg.clone() }
+        hir::PathSegment { ident: *seg }
     }
 
     /// Lower a pattern into a HIR pattern. Only use for single patterns, not match arms or
@@ -363,7 +362,7 @@ impl LoweringContext {
                 span: node.span,
             },
             ast::node::PatKind::Literal(box literal) => hir::Pat {
-                kind: hir::PatKind::Literal(Box::new(literal.clone())),
+                kind: hir::PatKind::Literal(Box::new(*literal)),
                 span: node.span,
             },
             ast::node::PatKind::Identifier(box ident) => {
@@ -381,7 +380,7 @@ impl LoweringContext {
                 //};
 
                 hir::Pat {
-                    kind: hir::PatKind::Identifier(hir_id, Box::new(ident.clone())),
+                    kind: hir::PatKind::Identifier(hir_id, Box::new(*ident)),
                     span: node.span,
                 }
             }
@@ -397,7 +396,7 @@ impl LoweringContext {
                 let path = self.lower_path(path);
                 let elements = elements
                     .iter()
-                    .map(|(ident, pat)| (ident.clone(), self.lower_pat(pat)))
+                    .map(|(ident, pat)| (*ident, self.lower_pat(pat)))
                     .collect();
 
                 hir::Pat {
@@ -445,9 +444,9 @@ impl LoweringContext {
 pub fn lower_to_hir(
     tlang_ast: &ast::node::Module,
     constant_pool_node_ids: &[NodeId],
-    symbol_id_allocator: SymbolIdAllocator,
-    root_symbol_table: Rc<RefCell<SymbolTable>>,
-    symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
+    symbol_id_allocator: DefIdAllocator,
+    root_symbol_table: Rc<RefCell<DefScope>>,
+    symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>>,
 ) -> hir::LowerResult {
     lower(
         &mut LoweringContext::new(symbol_id_allocator, root_symbol_table, symbol_tables),

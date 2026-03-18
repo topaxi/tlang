@@ -351,8 +351,9 @@ Module(
             ),
           ),
           leading_comments: [
-            Token(
-              kind: SingleLineComment(" comment"),
+            CommentToken(
+              kind: SingleLine,
+              text: " comment",
               span: Span(
                 start: 16,
                 end: 26,

@@ -24,7 +24,7 @@ tlang_interpreter = { path = "../tlang_interpreter", default-features = false }
 tlang_memory = { path = "../tlang_memory" }
 tlang_parser = { path = "../../tlang_parser", optional = true }
 tlang_semantics = { path = "../../tlang_semantics", optional = true }
-tlang_symbols = { path = "../../tlang_symbols" }
+tlang_defs = { path = "../../tlang_defs" }
 inventory = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true, optional = true }

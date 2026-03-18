@@ -73,8 +73,9 @@ Module(
         ),
       ),
       leading_comments: [
-        Token(
-          kind: MultiLineComment(" this is a comment "),
+        CommentToken(
+          kind: MultiLine,
+          text: " this is a comment ",
           span: Span(
             start: 0,
             end: 23,

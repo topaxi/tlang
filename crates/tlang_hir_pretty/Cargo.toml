@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
+tlang_intern = { path = "../tlang_intern" }
 tlang_hir = { path = "../tlang_hir" }
 tlang_span = { path = "../tlang_span" }
 

@@ -29,7 +29,7 @@ tlang_hir_pretty = { path = "../tlang_hir_pretty" }
 tlang_parser = { path = "../tlang_parser", features = ["serde"] }
 tlang_semantics = { path = "../tlang_semantics", features = ["serde"] }
 tlang_span = { path = "../tlang_span", features = ["serde"] }
-tlang_symbols = { path = "../tlang_symbols", features = ["serde"] }
+tlang_defs = { path = "../tlang_defs", features = ["serde"] }
 tlang_runtime = { path = "../tlang_runtime" }
 tlang_macros = { path = "../tlang_macros" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }

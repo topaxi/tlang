@@ -380,11 +380,8 @@ impl Interpreter {
             token::Literal::UnsignedInteger(value) => TlangValue::U64(*value),
             token::Literal::Float(value) => TlangValue::F64(*value),
             token::Literal::Boolean(value) => TlangValue::Bool(*value),
-            token::Literal::String(value) => state.new_string(value.to_string()),
-            token::Literal::Char(value) => state.new_string(value.to_string()),
-            token::Literal::TaggedString(_, _) => {
-                unreachable!("TaggedString is expanded to a Call by the parser")
-            }
+            token::Literal::String(id) => state.new_string(tlang_intern::get(*id).to_string()),
+            token::Literal::Char(id) => state.new_string(tlang_intern::get(*id).to_string()),
             token::Literal::None => unreachable!(),
         }
     }
@@ -1673,11 +1670,10 @@ impl Interpreter {
                     return true;
                 }
 
-                if let (TlangValue::Object(lhs), box token::Literal::String(box rhs)) =
-                    (value, literal)
+                if let (TlangValue::Object(lhs), box token::Literal::String(id)) = (value, literal)
                     && let TlangObjectKind::String(lhs) = state.get_object_by_id(lhs).unwrap()
                 {
-                    return *lhs == rhs;
+                    return *lhs == tlang_intern::get(*id);
                 }
 
                 false

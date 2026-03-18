@@ -2,8 +2,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use log::debug;
 use tlang_ast::node::{Module, StructDeclaration};
+use tlang_defs::{DefIdAllocator, DefKind, DefScope};
 use tlang_span::NodeId;
-use tlang_symbols::{SymbolIdAllocator, SymbolTable, SymbolType};
 
 use crate::{
     diagnostic::Diagnostic,
@@ -15,26 +15,26 @@ use crate::{
 /// Context for semantic analysis, containing shared state needed
 /// across all semantic analysis passes.
 pub struct SemanticAnalysisContext {
-    pub symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
-    pub symbol_id_allocator: SymbolIdAllocator,
-    pub root_symbol_table: Rc<RefCell<SymbolTable>>,
+    pub symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>>,
+    pub symbol_id_allocator: DefIdAllocator,
+    pub root_symbol_table: Rc<RefCell<DefScope>>,
     pub struct_declarations: HashMap<String, StructDeclaration>,
     pub diagnostics: Vec<Diagnostic>,
 }
 
 impl SemanticAnalysisContext {
     pub fn new() -> Self {
-        let root_symbol_table = Rc::new(RefCell::new(SymbolTable::default()));
+        let root_symbol_table = Rc::new(RefCell::new(DefScope::default()));
         SemanticAnalysisContext {
             symbol_tables: HashMap::from([(NodeId::new(1), root_symbol_table.clone())]),
-            symbol_id_allocator: SymbolIdAllocator::default(),
+            symbol_id_allocator: DefIdAllocator::default(),
             root_symbol_table,
             struct_declarations: HashMap::new(),
             diagnostics: Vec::new(),
         }
     }
 
-    pub fn get_symbol_table(&self, id: NodeId) -> Option<Rc<RefCell<SymbolTable>>> {
+    pub fn get_symbol_table(&self, id: NodeId) -> Option<Rc<RefCell<DefScope>>> {
         self.symbol_tables.get(&id).cloned()
     }
 
@@ -49,15 +49,15 @@ impl SemanticAnalysisContext {
     pub fn add_builtin_symbols<'a, S, I>(&mut self, symbols: I)
     where
         S: AsRef<str> + 'a,
-        I: IntoIterator<Item = &'a (S, SymbolType)>,
+        I: IntoIterator<Item = &'a (S, DefKind)>,
     {
-        use tlang_symbols::SymbolInfo;
+        use tlang_defs::Def;
 
-        for (name, symbol_type) in symbols {
-            let symbol_info = SymbolInfo::new_builtin(
+        for (name, kind) in symbols {
+            let symbol_info = Def::new_builtin(
                 self.symbol_id_allocator.next_id(),
                 name.as_ref(),
-                *symbol_type,
+                *kind,
                 None,
             );
             self.root_symbol_table.borrow_mut().insert(symbol_info);
@@ -67,15 +67,15 @@ impl SemanticAnalysisContext {
     pub fn add_builtin_symbols_with_slots<'a, S, I>(&mut self, symbols: I)
     where
         S: AsRef<str> + 'a,
-        I: IntoIterator<Item = &'a (S, SymbolType, Option<usize>)>,
+        I: IntoIterator<Item = &'a (S, DefKind, Option<usize>)>,
     {
-        use tlang_symbols::SymbolInfo;
+        use tlang_defs::Def;
 
-        for (name, symbol_type, global_slot) in symbols {
-            let symbol_info = SymbolInfo::new_builtin(
+        for (name, kind, global_slot) in symbols {
+            let symbol_info = Def::new_builtin(
                 self.symbol_id_allocator.next_id(),
                 name.as_ref(),
-                *symbol_type,
+                *kind,
                 *global_slot,
             );
             self.root_symbol_table.borrow_mut().insert(symbol_info);
@@ -182,26 +182,26 @@ impl SemanticAnalyzer {
     #[inline(always)]
     /// # Panics
     /// Panics if analysis has not been run first.
-    pub fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
+    pub fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<DefScope>>> {
         let ctx = self.context.as_ref().expect("Analysis must be run first");
         &ctx.symbol_tables
     }
 
     #[inline(always)]
-    pub fn get_symbol_table(&self, id: NodeId) -> Option<Rc<RefCell<SymbolTable>>> {
+    pub fn get_symbol_table(&self, id: NodeId) -> Option<Rc<RefCell<DefScope>>> {
         self.symbol_tables().get(&id).cloned()
     }
 
     /// # Panics
     /// Panics if analysis has not been run first.
-    pub fn root_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
+    pub fn root_symbol_table(&self) -> Rc<RefCell<DefScope>> {
         let ctx = self.context.as_ref().expect("Analysis must be run first");
         ctx.root_symbol_table.clone()
     }
 
     /// # Panics
     /// Panics if analysis has not been run first.
-    pub fn symbol_id_allocator(&self) -> SymbolIdAllocator {
+    pub fn symbol_id_allocator(&self) -> DefIdAllocator {
         let ctx = self.context.as_ref().expect("Analysis must be run first");
         ctx.symbol_id_allocator
     }
@@ -232,7 +232,7 @@ impl SemanticAnalyzer {
     pub fn add_builtin_symbols<'a, S, I>(&mut self, symbols: I)
     where
         S: AsRef<str> + 'a,
-        I: IntoIterator<Item = &'a (S, SymbolType)>,
+        I: IntoIterator<Item = &'a (S, DefKind)>,
     {
         // Initialize context if it doesn't exist
         if self.context.is_none() {
@@ -247,7 +247,7 @@ impl SemanticAnalyzer {
     pub fn add_builtin_symbols_with_slots<'a, S, I>(&mut self, symbols: I)
     where
         S: AsRef<str> + 'a,
-        I: IntoIterator<Item = &'a (S, SymbolType, Option<usize>)>,
+        I: IntoIterator<Item = &'a (S, DefKind, Option<usize>)>,
     {
         // Initialize context if it doesn't exist
         if self.context.is_none() {

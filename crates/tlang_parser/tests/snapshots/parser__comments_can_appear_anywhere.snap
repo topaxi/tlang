@@ -44,8 +44,9 @@ Module(
           id: 4,
           kind: Literal(UnsignedInteger(2)),
           leading_comments: [
-            Token(
-              kind: MultiLineComment(" comment before expr "),
+            CommentToken(
+              kind: MultiLine,
+              text: " comment before expr ",
               span: Span(
                 start: 52,
                 end: 77,
@@ -61,8 +62,9 @@ Module(
             ),
           ],
           trailing_comments: [
-            Token(
-              kind: MultiLineComment(" comment after expr "),
+            CommentToken(
+              kind: MultiLine,
+              text: " comment after expr ",
               span: Span(
                 start: 80,
                 end: 104,
@@ -105,8 +107,9 @@ Module(
         ),
       ),
       leading_comments: [
-        Token(
-          kind: SingleLineComment(" this is a third comment"),
+        CommentToken(
+          kind: SingleLine,
+          text: " this is a third comment",
           span: Span(
             start: 9,
             end: 35,
@@ -175,8 +178,9 @@ Module(
                 ]),
                 leading_comments: [],
                 trailing_comments: [
-                  Token(
-                    kind: SingleLineComment(" trailing comment"),
+                  CommentToken(
+                    kind: SingleLine,
+                    text: " trailing comment",
                     span: Span(
                       start: 148,
                       end: 167,
@@ -240,8 +244,9 @@ Module(
                 )),
                 leading_comments: [],
                 trailing_comments: [
-                  Token(
-                    kind: SingleLineComment(" trailing comment"),
+                  CommentToken(
+                    kind: SingleLine,
+                    text: " trailing comment",
                     span: Span(
                       start: 183,
                       end: 202,
@@ -255,8 +260,9 @@ Module(
                       ),
                     ),
                   ),
-                  Token(
-                    kind: SingleLineComment("|> bar"),
+                  CommentToken(
+                    kind: SingleLine,
+                    text: "|> bar",
                     span: Span(
                       start: 211,
                       end: 219,
@@ -378,8 +384,9 @@ Module(
         ),
       ),
       leading_comments: [
-        Token(
-          kind: SingleLineComment(" trailing comment"),
+        CommentToken(
+          kind: SingleLine,
+          text: " trailing comment",
           span: Span(
             start: 114,
             end: 133,

@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
 use log::debug;
+use tlang_defs::DefKind;
 use tlang_hir as hir;
 use tlang_interpreter::Interpreter;
 use tlang_memory::prelude::*;
 use tlang_memory::{NativeFnDef, NativeProtocolDef, VMState};
-use tlang_symbols::SymbolType;
 
 pub struct VM {
     state: VMState,
@@ -18,36 +18,36 @@ impl Default for VM {
 }
 
 impl VM {
-    fn builtin_module_symbols() -> Vec<(&'static str, SymbolType)> {
+    fn builtin_module_symbols() -> Vec<(&'static str, DefKind)> {
         let mut module_names = HashSet::new();
 
         inventory::iter::<NativeFnDef>
             .into_iter()
             .map(|def| def.module())
             .filter(|module_name| module_names.insert(module_name.to_string()))
-            .map(|module_name| (module_name, SymbolType::Module))
+            .map(|module_name| (module_name, DefKind::Module))
             .collect()
     }
 
-    const fn builtin_static_symbols() -> &'static [(&'static str, SymbolType)] {
+    const fn builtin_static_symbols() -> &'static [(&'static str, DefKind)] {
         &[
-            ("Option", SymbolType::Enum),
-            ("Option::None", SymbolType::EnumVariant(0)),
-            ("Result", SymbolType::Enum),
-            ("Regex", SymbolType::Struct),
-            ("math::pi", SymbolType::Variable),
+            ("Option", DefKind::Enum),
+            ("Option::None", DefKind::EnumVariant(0)),
+            ("Result", DefKind::Enum),
+            ("Regex", DefKind::Struct),
+            ("math::pi", DefKind::Variable),
         ]
     }
 
-    fn builtin_protocol_symbols() -> Vec<(String, SymbolType)> {
+    fn builtin_protocol_symbols() -> Vec<(String, DefKind)> {
         let mut symbols = Vec::new();
 
         for def in inventory::iter::<NativeProtocolDef> {
-            symbols.push((def.name().to_string(), SymbolType::Protocol));
+            symbols.push((def.name().to_string(), DefKind::Protocol));
             for &(method, arity) in def.methods() {
                 symbols.push((
                     format!("{}::{}", def.name(), method),
-                    SymbolType::ProtocolMethod(arity),
+                    DefKind::ProtocolMethod(arity),
                 ));
             }
         }
@@ -55,11 +55,11 @@ impl VM {
         symbols
     }
 
-    pub fn builtin_symbols() -> Vec<(String, SymbolType, Option<usize>)> {
+    pub fn builtin_symbols() -> Vec<(String, DefKind, Option<usize>)> {
         let mut slot_counter = 0usize;
 
         // Module symbols: no slot (never looked up as values)
-        let module_syms: Vec<(String, SymbolType, Option<usize>)> = Self::builtin_module_symbols()
+        let module_syms: Vec<(String, DefKind, Option<usize>)> = Self::builtin_module_symbols()
             .into_iter()
             .map(|(name, ty)| (name.to_string(), ty, None))
             .collect();
@@ -67,25 +67,25 @@ impl VM {
         // Native function symbols: sorted by name for determinism, each gets a slot
         let mut fn_defs: Vec<&NativeFnDef> = inventory::iter::<NativeFnDef>.into_iter().collect();
         fn_defs.sort_by_key(|def| def.name());
-        let fn_syms: Vec<(String, SymbolType, Option<usize>)> = fn_defs
+        let fn_syms: Vec<(String, DefKind, Option<usize>)> = fn_defs
             .iter()
             .map(|def| {
                 let slot = slot_counter;
                 slot_counter += 1;
                 (
                     def.name(),
-                    SymbolType::Function(def.arity() as u16),
+                    DefKind::Function(def.arity() as u16),
                     Some(slot),
                 )
             })
             .collect();
 
         // Const symbols: value-producing ones each get a slot
-        let const_syms: Vec<(String, SymbolType, Option<usize>)> = Self::builtin_static_symbols()
+        let const_syms: Vec<(String, DefKind, Option<usize>)> = Self::builtin_static_symbols()
             .iter()
             .map(|(name, ty)| {
                 let slot = match ty {
-                    SymbolType::Enum | SymbolType::Protocol | SymbolType::ProtocolMethod(_) => None,
+                    DefKind::Enum | DefKind::Protocol | DefKind::ProtocolMethod(_) => None,
                     _ => {
                         let s = Some(slot_counter);
                         slot_counter += 1;
@@ -97,11 +97,10 @@ impl VM {
             .collect();
 
         // Protocol symbols: derived from inventory (no slots)
-        let protocol_syms: Vec<(String, SymbolType, Option<usize>)> =
-            Self::builtin_protocol_symbols()
-                .into_iter()
-                .map(|(name, ty)| (name, ty, None))
-                .collect();
+        let protocol_syms: Vec<(String, DefKind, Option<usize>)> = Self::builtin_protocol_symbols()
+            .into_iter()
+            .map(|(name, ty)| (name, ty, None))
+            .collect();
 
         module_syms
             .into_iter()

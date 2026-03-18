@@ -6,9 +6,9 @@ use std::rc::Rc;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 use tlang_ast::node::{Ident, UnaryOp};
-use tlang_ast::token::{Literal, Token};
+use tlang_ast::token::{CommentToken, Literal};
+use tlang_defs::{DefIdAllocator, DefKind, DefScope};
 use tlang_span::{HirId, HirIdAllocator, Span};
-use tlang_symbols::{SymbolIdAllocator, SymbolTable, SymbolType};
 
 pub trait HirScope {
     // fn hir_id(&self) -> HirId;
@@ -73,17 +73,17 @@ pub enum BindingKind {
     Unknown,
 }
 
-impl From<SymbolType> for BindingKind {
-    fn from(symbol_type: SymbolType) -> Self {
-        match symbol_type {
-            SymbolType::Variable => BindingKind::Local,
-            SymbolType::Struct => BindingKind::Struct,
-            SymbolType::Enum => BindingKind::Enum,
-            SymbolType::EnumVariant(_) => BindingKind::Variant,
-            SymbolType::Function(_) | SymbolType::FunctionSelfRef(_) => BindingKind::Fn,
-            SymbolType::Parameter => BindingKind::Param,
-            SymbolType::Module => todo!(),
-            SymbolType::Protocol | SymbolType::ProtocolMethod(_) => BindingKind::Enum,
+impl From<DefKind> for BindingKind {
+    fn from(kind: DefKind) -> Self {
+        match kind {
+            DefKind::Variable => BindingKind::Local,
+            DefKind::Struct => BindingKind::Struct,
+            DefKind::Enum => BindingKind::Enum,
+            DefKind::EnumVariant(_) => BindingKind::Variant,
+            DefKind::Function(_) | DefKind::FunctionSelfRef(_) => BindingKind::Fn,
+            DefKind::Parameter => BindingKind::Param,
+            DefKind::Module => todo!(),
+            DefKind::Protocol | DefKind::ProtocolMethod(_) => BindingKind::Enum,
         }
     }
 }
@@ -503,8 +503,8 @@ pub struct Stmt {
     pub span: Span,
     // TODO: We might want to handle this somehow different, as we pass them on from the AST to
     //       HIR, which feels somewhat unnecessary.
-    pub leading_comments: Vec<Token>,
-    pub trailing_comments: Vec<Token>,
+    pub leading_comments: Vec<CommentToken>,
+    pub trailing_comments: Vec<CommentToken>,
 }
 
 impl Stmt {
@@ -595,8 +595,8 @@ pub struct MatchArm {
     pub pat_locals: usize,
     // TODO: We might want to handle this somehow different, as we pass them on from the AST to
     //       HIR, which feels somewhat unnecessary.
-    pub leading_comments: Vec<Token>,
-    pub trailing_comments: Vec<Token>,
+    pub leading_comments: Vec<CommentToken>,
+    pub trailing_comments: Vec<CommentToken>,
 }
 
 impl MatchArm {
@@ -910,9 +910,9 @@ pub enum BinaryOpKind {
 #[derive(Debug, Clone)]
 pub struct LowerResultMeta {
     pub root_symbol_table: HirId,
-    pub symbol_tables: HashMap<HirId, Rc<RefCell<SymbolTable>>>,
+    pub symbol_tables: HashMap<HirId, Rc<RefCell<DefScope>>>,
     pub hir_id_allocator: HirIdAllocator,
-    pub symbol_id_allocator: SymbolIdAllocator,
+    pub symbol_id_allocator: DefIdAllocator,
     /// HirIds of expressions that produce compile-time-constant values
     /// (e.g. tagged string parts lists). Used by the interpreter to cache
     /// these values for singleton semantics.

@@ -1,6 +1,6 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
-use tlang_symbols::SymbolType;
+use tlang_defs::DefKind;
 
 use crate::common::CodegenOptions;
 
@@ -40,7 +40,7 @@ fn test_pipeline_operator_with_call_parenthesis() {
 fn test_pipeline_operator_with_call_parenthesis_and_arguments() {
     let output = compile!(
         "fn main() { 1 |> log(2); }",
-        vec![("log", SymbolType::Function(2))]
+        vec![("log", DefKind::Function(2))]
     );
     let expected_output = indoc! {"
         function main() {
@@ -51,7 +51,7 @@ fn test_pipeline_operator_with_call_parenthesis_and_arguments() {
 
     let output = compile!(
         "fn main() { 1 |> log(2, 3); }",
-        vec![("log", SymbolType::Function(3))]
+        vec![("log", DefKind::Function(3))]
     );
     let expected_output = indoc! {"
         function main() {
@@ -65,7 +65,7 @@ fn test_pipeline_operator_with_call_parenthesis_and_arguments() {
 fn test_pipeline_operator_to_function_call_with_wildcards() {
     let output = compile!(
         "fn main() { 1 |> log(2, _); }",
-        vec![("log", SymbolType::Function(3))]
+        vec![("log", DefKind::Function(3))]
     );
     let expected_output = indoc! {"
         function main() {
@@ -80,10 +80,10 @@ fn test_pipeline_operator_long_chaining() {
     let mut options = CodegenOptions::default();
     options
         .builtin_symbols
-        .push(("filter", SymbolType::Function(2)));
+        .push(("filter", DefKind::Function(2)));
     options
         .builtin_symbols
-        .push(("foldl", SymbolType::Function(3)));
+        .push(("foldl", DefKind::Function(3)));
     let output = compile!(
         indoc! {"
             [1,2,3]

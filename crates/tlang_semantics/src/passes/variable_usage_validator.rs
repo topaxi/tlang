@@ -11,26 +11,26 @@ use tlang_ast::{
     },
     visit::{Visitor, walk_expr, walk_pat, walk_stmt},
 };
+use tlang_defs::{Def, DefScope};
 use tlang_span::{NodeId, Span};
-use tlang_symbols::{SymbolInfo, SymbolTable};
 
 /// Pass for validating variable usage, handling both unused variables
 /// and undeclared variable references.
 #[derive(Default)]
 pub struct VariableUsageValidator {
-    symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
+    symbol_table_stack: Vec<Rc<RefCell<DefScope>>>,
 }
 
 impl VariableUsageValidator {
-    fn current_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
+    fn current_symbol_table(&self) -> Rc<RefCell<DefScope>> {
         self.symbol_table_stack.last().cloned().unwrap()
     }
 
-    fn push_symbol_table(&mut self, symbol_table: &Rc<RefCell<SymbolTable>>) {
+    fn push_symbol_table(&mut self, symbol_table: &Rc<RefCell<DefScope>>) {
         self.symbol_table_stack.push(symbol_table.clone());
     }
 
-    fn pop_symbol_table(&mut self) -> Rc<RefCell<SymbolTable>> {
+    fn pop_symbol_table(&mut self) -> Rc<RefCell<DefScope>> {
         self.symbol_table_stack.pop().unwrap()
     }
 
@@ -44,11 +44,11 @@ impl VariableUsageValidator {
     /// Report unused symbols in the given symbol table
     ///
     /// # Panics
-    /// Panics if a function symbol has no arity information when calling `symbol_type.arity().unwrap()`.
+    /// Panics if a function symbol has no arity information when calling `kind.arity().unwrap()`.
     /// This should not happen in practice as all function symbols are expected to have arity information.
     pub fn report_unused_symbols(
         &mut self,
-        symbol_table: &Rc<RefCell<SymbolTable>>,
+        symbol_table: &Rc<RefCell<DefScope>>,
         ctx: &mut SemanticAnalysisContext,
     ) {
         let symbol_table = symbol_table.borrow();
@@ -70,15 +70,15 @@ impl VariableUsageValidator {
                 ctx.add_diagnostic(diagnostic::warn_at!(
                     unused_symbol.defined_at,
                     "Unused {} `{}/{}`",
-                    unused_symbol.symbol_type,
+                    unused_symbol.kind,
                     unused_symbol.name,
-                    unused_symbol.symbol_type.arity().unwrap(),
+                    unused_symbol.kind.arity().unwrap(),
                 ));
             } else {
                 ctx.add_diagnostic(diagnostic::warn_at!(
                     unused_symbol.defined_at,
                     "Unused {} `{}`, if this is intentional, prefix the name with an underscore: `_{}`",
-                    unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
+                    unused_symbol.kind, unused_symbol.name, unused_symbol.name
                 ));
             }
         }
@@ -223,7 +223,7 @@ impl VariableUsageValidator {
         &mut self,
         name: &str,
         span: Span,
-        symbol_table: &Rc<RefCell<SymbolTable>>,
+        symbol_table: &Rc<RefCell<DefScope>>,
         ctx: &mut SemanticAnalysisContext,
     ) {
         let did_you_mean = did_you_mean(name, &symbol_table.borrow().get_all_declared_symbols());
@@ -233,14 +233,11 @@ impl VariableUsageValidator {
                 diagnostic::error_at!(
                     span,
                     "Use of undeclared variable `{name}`, did you mean the {} `{}`?",
-                    suggestion.symbol_type,
+                    suggestion.kind,
                     suggestion.name,
                 )
                 .with_label(
-                    format!(
-                        "{} `{}` is defined here",
-                        suggestion.symbol_type, suggestion.name
-                    ),
+                    format!("{} `{}` is defined here", suggestion.kind, suggestion.name),
                     suggestion.defined_at,
                 ),
             );
@@ -258,7 +255,7 @@ impl VariableUsageValidator {
         name: &str,
         arity: usize,
         span: Span,
-        symbol_table: &Rc<RefCell<SymbolTable>>,
+        symbol_table: &Rc<RefCell<DefScope>>,
         ctx: &mut SemanticAnalysisContext,
     ) {
         let did_you_mean = did_you_mean(name, &symbol_table.borrow().get_all_declared_symbols());
@@ -268,14 +265,11 @@ impl VariableUsageValidator {
                 diagnostic::error_at!(
                     span,
                     "Use of undeclared function `{name}/{arity}`, did you mean the {} `{}`?",
-                    suggestion.symbol_type,
+                    suggestion.kind,
                     suggestion.name
                 )
                 .with_label(
-                    format!(
-                        "{} `{}` is defined here",
-                        suggestion.symbol_type, suggestion.name
-                    ),
+                    format!("{} `{}` is defined here", suggestion.kind, suggestion.name),
                     suggestion.defined_at,
                 ),
             );
@@ -441,7 +435,7 @@ impl<'ast> Visitor<'ast> for VariableUsageValidator {
     }
 }
 
-fn did_you_mean(name: &str, candidates: &[SymbolInfo]) -> Option<SymbolInfo> {
+fn did_you_mean(name: &str, candidates: &[Def]) -> Option<Def> {
     let mut best_distance = usize::MAX;
     let mut best_candidate = None;
     for candidate in candidates {

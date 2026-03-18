@@ -1,5 +1,5 @@
 use tlang_ast::node::{Ident, UnaryOp};
-use tlang_ast::token::{Literal, Token, TokenKind};
+use tlang_ast::token::{CommentKind, CommentToken, Literal};
 use tlang_hir as hir;
 use tlang_span::HirId;
 
@@ -126,28 +126,27 @@ impl HirPretty {
         self.push_char('}');
     }
 
-    fn print_comment(&mut self, comment: &Token) {
+    fn print_comment(&mut self, comment: &CommentToken) {
         if !self.options.comments {
             return;
         }
 
-        match &comment.kind {
-            TokenKind::SingleLineComment(comment) => {
+        match comment.kind {
+            CommentKind::SingleLine => {
                 self.push_indent();
                 self.push_str("// ");
-                self.push_str(comment);
+                self.push_str(&comment.text);
             }
-            TokenKind::MultiLineComment(comment) => {
+            CommentKind::MultiLine => {
                 self.push_indent();
                 self.push_str("/* ");
-                self.push_str(comment);
+                self.push_str(&comment.text);
                 self.push_str(" */");
             }
-            _ => unreachable!(),
         }
     }
 
-    fn print_comments(&mut self, comments: &[Token]) {
+    fn print_comments(&mut self, comments: &[CommentToken]) {
         if !self.options.comments {
             return;
         }
@@ -638,14 +637,12 @@ impl HirPretty {
     fn print_literal(&mut self, lit: &Literal) {
         match lit {
             Literal::Boolean(bool) => self.push_string(bool.to_string()),
-            Literal::String(s) => self.push_string(format!("{s:?}")),
-            Literal::Char(c) => self.push_string(format!("{c:?}")),
+            Literal::String(id) | Literal::Char(id) => {
+                self.push_string(format!("{:?}", tlang_intern::get(*id)));
+            }
             Literal::UnsignedInteger(u) => self.push_string(u.to_string()),
             Literal::Integer(i) => self.push_string(i.to_string()),
             Literal::Float(f) => self.push_string(f.to_string()),
-            Literal::TaggedString(_, _) => {
-                unreachable!("TaggedString is expanded to a Call by the parser")
-            }
             Literal::None => self.push_string("nil".to_string()),
         }
     }

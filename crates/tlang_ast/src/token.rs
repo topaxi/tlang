@@ -1,9 +1,10 @@
 use crate::keyword::Keyword;
 #[cfg(feature = "serde")]
 use serde::Serialize;
+use tlang_intern::Symbol;
 use tlang_span::Span;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum TokenKind {
     // Tokens for binary operators
@@ -55,15 +56,21 @@ pub enum TokenKind {
     DotDot,
     DotDotDot,
 
-    // Tokens for numbers
+    // Tokens for literals (numbers, booleans, strings, chars)
     Literal(Literal),
 
-    // Token for identifiers
-    Identifier(String),
+    // Token for identifiers — text is recovered from the source via span.
+    Identifier,
 
-    // Token for comments
-    SingleLineComment(String),
-    MultiLineComment(String),
+    // Token for comments — text is recovered from the source via span.
+    SingleLineComment,
+    MultiLineComment,
+
+    /// A tagged string header: the opening quote character.
+    /// The tag identifier text is recovered from the span (everything before
+    /// the trailing quote char). The actual string content is read lazily by
+    /// the parser via `Lexer::read_tagged_string_parts`.
+    TaggedStringStart(char),
 
     // Keywords
     Keyword(Keyword),
@@ -106,30 +113,16 @@ impl PartialEq for TaggedStringPart {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum Literal {
     Boolean(bool),
     Integer(i64),
     UnsignedInteger(u64),
     Float(f64),
-    String(Box<str>),
-    Char(Box<str>),
-    TaggedString(Box<str>, Vec<TaggedStringPart>),
+    String(Symbol),
+    Char(Symbol),
     None,
-}
-
-impl Clone for Literal {
-    fn clone(&self) -> Self {
-        // TODO: Would be great if literal string and char just refer to the string in the
-        //       source. Or we do some kind of interning at some point.
-        match self {
-            Literal::String(value) => Literal::String(value.clone()),
-            Literal::Char(value) => Literal::Char(value.clone()),
-            Literal::TaggedString(tag, parts) => Literal::TaggedString(tag.clone(), parts.clone()),
-            _ => unsafe { std::ptr::read(self) },
-        }
-    }
 }
 
 impl Literal {
@@ -150,7 +143,7 @@ impl From<bool> for Literal {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Token {
     pub kind: TokenKind,
@@ -171,32 +164,40 @@ impl Token {
         Self { kind, span }
     }
 
-    pub fn get_identifier(&self) -> Option<&String> {
-        match &self.kind {
-            TokenKind::Identifier(identifier) => Some(identifier),
-            _ => None,
-        }
-    }
-
-    pub fn get_keyword(&self) -> Option<&Keyword> {
-        match &self.kind {
+    pub fn get_keyword(&self) -> Option<Keyword> {
+        match self.kind {
             TokenKind::Keyword(keyword) => Some(keyword),
             _ => None,
         }
     }
 
-    pub fn get_comment(&self) -> Option<&String> {
-        match &self.kind {
-            TokenKind::SingleLineComment(comment) => Some(comment),
-            TokenKind::MultiLineComment(comment) => Some(comment),
-            _ => None,
-        }
-    }
-
-    pub fn take_literal(&mut self) -> Option<Literal> {
-        match &mut self.kind {
-            TokenKind::Literal(literal) => Some(std::mem::replace(literal, Literal::None)),
+    pub fn literal(&self) -> Option<Literal> {
+        match self.kind {
+            TokenKind::Literal(literal) => Some(literal),
             _ => None,
         }
     }
 }
+
+/// Comment kind for AST-stored comments (owned, no source lifetime).
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub enum CommentKind {
+    SingleLine,
+    MultiLine,
+}
+
+/// An owned comment extracted from the token stream for storage in AST/HIR nodes.
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct CommentToken {
+    pub kind: CommentKind,
+    pub text: Box<str>,
+    pub span: Span,
+}
+
+// Compile-time assertion that Token is Copy.
+const _: fn() = || {
+    let t = Token::default();
+    let _ = (t, t);
+};

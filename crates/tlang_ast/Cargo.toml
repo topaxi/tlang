@@ -5,11 +5,12 @@ edition.workspace = true
 
 [features]
 default = []
-serde = ["dep:serde", "tlang_span/serde"]
+serde = ["dep:serde", "tlang_span/serde", "tlang_intern/serde"]
 
 [dependencies]
 log = { workspace = true }
 serde = { workspace = true, optional = true }
+tlang_intern = { path = "../tlang_intern" }
 tlang_span = { path = "../tlang_span" }
 
 [dev-dependencies]

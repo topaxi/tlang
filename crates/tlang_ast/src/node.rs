@@ -6,15 +6,16 @@ use tlang_span::Spanned;
 use tlang_span::{NodeId, Span};
 
 use crate::keyword::kw;
+use crate::token::CommentToken;
 use crate::token::Literal;
-use crate::token::Token;
+use tlang_intern::{Symbol, get as intern_get, intern};
 
 pub use crate::macros::*;
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Ident {
-    name: Box<str>,
+    name: Symbol,
     pub span: Span,
 }
 
@@ -27,35 +28,35 @@ impl PartialEq for Ident {
 impl Ident {
     pub fn new(name: &str, span: Span) -> Self {
         Ident {
-            name: name.into(),
+            name: intern(name),
             span,
         }
     }
 
     pub fn set_name(&mut self, name: &str) {
-        self.name = name.into();
+        self.name = intern(name);
     }
 
     pub fn set_arity(&mut self, arity: usize) {
-        self.name = format!("{}/{}", self.name, arity).into();
+        self.name = intern(&format!("{}/{}", self.as_str(), arity));
     }
 
     pub fn is_self(&self) -> bool {
-        *self.name == *kw::_Self
+        self.as_str() == kw::_Self
     }
 
     pub fn is_wildcard(&self) -> bool {
-        *self.name == *kw::Underscore
+        self.as_str() == kw::Underscore
     }
 
     pub fn as_str(&self) -> &str {
-        &self.name
+        intern_get(self.name)
     }
 }
 
 impl Display for Ident {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.name)
+        f.write_str(self.as_str())
     }
 }
 
@@ -103,8 +104,8 @@ pub struct FunctionDeclaration {
     pub guard: Option<Expr>,
     pub return_type_annotation: Option<Ty>,
     pub body: Block,
-    pub leading_comments: Vec<Token>,
-    pub trailing_comments: Vec<Token>,
+    pub leading_comments: Vec<CommentToken>,
+    pub trailing_comments: Vec<CommentToken>,
     pub span: Span,
 }
 
@@ -197,8 +198,8 @@ pub struct IfElseExpression {
 pub struct Expr {
     pub id: NodeId,
     pub kind: ExprKind,
-    pub leading_comments: Vec<Token>,
-    pub trailing_comments: Vec<Token>,
+    pub leading_comments: Vec<CommentToken>,
+    pub trailing_comments: Vec<CommentToken>,
     pub span: Span,
 }
 
@@ -375,8 +376,8 @@ impl Path {
 pub struct Pat {
     pub id: NodeId,
     pub kind: PatKind,
-    pub leading_comments: Vec<Token>,
-    pub trailing_comments: Vec<Token>,
+    pub leading_comments: Vec<CommentToken>,
+    pub trailing_comments: Vec<CommentToken>,
     pub span: Span,
 }
 
@@ -474,8 +475,8 @@ pub struct Stmt {
     pub id: NodeId,
     pub kind: StmtKind,
     pub span: Span,
-    pub leading_comments: Vec<Token>,
-    pub trailing_comments: Vec<Token>,
+    pub leading_comments: Vec<CommentToken>,
+    pub trailing_comments: Vec<CommentToken>,
 }
 
 impl Stmt {
