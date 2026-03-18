@@ -43,4 +43,5 @@ const $StringBuf = class StringBuf {
   }
 };
 
-const StringBuf = (initial = '') => new $StringBuf(initial);
+string ??= {};
+string.StringBuf = (initial = '') => new $StringBuf(initial);

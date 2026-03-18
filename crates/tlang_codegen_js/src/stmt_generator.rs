@@ -316,7 +316,7 @@ impl<'a> InnerCodegen<'a> {
 fn is_builtin_type(type_name: &str) -> bool {
     matches!(
         type_name,
-        "List" | "Option" | "Result" | "ListIterator" | "StringBuf"
+        "List" | "Option" | "Result" | "ListIterator" | "string::StringBuf"
     )
 }
 

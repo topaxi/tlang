@@ -124,7 +124,7 @@ impl CodegenJS {
             ("string", DefKind::Module),
             ("string::from_char_code", DefKind::Function(1)),
             ("string::char_code_at", DefKind::Function(2)),
-            ("StringBuf", DefKind::Struct),
+            ("string::StringBuf", DefKind::Struct),
         ]
     }
 

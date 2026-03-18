@@ -1,18 +1,18 @@
 // StringBuf — mutable string buffer for performance-sensitive string building
 
-let buf = StringBuf("hello");
+let buf = string::StringBuf("hello");
 buf.push(", ");
 buf.push("world");
 buf.push("!");
 log(buf.to_string());
 
 // Chaining
-let buf2 = StringBuf();
+let buf2 = string::StringBuf();
 buf2.push("foo").push("bar").push("baz");
 log(buf2.to_string());
 
 // len and is_empty
-let buf3 = StringBuf();
+let buf3 = string::StringBuf();
 log(buf3.is_empty());
 buf3.push("abc");
 log(buf3.is_empty());
@@ -23,7 +23,7 @@ buf3.clear();
 log(buf3.is_empty());
 
 // push_char
-let buf4 = StringBuf();
+let buf4 = string::StringBuf();
 buf4.push_char("h");
 buf4.push_char("i");
 log(buf4.to_string());

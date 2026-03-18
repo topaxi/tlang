@@ -146,6 +146,10 @@ impl Default for Scope {
                 ("math::floor".to_string(), "Math.floor".to_string()),
                 ("math::random".to_string(), "Math.random".to_string()),
                 (
+                    "string::StringBuf".to_string(),
+                    "string.StringBuf".to_string(),
+                ),
+                (
                     "string::from_char_code".to_string(),
                     "String.fromCharCode".to_string(),
                 ),
