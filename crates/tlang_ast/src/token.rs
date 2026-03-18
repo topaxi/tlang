@@ -1,7 +1,7 @@
-use tlang_intern::Symbol;
 use crate::keyword::Keyword;
 #[cfg(feature = "serde")]
 use serde::Serialize;
+use tlang_intern::Symbol;
 use tlang_span::Span;
 
 #[derive(Copy, Clone, Debug, PartialEq)]

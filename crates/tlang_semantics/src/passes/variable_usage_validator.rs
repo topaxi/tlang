@@ -11,8 +11,8 @@ use tlang_ast::{
     },
     visit::{Visitor, walk_expr, walk_pat, walk_stmt},
 };
-use tlang_span::{NodeId, Span};
 use tlang_defs::{Def, DefScope};
+use tlang_span::{NodeId, Span};
 
 /// Pass for validating variable usage, handling both unused variables
 /// and undeclared variable references.
@@ -237,10 +237,7 @@ impl VariableUsageValidator {
                     suggestion.name,
                 )
                 .with_label(
-                    format!(
-                        "{} `{}` is defined here",
-                        suggestion.kind, suggestion.name
-                    ),
+                    format!("{} `{}` is defined here", suggestion.kind, suggestion.name),
                     suggestion.defined_at,
                 ),
             );
@@ -272,10 +269,7 @@ impl VariableUsageValidator {
                     suggestion.name
                 )
                 .with_label(
-                    format!(
-                        "{} `{}` is defined here",
-                        suggestion.kind, suggestion.name
-                    ),
+                    format!("{} `{}` is defined here", suggestion.kind, suggestion.name),
                     suggestion.defined_at,
                 ),
             );

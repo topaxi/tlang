@@ -1,8 +1,8 @@
 use log::{debug, warn};
+use tlang_defs::DefKind;
 use tlang_hir::visit::walk_expr;
 use tlang_hir::{self as hir, Visitor};
 use tlang_span::HirId;
-use tlang_defs::DefKind;
 
 use crate::HirPass;
 use crate::hir_opt::HirOptContext;

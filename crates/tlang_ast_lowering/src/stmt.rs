@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use log::debug;
 use tlang_ast as ast;
 use tlang_ast::node::{FunctionDeclaration, Ident, LetDeclaration};
-use tlang_hir as hir;
 use tlang_defs::DefKind;
+use tlang_hir as hir;
 
 use crate::LoweringContext;
 
@@ -457,12 +457,8 @@ impl LoweringContext {
                 params
                     .iter()
                     .map(|param| {
-                        let mut path = hir::Path::new(
-                            vec![hir::PathSegment {
-                                ident: param.name,
-                            }],
-                            span,
-                        );
+                        let mut path =
+                            hir::Path::new(vec![hir::PathSegment { ident: param.name }], span);
 
                         path.res.set_hir_id(param.hir_id);
                         path.res.set_binding_kind(hir::BindingKind::Param);

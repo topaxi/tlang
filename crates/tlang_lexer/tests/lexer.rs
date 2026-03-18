@@ -1,7 +1,7 @@
 use pretty_assertions::assert_eq;
-use tlang_intern::intern;
 use tlang_ast::keyword::Keyword;
 use tlang_ast::token::{Literal, TaggedStringPart, TokenKind};
+use tlang_intern::intern;
 
 use tlang_lexer::Lexer;
 

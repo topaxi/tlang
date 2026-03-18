@@ -1,8 +1,8 @@
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_codegen_js::js_hir_opt::JsHirOptimizer;
+use tlang_defs::DefKind;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
-use tlang_defs::DefKind;
 
 #[ctor::ctor]
 fn before_all() {

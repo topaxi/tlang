@@ -7,8 +7,8 @@ use tlang_ast::node::{
     StmtKind,
 };
 use tlang_ast::visit::{Visitor, walk_expr, walk_stmt};
+use tlang_defs::{Def, DefKind, DefScope};
 use tlang_span::{NodeId, Span};
-use tlang_defs::{Def, DefScope, DefKind};
 
 use crate::analyzer::{SemanticAnalysisContext, SemanticAnalysisPass};
 
@@ -56,8 +56,7 @@ impl DeclarationAnalyzer {
         scope_start: u32,
     ) {
         let id = ctx.symbol_id_allocator.next_id();
-        let symbol_info =
-            Def::new(id, name, kind, defined_at, scope_start).with_node_id(node_id);
+        let symbol_info = Def::new(id, name, kind, defined_at, scope_start).with_node_id(node_id);
 
         debug!("Declaring symbol: {symbol_info:#?}");
 

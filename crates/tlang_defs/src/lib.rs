@@ -46,9 +46,9 @@ impl Display for DefKind {
         match self {
             DefKind::Module => write!(f, "module"),
             DefKind::Variable => write!(f, "variable"),
-            DefKind::Function(_)
-            | DefKind::FunctionSelfRef(_)
-            | DefKind::ProtocolMethod(_) => write!(f, "function"),
+            DefKind::Function(_) | DefKind::FunctionSelfRef(_) | DefKind::ProtocolMethod(_) => {
+                write!(f, "function")
+            }
             DefKind::Parameter => write!(f, "parameter"),
             DefKind::Enum => write!(f, "enum"),
             DefKind::EnumVariant(_) => write!(f, "enum variant"),
@@ -87,13 +87,7 @@ pub struct Def {
 }
 
 impl Def {
-    pub fn new(
-        id: DefId,
-        name: &str,
-        kind: DefKind,
-        defined_at: Span,
-        scope_start: u32,
-    ) -> Self {
+    pub fn new(id: DefId, name: &str, kind: DefKind, defined_at: Span, scope_start: u32) -> Self {
         Def {
             id,
             name: name.into(),
@@ -110,12 +104,7 @@ impl Def {
         }
     }
 
-    pub fn new_builtin(
-        id: DefId,
-        name: &str,
-        kind: DefKind,
-        global_slot: Option<usize>,
-    ) -> Self {
+    pub fn new_builtin(id: DefId, name: &str, kind: DefKind, global_slot: Option<usize>) -> Self {
         let mut symbol_info = Def::new(id, name, kind, Span::default(), 0);
         symbol_info.builtin = true;
         symbol_info.global_slot = global_slot;
@@ -161,9 +150,7 @@ impl Def {
     pub fn is_any_fn(&self) -> bool {
         matches!(
             self.kind,
-            DefKind::Function(_)
-                | DefKind::FunctionSelfRef(_)
-                | DefKind::ProtocolMethod(_)
+            DefKind::Function(_) | DefKind::FunctionSelfRef(_) | DefKind::ProtocolMethod(_)
         )
     }
 
@@ -238,10 +225,7 @@ impl DefScope {
         self.symbols.iter().find(|s| predicate(s))
     }
 
-    fn get_local_mut(
-        &mut self,
-        predicate: impl Fn(&Def) -> bool,
-    ) -> Option<&mut Def> {
+    fn get_local_mut(&mut self, predicate: impl Fn(&Def) -> bool) -> Option<&mut Def> {
         self.symbols.iter_mut().find(|s| predicate(s))
     }
 
@@ -375,11 +359,7 @@ impl DefScope {
         self.symbols.insert(index, symbol_info);
     }
 
-    pub fn insert_after(
-        &mut self,
-        symbol_info: Def,
-        predicate: impl Fn(&Def) -> bool,
-    ) {
+    pub fn insert_after(&mut self, symbol_info: Def, predicate: impl Fn(&Def) -> bool) {
         debug!("Inserting symbol after predicate: {symbol_info:?}");
 
         if let Some(index) = self.symbols.iter().position(&predicate) {

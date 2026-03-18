@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use log::debug;
+use tlang_defs::DefScope;
 use tlang_hir as hir;
 use tlang_span::{HirId, HirIdAllocator};
-use tlang_defs::DefScope;
 
 #[derive(Debug)]
 pub struct HirOptContext {

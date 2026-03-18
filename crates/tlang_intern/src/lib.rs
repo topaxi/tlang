@@ -19,8 +19,9 @@ pub struct Symbol(NonZeroU32);
 struct Interner {
     /// Indexed by `Symbol.0.get() - 1`. Entries are never removed or moved.
     strings: Vec<Box<str>>,
-    /// Reverse map for deduplication.
-    map: HashMap<Box<str>, Symbol>,
+    /// Reverse map for deduplication. Keys are `&'static str` slices that
+    /// point into the stable heap allocations owned by `strings`.
+    map: HashMap<&'static str, Symbol>,
 }
 
 impl Interner {
@@ -39,8 +40,16 @@ impl Interner {
         let idx = self.strings.len() as u32 + 1;
         let id = Symbol(NonZeroU32::new(idx).expect("interner overflow"));
         let boxed: Box<str> = s.into();
-        self.strings.push(boxed.clone());
-        self.map.insert(boxed, id);
+        // SAFETY: `key` is a `&str` slice pointing into the heap allocation
+        // owned by `boxed`.  `Box<str>` stores its contents at a stable heap
+        // address; pushing the `Box` into `self.strings` only copies the fat
+        // pointer (not the string bytes), so `key` remains valid after the
+        // push.  `INTERNER` is a `static` whose `Interner` is never dropped
+        // or replaced, so the allocation outlives the program and the
+        // transmute to `&'static str` is sound.
+        let key: &'static str = unsafe { std::mem::transmute::<&str, &'static str>(&*boxed) };
+        self.strings.push(boxed);
+        self.map.insert(key, id);
         id
     }
 
