@@ -624,20 +624,11 @@ pub struct Module {
     pub id: NodeId,
     pub statements: Vec<Stmt>,
     pub span: Span,
-    /// NodeIds of expressions that produce compile-time-constant values
-    /// (e.g. tagged string parts lists). Carried through to HIR lowering.
-    #[cfg_attr(feature = "serde", serde(skip))]
-    pub constant_pool_node_ids: Vec<NodeId>,
 }
 
 impl Module {
     pub fn new(id: NodeId, statements: Vec<Stmt>, span: Span) -> Self {
-        Module {
-            id,
-            statements,
-            span,
-            constant_pool_node_ids: Vec::new(),
-        }
+        Module { id, statements, span }
     }
 }
 

@@ -641,9 +641,7 @@ impl<'src> Parser<'src> {
         let statements = self.parse_statements(false).0;
         self.end_span_from_previous_token(&mut span);
 
-        let mut module = Module::new(module_id, statements, span);
-        module.constant_pool_node_ids = std::mem::take(&mut self.constant_pool_node_ids);
-        module
+        Module::new(module_id, statements, span)
     }
 
     fn parse_block(&mut self) -> Block {

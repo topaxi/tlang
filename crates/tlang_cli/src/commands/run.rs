@@ -80,8 +80,11 @@ fn compile(input_file: &str) -> (hir::Module, std::collections::HashSet<tlang_hi
         );
     }
 
+    let constant_pool_node_ids = parser.constant_pool_node_ids().to_vec();
+
     let (mut module, meta) = lower_to_hir(
         &ast,
+        &constant_pool_node_ids,
         semantic_analyzer.symbol_id_allocator(),
         semantic_analyzer.root_symbol_table(),
         semantic_analyzer.symbol_tables().clone(),

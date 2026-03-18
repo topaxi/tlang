@@ -51,6 +51,7 @@ fn main() {
             process::exit(1);
         }
     };
+    let constant_pool_node_ids = parser.constant_pool_node_ids().to_vec();
     let mut analyzer = SemanticAnalyzer::default();
     analyzer.add_builtin_symbols_with_slots(&VM::builtin_symbols());
 
@@ -69,6 +70,7 @@ fn main() {
     }
     let (mut module, meta) = lower_to_hir(
         &ast,
+        &constant_pool_node_ids,
         analyzer.symbol_id_allocator(),
         analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),

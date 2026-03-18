@@ -21,25 +21,27 @@ fn before_all() {
         .try_init();
 }
 
-fn make_state() -> VMState {
+pub fn make_state() -> VMState {
     VM::new().into_state()
 }
 
-fn make_analyzer() -> SemanticAnalyzer {
+pub fn make_analyzer() -> SemanticAnalyzer {
     let mut analyzer = SemanticAnalyzer::default();
     analyzer.add_builtin_symbols_with_slots(&VM::builtin_symbols());
     analyzer
 }
 
-fn compile(source: &str, analyzer: &mut SemanticAnalyzer) -> (hir::Module, HashSet<HirId>) {
+pub fn compile(source: &str, analyzer: &mut SemanticAnalyzer) -> (hir::Module, HashSet<HirId>) {
     // Wrap in a block expression so the completion value is accessible.
     let wrapped = format!("{{ {source} }};");
     let mut parser = Parser::from_source(&wrapped);
     let mut ast = parser.parse().expect("parse error");
+    let constant_pool_node_ids = parser.constant_pool_node_ids().to_vec();
     analyzer.analyze(&mut ast).expect("semantic error");
 
     let (mut module, meta) = lower_to_hir(
         &ast,
+        &constant_pool_node_ids,
         analyzer.symbol_id_allocator(),
         analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),
@@ -52,7 +54,7 @@ fn compile(source: &str, analyzer: &mut SemanticAnalyzer) -> (hir::Module, HashS
     (module, constant_pool_ids)
 }
 
-fn eval_block_expr(state: &mut VMState, module: &hir::Module) -> TlangValue {
+pub fn eval_block_expr(state: &mut VMState, module: &hir::Module) -> TlangValue {
     let hir::StmtKind::Expr(expr) = &module.block.stmts[0].kind else {
         panic!(
             "Expected Expr statement, got {:?}",
