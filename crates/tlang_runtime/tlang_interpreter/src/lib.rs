@@ -1913,18 +1913,20 @@ mod tests {
             }
         }
 
-        fn parse_src(&mut self, src: &str) -> (tlang_ast::node::Module, Vec<tlang_span::NodeId>) {
+        fn parse_src(
+            &mut self,
+            src: &str,
+        ) -> (tlang_ast::node::Module, tlang_parser::ParseMeta) {
             let mut parser = tlang_parser::Parser::from_source(src)
                 .with_line_offset(self.last_span.end_lc.line + 1)
                 .with_byte_offset(self.last_span.end)
                 .set_node_id_allocator(self.node_id_allocator);
-            let module = parser.parse().unwrap();
-            let constant_pool_node_ids = parser.constant_pool_node_ids().to_vec();
+            let (module, parse_meta) = parser.parse().unwrap();
 
             self.last_span = module.span;
-            self.node_id_allocator = *parser.node_id_allocator();
+            self.node_id_allocator = parse_meta.node_id_allocator;
 
-            (module, constant_pool_node_ids)
+            (module, parse_meta)
         }
 
         fn analyze(&mut self, module: &mut tlang_ast::node::Module) {
@@ -1936,15 +1938,18 @@ mod tests {
         fn lower(
             &mut self,
             module: &tlang_ast::node::Module,
-            constant_pool_node_ids: &[tlang_span::NodeId],
+            parse_meta: &tlang_parser::ParseMeta,
         ) -> hir::Module {
             let mut lowering_context = tlang_ast_lowering::LoweringContext::new(
                 self.semantic_analyzer.symbol_id_allocator(),
                 self.semantic_analyzer.root_symbol_table(),
                 self.semantic_analyzer.symbol_tables().clone(),
             );
-            let (mut module, meta) =
-                tlang_ast_lowering::lower(&mut lowering_context, module, constant_pool_node_ids);
+            let (mut module, meta) = tlang_ast_lowering::lower(
+                &mut lowering_context,
+                module,
+                &parse_meta.constant_pool_node_ids,
+            );
 
             let mut optimizer = HirOptimizer::default();
             debug!("LowerResultMeta = {:?}", meta);
@@ -1958,9 +1963,9 @@ mod tests {
         }
 
         fn parse(&mut self, src: &str) -> hir::Module {
-            let (mut ast, constant_pool_node_ids) = self.parse_src(src);
+            let (mut ast, parse_meta) = self.parse_src(src);
             self.analyze(&mut ast);
-            self.lower(&ast, &constant_pool_node_ids)
+            self.lower(&ast, &parse_meta)
         }
 
         fn eval_root(&mut self, src: &str) -> TlangValue {

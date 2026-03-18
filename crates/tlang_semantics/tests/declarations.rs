@@ -11,7 +11,7 @@ mod common;
 macro_rules! analyze {
     ($source:expr) => {{
         let mut parser = Parser::from_source($source);
-        let mut ast = parser.parse().unwrap();
+        let (mut ast, _) = parser.parse().unwrap();
         let mut analyzer = SemanticAnalyzer::default();
         analyzer.add_builtin_symbols(&[("panic", SymbolType::Function(1))]);
         match analyzer.analyze(&mut ast) {

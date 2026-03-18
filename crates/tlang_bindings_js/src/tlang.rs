@@ -211,11 +211,15 @@ impl Tlang {
     fn parse(&mut self) -> Result<&ast::Module, &ParseError> {
         if self.build.parse_result.is_none() {
             let mut parser = Parser::from_source(&self.source).set_recoverable(true);
-            let result = parser.parse();
-            if result.is_ok() {
-                self.build.constant_pool_node_ids = parser.constant_pool_node_ids().to_vec();
+            match parser.parse() {
+                Ok((module, parse_meta)) => {
+                    self.build.constant_pool_node_ids = parse_meta.constant_pool_node_ids;
+                    self.build.parse_result = Some(Ok(module));
+                }
+                Err(e) => {
+                    self.build.parse_result = Some(Err(e));
+                }
             }
-            self.build.parse_result = Some(result);
         }
 
         self.build.parse_result.as_ref().unwrap().as_ref()

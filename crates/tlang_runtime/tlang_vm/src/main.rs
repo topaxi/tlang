@@ -40,8 +40,8 @@ fn main() {
 
     let mut parser = tlang_parser::Parser::from_source(&code);
     let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| parser.parse()));
-    let mut ast = match parse_result {
-        Ok(Ok(ast)) => ast,
+    let (mut ast, parse_meta) = match parse_result {
+        Ok(Ok(result)) => result,
         Ok(Err(err)) => {
             eprint!("{}", render_parse_issues(filename, &code, err.issues()));
             process::exit(1);
@@ -51,7 +51,6 @@ fn main() {
             process::exit(1);
         }
     };
-    let constant_pool_node_ids = parser.constant_pool_node_ids().to_vec();
     let mut analyzer = SemanticAnalyzer::default();
     analyzer.add_builtin_symbols_with_slots(&VM::builtin_symbols());
 
@@ -70,7 +69,7 @@ fn main() {
     }
     let (mut module, meta) = lower_to_hir(
         &ast,
-        &constant_pool_node_ids,
+        &parse_meta.constant_pool_node_ids,
         analyzer.symbol_id_allocator(),
         analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),

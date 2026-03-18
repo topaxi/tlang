@@ -9,7 +9,8 @@ macro_rules! parse {
         use tlang_parser::Parser;
 
         let mut parser = Parser::from_source($source);
-        parser.parse().expect("failed to parse")
+        let (module, _) = parser.parse().expect("failed to parse");
+        module
     }};
 }
 

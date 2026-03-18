@@ -22,15 +22,13 @@ fn before_all() {
 }
 
 pub fn compile(source: &str) -> hir::LowerResult {
-    let mut parser = Parser::from_source(source);
-    let mut ast = parser.parse().unwrap();
-    let constant_pool_node_ids = parser.constant_pool_node_ids().to_vec();
+    let (mut ast, parse_meta) = Parser::from_source(source).parse().unwrap();
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(&[("println", SymbolType::Function(u16::MAX))]);
     semantic_analyzer.analyze(&mut ast).unwrap();
     lower_to_hir(
         &ast,
-        &constant_pool_node_ids,
+        &parse_meta.constant_pool_node_ids,
         semantic_analyzer.symbol_id_allocator(),
         semantic_analyzer.root_symbol_table(),
         semantic_analyzer.symbol_tables().clone(),
@@ -75,15 +73,13 @@ pub fn compile_with_interpreter_builtins(source: &str) -> hir::LowerResult {
         ("Err", SymbolType::EnumVariant(1), Some(11)),
     ];
 
-    let mut parser = Parser::from_source(source);
-    let mut ast = parser.parse().unwrap();
-    let constant_pool_node_ids = parser.constant_pool_node_ids().to_vec();
+    let (mut ast, parse_meta) = Parser::from_source(source).parse().unwrap();
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols_with_slots(builtins);
     semantic_analyzer.analyze(&mut ast).unwrap();
     lower_to_hir(
         &ast,
-        &constant_pool_node_ids,
+        &parse_meta.constant_pool_node_ids,
         semantic_analyzer.symbol_id_allocator(),
         semantic_analyzer.root_symbol_table(),
         semantic_analyzer.symbol_tables().clone(),

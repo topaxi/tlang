@@ -203,7 +203,7 @@ mod tests {
             }
         "};
         let mut parser = Parser::from_source(source);
-        let mut ast = parser.parse().expect("source should parse");
+        let (mut ast, _) = parser.parse().expect("source should parse");
         let mut analyzer = SemanticAnalyzer::default();
         let _ = analyzer.analyze(&mut ast);
 
@@ -232,7 +232,7 @@ mod tests {
             let unused_var = 42;
         "};
         let mut parser = Parser::from_source(source);
-        let mut ast = parser.parse().expect("source should parse");
+        let (mut ast, _) = parser.parse().expect("source should parse");
         let mut analyzer = SemanticAnalyzer::default();
         let _ = analyzer.analyze(&mut ast);
         let warnings: Vec<_> = analyzer
@@ -256,7 +256,7 @@ mod tests {
             fn evaluate(val) { va }
         "};
         let mut parser = Parser::from_source(source);
-        let mut ast = parser.parse().expect("source should parse");
+        let (mut ast, _) = parser.parse().expect("source should parse");
         let mut analyzer = SemanticAnalyzer::default();
         let _ = analyzer.analyze(&mut ast);
         let errors: Vec<_> = analyzer

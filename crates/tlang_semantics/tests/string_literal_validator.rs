@@ -5,7 +5,7 @@ mod common;
 
 fn analyze_for_warnings(source: &str) -> Vec<String> {
     let mut parser = Parser::from_source(source);
-    let mut ast = parser.parse().unwrap();
+    let (mut ast, _) = parser.parse().unwrap();
     let mut analyzer = SemanticAnalyzer::default();
     let _ = analyzer.analyze(&mut ast);
     analyzer

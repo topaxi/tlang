@@ -22,9 +22,7 @@ mod helpers {
 
     /// Parse and lower source code to HIR module.
     pub fn parse_to_hir(src: &str) -> hir::Module {
-        let mut parser = Parser::from_source(src);
-        let mut ast = parser.parse().expect("Parse error");
-        let constant_pool_node_ids = parser.constant_pool_node_ids().to_vec();
+        let (mut ast, parse_meta) = Parser::from_source(src).parse().expect("Parse error");
 
         let mut analyzer = SemanticAnalyzer::default();
         analyzer.add_builtin_symbols_with_slots(&tlang_vm::VM::builtin_symbols());
@@ -32,7 +30,7 @@ mod helpers {
 
         let (mut module, meta) = lower_to_hir(
             &ast,
-            &constant_pool_node_ids,
+            &parse_meta.constant_pool_node_ids,
             analyzer.symbol_id_allocator(),
             analyzer.root_symbol_table(),
             analyzer.symbol_tables().clone(),

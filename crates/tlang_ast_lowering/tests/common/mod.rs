@@ -2,18 +2,16 @@
 
 use tlang_ast as ast;
 
-fn parse_str(input: &str) -> (ast::node::Module, Vec<tlang_span::NodeId>) {
+fn parse_str(input: &str) -> (ast::node::Module, tlang_parser::ParseMeta) {
     let mut parser = tlang_parser::Parser::from_source(input);
-    let module = parser.parse().unwrap();
-    let ids = parser.constant_pool_node_ids().to_vec();
-    (module, ids)
+    parser.parse().unwrap()
 }
 
 pub fn hir_from_str(input: &str) -> tlang_hir::Module {
-    let (ast, constant_pool_node_ids) = parse_str(input);
+    let (ast, parse_meta) = parse_str(input);
     let (module, _) = tlang_ast_lowering::lower_to_hir(
         &ast,
-        &constant_pool_node_ids,
+        &parse_meta.constant_pool_node_ids,
         Default::default(),
         Default::default(),
         Default::default(),
@@ -24,12 +22,12 @@ pub fn hir_from_str(input: &str) -> tlang_hir::Module {
 /// Like `hir_from_str` but runs semantic analysis first so that type inference
 /// annotations (e.g. inferred enum parameter types) are available.
 pub fn hir_from_str_analyzed(input: &str) -> tlang_hir::Module {
-    let (mut ast, constant_pool_node_ids) = parse_str(input);
+    let (mut ast, parse_meta) = parse_str(input);
     let mut analyzer = tlang_semantics::SemanticAnalyzer::default();
     let _ = analyzer.analyze(&mut ast);
     let (module, _) = tlang_ast_lowering::lower_to_hir(
         &ast,
-        &constant_pool_node_ids,
+        &parse_meta.constant_pool_node_ids,
         analyzer.symbol_id_allocator(),
         analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),

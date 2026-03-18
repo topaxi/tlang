@@ -15,6 +15,20 @@ use crate::error::{ParseError, ParseIssue, ParseIssueKind};
 use crate::macros::expect_token_matches;
 use log::debug;
 
+/// Metadata produced alongside the parsed [`Module`] by [`Parser::parse`].
+///
+/// Mirrors the pattern of [`tlang_hir::LowerResultMeta`] for the lowering phase.
+#[derive(Debug)]
+pub struct ParseMeta {
+    /// NodeIds of expressions that produce compile-time-constant values
+    /// (e.g. tagged string parts lists). Pass these to `lower_to_hir` so they
+    /// are mapped to HIR ids and registered in the runtime constant pool.
+    pub constant_pool_node_ids: Vec<NodeId>,
+    /// State of the node-id allocator after parsing. Use this when chaining a
+    /// subsequent incremental parse to avoid NodeId collisions.
+    pub node_id_allocator: NodeIdAllocator,
+}
+
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
     previous_span: Span,
@@ -73,14 +87,6 @@ impl<'src> Parser<'src> {
         &self.errors
     }
 
-    pub fn node_id_allocator(&self) -> &NodeIdAllocator {
-        &self.node_id_allocator
-    }
-
-    pub fn constant_pool_node_ids(&self) -> &[NodeId] {
-        &self.constant_pool_node_ids
-    }
-
     pub fn set_node_id_allocator(mut self, allocator: NodeIdAllocator) -> Self {
         self.node_id_allocator = allocator;
         self
@@ -94,14 +100,18 @@ impl<'src> Parser<'src> {
         Parser::new(Lexer::new(source))
     }
 
-    pub fn parse(&mut self) -> Result<Module, ParseError> {
+    pub fn parse(&mut self) -> Result<(Module, ParseMeta), ParseError> {
         self.current_token = self.lexer.next_token();
         self.next_token = self.lexer.next_token();
 
         let module = self.parse_module();
 
         if self.errors.is_empty() {
-            Ok(module)
+            let meta = ParseMeta {
+                constant_pool_node_ids: std::mem::take(&mut self.constant_pool_node_ids),
+                node_id_allocator: self.node_id_allocator,
+            };
+            Ok((module, meta))
         } else {
             Err(ParseError::new(self.errors.clone()))
         }

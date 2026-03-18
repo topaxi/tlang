@@ -10,7 +10,7 @@ impl CompileTarget for AstTarget {
         _module: &mut tlang_hir::Module,
     ) -> Result<String, ParserError> {
         let mut parser = tlang_parser::Parser::from_source(source);
-        let ast = parser.parse()?;
+        let (ast, _) = parser.parse()?;
         Ok(ron::ser::to_string_pretty(&ast, ron::ser::PrettyConfig::default()).unwrap())
     }
 }

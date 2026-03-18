@@ -35,13 +35,12 @@ pub fn compile(source: &str, analyzer: &mut SemanticAnalyzer) -> (hir::Module, H
     // Wrap in a block expression so the completion value is accessible.
     let wrapped = format!("{{ {source} }};");
     let mut parser = Parser::from_source(&wrapped);
-    let mut ast = parser.parse().expect("parse error");
-    let constant_pool_node_ids = parser.constant_pool_node_ids().to_vec();
+    let (mut ast, parse_meta) = parser.parse().expect("parse error");
     analyzer.analyze(&mut ast).expect("semantic error");
 
     let (mut module, meta) = lower_to_hir(
         &ast,
-        &constant_pool_node_ids,
+        &parse_meta.constant_pool_node_ids,
         analyzer.symbol_id_allocator(),
         analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),

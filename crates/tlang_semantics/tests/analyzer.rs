@@ -21,7 +21,7 @@ fn create_analyzer(builtin_symbols: &[(&str, SymbolType)]) -> SemanticAnalyzer {
 macro_rules! analyze {
     ($source:expr) => {{
         let mut parser = Parser::from_source($source);
-        let mut ast = parser.parse().unwrap();
+        let (mut ast, _) = parser.parse().unwrap();
         let mut analyzer = $crate::create_analyzer(&[]);
         match analyzer.analyze(&mut ast) {
             Ok(_) => (analyzer, ast),
@@ -35,7 +35,7 @@ macro_rules! analyze_diag {
 
     ($source:expr, $builtin_symbols:expr) => {{
         let mut parser = Parser::from_source($source);
-        let mut ast = parser.parse().unwrap();
+        let (mut ast, _) = parser.parse().unwrap();
         let mut analyzer = $crate::create_analyzer(&$builtin_symbols);
         let _ = analyzer.analyze(&mut ast);
         analyzer.get_diagnostics().to_owned()
@@ -492,7 +492,7 @@ fn test_variable_usage_validator_independent_usage() {
     "};
 
     let mut parser = Parser::from_source(source);
-    let ast = parser.parse().unwrap();
+    let (ast, _) = parser.parse().unwrap();
 
     // First run declaration analysis to collect declarations
     let mut declaration_analyzer = DeclarationAnalyzer::default();
@@ -526,7 +526,7 @@ fn test_variable_usage_validator_undeclared_variable() {
     "};
 
     let mut parser = Parser::from_source(source);
-    let ast = parser.parse().unwrap();
+    let (ast, _) = parser.parse().unwrap();
 
     // First run declaration analysis to collect declarations
     let mut declaration_analyzer = DeclarationAnalyzer::default();
