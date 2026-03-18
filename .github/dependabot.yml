@@ -5,22 +5,22 @@
 
 version: 2
 updates:
-  - package-ecosystem: 'github-actions'
-    directory: '/'
+  - package-ecosystem: "github-actions"
+    directory: "/"
     schedule:
-      interval: 'weekly'
+      interval: "weekly"
     groups:
       all:
         patterns:
-          - '*'
+          - "*"
   - package-ecosystem: rust-toolchain
     directory: /
     schedule:
-      interval: 'weekly'
-  - package-ecosystem: 'cargo'
-    directory: '/'
+      interval: "weekly"
+  - package-ecosystem: "cargo"
+    directory: "/"
     schedule:
-      interval: 'weekly'
+      interval: "weekly"
     groups:
       testing:
         patterns:
@@ -30,45 +30,48 @@ updates:
           - pretty_assertions
       wasm:
         patterns:
-          - 'wasm-bindgen'
-          - 'web-sys'
-          - 'js-sys'
+          - "wasm-bindgen"
+          - "web-sys"
+          - "js-sys"
+      codegen_js:
+        patterns:
+          - "oxc_*"
       serde:
         patterns:
-          - 'serde'
-          - 'serde_*'
+          - "serde"
+          - "serde_*"
       proc_macro:
         patterns:
-          - 'syn'
-          - 'quote'
-  - package-ecosystem: 'npm'
-    versioning-strategy: 'increase'
-    directory: '/'
+          - "syn"
+          - "quote"
+  - package-ecosystem: "npm"
+    versioning-strategy: "increase"
+    directory: "/"
     schedule:
-      interval: 'weekly'
+      interval: "weekly"
     groups:
       linting-formatting:
         patterns:
-          - 'eslint'
-          - 'eslint-*'
-          - '@eslint/*'
-          - 'globals'
-          - 'typescript-eslint'
-          - '@typescript-eslint/*'
-          - 'prettier'
-          - 'postcss-lit'
-          - '@jackolope/ts-lit-plugin'
-          - 'stylelint'
-          - 'stylelint-config-standard'
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "globals"
+          - "typescript-eslint"
+          - "@typescript-eslint/*"
+          - "prettier"
+          - "postcss-lit"
+          - "@jackolope/ts-lit-plugin"
+          - "stylelint"
+          - "stylelint-config-standard"
       lit:
         patterns:
-          - 'lit'
-          - 'ts-lit-plugin'
-          - '@lit/*'
+          - "lit"
+          - "ts-lit-plugin"
+          - "@lit/*"
       typescript:
         patterns:
-          - 'typescript'
-          - 'tslib'
-          - 'ts-node'
-          - '@types/node'
-          - 'node-dev'
+          - "typescript"
+          - "tslib"
+          - "ts-node"
+          - "@types/node"
+          - "node-dev"
