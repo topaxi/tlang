@@ -213,8 +213,7 @@ impl Tlang {
             let mut parser = Parser::from_source(&self.source).set_recoverable(true);
             let result = parser.parse();
             if result.is_ok() {
-                self.build.constant_pool_node_ids =
-                    parser.constant_pool_node_ids().to_vec();
+                self.build.constant_pool_node_ids = parser.constant_pool_node_ids().to_vec();
             }
             self.build.parse_result = Some(result);
         }

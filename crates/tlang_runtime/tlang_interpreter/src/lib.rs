@@ -1913,10 +1913,7 @@ mod tests {
             }
         }
 
-        fn parse_src(
-            &mut self,
-            src: &str,
-        ) -> (tlang_ast::node::Module, Vec<tlang_span::NodeId>) {
+        fn parse_src(&mut self, src: &str) -> (tlang_ast::node::Module, Vec<tlang_span::NodeId>) {
             let mut parser = tlang_parser::Parser::from_source(src)
                 .with_line_offset(self.last_span.end_lc.line + 1)
                 .with_byte_offset(self.last_span.end)
