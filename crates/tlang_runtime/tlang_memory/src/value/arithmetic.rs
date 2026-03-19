@@ -227,22 +227,34 @@ mod tests {
 
     #[test]
     fn test_int_add() {
-        assert_eq!(TlangValue::I64(3).add(TlangValue::I64(4)), TlangValue::I64(7));
+        assert_eq!(
+            TlangValue::I64(3).add(TlangValue::I64(4)),
+            TlangValue::I64(7)
+        );
     }
 
     #[test]
     fn test_int_sub() {
-        assert_eq!(TlangValue::I64(10).sub(TlangValue::I64(3)), TlangValue::I64(7));
+        assert_eq!(
+            TlangValue::I64(10).sub(TlangValue::I64(3)),
+            TlangValue::I64(7)
+        );
     }
 
     #[test]
     fn test_int_mul() {
-        assert_eq!(TlangValue::I64(4).mul(TlangValue::I64(5)), TlangValue::I64(20));
+        assert_eq!(
+            TlangValue::I64(4).mul(TlangValue::I64(5)),
+            TlangValue::I64(20)
+        );
     }
 
     #[test]
     fn test_int_div_exact() {
-        assert_eq!(TlangValue::I64(12).div(TlangValue::I64(4)), TlangValue::I64(3));
+        assert_eq!(
+            TlangValue::I64(12).div(TlangValue::I64(4)),
+            TlangValue::I64(3)
+        );
     }
 
     #[test]
@@ -261,7 +273,10 @@ mod tests {
 
     #[test]
     fn test_int_rem() {
-        assert_eq!(TlangValue::I64(17).rem(TlangValue::I64(5)), TlangValue::I64(2));
+        assert_eq!(
+            TlangValue::I64(17).rem(TlangValue::I64(5)),
+            TlangValue::I64(2)
+        );
     }
 
     #[test]
@@ -272,7 +287,10 @@ mod tests {
 
     #[test]
     fn test_int_pow_small() {
-        assert_eq!(TlangValue::I64(2).pow(TlangValue::I64(10)), TlangValue::I64(1024));
+        assert_eq!(
+            TlangValue::I64(2).pow(TlangValue::I64(10)),
+            TlangValue::I64(1024)
+        );
     }
 
     #[test]
@@ -319,12 +337,18 @@ mod tests {
 
     #[test]
     fn test_uint_add() {
-        assert_eq!(TlangValue::U64(10).add(TlangValue::U64(5)), TlangValue::U64(15));
+        assert_eq!(
+            TlangValue::U64(10).add(TlangValue::U64(5)),
+            TlangValue::U64(15)
+        );
     }
 
     #[test]
     fn test_uint_sub() {
-        assert_eq!(TlangValue::U64(10).sub(TlangValue::U64(3)), TlangValue::U64(7));
+        assert_eq!(
+            TlangValue::U64(10).sub(TlangValue::U64(3)),
+            TlangValue::U64(7)
+        );
     }
 
     #[test]
@@ -336,12 +360,18 @@ mod tests {
 
     #[test]
     fn test_uint_mul() {
-        assert_eq!(TlangValue::U64(6).mul(TlangValue::U64(7)), TlangValue::U64(42));
+        assert_eq!(
+            TlangValue::U64(6).mul(TlangValue::U64(7)),
+            TlangValue::U64(42)
+        );
     }
 
     #[test]
     fn test_uint_div_exact() {
-        assert_eq!(TlangValue::U64(20).div(TlangValue::U64(4)), TlangValue::U64(5));
+        assert_eq!(
+            TlangValue::U64(20).div(TlangValue::U64(4)),
+            TlangValue::U64(5)
+        );
     }
 
     #[test]
@@ -359,7 +389,10 @@ mod tests {
 
     #[test]
     fn test_uint_rem() {
-        assert_eq!(TlangValue::U64(17).rem(TlangValue::U64(5)), TlangValue::U64(2));
+        assert_eq!(
+            TlangValue::U64(17).rem(TlangValue::U64(5)),
+            TlangValue::U64(2)
+        );
     }
 
     #[test]
@@ -370,7 +403,10 @@ mod tests {
 
     #[test]
     fn test_uint_pow_small() {
-        assert_eq!(TlangValue::U64(2).pow(TlangValue::U64(8)), TlangValue::U64(256));
+        assert_eq!(
+            TlangValue::U64(2).pow(TlangValue::U64(8)),
+            TlangValue::U64(256)
+        );
     }
 
     #[test]

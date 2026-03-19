@@ -162,5 +162,8 @@ fn test_list_iterator_next() {
          let third = Iterator::next(it);
          [first, second, third]",
     );
-    assert_eq!(s, "[Option::Some(0: 10), Option::Some(0: 20), Option::None]");
+    assert_eq!(
+        s,
+        "[Option::Some(0: 10), Option::Some(0: 20), Option::None]"
+    );
 }

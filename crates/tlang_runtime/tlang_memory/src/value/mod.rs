@@ -636,8 +636,14 @@ mod tests {
 
     #[test]
     fn test_hash_bool() {
-        assert_eq!(hash_of(TlangValue::Bool(true)), hash_of(TlangValue::Bool(true)));
-        assert_ne!(hash_of(TlangValue::Bool(true)), hash_of(TlangValue::Bool(false)));
+        assert_eq!(
+            hash_of(TlangValue::Bool(true)),
+            hash_of(TlangValue::Bool(true))
+        );
+        assert_ne!(
+            hash_of(TlangValue::Bool(true)),
+            hash_of(TlangValue::Bool(false))
+        );
     }
 
     #[test]
