@@ -1,4 +1,6 @@
-/* eslint-disable no-undef, @typescript-eslint/no-unused-vars */
+import { Option } from './option.tlang.js';
+import { $Functor, $Iterable, $Iterator } from './protocols.tlang.js';
+
 $Functor ??= {};
 $Functor.List ??= {};
 $Functor.List.map ??= function (self, f) {
@@ -43,7 +45,7 @@ $Iterator[$Iterable.List.name] = class ListIterator {
   }
 };
 
-function $spread(value) {
+export function $spread(value) {
   if (value[Symbol.iterator]) return value;
   return $iter(value);
 

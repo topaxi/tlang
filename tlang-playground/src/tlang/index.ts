@@ -1,7 +1,6 @@
 import init, {
+  getStandardLibraryModule,
   getStandardLibrarySource,
-  getStandardLibraryNativeJs,
-  Tlang,
 } from 'tlang_bindings_js';
 
 await init();
@@ -22,19 +21,6 @@ export {
 
 export const standardLibrarySource = getStandardLibrarySource();
 
-let standardLibraryCompiled = '';
-
 export function getStandardLibraryCompiled(): string {
-  if (standardLibraryCompiled !== '') {
-    return standardLibraryCompiled;
-  }
-
-  const compiler = new Tlang(standardLibrarySource, 'JavaScript');
-
-  standardLibraryCompiled =
-    compiler.getJavaScript() + '\n' + getStandardLibraryNativeJs();
-
-  compiler.free();
-
-  return standardLibraryCompiled;
+  return getStandardLibraryModule();
 }

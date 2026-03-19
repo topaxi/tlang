@@ -48,6 +48,16 @@ pub fn get_standard_library_native_js() -> String {
     CodegenJS::get_standard_library_native_js()
 }
 
+/// Returns the precompiled stdlib ES module bundle as a JS string.
+///
+/// This is the output of `cargo xtask gen-stdlib`: all `.tlang` stdlib files
+/// compiled to JS (with `export` statements) concatenated with the native JS
+/// implementations. Use this instead of compiling the stdlib at runtime.
+#[wasm_bindgen(js_name = "getStandardLibraryModule")]
+pub fn get_standard_library_module() -> String {
+    CodegenJS::get_precompiled_stdlib_module().to_string()
+}
+
 #[derive(Deserialize, Serialize, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 #[serde(rename_all = "camelCase")]

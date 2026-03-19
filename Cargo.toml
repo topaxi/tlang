@@ -6,6 +6,7 @@ members = [
   "crates/tlang_core/tlang_vm",
   "crates/*",
   "tests/runner",
+  "xtask",
 ]
 resolver = "2"
 

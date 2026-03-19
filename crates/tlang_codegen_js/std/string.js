@@ -1,4 +1,5 @@
-/* eslint-disable no-undef */
+import { string } from './string.tlang.js';
+
 string ??= {};
 
 /**

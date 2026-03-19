@@ -2478,6 +2478,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "xtask"
+version = "0.1.0"
+dependencies = [
+ "tlang_ast_lowering",
+ "tlang_codegen_js",
+ "tlang_hir_opt",
+ "tlang_parser",
+ "tlang_semantics",
+]
+
+[[package]]
 name = "yansi"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

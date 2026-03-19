@@ -1,4 +1,4 @@
-protocol Functor {
+pub protocol Functor {
   fn map(self, f)
 }
 // Backwards compatibility and convenience
@@ -14,7 +14,7 @@ impl Functor for Result {
   fn map(Result::Err(e), _) { Result::Err(e) }
 }
 
-protocol Match {
+pub protocol Match {
   fn matches(self, value)
 }
 
@@ -22,15 +22,15 @@ impl Match for Regex {
   fn matches(self, value) { self.test(value) }
 }
 
-protocol Iterable {
+pub protocol Iterable {
   fn iter(self)
 }
 
-protocol Iterator {
+pub protocol Iterator {
   fn next(self)
 }
 
-protocol Display {
+pub protocol Display {
   fn to_string(self) {
     // Delegate to JavaScript's toString method by default
     self.toString()

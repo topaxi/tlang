@@ -1,0 +1,16 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+[dependencies]
+tlang_codegen_js = { path = "../crates/tlang_codegen_js" }
+tlang_parser = { path = "../crates/tlang_parser" }
+tlang_semantics = { path = "../crates/tlang_semantics" }
+tlang_ast_lowering = { path = "../crates/tlang_ast_lowering" }
+tlang_hir_opt = { path = "../crates/tlang_hir_opt" }

@@ -62,15 +62,8 @@ pub struct CompileOptions {
     pub source_map: bool,
 }
 
-fn compile_standard_library() -> Result<String, ParserError> {
-    let source = CodegenJS::get_standard_library_source();
-    let mut module = compile_to_hir("<stdlib>", &source, &CompileTargetArg::Js, false)?;
-    let mut js = JsTarget.compile(&source, &mut module)?;
-
-    js.push('\n');
-    js.push_str(&CodegenJS::get_standard_library_native_js());
-
-    Ok(js)
+fn get_compiled_standard_library() -> &'static str {
+    CodegenJS::get_precompiled_stdlib_module()
 }
 
 fn compile_to_hir(
@@ -139,7 +132,7 @@ fn compile_to_hir(
 pub fn handle_compile(options: CompileOptions) -> bool {
     if options.output_stdlib {
         if !options.silent {
-            println!("{}", compile_standard_library().unwrap());
+            println!("{}", get_compiled_standard_library());
         }
         return true;
     }
@@ -235,7 +228,7 @@ fn compile_source(
         (&options.target, &options.output_format),
         (CompileTargetArg::Js, OutputFormat::Source)
     ) {
-        let std_lib_source = compile_standard_library().unwrap();
+        let std_lib_source = get_compiled_standard_library();
         if let Some(map_json) = pending_source_map.take() {
             let stdlib_line_count = std_lib_source.lines().count();
             pending_source_map = Some(shift_source_map_lines(&map_json, stdlib_line_count));
