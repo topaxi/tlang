@@ -1,4 +1,4 @@
-use tlang_ast::node::{Ident, UnaryOp};
+use tlang_ast::node::{Ident, UnaryOp, Visibility};
 use tlang_ast::token::{CommentKind, CommentToken, Literal};
 use tlang_hir as hir;
 use tlang_span::HirId;
@@ -103,6 +103,12 @@ impl HirPretty {
         self.push_char('\n');
     }
 
+    fn print_visibility(&mut self, visibility: Visibility) {
+        if visibility == Visibility::Public {
+            self.push_str("pub ");
+        }
+    }
+
     pub fn output(&self) -> &str {
         &self.output
     }
@@ -194,6 +200,7 @@ impl HirPretty {
             }
             hir::StmtKind::StructDeclaration(decl) => self.print_struct_declaration(decl),
             hir::StmtKind::ProtocolDeclaration(decl) => {
+                self.print_visibility(decl.visibility);
                 self.push_str("protocol ");
                 self.push_str(decl.name.as_str());
                 self.push_str(" {");
@@ -250,6 +257,7 @@ impl HirPretty {
     }
 
     fn print_enum_declaration(&mut self, decl: &hir::EnumDeclaration) {
+        self.print_visibility(decl.visibility);
         self.push_str("enum ");
         self.print_ident(&decl.name);
         self.push_str(" {");
@@ -281,6 +289,7 @@ impl HirPretty {
     }
 
     fn print_struct_declaration(&mut self, decl: &hir::StructDeclaration) {
+        self.print_visibility(decl.visibility);
         self.push_str("struct ");
         self.print_ident(&decl.name);
         if self.options.print_ids {
@@ -497,6 +506,7 @@ impl HirPretty {
     }
 
     fn print_function_declaration(&mut self, decl: &hir::FunctionDeclaration) {
+        self.print_visibility(decl.visibility);
         self.push_str("fn ");
         self.print_function_name(&decl.name, decl.hir_id);
         self.push_char('(');
