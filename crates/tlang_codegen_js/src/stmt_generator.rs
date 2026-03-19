@@ -161,6 +161,7 @@ impl<'a> InnerCodegen<'a> {
         vec![self.let_array_destructuring(self.ast.vec_from_iter(elements), rest, init)]
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn generate_protocol_declaration(
         &mut self,
         decl: &hir::ProtocolDeclaration,
