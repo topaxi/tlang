@@ -311,6 +311,7 @@ impl LoweringContext {
 
             hir::FunctionDeclaration {
                 hir_id,
+                visibility: decl.visibility,
                 name,
                 parameters,
                 return_type,

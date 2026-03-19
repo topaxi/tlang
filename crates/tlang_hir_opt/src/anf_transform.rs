@@ -720,6 +720,7 @@ fn fold_function_decl<F: AnfFilter>(
     folder.current_function_name = prev_fn_name;
     hir::FunctionDeclaration {
         hir_id: decl.hir_id,
+        visibility: decl.visibility,
         name: decl.name,
         parameters: decl.parameters,
         return_type: decl.return_type,

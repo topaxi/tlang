@@ -284,6 +284,7 @@ fn fold_function_declaration<F: Folder>(
 ) -> hir::FunctionDeclaration {
     hir::FunctionDeclaration {
         hir_id: decl.hir_id,
+        visibility: decl.visibility,
         name: folder.fold_expr(decl.name),
         parameters: decl.parameters,
         return_type: folder.fold_ty(decl.return_type),

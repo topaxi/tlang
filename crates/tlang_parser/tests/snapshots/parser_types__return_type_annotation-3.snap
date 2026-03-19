@@ -44,6 +44,7 @@ Module(
           id: 9,
           kind: FunctionExpression(FunctionDeclaration(
             id: 10,
+            visibility: Private,
             name: Expr(
               id: 4,
               kind: Path(Path(

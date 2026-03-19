@@ -9,6 +9,7 @@ Module(
       id: 15,
       kind: FunctionDeclaration(FunctionDeclaration(
         id: 14,
+        visibility: Private,
         name: Expr(
           id: 3,
           kind: Path(Path(

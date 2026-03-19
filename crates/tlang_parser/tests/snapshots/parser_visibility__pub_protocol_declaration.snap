@@ -1,0 +1,172 @@
+---
+source: crates/tlang_parser/tests/parser_visibility.rs
+expression: "parse!\n(indoc!\n{\"\n        pub protocol Functor {\n            fn map(self, f)\n        }\n    \"})"
+---
+Module(
+  id: 2,
+  statements: [
+    Stmt(
+      id: 6,
+      kind: ProtocolDeclaration(ProtocolDeclaration(
+        visibility: Public,
+        name: Ident(
+          name: "Functor",
+          span: Span(
+            start: 13,
+            end: 20,
+            start_lc: LineColumn(
+              line: 0,
+              column: 13,
+            ),
+            end_lc: LineColumn(
+              line: 0,
+              column: 20,
+            ),
+          ),
+        ),
+        methods: [
+          ProtocolMethodSignature(
+            id: 5,
+            name: Ident(
+              name: "map",
+              span: Span(
+                start: 30,
+                end: 33,
+                start_lc: LineColumn(
+                  line: 1,
+                  column: 8,
+                ),
+                end_lc: LineColumn(
+                  line: 1,
+                  column: 11,
+                ),
+              ),
+            ),
+            parameters: [
+              FunctionParameter(
+                pattern: Pat(
+                  id: 3,
+                  kind: _Self,
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: 34,
+                    end: 38,
+                    start_lc: LineColumn(
+                      line: 1,
+                      column: 12,
+                    ),
+                    end_lc: LineColumn(
+                      line: 1,
+                      column: 16,
+                    ),
+                  ),
+                ),
+                type_annotation: None,
+                span: Span(
+                  start: 34,
+                  end: 38,
+                  start_lc: LineColumn(
+                    line: 1,
+                    column: 12,
+                  ),
+                  end_lc: LineColumn(
+                    line: 1,
+                    column: 16,
+                  ),
+                ),
+              ),
+              FunctionParameter(
+                pattern: Pat(
+                  id: 4,
+                  kind: Identifier(Ident(
+                    name: "f",
+                    span: Span(
+                      start: 40,
+                      end: 41,
+                      start_lc: LineColumn(
+                        line: 1,
+                        column: 18,
+                      ),
+                      end_lc: LineColumn(
+                        line: 1,
+                        column: 19,
+                      ),
+                    ),
+                  )),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: 40,
+                    end: 41,
+                    start_lc: LineColumn(
+                      line: 1,
+                      column: 18,
+                    ),
+                    end_lc: LineColumn(
+                      line: 1,
+                      column: 19,
+                    ),
+                  ),
+                ),
+                type_annotation: None,
+                span: Span(
+                  start: 40,
+                  end: 41,
+                  start_lc: LineColumn(
+                    line: 1,
+                    column: 18,
+                  ),
+                  end_lc: LineColumn(
+                    line: 1,
+                    column: 19,
+                  ),
+                ),
+              ),
+            ],
+            return_type_annotation: None,
+            body: None,
+            span: Span(
+              start: 27,
+              end: 42,
+              start_lc: LineColumn(
+                line: 1,
+                column: 5,
+              ),
+              end_lc: LineColumn(
+                line: 1,
+                column: 20,
+              ),
+            ),
+          ),
+        ],
+      )),
+      span: Span(
+        start: 0,
+        end: 44,
+        start_lc: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end_lc: LineColumn(
+          line: 2,
+          column: 2,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: 0,
+    end: 44,
+    start_lc: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end_lc: LineColumn(
+      line: 2,
+      column: 2,
+    ),
+  ),
+)

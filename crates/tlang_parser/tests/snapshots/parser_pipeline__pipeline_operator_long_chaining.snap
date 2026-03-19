@@ -153,6 +153,7 @@ Module(
                               id: 16,
                               kind: FunctionExpression(FunctionDeclaration(
                                 id: 17,
+                                visibility: Private,
                                 name: Expr(
                                   id: 9,
                                   kind: Path(Path(
@@ -476,6 +477,7 @@ Module(
                           id: 30,
                           kind: FunctionExpression(FunctionDeclaration(
                             id: 31,
+                            visibility: Private,
                             name: Expr(
                               id: 21,
                               kind: Path(Path(
@@ -837,6 +839,7 @@ Module(
                       id: 43,
                       kind: FunctionExpression(FunctionDeclaration(
                         id: 44,
+                        visibility: Private,
                         name: Expr(
                           id: 35,
                           kind: Path(Path(

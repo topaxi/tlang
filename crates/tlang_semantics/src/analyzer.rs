@@ -9,6 +9,7 @@ use crate::{
     diagnostic::Diagnostic,
     passes::{
         DeclarationAnalyzer, FnParamTypeInference, StringLiteralValidator, VariableUsageValidator,
+        VisibilityValidator,
     },
 };
 
@@ -162,6 +163,7 @@ impl Default for SemanticAnalyzer {
             Box::new(DeclarationAnalyzer::default()),
             Box::new(VariableUsageValidator::default()),
             Box::new(StringLiteralValidator),
+            Box::new(VisibilityValidator),
         ])
     }
 }

@@ -5,7 +5,7 @@ use tlang_ast::node::{
     FunctionDeclaration, FunctionParameter, Ident, IfElseExpression, ImplBlock,
     IndexAccessExpression, LetDeclaration, MatchArm, MatchExpression, Module, OperatorInfo, Pat,
     Path, ProtocolDeclaration, ProtocolMethodSignature, Stmt, StmtKind, StructDeclaration,
-    StructField, Ty, TyKind, UnaryOp,
+    StructField, Ty, TyKind, UnaryOp, Visibility,
 };
 use tlang_ast::token::{CommentKind, CommentToken, Literal, TaggedStringPart, Token, TokenKind};
 use tlang_intern::intern;
@@ -316,6 +316,12 @@ impl<'src> Parser<'src> {
         }
 
         let mut span = self.create_span_from_current_token();
+        let visibility = if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Pub)) {
+            self.advance();
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
         let mut node = match self.current_token.kind {
             TokenKind::Keyword(Keyword::Let) => self.parse_variable_declaration(),
             TokenKind::Keyword(Keyword::Fn)
@@ -323,12 +329,12 @@ impl<'src> Parser<'src> {
                 // If it's not, we assume a function expression which is handled as a primary expression.
                 if matches!(self.peek_token_kind(), TokenKind::Identifier) =>
             {
-                self.parse_function_declaration()
+                self.parse_function_declaration(visibility)
             }
+            TokenKind::Keyword(Keyword::Enum) => self.parse_enum_declaration(visibility),
+            TokenKind::Keyword(Keyword::Struct) => self.parse_struct_declaration(visibility),
+            TokenKind::Keyword(Keyword::Protocol) => self.parse_protocol_declaration(visibility),
             TokenKind::Keyword(Keyword::Return) => self.parse_return_statement(),
-            TokenKind::Keyword(Keyword::Enum) => self.parse_enum_declaration(),
-            TokenKind::Keyword(Keyword::Struct) => self.parse_struct_declaration(),
-            TokenKind::Keyword(Keyword::Protocol) => self.parse_protocol_declaration(),
             TokenKind::Keyword(Keyword::Impl) => self.parse_impl_block(),
             TokenKind::LBrace => self.parse_block_stmt(),
             _ => node::stmt!(self.unique_id(), Expr(Box::new(self.parse_expression()))),
@@ -398,7 +404,7 @@ impl<'src> Parser<'src> {
         node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span)
     }
 
-    fn parse_struct_declaration(&mut self) -> Stmt {
+    fn parse_struct_declaration(&mut self, visibility: Visibility) -> Stmt {
         self.consume_keyword_token(Keyword::Struct);
         let name = self.parse_identifier();
         self.consume_token(TokenKind::LBrace);
@@ -413,7 +419,11 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::RBrace);
         node::stmt!(
             self.unique_id(),
-            StructDeclaration(Box::new(StructDeclaration { name, fields }))
+            StructDeclaration(Box::new(StructDeclaration {
+                visibility,
+                name,
+                fields
+            }))
         )
     }
 
@@ -428,7 +438,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_enum_declaration(&mut self) -> Stmt {
+    fn parse_enum_declaration(&mut self, visibility: Visibility) -> Stmt {
         self.consume_keyword_token(Keyword::Enum);
 
         let name = self.parse_identifier();
@@ -444,7 +454,11 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::RBrace);
         node::stmt!(
             self.unique_id(),
-            EnumDeclaration(Box::new(EnumDeclaration { name, variants }))
+            EnumDeclaration(Box::new(EnumDeclaration {
+                visibility,
+                name,
+                variants
+            }))
         )
     }
 
@@ -526,7 +540,7 @@ impl<'src> Parser<'src> {
         node
     }
 
-    fn parse_protocol_declaration(&mut self) -> Stmt {
+    fn parse_protocol_declaration(&mut self, visibility: Visibility) -> Stmt {
         self.consume_keyword_token(Keyword::Protocol);
         let name = self.parse_identifier();
         self.consume_token(TokenKind::LBrace);
@@ -537,7 +551,11 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::RBrace);
         node::stmt!(
             self.unique_id(),
-            ProtocolDeclaration(Box::new(ProtocolDeclaration { name, methods }))
+            ProtocolDeclaration(Box::new(ProtocolDeclaration {
+                visibility,
+                name,
+                methods
+            }))
         )
     }
 
@@ -594,7 +612,7 @@ impl<'src> Parser<'src> {
                 }
                 self.consume_token(TokenKind::Semicolon);
             } else {
-                let fn_stmt = self.parse_function_declaration();
+                let fn_stmt = self.parse_function_declaration(Visibility::Private);
                 match fn_stmt.kind {
                     StmtKind::FunctionDeclaration(decl) => methods.push(*decl),
                     StmtKind::FunctionDeclarations(decls) => methods.extend(decls),
@@ -1484,6 +1502,7 @@ impl<'src> Parser<'src> {
             self.unique_id(),
             FunctionExpression(Box::new(FunctionDeclaration {
                 id: self.unique_id(),
+                visibility: Visibility::Private,
                 name,
                 parameters,
                 body,
@@ -1556,13 +1575,15 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_function_declaration(&mut self) -> Stmt {
+    fn parse_function_declaration(&mut self, visibility: Visibility) -> Stmt {
         let mut name: Option<Expr> = None;
         let mut declarations: Vec<FunctionDeclaration> = Vec::new();
+        let mut clause_visibility = visibility;
 
         while matches!(
             self.current_token_kind(),
             TokenKind::Keyword(Keyword::Fn)
+                | TokenKind::Keyword(Keyword::Pub)
                 | TokenKind::SingleLineComment
                 | TokenKind::MultiLineComment
         ) {
@@ -1578,6 +1599,16 @@ impl<'src> Parser<'src> {
 
             let comments = self.parse_comments();
             let mut span = self.create_span_from_current_token();
+
+            // For subsequent clauses, check for `pub` keyword.
+            if !declarations.is_empty() {
+                if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Pub)) {
+                    self.advance();
+                    clause_visibility = Visibility::Public;
+                } else {
+                    clause_visibility = Visibility::Private;
+                }
+            }
 
             if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Fn)) {
                 self.advance();
@@ -1629,6 +1660,7 @@ impl<'src> Parser<'src> {
 
             declarations.push(FunctionDeclaration {
                 id: self.unique_id(),
+                visibility: clause_visibility,
                 name: name.clone().unwrap(),
                 parameters,
                 guard,

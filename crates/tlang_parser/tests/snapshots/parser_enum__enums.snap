@@ -8,6 +8,7 @@ Module(
     Stmt(
       id: 7,
       kind: EnumDeclaration(EnumDeclaration(
+        visibility: Private,
         name: Ident(
           name: "Option",
           span: Span(

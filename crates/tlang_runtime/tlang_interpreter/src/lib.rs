@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use log::debug;
 use smallvec::SmallVec;
-use tlang_ast::node::{Ident, UnaryOp};
+use tlang_ast::node::{Ident, UnaryOp, Visibility};
 use tlang_ast::token;
 use tlang_hir::{self as hir, BindingKind};
 use tlang_memory::prelude::*;
@@ -854,6 +854,7 @@ impl Interpreter {
                 };
                 let fn_decl = hir::FunctionDeclaration {
                     hir_id: method.hir_id,
+                    visibility: Visibility::Private,
                     name: name_expr,
                     parameters: method.parameters.clone(),
                     return_type: method.return_type.clone(),

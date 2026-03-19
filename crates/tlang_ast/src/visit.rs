@@ -637,6 +637,7 @@ mod tests {
     fn test_walk_function_declaration() {
         let declaration = node::FunctionDeclaration {
             id: NodeId::new(1),
+            visibility: node::Visibility::Private,
             name: node::Expr::new(
                 NodeId::new(2),
                 node::ExprKind::Path(Box::new(node::Path::new(vec![Ident::new(

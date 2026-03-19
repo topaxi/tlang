@@ -95,10 +95,19 @@ impl FunctionParameter {
     }
 }
 
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub enum Visibility {
+    #[default]
+    Private,
+    Public,
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct FunctionDeclaration {
     pub id: NodeId,
+    pub visibility: Visibility,
     pub name: Expr,
     pub parameters: Vec<FunctionParameter>,
     pub guard: Option<Expr>,
@@ -465,6 +474,7 @@ pub struct EnumVariant {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct EnumDeclaration {
+    pub visibility: Visibility,
     pub name: Ident,
     pub variants: Vec<EnumVariant>,
 }
@@ -499,6 +509,7 @@ impl Stmt {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ProtocolDeclaration {
+    pub visibility: Visibility,
     pub name: Ident,
     pub methods: Vec<ProtocolMethodSignature>,
 }
@@ -551,6 +562,7 @@ pub struct LetDeclaration {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct StructDeclaration {
+    pub visibility: Visibility,
     pub name: Ident,
     pub fields: Vec<StructField>,
 }

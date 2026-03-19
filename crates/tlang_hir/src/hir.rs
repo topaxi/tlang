@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
-use tlang_ast::node::{Ident, UnaryOp};
+use tlang_ast::node::{Ident, UnaryOp, Visibility};
 use tlang_ast::token::{CommentToken, Literal};
 use tlang_defs::{DefIdAllocator, DefKind, DefScope};
 use tlang_span::{HirId, HirIdAllocator, Span};
@@ -748,6 +748,7 @@ pub struct FunctionParameter {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct FunctionDeclaration {
     pub hir_id: HirId,
+    pub visibility: Visibility,
     pub name: Expr,
     pub parameters: Vec<FunctionParameter>,
     pub return_type: Ty,
@@ -759,6 +760,7 @@ impl FunctionDeclaration {
     pub fn new(hir_id: HirId, name: Expr, params: Vec<FunctionParameter>, body: Block) -> Self {
         FunctionDeclaration {
             hir_id,
+            visibility: Visibility::Private,
             name,
             parameters: params,
             return_type: Ty::default(),
@@ -827,6 +829,7 @@ pub struct DynFunctionDeclaration {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct StructDeclaration {
     pub hir_id: HirId,
+    pub visibility: Visibility,
     pub name: Ident,
     pub fields: Vec<StructField>,
 }
@@ -843,6 +846,7 @@ pub struct StructField {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct EnumDeclaration {
     pub hir_id: HirId,
+    pub visibility: Visibility,
     pub name: Ident,
     pub variants: Vec<EnumVariant>,
 }
@@ -860,6 +864,7 @@ pub struct EnumVariant {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ProtocolDeclaration {
     pub hir_id: HirId,
+    pub visibility: Visibility,
     pub name: Ident,
     pub methods: Vec<ProtocolMethodSignature>,
 }

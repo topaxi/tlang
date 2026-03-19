@@ -24,6 +24,7 @@ impl LoweringContext {
                 pattern,
                 expression,
                 type_annotation,
+                ..
             }) => {
                 let expr = self.lower_expr(expression);
                 let ty = self.lower_ty(type_annotation.as_ref());
@@ -66,6 +67,7 @@ impl LoweringContext {
             ast::node::StmtKind::StructDeclaration(decl) => {
                 let decl = hir::StructDeclaration {
                     hir_id: self.lower_node_id(node.id),
+                    visibility: decl.visibility,
                     name: decl.name,
                     fields: decl
                         .fields
@@ -232,6 +234,7 @@ impl LoweringContext {
     ) -> hir::Stmt {
         let decl = hir::EnumDeclaration {
             hir_id: self.lower_node_id(node.id),
+            visibility: decl.visibility,
             name: decl.name,
             variants: decl
                 .variants
@@ -297,6 +300,7 @@ impl LoweringContext {
 
         let protocol = hir::ProtocolDeclaration {
             hir_id: self.lower_node_id(node.id),
+            visibility: decl.visibility,
             name: decl.name,
             methods,
         };
@@ -547,10 +551,12 @@ impl LoweringContext {
                 tlang_span::Span::default(),
             );
 
-            (
-                hir_id,
-                hir::FunctionDeclaration::new(hir_id, fn_name, params, body),
-            )
+            (hir_id, {
+                let mut decl = hir::FunctionDeclaration::new(hir_id, fn_name, params, body);
+                // Multi-clause functions inherit visibility from the first clause.
+                decl.visibility = decls[0].visibility;
+                decl
+            })
         })
     }
 

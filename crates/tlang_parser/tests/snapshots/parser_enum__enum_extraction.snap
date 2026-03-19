@@ -8,6 +8,7 @@ Module(
     Stmt(
       id: 7,
       kind: EnumDeclaration(EnumDeclaration(
+        visibility: Private,
         name: Ident(
           name: "Option",
           span: Span(
@@ -175,6 +176,7 @@ Module(
       kind: FunctionDeclarations([
         FunctionDeclaration(
           id: 15,
+          visibility: Private,
           name: Expr(
             id: 8,
             kind: Path(Path(
@@ -431,6 +433,7 @@ Module(
         ),
         FunctionDeclaration(
           id: 22,
+          visibility: Private,
           name: Expr(
             id: 16,
             kind: Path(Path(

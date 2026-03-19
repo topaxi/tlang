@@ -1,6 +1,6 @@
 ---
-source: crates/tlang_parser/tests/parser_struct.rs
-expression: "parse! (\"struct Foo { x: Int, y: Int }\")"
+source: crates/tlang_parser/tests/parser_visibility.rs
+expression: "parse! (\"pub struct Point { x: Int, y: Int }\")"
 ---
 Module(
   id: 2,
@@ -8,19 +8,19 @@ Module(
     Stmt(
       id: 7,
       kind: StructDeclaration(StructDeclaration(
-        visibility: Private,
+        visibility: Public,
         name: Ident(
-          name: "Foo",
+          name: "Point",
           span: Span(
-            start: 7,
-            end: 10,
+            start: 11,
+            end: 16,
             start_lc: LineColumn(
               line: 0,
-              column: 7,
+              column: 11,
             ),
             end_lc: LineColumn(
               line: 0,
-              column: 10,
+              column: 16,
             ),
           ),
         ),
@@ -30,15 +30,15 @@ Module(
             name: Ident(
               name: "x",
               span: Span(
-                start: 13,
-                end: 14,
+                start: 19,
+                end: 20,
                 start_lc: LineColumn(
                   line: 0,
-                  column: 13,
+                  column: 19,
                 ),
                 end_lc: LineColumn(
                   line: 0,
-                  column: 14,
+                  column: 20,
                 ),
               ),
             ),
@@ -49,30 +49,30 @@ Module(
                   Ident(
                     name: "Int",
                     span: Span(
-                      start: 16,
-                      end: 19,
+                      start: 22,
+                      end: 25,
                       start_lc: LineColumn(
                         line: 0,
-                        column: 16,
+                        column: 22,
                       ),
                       end_lc: LineColumn(
                         line: 0,
-                        column: 19,
+                        column: 25,
                       ),
                     ),
                   ),
                 ],
                 res: Unresolved,
                 span: Span(
-                  start: 16,
-                  end: 19,
+                  start: 22,
+                  end: 25,
                   start_lc: LineColumn(
                     line: 0,
-                    column: 16,
+                    column: 22,
                   ),
                   end_lc: LineColumn(
                     line: 0,
-                    column: 19,
+                    column: 25,
                   ),
                 ),
               )),
@@ -96,15 +96,15 @@ Module(
             name: Ident(
               name: "y",
               span: Span(
-                start: 21,
-                end: 22,
+                start: 27,
+                end: 28,
                 start_lc: LineColumn(
                   line: 0,
-                  column: 21,
+                  column: 27,
                 ),
                 end_lc: LineColumn(
                   line: 0,
-                  column: 22,
+                  column: 28,
                 ),
               ),
             ),
@@ -115,30 +115,30 @@ Module(
                   Ident(
                     name: "Int",
                     span: Span(
-                      start: 24,
-                      end: 27,
+                      start: 30,
+                      end: 33,
                       start_lc: LineColumn(
                         line: 0,
-                        column: 24,
+                        column: 30,
                       ),
                       end_lc: LineColumn(
                         line: 0,
-                        column: 27,
+                        column: 33,
                       ),
                     ),
                   ),
                 ],
                 res: Unresolved,
                 span: Span(
-                  start: 24,
-                  end: 27,
+                  start: 30,
+                  end: 33,
                   start_lc: LineColumn(
                     line: 0,
-                    column: 24,
+                    column: 30,
                   ),
                   end_lc: LineColumn(
                     line: 0,
-                    column: 27,
+                    column: 33,
                   ),
                 ),
               )),
@@ -161,14 +161,14 @@ Module(
       )),
       span: Span(
         start: 0,
-        end: 29,
+        end: 35,
         start_lc: LineColumn(
           line: 0,
           column: 0,
         ),
         end_lc: LineColumn(
           line: 0,
-          column: 29,
+          column: 35,
         ),
       ),
       leading_comments: [],
@@ -177,14 +177,14 @@ Module(
   ],
   span: Span(
     start: 0,
-    end: 29,
+    end: 35,
     start_lc: LineColumn(
       line: 0,
       column: 0,
     ),
     end_lc: LineColumn(
       line: 0,
-      column: 29,
+      column: 35,
     ),
   ),
 )

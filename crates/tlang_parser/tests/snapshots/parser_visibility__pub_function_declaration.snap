@@ -1,15 +1,15 @@
 ---
-source: crates/tlang_parser/tests/parser_types.rs
-expression: "parse! (\"fn foo() -> i64 { 1 }\")"
+source: crates/tlang_parser/tests/parser_visibility.rs
+expression: "parse! (\"pub fn foo() { 1 }\")"
 ---
 Module(
   id: 2,
   statements: [
     Stmt(
-      id: 9,
+      id: 8,
       kind: FunctionDeclaration(FunctionDeclaration(
-        id: 8,
-        visibility: Private,
+        id: 7,
+        visibility: Public,
         name: Expr(
           id: 3,
           kind: Path(Path(
@@ -17,157 +17,110 @@ Module(
               Ident(
                 name: "foo",
                 span: Span(
-                  start: 3,
-                  end: 6,
+                  start: 7,
+                  end: 10,
                   start_lc: LineColumn(
                     line: 0,
-                    column: 3,
+                    column: 7,
                   ),
                   end_lc: LineColumn(
                     line: 0,
-                    column: 6,
+                    column: 10,
                   ),
                 ),
               ),
             ],
             res: Unresolved,
             span: Span(
-              start: 3,
-              end: 6,
+              start: 7,
+              end: 10,
               start_lc: LineColumn(
                 line: 0,
-                column: 3,
+                column: 7,
               ),
               end_lc: LineColumn(
                 line: 0,
-                column: 6,
+                column: 10,
               ),
             ),
           )),
           leading_comments: [],
           trailing_comments: [],
           span: Span(
-            start: 3,
-            end: 6,
+            start: 7,
+            end: 10,
             start_lc: LineColumn(
               line: 0,
-              column: 3,
+              column: 7,
             ),
             end_lc: LineColumn(
               line: 0,
-              column: 6,
+              column: 10,
             ),
           ),
         ),
         parameters: [],
         guard: None,
-        return_type_annotation: Some(Ty(
-          id: 4,
-          kind: Path(Path(
-            segments: [
-              Ident(
-                name: "i64",
-                span: Span(
-                  start: 12,
-                  end: 15,
-                  start_lc: LineColumn(
-                    line: 0,
-                    column: 12,
-                  ),
-                  end_lc: LineColumn(
-                    line: 0,
-                    column: 15,
-                  ),
-                ),
-              ),
-            ],
-            res: Unresolved,
-            span: Span(
-              start: 12,
-              end: 15,
-              start_lc: LineColumn(
-                line: 0,
-                column: 12,
-              ),
-              end_lc: LineColumn(
-                line: 0,
-                column: 15,
-              ),
-            ),
-          )),
-          parameters: [],
-          span: Span(
-            start: 0,
-            end: 0,
-            start_lc: LineColumn(
-              line: 0,
-              column: 0,
-            ),
-            end_lc: LineColumn(
-              line: 0,
-              column: 0,
-            ),
-          ),
-        )),
+        return_type_annotation: None,
         body: Block(
-          id: 7,
+          id: 6,
           statements: [],
           expression: Some(Expr(
-            id: 6,
+            id: 5,
             kind: Literal(UnsignedInteger(1)),
             leading_comments: [],
             trailing_comments: [],
             span: Span(
-              start: 18,
-              end: 19,
+              start: 15,
+              end: 16,
               start_lc: LineColumn(
                 line: 0,
-                column: 18,
+                column: 15,
               ),
               end_lc: LineColumn(
                 line: 0,
-                column: 19,
+                column: 16,
               ),
             ),
           )),
           span: Span(
-            start: 16,
-            end: 21,
+            start: 13,
+            end: 18,
             start_lc: LineColumn(
               line: 0,
-              column: 16,
+              column: 13,
             ),
             end_lc: LineColumn(
               line: 0,
-              column: 21,
+              column: 18,
             ),
           ),
         ),
         leading_comments: [],
         trailing_comments: [],
         span: Span(
-          start: 0,
-          end: 21,
+          start: 4,
+          end: 18,
           start_lc: LineColumn(
             line: 0,
-            column: 0,
+            column: 4,
           ),
           end_lc: LineColumn(
             line: 0,
-            column: 21,
+            column: 18,
           ),
         ),
       )),
       span: Span(
         start: 0,
-        end: 21,
+        end: 18,
         start_lc: LineColumn(
           line: 0,
           column: 0,
         ),
         end_lc: LineColumn(
           line: 0,
-          column: 21,
+          column: 18,
         ),
       ),
       leading_comments: [],
@@ -176,14 +129,14 @@ Module(
   ],
   span: Span(
     start: 0,
-    end: 21,
+    end: 18,
     start_lc: LineColumn(
       line: 0,
       column: 0,
     ),
     end_lc: LineColumn(
       line: 0,
-      column: 21,
+      column: 18,
     ),
   ),
 )

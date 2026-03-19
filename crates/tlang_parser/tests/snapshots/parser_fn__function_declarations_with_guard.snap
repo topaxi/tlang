@@ -10,6 +10,7 @@ Module(
       kind: FunctionDeclarations([
         FunctionDeclaration(
           id: 9,
+          visibility: Private,
           name: Expr(
             id: 3,
             kind: Path(Path(
@@ -194,6 +195,7 @@ Module(
         ),
         FunctionDeclaration(
           id: 28,
+          visibility: Private,
           name: Expr(
             id: 10,
             kind: Path(Path(
@@ -813,6 +815,7 @@ Module(
         ),
         FunctionDeclaration(
           id: 42,
+          visibility: Private,
           name: Expr(
             id: 29,
             kind: Path(Path(

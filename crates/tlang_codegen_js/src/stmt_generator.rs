@@ -1,6 +1,7 @@
 use oxc_ast::NONE;
 use oxc_ast::ast::*;
 use oxc_span::SPAN;
+use tlang_ast::node::Visibility;
 use tlang_ast::token::Literal;
 use tlang_hir as hir;
 
@@ -28,20 +29,72 @@ impl<'a> InnerCodegen<'a> {
             hir::StmtKind::Let(pattern, expression, _ty) => {
                 self.generate_variable_declaration(pattern, expression)
             }
-            hir::StmtKind::FunctionDeclaration(decl) => self.generate_function_declaration(decl),
+            hir::StmtKind::FunctionDeclaration(decl) => {
+                let stmts = self.generate_function_declaration(decl);
+                if decl.visibility == Visibility::Public {
+                    stmts
+                        .into_iter()
+                        .map(|s| self.wrap_export_named(s))
+                        .collect()
+                } else {
+                    stmts
+                }
+            }
             hir::StmtKind::DynFunctionDeclaration(decl) => {
                 self.generate_dyn_function_declaration(decl)
             }
             hir::StmtKind::Return(expr) => self.generate_return_stmt(expr.as_deref()),
             hir::StmtKind::EnumDeclaration(decl) => {
-                vec![self.generate_enum_declaration(decl)]
+                let stmt = self.generate_enum_declaration(decl);
+                if decl.visibility == Visibility::Public {
+                    vec![self.wrap_export_named(stmt)]
+                } else {
+                    vec![stmt]
+                }
             }
             hir::StmtKind::StructDeclaration(decl) => {
-                vec![self.generate_struct_declaration(decl)]
+                let stmt = self.generate_struct_declaration(decl);
+                if decl.visibility == Visibility::Public {
+                    vec![self.wrap_export_named(stmt)]
+                } else {
+                    vec![stmt]
+                }
             }
-            hir::StmtKind::ProtocolDeclaration(decl) => self.generate_protocol_declaration(decl),
+            hir::StmtKind::ProtocolDeclaration(decl) => {
+                let stmts = self.generate_protocol_declaration(decl);
+                if decl.visibility == Visibility::Public {
+                    stmts
+                        .into_iter()
+                        .map(|s| self.wrap_export_named(s))
+                        .collect()
+                } else {
+                    stmts
+                }
+            }
             hir::StmtKind::ImplBlock(impl_block) => self.generate_impl_block(impl_block),
         }
+    }
+
+    /// Wrap a statement in an `export` declaration. If the statement contains
+    /// a declaration (function, class, variable), it becomes
+    /// `export <declaration>`. Otherwise the statement is returned unchanged.
+    fn wrap_export_named(&self, stmt: Statement<'a>) -> Statement<'a> {
+        let declaration = match stmt {
+            Statement::FunctionDeclaration(func) => Declaration::FunctionDeclaration(func),
+            Statement::ClassDeclaration(class) => Declaration::ClassDeclaration(class),
+            Statement::VariableDeclaration(var) => Declaration::VariableDeclaration(var),
+            other => return other,
+        };
+
+        let export = self.ast.module_declaration_export_named_declaration(
+            SPAN,
+            Some(declaration),
+            self.ast.vec(),
+            None::<StringLiteral<'a>>,
+            ImportOrExportKind::Value,
+            NONE,
+        );
+        Statement::from(export)
     }
 
     fn generate_expr_stmt(&mut self, expr: &hir::Expr) -> Vec<Statement<'a>> {
@@ -315,6 +368,7 @@ impl<'a> InnerCodegen<'a> {
 
         hir::FunctionDeclaration {
             hir_id: method.hir_id,
+            visibility: Visibility::Private,
             name,
             parameters: method.parameters.clone(),
             return_type: method.return_type.clone(),
