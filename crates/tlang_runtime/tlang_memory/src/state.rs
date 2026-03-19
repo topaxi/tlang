@@ -659,6 +659,9 @@ impl VMState {
         }
 
         // 2. Register protocols.
+        // Native protocol IDs are assigned sequentially. The inventory crate
+        // guarantees deterministic iteration order within a single build, so
+        // IDs remain stable across runs of the same binary.
         let mut native_protocol_counter = 0u32;
         for def in inventory::iter::<NativeProtocolDef> {
             let protocol_id = ProtocolId::Native(native_protocol_counter);

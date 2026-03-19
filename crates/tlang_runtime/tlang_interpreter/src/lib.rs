@@ -884,7 +884,10 @@ impl Interpreter {
                 state.protocol_id_by_name(&impl_block.protocol_name.to_string())
             })
             .unwrap_or_else(|| {
-                state.panic(format!("Protocol `{}` not found", impl_block.protocol_name))
+                state.panic(format!(
+                    "Protocol `{}` not found (unresolved in HIR and not registered in runtime)",
+                    impl_block.protocol_name
+                ))
             });
 
         let target_type_shape_key = impl_block
