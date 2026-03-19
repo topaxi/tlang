@@ -332,6 +332,8 @@ impl<'a> InnerCodegen<'a> {
     pub fn generate_impl_block(&mut self, impl_block: &hir::ImplBlock) -> Vec<Statement<'a>> {
         let protocol_name = impl_block.protocol_name.to_string();
         let target_type = impl_block.target_type.to_string();
+        // Note: protocol_name.res.hir_id() and target_type.res.hir_id() carry
+        // the resolved node definitions, but JS output requires string names.
         let js_protocol_name = CodegenJS::protocol_js_name(&protocol_name);
 
         let mut stmts = Vec::new();

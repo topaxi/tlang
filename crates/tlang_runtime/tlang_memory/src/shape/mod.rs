@@ -17,6 +17,9 @@ pub enum ShapeKey {
     Native(usize),
     // ShapeKeyImpl::Dict is a hash value generated from each of the keys in the struct.
     Dict(u64),
+    /// Sentinel used in protocol dispatch to represent a wildcard/default
+    /// implementation that applies to any type without a more specific impl.
+    Wildcard,
 }
 
 impl ShapeKey {
@@ -53,6 +56,18 @@ impl From<HirId> for ShapeKey {
     fn from(id: HirId) -> Self {
         ShapeKey::new_hir_id(id)
     }
+}
+
+/// Unique identifier for a protocol, used in protocol resolution.
+/// Avoids string-based lookups for module-system readiness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ProtocolId {
+    /// A native/builtin protocol registered via inventory. The `u32` is a
+    /// sequential counter assigned during `collect_native_inventory`.
+    Native(u32),
+    /// A user-defined protocol from HIR lowering. The `HirId` corresponds
+    /// to the `ProtocolDeclaration` node in the HIR.
+    Hir(HirId),
 }
 
 pub enum TlangShape {

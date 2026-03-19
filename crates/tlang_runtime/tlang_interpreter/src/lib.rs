@@ -8,7 +8,7 @@ use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
 use tlang_hir::{self as hir, BindingKind};
 use tlang_memory::prelude::*;
-use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
+use tlang_memory::shape::{ProtocolId, ShapeKey, Shaped, TlangEnumVariant, TlangShape};
 use tlang_memory::value::TlangArithmetic;
 use tlang_memory::value::object::TlangEnum;
 use tlang_memory::{NativeFnReturn, Resolver, VMState, execution, scope};
@@ -831,9 +831,11 @@ impl Interpreter {
     }
 
     fn eval_protocol_decl(&self, state: &mut VMState, decl: &hir::ProtocolDeclaration) {
+        let protocol_id = ProtocolId::Hir(decl.hir_id);
         let protocol_name = decl.name.to_string();
         state.register_protocol(
-            protocol_name.clone(),
+            protocol_id,
+            protocol_name,
             decl.methods.iter().map(|m| m.name.to_string()).collect(),
         );
 
@@ -861,14 +863,48 @@ impl Interpreter {
 
                 state.set_fn_decl(method.hir_id, Rc::new(fn_decl));
                 let fn_value = state.new_object(TlangObjectKind::Fn(method.hir_id));
-                state.register_protocol_impl(&protocol_name, "*", &method_name, fn_value);
+                state.register_protocol_impl(
+                    protocol_id,
+                    ShapeKey::Wildcard,
+                    &method_name,
+                    fn_value,
+                );
             }
         }
     }
 
     fn eval_impl_block(&self, state: &mut VMState, impl_block: &hir::ImplBlock) {
-        let protocol_name = impl_block.protocol_name.to_string();
-        let target_type = impl_block.target_type.to_string();
+        let protocol_id = impl_block
+            .protocol_name
+            .res
+            .hir_id()
+            .map(ProtocolId::Hir)
+            .or_else(|| {
+                // Fallback to name-based lookup for unresolved paths
+                state.protocol_id_by_name(&impl_block.protocol_name.to_string())
+            })
+            .unwrap_or_else(|| {
+                state.panic(format!(
+                    "Protocol `{}` not found (unresolved in HIR and not registered in runtime)",
+                    impl_block.protocol_name
+                ))
+            });
+
+        let target_type_shape_key = impl_block
+            .target_type
+            .res
+            .hir_id()
+            .map(ShapeKey::from)
+            .or_else(|| {
+                // Fallback to name-based shape lookup for native types
+                state.lookup_builtin_shape(&impl_block.target_type.to_string())
+            })
+            .unwrap_or_else(|| {
+                state.panic(format!(
+                    "Type `{}` not found for protocol implementation",
+                    impl_block.target_type
+                ))
+            });
 
         for method in &impl_block.methods {
             // Register the function declaration so it can be called
@@ -880,12 +916,23 @@ impl Interpreter {
                 hir::ExprKind::FieldAccess(_, ident) => ident.to_string(),
                 _ => unreachable!(),
             };
-            state.register_protocol_impl(&protocol_name, &target_type, &method_name, fn_value);
+            state.register_protocol_impl(
+                protocol_id,
+                target_type_shape_key,
+                &method_name,
+                fn_value,
+            );
         }
 
         for apply_ident in &impl_block.apply_methods {
             let method_name = apply_ident.as_str();
-            self.install_protocol_method_on_shape(state, &protocol_name, &target_type, method_name);
+            self.install_protocol_method_on_shape(
+                state,
+                protocol_id,
+                target_type_shape_key,
+                &impl_block.target_type.to_string(),
+                method_name,
+            );
         }
     }
 
@@ -893,37 +940,22 @@ impl Interpreter {
         matches!(type_name, "List" | "Option" | "Result" | "ListIterator")
     }
 
-    fn shape_key_for_type_name(&self, state: &VMState, type_name: &str) -> Option<ShapeKey> {
-        if let Some(decl) = state.get_struct_decl_by_name(type_name) {
-            return Some(decl.hir_id.into());
-        }
-        if let Some(decl) = state.get_enum_decl_by_name(type_name) {
-            return Some(decl.hir_id.into());
-        }
-        None
-    }
-
     fn install_protocol_method_on_shape(
         &self,
         state: &mut VMState,
-        protocol_name: &str,
-        target_type: &str,
+        protocol_id: ProtocolId,
+        target_type: ShapeKey,
+        target_type_name: &str,
         method_name: &str,
     ) {
-        if Self::is_builtin_type(target_type) {
+        if Self::is_builtin_type(target_type_name) {
             state.panic(format!(
-                "Cannot use 'apply' for built-in type '{target_type}': \
+                "Cannot use 'apply' for built-in type '{target_type_name}': \
                  applying methods to built-in types is not allowed to preserve backwards compatibility"
             ));
         }
 
-        let shape_key = self
-            .shape_key_for_type_name(state, target_type)
-            .unwrap_or_else(|| {
-                state.panic(format!(
-                    "Cannot install method '{method_name}': type '{target_type}' not found"
-                ))
-            });
+        let shape_key = target_type;
 
         // Collision check
         if state
@@ -933,15 +965,15 @@ impl Interpreter {
             .is_some()
         {
             state.panic(format!(
-                "Method collision: '{method_name}' is already defined on '{target_type}'"
+                "Method collision: '{method_name}' is already defined on '{target_type_name}'"
             ));
         }
 
         let fn_value = state
-            .get_protocol_impl(protocol_name, target_type, method_name)
+            .get_protocol_impl(protocol_id, Some(target_type), method_name)
             .unwrap_or_else(|| {
                 state.panic(format!(
-                    "Cannot install method '{method_name}': not found in impl of '{protocol_name}' for '{target_type}'"
+                    "Cannot install method '{method_name}': not found in impl for '{target_type_name}'"
                 ))
             });
 
@@ -1183,9 +1215,12 @@ impl Interpreter {
             {
                 let protocol_name = path.segments[0].ident.as_str();
                 let method_name = path.segments[1].ident.as_str();
+                let protocol_id = state.protocol_id_by_name(protocol_name).unwrap();
                 let args = eval_exprs!(state, |s, e| self.eval_expr(s, e), call_expr.arguments);
+                let type_shape_key = state.type_shape_key_of(args[0]);
                 let type_name = state.type_name_of(args[0]);
-                let Some(fn_value) = state.get_protocol_impl(protocol_name, type_name, method_name)
+                let Some(fn_value) =
+                    state.get_protocol_impl(protocol_id, type_shape_key, method_name)
                 else {
                     state.panic(format!(
                         "No implementation of `{protocol_name}::{method_name}` for type `{type_name}`"
@@ -1518,8 +1553,10 @@ impl Interpreter {
     fn collect_iterable(&self, state: &mut VMState, value: TlangValue) -> TlangValue {
         let mark = state.temp_roots_mark();
         let type_name = state.type_name_of(value).to_string();
+        let type_shape_key = state.type_shape_key_of(value);
+        let iterable_id = state.protocol_id_by_name("Iterable").unwrap();
         let iter_fn = state
-            .get_protocol_impl("Iterable", &type_name, "iter")
+            .get_protocol_impl(iterable_id, type_shape_key, "iter")
             .unwrap_or_else(|| {
                 state.panic(format!(
                     "Type `{type_name}` is not iterable (no `Iterable::iter` implementation)"
@@ -1529,8 +1566,10 @@ impl Interpreter {
         state.push_temp_root(iterator);
 
         let iter_type_name = state.type_name_of(iterator).to_string();
+        let iter_type_shape_key = state.type_shape_key_of(iterator);
+        let iterator_id = state.protocol_id_by_name("Iterator").unwrap();
         let next_fn = state
-            .get_protocol_impl("Iterator", &iter_type_name, "next")
+            .get_protocol_impl(iterator_id, iter_type_shape_key, "next")
             .unwrap_or_else(|| {
                 state.panic(format!(
                     "Iterator type `{iter_type_name}` has no `Iterator::next` implementation"
