@@ -10,7 +10,7 @@ use crate::heap::{Heap, MemoryStats, NativeFnMeta};
 use crate::program::Program;
 use crate::resolver::Resolver;
 use crate::scope::Scope;
-use crate::shape::{ShapeKey, Shaped, TlangShape, TlangStructMethod};
+use crate::shape::{ProtocolId, ShapeKey, Shaped, TlangShape, TlangStructMethod};
 use crate::value::{
     TlangValue,
     function::NativeFnReturn,
@@ -419,6 +419,28 @@ impl VMState {
         }
     }
 
+    /// Returns the ShapeKey for the type of a value, if available.
+    /// Returns None for primitive types (Int, Float, Bool, Nil).
+    /// Returns `Some` for shaped objects, String objects (using the builtin
+    /// `string` shape), and Slice objects (using the builtin `slice` shape).
+    pub fn type_shape_key_of(&self, value: TlangValue) -> Option<ShapeKey> {
+        if !value.is_object() {
+            return None;
+        }
+        if let Some(obj) = self.get_object(value) {
+            if let Some(shape_key) = obj.shape() {
+                return Some(shape_key);
+            }
+            if obj.as_str().is_some() {
+                return Some(self.heap.builtin_shapes.string);
+            }
+            if obj.as_slice().is_some() {
+                return Some(self.heap.builtin_shapes.slice);
+            }
+        }
+        None
+    }
+
     pub fn get_struct_field_index(&self, shape: ShapeKey, field: &str) -> Option<usize> {
         self.heap.get_struct_field_index(shape, field)
     }
@@ -475,14 +497,14 @@ impl VMState {
         self.program.set_enum_decl(path_name, decl);
     }
 
-    pub fn register_protocol(&mut self, name: String, methods: Vec<String>) {
-        self.program.register_protocol(name, methods);
+    pub fn register_protocol(&mut self, id: ProtocolId, name: String, methods: Vec<String>) {
+        self.program.register_protocol(id, name, methods);
     }
 
     pub fn register_protocol_impl(
         &mut self,
-        protocol: &str,
-        target_type: &str,
+        protocol: ProtocolId,
+        target_type: Option<ShapeKey>,
         method: &str,
         fn_value: TlangValue,
     ) {
@@ -492,8 +514,8 @@ impl VMState {
 
     pub fn get_protocol_impl(
         &self,
-        protocol: &str,
-        target_type: &str,
+        protocol: ProtocolId,
+        target_type: Option<ShapeKey>,
         method: &str,
     ) -> Option<TlangValue> {
         self.program
@@ -502,8 +524,8 @@ impl VMState {
 
     pub fn call_protocol_method(
         &mut self,
-        protocol: &str,
-        target_type: &str,
+        protocol: ProtocolId,
+        target_type: Option<ShapeKey>,
         method: &str,
         args: &[TlangValue],
     ) -> Option<TlangValue> {
@@ -512,7 +534,15 @@ impl VMState {
     }
 
     pub fn is_protocol(&self, name: &str) -> bool {
-        self.program.is_protocol(name)
+        self.program.is_protocol_by_name(name)
+    }
+
+    pub fn protocol_id_by_name(&self, name: &str) -> Option<ProtocolId> {
+        self.program.protocol_id_by_name(name)
+    }
+
+    pub fn lookup_builtin_shape(&self, name: &str) -> Option<ShapeKey> {
+        self.heap.builtin_shapes.lookup(name)
     }
 
     // ── Inventory-driven registration helpers ───────────────────────────
@@ -587,7 +617,16 @@ impl VMState {
             &format!("{}::{}::{}", def.protocol(), def.type_name(), def.method()),
             def.fn_ptr(),
         );
-        self.register_protocol_impl(def.protocol(), def.type_name(), def.method(), fn_value);
+        let protocol_id = self
+            .program
+            .protocol_id_by_name(def.protocol())
+            .unwrap_or_else(|| panic!("Protocol '{}' not registered", def.protocol()));
+        let target_type = if def.type_name() == "*" {
+            None
+        } else {
+            self.heap.builtin_shapes.lookup(def.type_name())
+        };
+        self.register_protocol_impl(protocol_id, target_type, def.method(), fn_value);
     }
 
     /// Collect and register all inventory-submitted native definitions.
@@ -610,8 +649,12 @@ impl VMState {
         }
 
         // 2. Register protocols.
+        let mut native_protocol_counter = 0u32;
         for def in inventory::iter::<NativeProtocolDef> {
+            let protocol_id = ProtocolId::Native(native_protocol_counter);
+            native_protocol_counter += 1;
             self.register_protocol(
+                protocol_id,
                 def.name().to_string(),
                 def.methods().iter().map(|(m, _)| m.to_string()).collect(),
             );
@@ -837,15 +880,20 @@ impl VMState {
             return value.is_truthy();
         }
 
-        let type_name = self.type_name_of(value).to_string();
-        if let Some(truthy_fn) = self.get_protocol_impl("Truthy", &type_name, "truthy") {
-            let result = if matches!(self.get_object(truthy_fn), Some(TlangObjectKind::NativeFn)) {
-                let id = truthy_fn.get_object_id().unwrap();
-                *self.call_native_fn(id, &[value]).unwrap().value().unwrap()
-            } else {
-                self.call(truthy_fn, &[value])
-            };
-            return result.is_truthy();
+        let type_shape_key = self.type_shape_key_of(value);
+        if let Some(truthy_id) = self.protocol_id_by_name("Truthy") {
+            if let Some(truthy_fn) =
+                self.get_protocol_impl(truthy_id, type_shape_key, "truthy")
+            {
+                let result =
+                    if matches!(self.get_object(truthy_fn), Some(TlangObjectKind::NativeFn)) {
+                        let id = truthy_fn.get_object_id().unwrap();
+                        *self.call_native_fn(id, &[value]).unwrap().value().unwrap()
+                    } else {
+                        self.call(truthy_fn, &[value])
+                    };
+                return result.is_truthy();
+            }
         }
 
         match self
@@ -1018,15 +1066,13 @@ impl VMState {
                         .heap
                         .get_object_by_id(id)
                         .unwrap_or_else(|| self.panic(format!("Object with id {} not found", id)));
-                    obj.shape()
-                        .and_then(|key| self.get_shape_by_key(key))
-                        .and_then(|shape| {
-                            self.program.get_concrete_protocol_impl(
-                                "Display",
-                                shape.name(),
-                                "to_string",
-                            )
-                        })
+                    let shape_key = obj.shape();
+                    if let Some(display_id) = self.program.protocol_id_by_name("Display") {
+                        self.program
+                            .get_concrete_protocol_impl(display_id, shape_key, "to_string")
+                    } else {
+                        None
+                    }
                 };
 
                 if let Some(fn_value) = display_fn {

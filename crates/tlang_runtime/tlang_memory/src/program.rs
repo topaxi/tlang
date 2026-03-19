@@ -4,6 +4,7 @@ use std::rc::Rc;
 use tlang_hir as hir;
 use tlang_span::HirId;
 
+use crate::shape::{ProtocolId, ShapeKey};
 use crate::value::TlangValue;
 
 /// Static program metadata: HIR declarations and the global variable namespace.
@@ -20,12 +21,16 @@ pub struct Program {
     pub(crate) global_slot_map: HashMap<String, usize>,
     /// Fallback HashMap for dynamic globals (user-defined top-level fns, JS bindings).
     pub(crate) globals: HashMap<String, TlangValue>,
-    /// Protocol definitions: protocol_name → list of method names
-    pub(crate) protocols: HashMap<String, Vec<String>>,
-    /// Reverse lookup: method_name → protocol_name (for global aliases)
-    pub(crate) protocol_method_to_protocol: HashMap<String, String>,
-    /// Protocol implementations: (protocol_name, type_name, method_name) → fn value
-    pub(crate) protocol_impls: HashMap<(String, String, String), TlangValue>,
+    /// Protocol definitions: protocol ID → list of method names
+    pub(crate) protocols: HashMap<ProtocolId, Vec<String>>,
+    /// Reverse lookup: method_name → protocol ID
+    pub(crate) protocol_method_to_protocol: HashMap<String, ProtocolId>,
+    /// Protocol implementations: (protocol_id, type_shape_key_or_none, method_name) → fn value.
+    /// `None` for the ShapeKey represents a wildcard/default implementation (previously `"*"`)
+    /// that applies to all types without a specific implementation registered.
+    pub(crate) protocol_impls: HashMap<(ProtocolId, Option<ShapeKey>, String), TlangValue>,
+    /// Name-based index for looking up protocol IDs by name at call sites
+    pub(crate) protocol_name_to_id: HashMap<String, ProtocolId>,
     /// HirIds of expressions whose values are compile-time constants (e.g. tagged
     /// string parts lists). These are evaluated once and cached for the program's
     /// lifetime, giving singleton semantics (same object identity on every access).
@@ -47,6 +52,7 @@ impl Program {
             protocols: HashMap::new(),
             protocol_method_to_protocol: HashMap::new(),
             protocol_impls: HashMap::new(),
+            protocol_name_to_id: HashMap::new(),
             constant_pool_ids: HashSet::new(),
             constant_pool: HashMap::new(),
         }
@@ -126,50 +132,39 @@ impl Program {
             .chain(self.constant_pool.values().copied())
     }
 
-    pub fn register_protocol(&mut self, name: String, methods: Vec<String>) {
+    pub fn register_protocol(&mut self, id: ProtocolId, name: String, methods: Vec<String>) {
         for method in &methods {
-            self.protocol_method_to_protocol
-                .insert(method.clone(), name.clone());
+            self.protocol_method_to_protocol.insert(method.clone(), id);
         }
-        self.protocols.insert(name, methods);
+        self.protocols.insert(id, methods);
+        self.protocol_name_to_id.insert(name, id);
     }
 
     pub fn register_protocol_impl(
         &mut self,
-        protocol: &str,
-        target_type: &str,
+        protocol: ProtocolId,
+        target_type: Option<ShapeKey>,
         method: &str,
         fn_value: TlangValue,
     ) {
         self.protocol_impls.insert(
-            (
-                protocol.to_string(),
-                target_type.to_string(),
-                method.to_string(),
-            ),
+            (protocol, target_type, method.to_string()),
             fn_value,
         );
     }
 
     pub fn get_protocol_impl(
         &self,
-        protocol: &str,
-        target_type: &str,
+        protocol: ProtocolId,
+        target_type: Option<ShapeKey>,
         method: &str,
     ) -> Option<TlangValue> {
         self.protocol_impls
-            .get(&(
-                protocol.to_string(),
-                target_type.to_string(),
-                method.to_string(),
-            ))
+            .get(&(protocol, target_type, method.to_string()))
             .or_else(|| {
-                // Fallback to default impl (wildcard type "*")
-                self.protocol_impls.get(&(
-                    protocol.to_string(),
-                    "*".to_string(),
-                    method.to_string(),
-                ))
+                // Fallback to default impl (wildcard type None)
+                self.protocol_impls
+                    .get(&(protocol, None, method.to_string()))
             })
             .copied()
     }
@@ -178,26 +173,24 @@ impl Program {
     /// to the default wildcard impl.
     pub fn get_concrete_protocol_impl(
         &self,
-        protocol: &str,
-        target_type: &str,
+        protocol: ProtocolId,
+        target_type: Option<ShapeKey>,
         method: &str,
     ) -> Option<TlangValue> {
         self.protocol_impls
-            .get(&(
-                protocol.to_string(),
-                target_type.to_string(),
-                method.to_string(),
-            ))
+            .get(&(protocol, target_type, method.to_string()))
             .copied()
     }
 
-    pub fn is_protocol(&self, name: &str) -> bool {
-        self.protocols.contains_key(name)
+    pub fn is_protocol_by_name(&self, name: &str) -> bool {
+        self.protocol_name_to_id.contains_key(name)
     }
 
-    pub fn get_protocol_for_method(&self, method_name: &str) -> Option<&str> {
-        self.protocol_method_to_protocol
-            .get(method_name)
-            .map(|s| s.as_str())
+    pub fn protocol_id_by_name(&self, name: &str) -> Option<ProtocolId> {
+        self.protocol_name_to_id.get(name).copied()
+    }
+
+    pub fn get_protocol_for_method(&self, method_name: &str) -> Option<ProtocolId> {
+        self.protocol_method_to_protocol.get(method_name).copied()
     }
 }

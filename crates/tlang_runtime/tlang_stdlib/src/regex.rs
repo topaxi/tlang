@@ -277,8 +277,10 @@ mod tests {
     fn test_display_to_string() {
         let mut state = setup();
         let re = regex(&mut state, "foo|bar", "i");
+        let display_id = state.protocol_id_by_name("Display").unwrap();
+        let regex_shape = Some(state.heap.builtin_shapes.regex);
         let string_value = state
-            .call_protocol_method("Display", "Regex", "to_string", &[re])
+            .call_protocol_method(display_id, regex_shape, "to_string", &[re])
             .unwrap();
         assert_eq!(state.stringify(string_value), "/foo|bar/i");
     }

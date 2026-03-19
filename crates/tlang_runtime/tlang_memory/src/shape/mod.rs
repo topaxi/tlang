@@ -55,6 +55,18 @@ impl From<HirId> for ShapeKey {
     }
 }
 
+/// Unique identifier for a protocol, used in protocol resolution.
+/// Avoids string-based lookups for module-system readiness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ProtocolId {
+    /// A native/builtin protocol registered via inventory. The `u32` is a
+    /// sequential counter assigned during `collect_native_inventory`.
+    Native(u32),
+    /// A user-defined protocol from HIR lowering. The `HirId` corresponds
+    /// to the `ProtocolDeclaration` node in the HIR.
+    Hir(HirId),
+}
+
 pub enum TlangShape {
     Struct(TlangStructShape),
     Enum(TlangEnumShape),

@@ -28,7 +28,9 @@ tlang_macros::define_protocol! {
 #[native_fn(name = "map")]
 pub fn map(state: &mut VMState, iterable: TlangValue, func: TlangValue) -> TlangValue {
     let type_name = state.type_name_of(iterable);
-    if let Some(fn_value) = state.get_protocol_impl("Functor", type_name, "map") {
+    let type_shape_key = state.type_shape_key_of(iterable);
+    let functor_id = state.protocol_id_by_name("Functor").unwrap();
+    if let Some(fn_value) = state.get_protocol_impl(functor_id, type_shape_key, "map") {
         return state.call(fn_value, &[iterable, func]);
     }
 

@@ -13,6 +13,8 @@ pub struct BuiltinShapes {
     pub result: ShapeKey,
     pub regex: ShapeKey,
     pub string_buf: ShapeKey,
+    pub string: ShapeKey,
+    pub slice: ShapeKey,
 
     store: Slab<TlangShape>,
     shapes_by_name: HashMap<String, ShapeKey>,
@@ -26,7 +28,7 @@ impl Default for BuiltinShapes {
 
 impl BuiltinShapes {
     pub fn new() -> Self {
-        let mut store = Slab::with_capacity(6);
+        let mut store = Slab::with_capacity(8);
 
         let option = Self::create_option_shape(&mut store);
         let result = Self::create_result_shape(&mut store);
@@ -34,14 +36,18 @@ impl BuiltinShapes {
         let list_iterator = Self::create_list_iterator_shape(&mut store);
         let regex = Self::create_regex_shape(&mut store);
         let string_buf = Self::create_string_buf_shape(&mut store);
+        let string = Self::create_string_shape(&mut store);
+        let slice = Self::create_slice_shape(&mut store);
 
-        let mut shapes_by_name = HashMap::with_capacity(6);
+        let mut shapes_by_name = HashMap::with_capacity(8);
         shapes_by_name.insert("Option".to_string(), option);
         shapes_by_name.insert("Result".to_string(), result);
         shapes_by_name.insert("List".to_string(), list);
         shapes_by_name.insert("ListIterator".to_string(), list_iterator);
         shapes_by_name.insert("Regex".to_string(), regex);
         shapes_by_name.insert("StringBuf".to_string(), string_buf);
+        shapes_by_name.insert("String".to_string(), string);
+        shapes_by_name.insert("Slice".to_string(), slice);
 
         Self {
             list,
@@ -50,6 +56,8 @@ impl BuiltinShapes {
             result,
             regex,
             string_buf,
+            string,
+            slice,
             store,
             shapes_by_name,
         }
@@ -116,6 +124,22 @@ impl BuiltinShapes {
     fn create_string_buf_shape(store: &mut Slab<TlangShape>) -> ShapeKey {
         ShapeKey::new_native(store.insert(TlangShape::new_struct_shape(
             "StringBuf".to_string(),
+            vec![],
+            HashMap::new(),
+        )))
+    }
+
+    fn create_string_shape(store: &mut Slab<TlangShape>) -> ShapeKey {
+        ShapeKey::new_native(store.insert(TlangShape::new_struct_shape(
+            "String".to_string(),
+            vec![],
+            HashMap::new(),
+        )))
+    }
+
+    fn create_slice_shape(store: &mut Slab<TlangShape>) -> ShapeKey {
+        ShapeKey::new_native(store.insert(TlangShape::new_struct_shape(
+            "Slice".to_string(),
             vec![],
             HashMap::new(),
         )))
