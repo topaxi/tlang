@@ -37,7 +37,8 @@ fn int_arithmetic(op: ArithmeticOp, l: i64, r: i64) -> TlangValue {
         Mul => l.checked_mul(r).map(I64).unwrap_or_else(|| F64(l_f * r_f)),
         Div => {
             if r == 0 {
-                F64(f64::INFINITY)
+                // Let IEEE 754 handle the sign: negative / 0 → -inf, positive / 0 → +inf
+                F64(l_f / r_f)
             } else if l % r == 0 {
                 I64(l / r)
             } else {
@@ -60,7 +61,10 @@ fn int_arithmetic(op: ArithmeticOp, l: i64, r: i64) -> TlangValue {
                 }
             } else if r <= 32 {
                 // Small positive integer exponent → fast repeated squaring
-                I64(int_pow(l, r as u32))
+                // Fall back to float on overflow so the result is never silently wrong.
+                int_pow(l, r as u32)
+                    .map(I64)
+                    .unwrap_or_else(|| F64(l_f.powf(r_f)))
             } else {
                 // large exponent → fallback to float
                 F64(l_f.powf(r_f))
@@ -99,7 +103,11 @@ fn uint_arithmetic(op: ArithmeticOp, l: u64, r: u64) -> TlangValue {
         }
         Pow => {
             if r <= 32 {
-                U64(uint_pow(l, r as u32))
+                // Small positive integer exponent → fast repeated squaring.
+                // Fall back to float on overflow so the result is never silently wrong.
+                uint_pow(l, r as u32)
+                    .map(U64)
+                    .unwrap_or_else(|| F64(l_f.powf(r_f)))
             } else {
                 F64(l_f.powf(r_f))
             }
@@ -116,20 +124,8 @@ fn float_arithmetic(op: ArithmeticOp, lhs: f64, rhs: f64) -> TlangValue {
         Add => F64(lhs + rhs),
         Sub => F64(lhs - rhs),
         Mul => F64(lhs * rhs),
-        Div => {
-            if rhs == 0.0 {
-                F64(f64::INFINITY)
-            } else {
-                F64(lhs / rhs)
-            }
-        }
-        Rem => {
-            if rhs == 0.0 {
-                F64(f64::NAN)
-            } else {
-                F64(lhs % rhs)
-            }
-        }
+        Div => F64(lhs / rhs), // IEEE 754: sign is preserved, ±inf on division by zero
+        Rem => F64(lhs % rhs), // IEEE 754: NaN on modulo by zero
         Pow => F64(lhs.powf(rhs)),
     }
 }
@@ -145,36 +141,38 @@ fn to_f64(v: &TlangValue) -> f64 {
     }
 }
 
-// Fast integer exponentiation for small positive powers
+// Fast integer exponentiation for small positive powers.
+// Returns `None` on overflow so callers can fall back to float.
 #[inline(always)]
-fn int_pow(mut base: i64, mut exp: u32) -> i64 {
+fn int_pow(mut base: i64, mut exp: u32) -> Option<i64> {
     let mut result = 1i64;
     while exp > 0 {
         if exp & 1 == 1 {
-            result = result.saturating_mul(base);
+            result = result.checked_mul(base)?;
         }
         exp >>= 1;
         if exp > 0 {
-            base = base.saturating_mul(base);
+            base = base.checked_mul(base)?;
         }
     }
-    result
+    Some(result)
 }
 
-// Fast unsigned exponentiation for small positive powers
+// Fast unsigned exponentiation for small positive powers.
+// Returns `None` on overflow so callers can fall back to float.
 #[inline(always)]
-fn uint_pow(mut base: u64, mut exp: u32) -> u64 {
+fn uint_pow(mut base: u64, mut exp: u32) -> Option<u64> {
     let mut result = 1u64;
     while exp > 0 {
         if exp & 1 == 1 {
-            result = result.saturating_mul(base);
+            result = result.checked_mul(base)?;
         }
         exp >>= 1;
         if exp > 0 {
-            base = base.saturating_mul(base);
+            base = base.checked_mul(base)?;
         }
     }
-    result
+    Some(result)
 }
 
 pub trait TlangArithmetic {
@@ -272,6 +270,13 @@ mod tests {
     }
 
     #[test]
+    fn test_int_div_by_zero_negative_numerator() {
+        // Sign of numerator must be preserved: -5 / 0 = -inf
+        let result = TlangValue::I64(-5).div(TlangValue::I64(0));
+        assert!(matches!(result, TlangValue::F64(f) if f.is_infinite() && f < 0.0));
+    }
+
+    #[test]
     fn test_int_rem() {
         assert_eq!(
             TlangValue::I64(17).rem(TlangValue::I64(5)),
@@ -331,6 +336,13 @@ mod tests {
     fn test_int_mul_overflow_falls_back_to_float() {
         let result = TlangValue::I64(i64::MAX).mul(TlangValue::I64(2));
         assert!(matches!(result, TlangValue::F64(_)));
+    }
+
+    #[test]
+    fn test_int_pow_overflow_falls_back_to_float() {
+        // (-4_000_000_000)^2 = 16e18 > i64::MAX → must not saturate to i64::MAX
+        let result = TlangValue::I64(-4_000_000_000).pow(TlangValue::I64(2));
+        assert!(matches!(result, TlangValue::F64(f) if f > 1e18));
     }
 
     // ── Unsigned integer (U64) arithmetic ────────────────────────────────────
@@ -424,6 +436,13 @@ mod tests {
         assert!(matches!(result, TlangValue::F64(_)));
     }
 
+    #[test]
+    fn test_uint_pow_overflow_falls_back_to_float() {
+        // 5_000_000_000^2 = 25e18 > u64::MAX (18.4e18) → must not silently saturate
+        let result = TlangValue::U64(5_000_000_000).pow(TlangValue::U64(2));
+        assert!(matches!(result, TlangValue::F64(f) if f > 2e19));
+    }
+
     // ── Float arithmetic ──────────────────────────────────────────────────────
 
     #[test]
@@ -458,6 +477,13 @@ mod tests {
     fn test_float_div_by_zero() {
         let result = TlangValue::F64(1.0).div(TlangValue::F64(0.0));
         assert!(matches!(result, TlangValue::F64(f) if f.is_infinite() && f > 0.0));
+    }
+
+    #[test]
+    fn test_float_div_by_zero_negative() {
+        // IEEE 754: -1.0 / 0.0 = -inf
+        let result = TlangValue::F64(-1.0).div(TlangValue::F64(0.0));
+        assert!(matches!(result, TlangValue::F64(f) if f.is_infinite() && f < 0.0));
     }
 
     #[test]

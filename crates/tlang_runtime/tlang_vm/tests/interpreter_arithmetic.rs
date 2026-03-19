@@ -67,6 +67,20 @@ fn test_float_division_by_zero() {
     assert!(matches!(value, TlangValue::F64(f) if f.is_infinite() && f > 0.0));
 }
 
+#[test]
+fn test_negative_integer_division_by_zero() {
+    // Sign of numerator must be preserved: -1 / 0 = -inf
+    let value = eval_binop("/", "(-1)", "0");
+    assert!(matches!(value, TlangValue::F64(f) if f.is_infinite() && f < 0.0));
+}
+
+#[test]
+fn test_negative_float_division_by_zero() {
+    // IEEE 754: -1.0 / 0.0 = -inf
+    let value = eval_binop("/", "(-1.0)", "0.0");
+    assert!(matches!(value, TlangValue::F64(f) if f.is_infinite() && f < 0.0));
+}
+
 // ── Modulo edge cases ──────────────────────────────────────────────────────────
 
 #[test]
@@ -94,6 +108,13 @@ fn test_unsigned_large_exponent_falls_back_to_float() {
     // Exponent > 32 falls back to float in uint_arithmetic
     let value = eval_binop("**", "2", "33");
     assert!(matches!(value, TlangValue::F64(_)));
+}
+
+#[test]
+fn test_unsigned_pow_overflow_falls_back_to_float() {
+    // 5_000_000_000 ^ 2 = 25e18 > u64::MAX (18.4e18) → must not silently saturate
+    let value = eval_binop("**", "5000000000", "2");
+    assert!(matches!(value, TlangValue::F64(f) if f > 2e19));
 }
 
 #[test]

@@ -46,8 +46,11 @@ impl std::cmp::Eq for TlangValue {}
 
 impl std::hash::Hash for TlangValue {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Include a discriminant so different types with the same inner value
+        // produce different hashes (e.g. U8(1) vs U16(1) vs I8(1)).
+        std::mem::discriminant(self).hash(state);
         match self {
-            TlangValue::Nil => 0.hash(state),
+            TlangValue::Nil => {}
             TlangValue::Bool(b) => b.hash(state),
 
             TlangValue::U8(i) => i.hash(state),
