@@ -863,7 +863,12 @@ impl Interpreter {
 
                 state.set_fn_decl(method.hir_id, Rc::new(fn_decl));
                 let fn_value = state.new_object(TlangObjectKind::Fn(method.hir_id));
-                state.register_protocol_impl(protocol_id, None, &method_name, fn_value);
+                state.register_protocol_impl(
+                    protocol_id,
+                    ShapeKey::Wildcard,
+                    &method_name,
+                    fn_value,
+                );
             }
         }
     }
@@ -879,10 +884,7 @@ impl Interpreter {
                 state.protocol_id_by_name(&impl_block.protocol_name.to_string())
             })
             .unwrap_or_else(|| {
-                state.panic(format!(
-                    "Protocol `{}` not found",
-                    impl_block.protocol_name
-                ))
+                state.panic(format!("Protocol `{}` not found", impl_block.protocol_name))
             });
 
         let target_type_shape_key = impl_block
@@ -893,6 +895,12 @@ impl Interpreter {
             .or_else(|| {
                 // Fallback to name-based shape lookup for native types
                 state.lookup_builtin_shape(&impl_block.target_type.to_string())
+            })
+            .unwrap_or_else(|| {
+                state.panic(format!(
+                    "Type `{}` not found for protocol implementation",
+                    impl_block.target_type
+                ))
             });
 
         for method in &impl_block.methods {
@@ -929,21 +937,11 @@ impl Interpreter {
         matches!(type_name, "List" | "Option" | "Result" | "ListIterator")
     }
 
-    fn shape_key_for_type_name(&self, state: &VMState, type_name: &str) -> Option<ShapeKey> {
-        if let Some(decl) = state.get_struct_decl_by_name(type_name) {
-            return Some(decl.hir_id.into());
-        }
-        if let Some(decl) = state.get_enum_decl_by_name(type_name) {
-            return Some(decl.hir_id.into());
-        }
-        None
-    }
-
     fn install_protocol_method_on_shape(
         &self,
         state: &mut VMState,
         protocol_id: ProtocolId,
-        target_type: Option<ShapeKey>,
+        target_type: ShapeKey,
         target_type_name: &str,
         method_name: &str,
     ) {
@@ -954,13 +952,7 @@ impl Interpreter {
             ));
         }
 
-        let shape_key = target_type
-            .or_else(|| self.shape_key_for_type_name(state, target_type_name))
-            .unwrap_or_else(|| {
-                state.panic(format!(
-                    "Cannot install method '{method_name}': type '{target_type_name}' not found"
-                ))
-            });
+        let shape_key = target_type;
 
         // Collision check
         if state
@@ -975,7 +967,7 @@ impl Interpreter {
         }
 
         let fn_value = state
-            .get_protocol_impl(protocol_id, target_type, method_name)
+            .get_protocol_impl(protocol_id, Some(target_type), method_name)
             .unwrap_or_else(|| {
                 state.panic(format!(
                     "Cannot install method '{method_name}': not found in impl for '{target_type_name}'"

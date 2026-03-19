@@ -25,10 +25,10 @@ pub struct Program {
     pub(crate) protocols: HashMap<ProtocolId, Vec<String>>,
     /// Reverse lookup: method_name → protocol ID
     pub(crate) protocol_method_to_protocol: HashMap<String, ProtocolId>,
-    /// Protocol implementations: (protocol_id, type_shape_key_or_none, method_name) → fn value.
-    /// `None` for the ShapeKey represents a wildcard/default implementation (previously `"*"`)
-    /// that applies to all types without a specific implementation registered.
-    pub(crate) protocol_impls: HashMap<(ProtocolId, Option<ShapeKey>, String), TlangValue>,
+    /// Protocol implementations: (protocol_id, type_shape_key, method_name) → fn value.
+    /// `ShapeKey::Wildcard` represents a default implementation that applies to all types
+    /// without a more specific implementation registered.
+    pub(crate) protocol_impls: HashMap<(ProtocolId, ShapeKey, String), TlangValue>,
     /// Name-based index for looking up protocol IDs by name at call sites
     pub(crate) protocol_name_to_id: HashMap<String, ProtocolId>,
     /// HirIds of expressions whose values are compile-time constants (e.g. tagged
@@ -143,14 +143,12 @@ impl Program {
     pub fn register_protocol_impl(
         &mut self,
         protocol: ProtocolId,
-        target_type: Option<ShapeKey>,
+        target_type: ShapeKey,
         method: &str,
         fn_value: TlangValue,
     ) {
-        self.protocol_impls.insert(
-            (protocol, target_type, method.to_string()),
-            fn_value,
-        );
+        self.protocol_impls
+            .insert((protocol, target_type, method.to_string()), fn_value);
     }
 
     pub fn get_protocol_impl(
@@ -159,13 +157,17 @@ impl Program {
         target_type: Option<ShapeKey>,
         method: &str,
     ) -> Option<TlangValue> {
+        // First try an exact match for the concrete type (if known)
+        if let Some(key) = target_type
+            && let Some(val) = self
+                .protocol_impls
+                .get(&(protocol, key, method.to_string()))
+        {
+            return Some(*val);
+        }
+        // Fallback to default/wildcard impl
         self.protocol_impls
-            .get(&(protocol, target_type, method.to_string()))
-            .or_else(|| {
-                // Fallback to default impl (wildcard type None)
-                self.protocol_impls
-                    .get(&(protocol, None, method.to_string()))
-            })
+            .get(&(protocol, ShapeKey::Wildcard, method.to_string()))
             .copied()
     }
 
@@ -177,8 +179,9 @@ impl Program {
         target_type: Option<ShapeKey>,
         method: &str,
     ) -> Option<TlangValue> {
+        let key = target_type?;
         self.protocol_impls
-            .get(&(protocol, target_type, method.to_string()))
+            .get(&(protocol, key, method.to_string()))
             .copied()
     }
 

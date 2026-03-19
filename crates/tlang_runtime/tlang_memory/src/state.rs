@@ -504,7 +504,7 @@ impl VMState {
     pub fn register_protocol_impl(
         &mut self,
         protocol: ProtocolId,
-        target_type: Option<ShapeKey>,
+        target_type: ShapeKey,
         method: &str,
         fn_value: TlangValue,
     ) {
@@ -622,9 +622,19 @@ impl VMState {
             .protocol_id_by_name(def.protocol())
             .unwrap_or_else(|| panic!("Protocol '{}' not registered", def.protocol()));
         let target_type = if def.type_name() == "*" {
-            None
+            ShapeKey::Wildcard
         } else {
-            self.heap.builtin_shapes.lookup(def.type_name())
+            self.heap
+                .builtin_shapes
+                .lookup(def.type_name())
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Type '{}' not found in builtin shapes for protocol impl {}::{}",
+                        def.type_name(),
+                        def.protocol(),
+                        def.method()
+                    )
+                })
         };
         self.register_protocol_impl(protocol_id, target_type, def.method(), fn_value);
     }
@@ -881,19 +891,16 @@ impl VMState {
         }
 
         let type_shape_key = self.type_shape_key_of(value);
-        if let Some(truthy_id) = self.protocol_id_by_name("Truthy") {
-            if let Some(truthy_fn) =
-                self.get_protocol_impl(truthy_id, type_shape_key, "truthy")
-            {
-                let result =
-                    if matches!(self.get_object(truthy_fn), Some(TlangObjectKind::NativeFn)) {
-                        let id = truthy_fn.get_object_id().unwrap();
-                        *self.call_native_fn(id, &[value]).unwrap().value().unwrap()
-                    } else {
-                        self.call(truthy_fn, &[value])
-                    };
-                return result.is_truthy();
-            }
+        if let Some(truthy_id) = self.protocol_id_by_name("Truthy")
+            && let Some(truthy_fn) = self.get_protocol_impl(truthy_id, type_shape_key, "truthy")
+        {
+            let result = if matches!(self.get_object(truthy_fn), Some(TlangObjectKind::NativeFn)) {
+                let id = truthy_fn.get_object_id().unwrap();
+                *self.call_native_fn(id, &[value]).unwrap().value().unwrap()
+            } else {
+                self.call(truthy_fn, &[value])
+            };
+            return result.is_truthy();
         }
 
         match self
@@ -1058,18 +1065,18 @@ impl VMState {
     /// # Panics
     pub fn stringify(&mut self, value: TlangValue) -> String {
         match value {
-            TlangValue::Object(id) => {
+            TlangValue::Object(_id) => {
                 // Check for a concrete Display::to_string impl (not the default wildcard).
-                // We extract shape info first to avoid holding borrows across `self.call()`.
+                // Use type_shape_key_of to get the ShapeKey for all object types
+                // (including String/Slice which don't have shapes on TlangObjectKind).
                 let display_fn = {
-                    let obj = self
-                        .heap
-                        .get_object_by_id(id)
-                        .unwrap_or_else(|| self.panic(format!("Object with id {} not found", id)));
-                    let shape_key = obj.shape();
+                    let type_shape_key = self.type_shape_key_of(value);
                     if let Some(display_id) = self.program.protocol_id_by_name("Display") {
-                        self.program
-                            .get_concrete_protocol_impl(display_id, shape_key, "to_string")
+                        self.program.get_concrete_protocol_impl(
+                            display_id,
+                            type_shape_key,
+                            "to_string",
+                        )
                     } else {
                         None
                     }

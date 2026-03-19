@@ -17,6 +17,9 @@ pub enum ShapeKey {
     Native(usize),
     // ShapeKeyImpl::Dict is a hash value generated from each of the keys in the struct.
     Dict(u64),
+    /// Sentinel used in protocol dispatch to represent a wildcard/default
+    /// implementation that applies to any type without a more specific impl.
+    Wildcard,
 }
 
 impl ShapeKey {
