@@ -612,6 +612,9 @@ impl VMState {
     }
 
     /// Register a native protocol impl from an inventory descriptor.
+    /// # Panics
+    /// When the protocol name is not found in the program's registered protocols, or
+    /// when the type name is not found in the heap's builtin shapes (unless there is a default).
     pub fn register_native_protocol_impl(&mut self, def: &crate::NativeProtocolImplDef) {
         let fn_value = self.new_native_fn(
             &format!("{}::{}::{}", def.protocol(), def.type_name(), def.method()),
@@ -662,10 +665,10 @@ impl VMState {
         // Native protocol IDs are assigned sequentially. The inventory crate
         // guarantees deterministic iteration order within a single build, so
         // IDs remain stable across runs of the same binary.
-        let mut native_protocol_counter = 0u32;
-        for def in inventory::iter::<NativeProtocolDef> {
-            let protocol_id = ProtocolId::Native(native_protocol_counter);
-            native_protocol_counter += 1;
+        for (native_protocol_counter, def) in
+            inventory::iter::<NativeProtocolDef>.into_iter().enumerate()
+        {
+            let protocol_id = ProtocolId::Native(native_protocol_counter as u32);
             self.register_protocol(
                 protocol_id,
                 def.name().to_string(),
