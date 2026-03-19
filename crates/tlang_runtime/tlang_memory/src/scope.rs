@@ -3,7 +3,7 @@ use tlang_hir::{self as hir, HirScope, ScopeIndex};
 use crate::resolver::Resolver;
 use crate::value::TlangValue;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ScopeStack {
     pub scopes: Vec<Scope>,
     // Global scope memory - can grow independently without affecting other scopes

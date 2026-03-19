@@ -289,6 +289,7 @@ impl LoweringContext {
                     name: method.name,
                     parameters: params,
                     return_type: self.lower_ty(method.return_type_annotation.as_ref()),
+                    body: method.body.as_ref().map(|b| self.lower_block(b)),
                     span: method.span,
                 }
             })

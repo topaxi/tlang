@@ -28,7 +28,7 @@ pub struct VMState {
     pub heap: Heap,
     pub program: Program,
     pub execution: ExecutionContext,
-    call_fn: Option<CallFn>,
+    call_fn: CallFn,
 }
 
 impl Resolver for VMState {
@@ -48,9 +48,7 @@ impl Resolver for VMState {
 
         debug!(
             "Resolved path: \"{}\" ({:?}), got: {:?}",
-            path,
-            path.res,
-            value.map(|v| self.stringify(v))
+            path, path.res, value
         );
 
         value
@@ -58,12 +56,20 @@ impl Resolver for VMState {
 }
 
 impl VMState {
+    /// # Panics
+    /// Must call `register_call_fn` before using `call`, or else the default call handler
+    /// will panic on any attempt to call a value.
     pub fn new() -> Self {
         Self {
             heap: Heap::new(),
             program: Program::new(),
             execution: ExecutionContext::new(),
-            call_fn: None,
+            call_fn: |_vm, callee, args| {
+                panic!(
+                    "Call handler not registered: attempted to call {:?} with args {:?}",
+                    callee, args
+                )
+            },
         }
     }
 
@@ -494,12 +500,19 @@ impl VMState {
             .get_protocol_impl(protocol, target_type, method)
     }
 
-    pub fn is_protocol(&self, name: &str) -> bool {
-        self.program.is_protocol(name)
+    pub fn call_protocol_method(
+        &mut self,
+        protocol: &str,
+        target_type: &str,
+        method: &str,
+        args: &[TlangValue],
+    ) -> Option<TlangValue> {
+        self.get_protocol_impl(protocol, target_type, method)
+            .map(|fn_value| self.call(fn_value, args))
     }
 
-    pub fn get_protocol_for_method(&self, method_name: &str) -> Option<&str> {
-        self.program.get_protocol_for_method(method_name)
+    pub fn is_protocol(&self, name: &str) -> bool {
+        self.program.is_protocol(name)
     }
 
     // ── Inventory-driven registration helpers ───────────────────────────
@@ -802,7 +815,7 @@ impl VMState {
     /// during initialization so that native functions can invoke callables
     /// via [`VMState::call`].
     pub fn register_call_fn(&mut self, call_fn: CallFn) {
-        self.call_fn = Some(call_fn);
+        self.call_fn = call_fn;
     }
 
     /// Call a `TlangValue` that references a callable (function, closure, or
@@ -815,8 +828,7 @@ impl VMState {
     /// # Panics
     /// Panics if no call handler has been registered.
     pub fn call(&mut self, callee: TlangValue, args: &[TlangValue]) -> TlangValue {
-        let call_fn = self.call_fn.expect("call handler not registered");
-        (call_fn)(self, callee, args)
+        (self.call_fn)(self, callee, args)
     }
 
     /// # Panics
@@ -865,11 +877,12 @@ impl VMState {
         }
     }
 
-    pub fn debug_stringify_scope_stack(&self) -> String {
+    pub fn debug_stringify_scope_stack(&mut self) -> String {
+        let scope_stack = self.execution.scope_stack.clone();
         let mut out = "[\n".to_string();
-        for scope in self.execution.scope_stack.iter() {
+        for scope in scope_stack.iter() {
             out.push_str("  {\n");
-            for entry in self.execution.scope_stack.get_scope_locals(scope) {
+            for entry in scope_stack.get_scope_locals(scope) {
                 out.push_str("    ");
                 out.push_str(self.stringify(*entry).as_str());
                 out.push_str(",\n");
@@ -880,9 +893,8 @@ impl VMState {
         out
     }
 
-    fn stringify_struct_as_list(&self, s: &TlangStruct) -> String {
-        let values = s
-            .values()
+    fn stringify_list_values(&mut self, values: &[TlangValue]) -> String {
+        let values = values
             .iter()
             .map(|v| self.stringify(*v))
             .collect::<Vec<String>>()
@@ -890,21 +902,21 @@ impl VMState {
         format!("[{values}]")
     }
 
-    fn stringify_struct(&self, s: &TlangStruct) -> String {
-        if s.shape() == self.heap.builtin_shapes.list {
-            return self.stringify_struct_as_list(s);
+    fn stringify_struct_data(&mut self, shape_key: ShapeKey, values: &[TlangValue]) -> String {
+        if shape_key == self.heap.builtin_shapes.list {
+            return self.stringify_list_values(values);
         }
 
-        if s.shape() == self.heap.builtin_shapes.regex {
-            let source = self.stringify(s[0]);
-            let flags = self.stringify(s[1]);
+        if shape_key == self.heap.builtin_shapes.regex {
+            let source = self.stringify(values[0]);
+            let flags = self.stringify(values[1]);
             return format!("/{source}/{flags}");
         }
 
-        if s.shape() == self.heap.builtin_shapes.string_buf {
+        if shape_key == self.heap.builtin_shapes.string_buf {
             return self
                 .heap
-                .get_object(s[0])
+                .get_object(values[0])
                 .and_then(|o| o.as_str())
                 .unwrap_or("")
                 .to_string();
@@ -912,29 +924,38 @@ impl VMState {
 
         let shape = self
             .heap
-            .get_shape(s)
+            .get_shape_by_key(shape_key)
             .and_then(|s| s.get_struct_shape())
             .unwrap();
 
-        if shape.has_fields() && shape.has_consecutive_integer_fields() {
-            return format!("{} {}", shape.name, self.stringify_struct_as_list(s));
+        let shape_name = shape.name.clone();
+        let has_fields = shape.has_fields();
+        let is_list_like = has_fields && shape.has_consecutive_integer_fields();
+        let fields = if has_fields {
+            shape.get_fields()
+        } else {
+            vec![]
+        };
+
+        if is_list_like {
+            return format!("{} {}", shape_name, self.stringify_list_values(values));
         }
 
         let mut result = String::new();
-        result.push_str(&shape.name);
+        result.push_str(&shape_name);
         result.push_str(" { ");
 
-        if !shape.has_fields() {
+        if !has_fields {
             result.push('}');
             return result;
         }
 
-        let mut fields = shape.get_fields();
+        let mut fields = fields;
         fields.sort();
         result.push_str(
             &fields
                 .into_iter()
-                .map(|(field, idx)| format!("{}: {}", field, self.stringify(s[idx])))
+                .map(|(field, idx)| format!("{}: {}", field, self.stringify(values[idx])))
                 .collect::<Vec<String>>()
                 .join(", "),
         );
@@ -943,91 +964,169 @@ impl VMState {
         result
     }
 
-    fn stringify_enum(&self, e: &TlangEnum) -> String {
+    fn stringify_enum_data(
+        &mut self,
+        shape_key: ShapeKey,
+        variant: usize,
+        field_values: &[TlangValue],
+    ) -> String {
         let shape = self
             .heap
-            .get_shape(e)
+            .get_shape_by_key(shape_key)
             .and_then(|s| s.get_enum_shape())
             .unwrap();
-        let variant = &shape.variants[e.variant];
-        let mut result = String::new();
-        result.push_str(&shape.name);
-        result.push_str("::");
-        result.push_str(&variant.name);
+        let variant_shape = &shape.variants[variant];
 
-        if variant.field_map.is_empty() {
+        let shape_name = shape.name.clone();
+        let variant_name = variant_shape.name.clone();
+        let field_entries: Vec<(String, usize)> = variant_shape
+            .field_map
+            .iter()
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
+
+        let mut result = String::new();
+        result.push_str(&shape_name);
+        result.push_str("::");
+        result.push_str(&variant_name);
+
+        if field_entries.is_empty() {
             return result;
         }
 
         result.push('(');
-        for (i, (field, idx)) in variant.field_map.iter().enumerate() {
+        for (i, (field, idx)) in field_entries.iter().enumerate() {
             if i > 0 {
                 result.push_str(", ");
             }
             result.push_str(field);
             result.push_str(": ");
-            result.push_str(&self.stringify(e.field_values[*idx]));
+            result.push_str(&self.stringify(field_values[*idx]));
         }
         result.push(')');
         result
     }
 
     /// # Panics
-    pub fn stringify(&self, value: TlangValue) -> String {
+    pub fn stringify(&mut self, value: TlangValue) -> String {
         match value {
-            TlangValue::Object(id) => match self.heap.get_object_by_id(id) {
-                None => value.to_string(),
-                Some(TlangObjectKind::String(s)) => s.clone(),
-                Some(TlangObjectKind::Struct(s)) => self.stringify_struct(s),
-                Some(TlangObjectKind::Enum(e)) => self.stringify_enum(e),
-                Some(TlangObjectKind::Slice(s)) => {
-                    let values = self
+            TlangValue::Object(id) => {
+                // Check for a concrete Display::to_string impl (not the default wildcard).
+                // We extract shape info first to avoid holding borrows across `self.call()`.
+                let display_fn = {
+                    let obj = self
                         .heap
-                        .get_slice_values(*s)
-                        .iter()
-                        .map(|v| self.stringify(*v))
-                        .collect::<Vec<String>>()
-                        .join(", ");
-                    format!("&[{values}]")
+                        .get_object_by_id(id)
+                        .unwrap_or_else(|| self.panic(format!("Object with id {} not found", id)));
+                    obj.shape()
+                        .and_then(|key| self.get_shape_by_key(key))
+                        .and_then(|shape| {
+                            self.program.get_concrete_protocol_impl(
+                                "Display",
+                                shape.name(),
+                                "to_string",
+                            )
+                        })
+                };
+
+                if let Some(fn_value) = display_fn {
+                    let result = self.call(fn_value, &[value]);
+                    return self.stringify(result);
                 }
-                Some(TlangObjectKind::Closure(s)) => {
-                    let fn_decl = self.program.closures.get(&s.id).unwrap();
-                    format!(
-                        "fn {}#{}({})",
-                        fn_decl.name(),
-                        s.id,
-                        fn_decl
-                            .parameters
-                            .iter()
-                            .map(|p| p.name.as_str())
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                    )
-                }
-                Some(TlangObjectKind::Fn(id)) => {
-                    let fn_decl = self.program.fn_decls.get(id).unwrap();
-                    format!(
-                        "fn {}#{}({})",
-                        fn_decl.name(),
-                        id,
-                        fn_decl
-                            .parameters
-                            .iter()
-                            .map(|p| p.name.as_str())
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                    )
-                }
-                Some(TlangObjectKind::NativeFn) => {
-                    if let Some(meta) = self.heap.native_fns_meta.get(&id) {
-                        format!("fn {}(...) {{ *native* }}", meta.name)
-                    } else {
-                        "fn anonymous(...) { *native* }".to_string()
-                    }
-                }
-                Some(TlangObjectKind::Cell(cell)) => self.stringify(cell.get()),
-            },
+
+                self.stringify_default(value)
+            }
             _ => value.to_string(),
+        }
+    }
+
+    /// Default stringify without Display protocol dispatch.
+    /// Used by the native default `Display::to_string` implementation to
+    /// avoid infinite recursion.
+    pub fn stringify_default(&mut self, value: TlangValue) -> String {
+        match value {
+            TlangValue::Object(id) => self.stringify_object(id),
+            _ => value.to_string(),
+        }
+    }
+
+    fn stringify_object(&mut self, id: TlangObjectId) -> String {
+        let obj = self
+            .heap
+            .get_object_by_id(id)
+            .unwrap_or_else(|| self.panic(format!("Object with id {} not found", id)));
+
+        // Extract all data we need from the object reference before dropping
+        // the borrow, so we can call &mut self methods (stringify, etc.).
+        enum ObjData {
+            String(String),
+            Struct(ShapeKey, Vec<TlangValue>),
+            Enum(ShapeKey, usize, Vec<TlangValue>),
+            Slice(TlangSlice),
+            Closure(HirId),
+            Fn(HirId),
+            NativeFn,
+            Cell(TlangValue),
+        }
+
+        let data = match obj {
+            TlangObjectKind::String(s) => ObjData::String(s.clone()),
+            TlangObjectKind::Struct(s) => ObjData::Struct(s.shape(), s.values().to_vec()),
+            TlangObjectKind::Enum(e) => ObjData::Enum(e.shape(), e.variant, e.field_values.clone()),
+            TlangObjectKind::Slice(s) => ObjData::Slice(*s),
+            TlangObjectKind::Closure(c) => ObjData::Closure(c.id),
+            TlangObjectKind::Fn(hir_id) => ObjData::Fn(*hir_id),
+            TlangObjectKind::NativeFn => ObjData::NativeFn,
+            TlangObjectKind::Cell(cell) => ObjData::Cell(cell.get()),
+        };
+
+        match data {
+            ObjData::String(s) => s,
+            ObjData::Struct(shape_key, values) => self.stringify_struct_data(shape_key, &values),
+            ObjData::Enum(shape_key, variant, field_values) => {
+                self.stringify_enum_data(shape_key, variant, &field_values)
+            }
+            ObjData::Slice(s) => {
+                let values: Vec<TlangValue> = self.heap.get_slice_values(s).to_vec();
+                let parts: Vec<String> = values.iter().map(|v| self.stringify(*v)).collect();
+                format!("&[{}]", parts.join(", "))
+            }
+            ObjData::Closure(closure_id) => {
+                let fn_decl = self.program.closures.get(&closure_id).unwrap().clone();
+                format!(
+                    "fn {}#{}({})",
+                    fn_decl.name(),
+                    closure_id,
+                    fn_decl
+                        .parameters
+                        .iter()
+                        .map(|p| p.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                )
+            }
+            ObjData::Fn(hir_id) => {
+                let fn_decl = self.program.fn_decls.get(&hir_id).unwrap().clone();
+                format!(
+                    "fn {}#{}({})",
+                    fn_decl.name(),
+                    hir_id,
+                    fn_decl
+                        .parameters
+                        .iter()
+                        .map(|p| p.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                )
+            }
+            ObjData::NativeFn => {
+                if let Some(meta) = self.heap.native_fns_meta.get(&id) {
+                    format!("fn {}(...) {{ *native* }}", meta.name)
+                } else {
+                    "fn anonymous(...) { *native* }".to_string()
+                }
+            }
+            ObjData::Cell(inner) => self.stringify(inner),
         }
     }
 }

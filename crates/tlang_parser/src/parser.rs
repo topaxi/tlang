@@ -548,12 +548,21 @@ impl<'src> Parser<'src> {
         self.expect_token(TokenKind::LParen);
         let parameters = self.parse_parameter_list();
         let return_type = self.parse_return_type();
+
+        // Optional default implementation body
+        let body = if matches!(self.current_token_kind(), TokenKind::LBrace) {
+            Some(self.parse_block())
+        } else {
+            None
+        };
+
         self.end_span_from_previous_token(&mut span);
         ProtocolMethodSignature {
             id: self.unique_id(),
             name,
             parameters,
             return_type_annotation: return_type,
+            body,
             span,
         }
     }

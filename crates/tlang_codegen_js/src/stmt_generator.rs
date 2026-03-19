@@ -180,7 +180,8 @@ impl<'a> InnerCodegen<'a> {
 
             // $Protocol.methodName = function(self, ...args) {
             //   const __type = Array.isArray(self) ? "List" : self?.constructor?.name ?? typeof self;
-            //   return $Protocol[__type].methodName(self, ...args);
+            //   const __impl = $Protocol[__type] ?? $Protocol.__default;
+            //   return __impl.methodName(self, ...args);
             // };
             let self_param = self.formal_param("self");
             let rest_binding = self.binding_pattern_ident("args");
@@ -221,10 +222,21 @@ impl<'a> InnerCodegen<'a> {
             );
             let type_decl = self.const_decl("__type", type_expr);
 
-            // return $Protocol[__type].methodName(self, ...args);
+            // const __impl = $Protocol[__type] ?? $Protocol.__default;
             let proto_type_access =
                 self.computed_member_expr(self.ident_expr(&js_name), self.ident_expr("__type"));
-            let method_access = self.static_member_expr(proto_type_access, method_name);
+            let proto_default_access =
+                self.static_member_expr(self.ident_expr(&js_name), "__default");
+            let impl_expr = self.ast.expression_logical(
+                SPAN,
+                proto_type_access,
+                LogicalOperator::Coalesce,
+                proto_default_access,
+            );
+            let impl_decl = self.const_decl("__impl", impl_expr);
+
+            // return __impl.methodName(self, ...args);
+            let method_access = self.static_member_expr(self.ident_expr("__impl"), method_name);
             let spread_args = Argument::SpreadElement(
                 self.ast.alloc_spread_element(SPAN, self.ident_expr("args")),
             );
@@ -234,7 +246,7 @@ impl<'a> InnerCodegen<'a> {
             );
             let return_stmt = self.ast.statement_return(SPAN, Some(dispatch_call));
 
-            let body = self.fn_body(self.ast.vec_from_iter([type_decl, return_stmt]));
+            let body = self.fn_body(self.ast.vec_from_iter([type_decl, impl_decl, return_stmt]));
             let func = self.ast.expression_function(
                 SPAN,
                 FunctionType::FunctionExpression,
@@ -255,7 +267,65 @@ impl<'a> InnerCodegen<'a> {
             stmts.push(self.expr_stmt(assign));
         }
 
+        // Generate default implementation functions for methods with bodies
+        for method in &decl.methods {
+            if method.body.is_some() {
+                let method_name = method.name.as_str();
+
+                // $Protocol.__default = $Protocol.__default || {};
+                let default_access =
+                    self.static_member_expr(self.ident_expr(&js_name), "__default");
+                let default_or_obj = self.ast.expression_logical(
+                    SPAN,
+                    default_access,
+                    LogicalOperator::Or,
+                    self.ast.expression_object(SPAN, self.ast.vec()),
+                );
+                let target = self.assignment_target_member(self.ident_expr(&js_name), "__default");
+                let assign = self.assign_expr(target, default_or_obj);
+                stmts.push(self.expr_stmt(assign));
+
+                // $Protocol.__default.methodName = function(self, ...args) { <body> };
+                let fn_decl = self.build_fn_decl_from_protocol_method(method);
+                let fn_expr = self.generate_function_expression(&fn_decl);
+
+                let default_obj = self.static_member_expr(self.ident_expr(&js_name), "__default");
+                let target = self.assignment_target_member(default_obj, method_name);
+                let assign = self.assign_expr(target, fn_expr);
+                stmts.push(self.expr_stmt(assign));
+            }
+        }
+
         stmts
+    }
+
+    fn build_fn_decl_from_protocol_method(
+        &self,
+        method: &hir::ProtocolMethodSignature,
+    ) -> hir::FunctionDeclaration {
+        let name = hir::Expr {
+            hir_id: method.hir_id,
+            kind: hir::ExprKind::Path(Box::new(hir::Path::new(
+                vec![hir::PathSegment::new(method.name)],
+                method.span,
+            ))),
+            span: method.span,
+        };
+
+        hir::FunctionDeclaration {
+            hir_id: method.hir_id,
+            name,
+            parameters: method.parameters.clone(),
+            return_type: method.return_type.clone(),
+            body: method.body.clone().unwrap_or_else(|| hir::Block {
+                hir_id: method.hir_id,
+                stmts: vec![],
+                expr: None,
+                scope: Default::default(),
+                span: method.span,
+            }),
+            span: method.span,
+        }
     }
 
     pub fn generate_impl_block(&mut self, impl_block: &hir::ImplBlock) -> Vec<Statement<'a>> {

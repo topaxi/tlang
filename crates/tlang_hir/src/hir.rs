@@ -871,6 +871,7 @@ pub struct ProtocolMethodSignature {
     pub name: Ident,
     pub parameters: Vec<FunctionParameter>,
     pub return_type: Ty,
+    pub body: Option<Block>,
     pub span: Span,
 }
 

@@ -163,6 +163,31 @@ impl Program {
                 target_type.to_string(),
                 method.to_string(),
             ))
+            .or_else(|| {
+                // Fallback to default impl (wildcard type "*")
+                self.protocol_impls.get(&(
+                    protocol.to_string(),
+                    "*".to_string(),
+                    method.to_string(),
+                ))
+            })
+            .copied()
+    }
+
+    /// Lookup a concrete (type-specific) protocol impl, without falling back
+    /// to the default wildcard impl.
+    pub fn get_concrete_protocol_impl(
+        &self,
+        protocol: &str,
+        target_type: &str,
+        method: &str,
+    ) -> Option<TlangValue> {
+        self.protocol_impls
+            .get(&(
+                protocol.to_string(),
+                target_type.to_string(),
+                method.to_string(),
+            ))
             .copied()
     }
 

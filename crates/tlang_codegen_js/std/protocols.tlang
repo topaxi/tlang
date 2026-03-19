@@ -29,3 +29,10 @@ protocol Iterable {
 protocol Iterator {
   fn next(self)
 }
+
+protocol Display {
+  fn to_string(self) {
+    // Delegate to JavaScript's toString method by default
+    self.toString()
+  }
+}

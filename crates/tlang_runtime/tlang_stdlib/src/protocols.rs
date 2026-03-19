@@ -17,6 +17,12 @@ tlang_macros::define_protocol! {
     Iterator {
         fn next(this);
     }
+    Display {
+        fn to_string(this) {
+            let s = vm.stringify_default(this);
+            vm.new_string(s)
+        }
+    }
 }
 
 #[native_fn(name = "map")]

@@ -16,7 +16,8 @@ fn test_protocol_declaration() {
         const $Showable = {};
         $Showable.show = function(self, ...args) {
             const __type = Array.isArray(self) ? \"List\" : self?.constructor?.name ?? typeof self;
-            return $Showable[__type].show(self, ...args);
+            const __impl = $Showable[__type] ?? $Showable.__default;
+            return __impl.show(self, ...args);
         };
     "};
     assert_eq!(output, expected);

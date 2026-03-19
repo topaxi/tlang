@@ -160,17 +160,40 @@ define_struct! {
             TlangValue::Bool(regex_match(vm, this, &haystack))
         }
     }
+
+    impl Display for Regex {
+        fn to_string(this) {
+            let source = get_regex_pattern(vm, this);
+            let flags = get_regex_flags(vm, this);
+            let s = if flags.is_empty() {
+                source
+            } else {
+                format!("/{source}/{flags}")
+            };
+            vm.new_string(s)
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use tlang_memory::{TlangValue, VMState};
+    use tlang_memory::{TlangObjectKind, TlangValue, VMState};
 
     use super::{REGEX_FIELD_FLAGS, REGEX_FIELD_SOURCE};
 
     fn setup() -> VMState {
         let mut state = VMState::new();
         state.collect_native_inventory();
+        state.register_call_fn(|state, callee, args| {
+            let id = callee.get_object_id().expect("object is not a function");
+
+            match state.get_object_by_id(id).unwrap() {
+                TlangObjectKind::NativeFn => {
+                    *state.call_native_fn(id, args).unwrap().value().unwrap()
+                }
+                obj => panic!("`{obj:?}` is not a function"),
+            }
+        });
         state
     }
 
@@ -248,6 +271,16 @@ mod tests {
         let mut state = setup();
         let re = regex(&mut state, "foo|bar", "i");
         assert_eq!(state.stringify(re), "/foo|bar/i");
+    }
+
+    #[test]
+    fn test_display_to_string() {
+        let mut state = setup();
+        let re = regex(&mut state, "foo|bar", "i");
+        let string_value = state
+            .call_protocol_method("Display", "Regex", "to_string", &[re])
+            .unwrap();
+        assert_eq!(state.stringify(string_value), "/foo|bar/i");
     }
 
     fn call_method_str(state: &mut VMState, re: TlangValue, method: &str, arg: &str) -> TlangValue {

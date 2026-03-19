@@ -255,11 +255,10 @@ impl Interpreter {
         match &expr.kind {
             hir::ExprKind::Path(path) => {
                 EvalResult::Value(state.resolve_value(path).unwrap_or_else(|| {
+                    let scope_debug = state.debug_stringify_scope_stack();
                     state.panic(format!(
                         "Could not resolve path \"{}\" ({:?})\nCurrent scope: {}",
-                        path,
-                        path.res,
-                        state.debug_stringify_scope_stack()
+                        path, path.res, scope_debug
                     ))
                 }))
             }
@@ -365,13 +364,15 @@ impl Interpreter {
         }
 
         if !value.is_object() {
+            let s = state.stringify(value);
             state.panic(format!(
                 "Cannot access field `{ident}` on non-object: {}",
-                state.stringify(value)
+                s
             ));
         }
 
-        todo!("eval_field_access: {}.{}", state.stringify(value), ident);
+        let s = state.stringify(value);
+        todo!("eval_field_access: {}.{}", s, ident);
     }
 
     fn eval_literal(&self, state: &mut VMState, literal: &token::Literal) -> TlangValue {
@@ -830,10 +831,39 @@ impl Interpreter {
     }
 
     fn eval_protocol_decl(&self, state: &mut VMState, decl: &hir::ProtocolDeclaration) {
+        let protocol_name = decl.name.to_string();
         state.register_protocol(
-            decl.name.to_string(),
+            protocol_name.clone(),
             decl.methods.iter().map(|m| m.name.to_string()).collect(),
         );
+
+        // Register default implementations for methods that have bodies
+        for method in &decl.methods {
+            if let Some(body) = &method.body {
+                let method_name = method.name.to_string();
+
+                // Build a FunctionDeclaration from the protocol method signature
+                let name_path =
+                    hir::Path::new(vec![hir::PathSegment::new(method.name)], method.span);
+                let name_expr = hir::Expr {
+                    hir_id: method.hir_id,
+                    kind: hir::ExprKind::Path(Box::new(name_path)),
+                    span: method.span,
+                };
+                let fn_decl = hir::FunctionDeclaration {
+                    hir_id: method.hir_id,
+                    name: name_expr,
+                    parameters: method.parameters.clone(),
+                    return_type: method.return_type.clone(),
+                    body: body.clone(),
+                    span: method.span,
+                };
+
+                state.set_fn_decl(method.hir_id, Rc::new(fn_decl));
+                let fn_value = state.new_object(TlangObjectKind::Fn(method.hir_id));
+                state.register_protocol_impl(&protocol_name, "*", &method_name, fn_value);
+            }
+        }
     }
 
     fn eval_impl_block(&self, state: &mut VMState, impl_block: &hir::ImplBlock) {
@@ -996,20 +1026,18 @@ impl Interpreter {
                 TlangValue::Object(obj) => match state.get_object_by_id(obj).unwrap() {
                     TlangObjectKind::Fn(hir_id) => *hir_id,
                     TlangObjectKind::NativeFn => {
-                        state.panic(format!(
-                            "`{:?}` is a native function, cannot tail call",
-                            state.stringify(tail_call.callee)
-                        ));
+                        let s = state.stringify(tail_call.callee);
+                        state.panic(format!("`{:?}` is a native function, cannot tail call", s));
                     }
-                    _ => state.panic(format!(
-                        "`{:?}` is not a function",
-                        state.stringify(tail_call.callee)
-                    )),
+                    _ => {
+                        let s = state.stringify(tail_call.callee);
+                        state.panic(format!("`{:?}` is not a function", s))
+                    }
                 },
-                _ => state.panic(format!(
-                    "`{:?}` is not a function",
-                    state.stringify(tail_call.callee)
-                )),
+                _ => {
+                    let s = state.stringify(tail_call.callee);
+                    state.panic(format!("`{:?}` is not a function", s))
+                }
             };
 
             // Optimized for self referencial tail calls, if we are calling the same function,
@@ -1166,10 +1194,10 @@ impl Interpreter {
                 self.eval_call_object(state, fn_value, &args)
             }
             hir::ExprKind::Path(path) => {
+                let scope_debug = state.debug_stringify_scope_stack();
                 state.panic(format!(
                     "Function `{}` not found\nCurrent scope: {}",
-                    path,
-                    state.debug_stringify_scope_stack()
+                    path, scope_debug
                 ));
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
@@ -1187,11 +1215,11 @@ impl Interpreter {
                 if let Some(shape_key) = shape_key {
                     self.call_shape_method(state, shape_key, ident.as_str(), &args)
                 } else {
+                    let s = state.stringify(call_target);
+                    let scope_debug = state.debug_stringify_scope_stack();
                     state.panic(format!(
                         "Field access on non-struct: {:?},\nExpr: {:?}, Current scope: {}",
-                        state.stringify(call_target),
-                        expr,
-                        state.debug_stringify_scope_stack()
+                        s, expr, scope_debug
                     ));
                 }
             }
@@ -1436,10 +1464,8 @@ impl Interpreter {
         let value = eval_value!(state, self.eval_expr(state, expr));
 
         if !self.eval_pat(state, pat, value) {
-            state.panic(format!(
-                "Pattern did not match value {:?}",
-                state.stringify(value)
-            ));
+            let s = state.stringify(value);
+            state.panic(format!("Pattern did not match value {:?}", s));
         }
 
         EvalResult::Void
@@ -1585,10 +1611,8 @@ impl Interpreter {
             }
         }
 
-        state.panic(format!(
-            "No match found for value {:?}",
-            state.stringify(value)
-        ));
+        let s = state.stringify(value);
+        state.panic(format!("No match found for value {:?}", s));
     }
 
     /// Evaluates a match arm and returns the value if it matches, otherwise returns None.
@@ -1695,36 +1719,39 @@ impl Interpreter {
             hir::PatKind::Wildcard => true,
             hir::PatKind::Enum(path, kvs) if let Some(tlang_enum) = state.get_enum(value) => {
                 let variant_index = tlang_enum.variant;
-                let shape = self
-                    .get_shape_of(state, value)
-                    .unwrap_or_else(|| {
-                        state.panic(format!(
-                            "Enum shape not found for value {:?}",
-                            state.stringify(value)
-                        ))
-                    })
-                    .get_enum_shape()
-                    .unwrap_or_else(|| {
-                        state.panic(format!(
-                            "Value has a shape, but not an enum shape {:?}",
-                            state.stringify(value)
-                        ))
-                    });
+                let shape_opt = self.get_shape_of(state, value);
+                let shape = match shape_opt {
+                    Some(s) => s,
+                    None => {
+                        let s = state.stringify(value);
+                        state.panic(format!("Enum shape not found for value {:?}", s))
+                    }
+                };
+                let enum_shape = match shape.get_enum_shape() {
+                    Some(s) => s,
+                    None => {
+                        let s = state.stringify(value);
+                        state.panic(format!("Value has a shape, but not an enum shape {:?}", s))
+                    }
+                };
                 let path_name = path.as_init().to_string();
 
-                if shape.name != path_name {
-                    debug!("eval_pat: Not matched as {} != {}", shape.name, path_name);
+                if enum_shape.name != path_name {
+                    debug!(
+                        "eval_pat: Not matched as {} != {}",
+                        enum_shape.name, path_name
+                    );
 
                     return false;
                 }
 
                 let variant_name = path.last_ident().as_str();
-                let variant_shape = &shape.variants[variant_index];
+                let variant_shape = &enum_shape.variants[variant_index];
 
                 if variant_shape.name != variant_name {
                     debug!(
                         "eval_pat: Not matched as {} != {}",
-                        shape.variants[variant_index].name, variant_name
+                        enum_shape.variants[variant_index].name, variant_name
                     );
 
                     return false;
@@ -2436,7 +2463,10 @@ mod tests {
 
         let result = interpreter.eval("even_odd()");
 
-        assert_eq!(interpreter.state().stringify(result), "[[2, 4], [1, 3]]");
+        assert_eq!(
+            interpreter.state_mut().stringify(result),
+            "[[2, 4], [1, 3]]"
+        );
     }
 
     #[test]
@@ -2452,7 +2482,7 @@ mod tests {
         let result = t.eval(r#"Named { label: "hello", value: "world" }"#);
         // stringify prints strings without quotes; fields are sorted alphabetically.
         assert_eq!(
-            t.state().stringify(result),
+            t.state_mut().stringify(result),
             "Named { label: hello, value: world }"
         );
     }
@@ -2474,8 +2504,10 @@ mod tests {
             _ => panic!("expected Object"),
         };
         assert_eq!(enum_data.variant, 1);
-        assert_eq!(t.state().stringify(enum_data.field_values[0]), "wide");
-        assert_eq!(t.state().stringify(enum_data.field_values[1]), "tall");
+        let field0 = enum_data.field_values[0];
+        let field1 = enum_data.field_values[1];
+        assert_eq!(t.state_mut().stringify(field0), "wide");
+        assert_eq!(t.state_mut().stringify(field1), "tall");
     }
 
     #[test]
@@ -2491,7 +2523,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         let result = t.eval(r#"first_and_rest(["a", "b", "c"])"#);
         // first is a string (no quotes in stringify), rest is a slice (&[...]).
-        assert_eq!(t.state().stringify(result), "[a, &[b, c]]");
+        assert_eq!(t.state_mut().stringify(result), "[a, &[b, c]]");
     }
 
     #[test]
@@ -2507,7 +2539,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         let result = t.eval(r#"split_first("hello")"#);
         // Both first and rest are strings; stringify prints them without quotes.
-        assert_eq!(t.state().stringify(result), "[h, ello]");
+        assert_eq!(t.state_mut().stringify(result), "[h, ello]");
     }
 
     #[test]
@@ -2516,7 +2548,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         // String concatenation allocates a new string via new_string.
         let result = t.eval(r#""hello" + " " + "world""#);
-        assert_eq!(t.state().stringify(result), "hello world");
+        assert_eq!(t.state_mut().stringify(result), "hello world");
     }
 
     #[test]
@@ -2525,7 +2557,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         // Each string literal allocates, then new_list allocates the list.
         let result = t.eval(r#"["a", "b", "c", "d", "e"]"#);
-        assert_eq!(t.state().stringify(result), "[a, b, c, d, e]");
+        assert_eq!(t.state_mut().stringify(result), "[a, b, c, d, e]");
     }
 
     #[test]
@@ -2536,7 +2568,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         // Spread creates a new list from existing objects.
         let result = t.eval(r#"prepend("x", ["a", "b", "c"])"#);
-        assert_eq!(t.state().stringify(result), "[x, a, b, c]");
+        assert_eq!(t.state_mut().stringify(result), "[x, a, b, c]");
     }
 
     #[test]
@@ -2549,7 +2581,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         // Recursive string decomposition creates many char/rest/concat strings.
         let result = t.eval(r#"reverse("abcdef")"#);
-        assert_eq!(t.state().stringify(result), "fedcba");
+        assert_eq!(t.state_mut().stringify(result), "fedcba");
     }
 
     #[test]
@@ -2562,7 +2594,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         // Closure captures a string, then concatenation inside allocates more strings.
         let result = t.eval(r#"make_greeter("hello")("world")"#);
-        assert_eq!(t.state().stringify(result), "hello world");
+        assert_eq!(t.state_mut().stringify(result), "hello world");
     }
 
     #[test]
@@ -2588,7 +2620,7 @@ mod tests {
         // Each recursive call creates a string + list + spread.
         let result = t.eval("build(5)");
         assert_eq!(
-            t.state().stringify(result),
+            t.state_mut().stringify(result),
             "[item, item, item, item, item]"
         );
     }
@@ -2602,7 +2634,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         // map creates closures, new strings from concatenation, and new lists.
         let result = t.eval(r#"map(["a", "b", "c"], fn(s) { s + s })"#);
-        assert_eq!(t.state().stringify(result), "[aa, bb, cc]");
+        assert_eq!(t.state_mut().stringify(result), "[aa, bb, cc]");
     }
 
     #[test]
@@ -2617,7 +2649,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         // Each iteration creates a new string and a new list via spread.
         let result = t.eval("collect_strings()");
-        assert_eq!(t.state().stringify(result), "[x, x, x, x]");
+        assert_eq!(t.state_mut().stringify(result), "[x, x, x, x]");
     }
 
     #[test]
@@ -2635,7 +2667,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         // Enum wrapping and unwrapping with string values.
         let result = t.eval(r#"unwrap(Wrapper::Val("hello"))"#);
-        assert_eq!(t.state().stringify(result), "hello");
+        assert_eq!(t.state_mut().stringify(result), "hello");
     }
 
     #[test]
@@ -2651,7 +2683,7 @@ mod tests {
         // Creates multiple structs in sequence. Fields access existing objects,
         // swap creates a new struct from field values of an existing one.
         let result = t.eval(r#"swap(Pair { fst: "a", snd: "b" })"#);
-        assert_eq!(t.state().stringify(result), "Pair { fst: b, snd: a }");
+        assert_eq!(t.state_mut().stringify(result), "Pair { fst: b, snd: a }");
     }
 
     #[test]
@@ -2663,7 +2695,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         // Chained calls test watermark save/restore with object values passing through.
         let result = t.eval(r#"wrap(identity(identity("hello")))"#);
-        assert_eq!(t.state().stringify(result), "[hello]");
+        assert_eq!(t.state_mut().stringify(result), "[hello]");
     }
 
     #[test]
@@ -2679,7 +2711,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         // Nested pattern creates multiple slices as rest values.
         let result = t.eval(r#"nested_match([["x", "y", "z"], "a", "b"])"#);
-        assert_eq!(t.state().stringify(result), "[x, &[y, z], &[a, b]]");
+        assert_eq!(t.state_mut().stringify(result), "[x, &[y, z], &[a, b]]");
     }
 
     #[test]
@@ -2691,7 +2723,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         // Each character in the pattern creates a new_string allocation.
         let result = t.eval(r#"chars("abc")"#);
-        assert_eq!(t.state().stringify(result), "[a, b, c]");
+        assert_eq!(t.state_mut().stringify(result), "[a, b, c]");
     }
 
     #[test]
@@ -2713,7 +2745,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         // Partial application captures a string object, then applies with another.
         let result = t.eval(r#"concat("hello ", _)("world")"#);
-        assert_eq!(t.state().stringify(result), "hello world");
+        assert_eq!(t.state_mut().stringify(result), "hello world");
     }
 
     #[test]
@@ -2725,7 +2757,7 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         // foldl with string concatenation creates many intermediate strings.
         let result = t.eval(r#"foldl(["a", "b", "c", "d"], "", fn(acc, x) { acc + x })"#);
-        assert_eq!(t.state().stringify(result), "abcd");
+        assert_eq!(t.state_mut().stringify(result), "abcd");
     }
 
     #[test]
@@ -2748,9 +2780,9 @@ mod tests {
         t.state_mut().set_stress_gc(true);
         // Enum with two string fields, then destructure to access them.
         let result = t.eval(r#"first(Entry::Pair("key", "value"))"#);
-        assert_eq!(t.state().stringify(result), "key");
+        assert_eq!(t.state_mut().stringify(result), "key");
         let result = t.eval(r#"second(Entry::Pair("key", "value"))"#);
-        assert_eq!(t.state().stringify(result), "value");
+        assert_eq!(t.state_mut().stringify(result), "value");
     }
 
     // --- GC collection tests: verify unreachable objects are swept ---
@@ -2763,7 +2795,7 @@ mod tests {
             fn concat_three() { "hello" + " " + "world" }
         "#});
         let result = t.eval("concat_three()");
-        assert_eq!(t.state().stringify(result), "hello world");
+        assert_eq!(t.state_mut().stringify(result), "hello world");
         // After the call returns, temp_roots have been trimmed.
         // An explicit GC should collect the intermediate strings.
         let before = t.memory_stats().objects_deallocated;
@@ -2905,7 +2937,7 @@ mod tests {
         "#});
         t.state_mut().set_stress_gc(true);
         let result = t.eval("loop_alloc(50)");
-        assert_eq!(t.state().stringify(result), "done");
+        assert_eq!(t.state_mut().stringify(result), "done");
         // After the top-level call returns, do a final collection.
         t.state_mut().collect_garbage();
         let stats = t.memory_stats();
@@ -2938,7 +2970,7 @@ mod tests {
         "#});
         t.state_mut().set_stress_gc(true);
         let result = t.eval(r#"reverse("abcdefgh")"#);
-        assert_eq!(t.state().stringify(result), "hgfedcba");
+        assert_eq!(t.state_mut().stringify(result), "hgfedcba");
         // After the call returns, temp_roots are trimmed. Explicit GC collects the rest.
         t.state_mut().collect_garbage();
         let stats = t.memory_stats();
@@ -2960,7 +2992,7 @@ mod tests {
         "});
         t.state_mut().set_stress_gc(true);
         let result = t.eval("map([1, 2, 3, 4, 5], identity)");
-        assert_eq!(t.state().stringify(result), "[1, 2, 3, 4, 5]");
+        assert_eq!(t.state_mut().stringify(result), "[1, 2, 3, 4, 5]");
         let stats = t.memory_stats();
         // map creates intermediate slices (from ...xs rest pattern) at each recursive step.
         // These slices become unreachable as recursion unwinds.
@@ -2974,62 +3006,62 @@ mod tests {
     fn test_native_map_list() {
         let mut t = interpreter("");
         let result = t.eval("map([1, 2, 3], fn(x) { x * 2 })");
-        assert_eq!(t.state().stringify(result), "[2, 4, 6]");
+        assert_eq!(t.state_mut().stringify(result), "[2, 4, 6]");
     }
 
     #[test]
     fn test_native_map_list_empty() {
         let mut t = interpreter("");
         let result = t.eval("map([], fn(x) { x * 2 })");
-        assert_eq!(t.state().stringify(result), "[]");
+        assert_eq!(t.state_mut().stringify(result), "[]");
     }
 
     #[test]
     fn test_native_map_option_some() {
         let mut t = interpreter("");
         let result = t.eval("Option::Some(5).map(fn(x) { x * 2 })");
-        assert_eq!(t.state().stringify(result), "Option::Some(0: 10)");
+        assert_eq!(t.state_mut().stringify(result), "Option::Some(0: 10)");
     }
 
     #[test]
     fn test_native_map_option_none() {
         let mut t = interpreter("");
         let result = t.eval("Option::None.map(fn(x) { x * 2 })");
-        assert_eq!(t.state().stringify(result), "Option::None");
+        assert_eq!(t.state_mut().stringify(result), "Option::None");
     }
 
     #[test]
     fn test_native_map_option_toplevel() {
         let mut t = interpreter("");
         let result = t.eval("map(Option::Some(3), fn(x) { x + 1 })");
-        assert_eq!(t.state().stringify(result), "Option::Some(0: 4)");
+        assert_eq!(t.state_mut().stringify(result), "Option::Some(0: 4)");
 
         let result = t.eval("map(Option::None, fn(x) { x + 1 })");
-        assert_eq!(t.state().stringify(result), "Option::None");
+        assert_eq!(t.state_mut().stringify(result), "Option::None");
     }
 
     #[test]
     fn test_native_map_result_ok() {
         let mut t = interpreter("");
         let result = t.eval("Result::Ok(10).map(fn(x) { x + 5 })");
-        assert_eq!(t.state().stringify(result), "Result::Ok(0: 15)");
+        assert_eq!(t.state_mut().stringify(result), "Result::Ok(0: 15)");
     }
 
     #[test]
     fn test_native_map_result_err() {
         let mut t = interpreter("");
         let result = t.eval("Result::Err(42).map(fn(x) { x + 5 })");
-        assert_eq!(t.state().stringify(result), "Result::Err(0: 42)");
+        assert_eq!(t.state_mut().stringify(result), "Result::Err(0: 42)");
     }
 
     #[test]
     fn test_native_map_result_toplevel() {
         let mut t = interpreter("");
         let result = t.eval("map(Result::Ok(7), fn(x) { x * 3 })");
-        assert_eq!(t.state().stringify(result), "Result::Ok(0: 21)");
+        assert_eq!(t.state_mut().stringify(result), "Result::Ok(0: 21)");
 
         let result = t.eval("map(Result::Err(99), fn(x) { x * 3 })");
-        assert_eq!(t.state().stringify(result), "Result::Err(0: 99)");
+        assert_eq!(t.state_mut().stringify(result), "Result::Err(0: 99)");
     }
 
     #[test]
@@ -3037,7 +3069,7 @@ mod tests {
         let mut t = interpreter("");
         // Use the slice method to get a slice, then map over it
         let result = t.eval("[1, 2, 3].slice(1) |> map(fn(x) { x * 10 })");
-        assert_eq!(t.state().stringify(result), "[20, 30]");
+        assert_eq!(t.state_mut().stringify(result), "[20, 30]");
     }
 
     #[test]
@@ -3045,6 +3077,6 @@ mod tests {
         let mut t = interpreter("");
         // map over string maps over each character
         let result = t.eval(r#"map("abc", fn(c) { c + c })"#);
-        assert_eq!(t.state().stringify(result), "aabbcc");
+        assert_eq!(t.state_mut().stringify(result), "aabbcc");
     }
 }

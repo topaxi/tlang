@@ -62,6 +62,8 @@ pub fn compile_with_interpreter_builtins(source: &str) -> hir::LowerResult {
         ("Iterable::iter", DefKind::ProtocolMethod(1), None),
         ("Iterator", DefKind::Protocol, None),
         ("Iterator::next", DefKind::ProtocolMethod(1), None),
+        ("Display", DefKind::Protocol, None),
+        ("Display::to_string", DefKind::ProtocolMethod(1), None),
         // const value symbols – need slots
         ("Option::Some", DefKind::EnumVariant(1), Some(4)),
         ("Option::None", DefKind::EnumVariant(0), Some(5)),
