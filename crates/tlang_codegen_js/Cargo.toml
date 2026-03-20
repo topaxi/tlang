@@ -4,12 +4,12 @@ version = "0.1.0"
 edition.workspace = true
 
 [dependencies]
-oxc_allocator = "0.120"
-oxc_ast = { version = "0.120", features = ["serialize"] }
-oxc_codegen = "0.120"
-oxc_sourcemap = "6"
-oxc_estree = { version = "0.120", features = ["serialize"] }
-oxc_span = "0.120"
+oxc_allocator = { workspace = true }
+oxc_ast = { workspace = true }
+oxc_codegen = { workspace = true }
+oxc_sourcemap = { workspace = true }
+oxc_estree = { workspace = true }
+oxc_span = { workspace = true }
 tlang_ast = { path = "../tlang_ast" }
 tlang_intern = { path = "../tlang_intern" }
 tlang_hir = { path = "../tlang_hir" }

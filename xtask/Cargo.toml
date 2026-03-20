@@ -14,3 +14,7 @@ tlang_parser = { path = "../crates/tlang_parser" }
 tlang_semantics = { path = "../crates/tlang_semantics" }
 tlang_ast_lowering = { path = "../crates/tlang_ast_lowering" }
 tlang_hir_opt = { path = "../crates/tlang_hir_opt" }
+oxc_allocator = { workspace = true }
+oxc_ast = { workspace = true }
+oxc_parser = { workspace = true }
+oxc_span = { workspace = true }
