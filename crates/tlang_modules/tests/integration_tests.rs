@@ -237,7 +237,6 @@ fn test_cross_module_enum() {
 }
 
 #[test]
-#[ignore = "interpreter: cross-module enum pattern matching not yet implemented"]
 fn test_interpreter_cross_module_enum() {
     let output = run_interpreter("cross_module_enum");
     assert_eq!(output.trim(), "circle(5)\n75\nrect(3,4)\n12");
@@ -253,7 +252,6 @@ fn test_cross_module_protocol() {
 }
 
 #[test]
-#[ignore = "interpreter: cross-module protocol dispatch not yet implemented"]
 fn test_interpreter_cross_module_protocol() {
     let output = run_interpreter("cross_module_protocol");
     assert_eq!(output.trim(), "Woof! I'm Rex\nMeow! I'm Whiskers");
@@ -320,7 +318,6 @@ fn test_struct_methods_cross_module() {
 }
 
 #[test]
-#[ignore = "interpreter: cross-module struct field access not yet implemented"]
 fn test_interpreter_struct_methods_cross_module() {
     let output = run_interpreter("struct_methods_cross_module");
     assert_eq!(output.trim(), "3\n4\n7\n13\n24\n37");

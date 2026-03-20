@@ -79,7 +79,7 @@ fn handle_run_project(project_dir: &Path) {
         let mut ctx = compiled.lower_meta.clone().into();
         optimizer.optimize_hir(&mut hir_module, &mut ctx);
 
-        vm.eval(&hir_module);
+        vm.eval_module(&hir_module);
 
         // Copy exported function values to the global slots used by importing modules
         populate_import_slots(&mut vm, path, &result);
@@ -95,7 +95,7 @@ fn handle_run_project(project_dir: &Path) {
         // Copy exported function values for root module imports
         populate_import_slots(&mut vm, &ModulePath::root(), &result);
 
-        let result = vm.eval(&hir_module);
+        let result = vm.eval_module(&hir_module);
         match result {
             TlangValue::Nil => {}
             _ => println!("{result}"),
