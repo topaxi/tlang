@@ -773,9 +773,12 @@ impl VMState {
 
     /// Set a value directly at a specific global slot index.
     pub fn set_global_slot(&mut self, slot: usize, value: TlangValue) {
-        if slot < self.program.global_slots.len() {
-            self.program.global_slots[slot] = value;
-        }
+        assert!(
+            slot < self.program.global_slots.len(),
+            "attempted to set global slot {slot} but only {} slots allocated — this is a compiler bug",
+            self.program.global_slots.len()
+        );
+        self.program.global_slots[slot] = value;
     }
 
     pub fn get_global(&self, name: &str) -> Option<TlangValue> {
