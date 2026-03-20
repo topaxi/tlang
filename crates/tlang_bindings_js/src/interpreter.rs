@@ -1,9 +1,9 @@
+use tlang_core::memory::{NativeFnReturn, VMState, prelude::*};
 use tlang_hir as hir;
-use tlang_runtime::memory::{NativeFnReturn, VMState, prelude::*};
 use wasm_bindgen::prelude::*;
 
 pub struct TlangInterpreter {
-    vm: tlang_runtime::vm::VM,
+    vm: tlang_core::vm::VM,
 }
 
 impl Default for TlangInterpreter {
@@ -15,7 +15,7 @@ impl Default for TlangInterpreter {
 impl TlangInterpreter {
     pub(crate) fn new() -> Self {
         TlangInterpreter {
-            vm: tlang_runtime::vm::VM::new(),
+            vm: tlang_core::vm::VM::new(),
         }
     }
 

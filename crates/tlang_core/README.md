@@ -1,4 +1,4 @@
-# tlang_runtime
+# tlang_core
 
 The runtime environment for tlang.
 

@@ -1741,6 +1741,7 @@ dependencies = [
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_codegen_js",
+ "tlang_core",
  "tlang_defs",
  "tlang_diagnostics",
  "tlang_hir",
@@ -1748,7 +1749,6 @@ dependencies = [
  "tlang_hir_pretty",
  "tlang_macros",
  "tlang_parser",
- "tlang_runtime",
  "tlang_semantics",
  "tlang_span",
  "tsify",
@@ -1769,12 +1769,12 @@ dependencies = [
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_codegen_js",
+ "tlang_core",
  "tlang_diagnostics",
  "tlang_hir",
  "tlang_hir_opt",
  "tlang_hir_pretty",
  "tlang_parser",
- "tlang_runtime",
  "tlang_semantics",
 ]
 
@@ -1802,6 +1802,16 @@ dependencies = [
  "tlang_parser",
  "tlang_semantics",
  "tlang_span",
+]
+
+[[package]]
+name = "tlang_core"
+version = "0.1.0"
+dependencies = [
+ "tlang_interpreter",
+ "tlang_memory",
+ "tlang_stdlib",
+ "tlang_vm",
 ]
 
 [[package]]
@@ -1947,16 +1957,6 @@ dependencies = [
  "tlang_intern",
  "tlang_lexer",
  "tlang_span",
-]
-
-[[package]]
-name = "tlang_runtime"
-version = "0.1.0"
-dependencies = [
- "tlang_interpreter",
- "tlang_memory",
- "tlang_stdlib",
- "tlang_vm",
 ]
 
 [[package]]

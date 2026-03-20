@@ -1,6 +1,6 @@
+use tlang_core::memory as tlang_memory;
+use tlang_core::memory::{VMState, prelude::*};
 use tlang_macros::native_fn;
-use tlang_runtime::memory as tlang_memory;
-use tlang_runtime::memory::{VMState, prelude::*};
 
 #[native_fn]
 pub fn random(_: &mut VMState) -> TlangValue {

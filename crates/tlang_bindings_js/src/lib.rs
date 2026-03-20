@@ -3,8 +3,8 @@ extern crate console_error_panic_hook;
 
 use wasm_bindgen::prelude::*;
 
-pub use tlang_runtime::memory::NativeFnDef;
-pub use tlang_runtime::memory::{
+pub use tlang_core::memory::NativeFnDef;
+pub use tlang_core::memory::{
     NativeEnumDef, NativeEnumVariantDef, NativeMethodDef, NativeProtocolDef, NativeProtocolImplDef,
     NativeStructDef,
 };

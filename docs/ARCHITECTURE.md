@@ -14,12 +14,12 @@ The tlang compiler follows a traditional multi-pass architecture:
 8.  **Optimization** (`crates/tlang_hir_opt`): Performs optimizations on the HIR (e.g., dead code elimination, constant folding).
 9.  **Code Generation**:
     *   **JavaScript** (`crates/tlang_codegen_js`): Generates JavaScript code from the optimized HIR.
-    *   **Interpreter** (`crates/tlang_runtime/tlang_interpreter`): Directly executes the code (via `tlangdi`).
+    *   **Interpreter** (`crates/tlang_core/tlang_interpreter`): Directly executes the code (via `tlangdi`).
 
-## Runtime
+## Core
 
-The runtime (`crates/tlang_runtime`) provides the necessary environment for execution:
+The core (`crates/tlang_core`) provides the necessary environment for execution:
 
-*   **Memory** (`crates/tlang_runtime/tlang_memory`): Handles memory management.
-*   **Standard Library** (`crates/tlang_runtime/tlang_stdlib`): Built-in functions available to tlang programs.
-*   **Interpreter** (`crates/tlang_runtime/tlang_interpreter`): The direct execution engine.
+*   **Memory** (`crates/tlang_core/tlang_memory`): Handles memory management.
+*   **Standard Library** (`crates/tlang_core/tlang_stdlib`): Built-in functions available to tlang programs.
+*   **Interpreter** (`crates/tlang_core/tlang_interpreter`): The direct execution engine.

@@ -1,10 +1,10 @@
 use std::{fs::File, io::Read, path::Path};
 
 use tlang_ast_lowering::lower_to_hir;
+use tlang_core::{memory::TlangValue, vm::VM};
 use tlang_diagnostics::{render_parse_issues, render_semantic_diagnostics};
 use tlang_hir as hir;
 use tlang_hir_opt::HirOptimizer;
-use tlang_runtime::{memory::TlangValue, vm::VM};
 use tlang_semantics::SemanticAnalyzer;
 
 pub fn handle_run(input_file: &str) {

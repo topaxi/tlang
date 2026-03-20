@@ -150,7 +150,7 @@ impl Tlang {
                 analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
             }
             RunnerKind::Interpreter => {
-                analyzer.add_builtin_symbols_with_slots(&tlang_runtime::vm::VM::builtin_symbols());
+                analyzer.add_builtin_symbols_with_slots(&tlang_core::vm::VM::builtin_symbols());
             }
         }
 

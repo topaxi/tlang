@@ -30,7 +30,7 @@ tlang_parser = { path = "../tlang_parser", features = ["serde"] }
 tlang_semantics = { path = "../tlang_semantics", features = ["serde"] }
 tlang_span = { path = "../tlang_span", features = ["serde"] }
 tlang_defs = { path = "../tlang_defs", features = ["serde"] }
-tlang_runtime = { path = "../tlang_runtime" }
+tlang_core = { path = "../tlang_core" }
 tlang_macros = { path = "../tlang_macros" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }
 tlang_diagnostics = { path = "../tlang_diagnostics" }

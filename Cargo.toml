@@ -1,10 +1,9 @@
 [workspace]
 members = [
-  "crates/tlang_runtime/tlang_memory",
-  "crates/tlang_runtime/tlang_stdlib",
-  "crates/tlang_cli",
-  "crates/tlang_runtime/tlang_interpreter",
-  "crates/tlang_runtime/tlang_vm",
+  "crates/tlang_core/tlang_memory",
+  "crates/tlang_core/tlang_stdlib",
+  "crates/tlang_core/tlang_interpreter",
+  "crates/tlang_core/tlang_vm",
   "crates/*",
   "tests/runner",
 ]

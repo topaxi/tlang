@@ -240,7 +240,7 @@ The playground provides:
   - `tlang_cli` - Command-line tools
   - `tlang_macros` - Procedural macros
   - `tlang_span` - Source location tracking
-  - `tlang_runtime/` - Runtime components:
+  - `tlang_core/` - Runtime components:
     - `tlang_interpreter` - Direct execution interpreter
     - `tlang_memory` - Memory management
     - `tlang_stdlib` - Standard library

@@ -10,4 +10,4 @@ JavaScript code generator for tlang.
     *   Function definitions.
     *   Pattern matching (compilation to if/else or switch).
     *   Tail call optimization (trampolines or loops).
-    *   Runtime library calls (from `tlang_runtime`).
+    *   Runtime library calls (from `tlang_core`).
