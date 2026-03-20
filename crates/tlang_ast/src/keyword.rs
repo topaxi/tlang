@@ -19,6 +19,7 @@ define_keywords! {
     Loop => "loop",
     Break => "break",
     Continue => "continue",
+    With => "with",
 
     // TODO: Similar to `self`, we might want to treat this as an identifier.
     Underscore => "_",
@@ -29,12 +30,11 @@ define_keywords! {
     Impl => "impl",
     Apply => "apply",
 
+    Pub => "pub",
     Mod => "mod",
+    Use => "use",
 
     // Reserved keywords, unused at the moment
-    Pub => "pub",
     SelfUpper => "Self",
-    Use => "use",
-    While => "while",
-    With => "with"
+    While => "while"
 }
