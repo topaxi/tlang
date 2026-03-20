@@ -22,3 +22,6 @@ benchmark_report.md
 # Binaryen downloaded files
 binaryen-version_*
 binaryen-version_*.tar.gz
+
+# Generated JS stdlib bundle
+crates/tlang_codegen_js/std/dist/
