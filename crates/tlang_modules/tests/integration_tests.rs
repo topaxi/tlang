@@ -129,3 +129,64 @@ fn test_cross_module_calls() {
     let output = run_js(&js);
     assert_eq!(output.trim(), "14");
 }
+
+// === Interpreter tests ===
+
+fn run_interpreter(project_name: &str) -> String {
+    use std::process::Command;
+    let dir = test_project_dir(project_name);
+    let lib_path = dir.join("src").join("lib.tlang");
+
+    // Find the tlang binary in target directory
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = manifest_dir.parent().unwrap().parent().unwrap();
+    let binary = workspace_root.join("target").join("release").join("tlang");
+    let binary = if binary.exists() {
+        binary
+    } else {
+        workspace_root.join("target").join("debug").join("tlang")
+    };
+
+    let output = Command::new(&binary)
+        .arg("run")
+        .arg(&lib_path)
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run tlang at {}: {e}", binary.display()));
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        panic!("Interpreter execution failed for {project_name}:\n{stderr}");
+    }
+
+    String::from_utf8(output.stdout).unwrap()
+}
+
+#[test]
+fn test_interpreter_basic_import() {
+    let output = run_interpreter("basic_import");
+    assert_eq!(output.trim(), "5");
+}
+
+#[test]
+fn test_interpreter_grouped_imports() {
+    let output = run_interpreter("grouped_imports");
+    assert_eq!(output.trim(), "5\n20");
+}
+
+#[test]
+fn test_interpreter_alias_import() {
+    let output = run_interpreter("alias_import");
+    assert_eq!(output.trim(), "3\n12");
+}
+
+#[test]
+fn test_interpreter_nested_modules() {
+    let output = run_interpreter("nested_modules");
+    assert_eq!(output.trim(), "30");
+}
+
+#[test]
+fn test_interpreter_cross_module_calls() {
+    let output = run_interpreter("cross_module_calls");
+    assert_eq!(output.trim(), "14");
+}

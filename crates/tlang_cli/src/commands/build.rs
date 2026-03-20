@@ -28,7 +28,7 @@ pub fn handle_build(options: &BuildOptions) -> bool {
     let result = match compile_project(project_dir, builtin_symbols) {
         Ok(result) => result,
         Err(err) => {
-            eprintln!("Error: {err}");
+            eprint!("{}", crate::commands::error::render_compile_error(&err));
             return false;
         }
     };

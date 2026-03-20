@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
 
 use tlang_ast::node::{self, StmtKind, Visibility};
+use tlang_parser::error::ParseIssue;
 use tlang_parser::{ParseMeta, Parser};
 
 use crate::module_tree::ModuleTreeError;
@@ -12,6 +13,7 @@ use crate::{ModulePath, ModuleTree};
 pub struct ParsedModule {
     pub path: ModulePath,
     pub file_path: PathBuf,
+    pub source: String,
     pub ast: node::Module,
     pub parse_meta: ParseMeta,
     /// Module names declared via `pub mod` or `mod`.
@@ -62,7 +64,8 @@ pub enum ModuleGraphError {
     ParseError {
         module_path: ModulePath,
         file_path: PathBuf,
-        errors: Vec<String>,
+        source: String,
+        issues: Vec<ParseIssue>,
     },
     CycleError {
         cycle: Vec<ModulePath>,
@@ -100,8 +103,10 @@ impl std::fmt::Display for ModuleGraphError {
             ModuleGraphError::ParseError {
                 module_path,
                 file_path,
-                errors,
+                issues,
+                ..
             } => {
+                let errors: Vec<_> = issues.iter().map(|i| i.to_string()).collect();
                 write!(
                     f,
                     "parse error in module `{module_path}` ({}): {}",
@@ -208,6 +213,20 @@ impl ModuleGraph {
             visible_modules,
         })
     }
+
+    /// Extract source information from all modules, useful for rendering
+    /// source-aware diagnostics after errors.
+    pub fn source_info(&self) -> BTreeMap<ModulePath, (PathBuf, String)> {
+        self.modules
+            .iter()
+            .map(|(path, module)| {
+                (
+                    path.clone(),
+                    (module.file_path.clone(), module.source.clone()),
+                )
+            })
+            .collect()
+    }
 }
 
 fn parse_all_modules(
@@ -222,7 +241,12 @@ fn parse_all_modules(
                 errors.push(ModuleGraphError::ParseError {
                     module_path: node.path.clone(),
                     file_path: file_path.clone(),
-                    errors: vec![e.to_string()],
+                    source: String::new(),
+                    issues: vec![ParseIssue {
+                        msg: e.to_string(),
+                        kind: tlang_parser::error::ParseIssueKind::UnexpectedEof,
+                        span: tlang_span::Span::default(),
+                    }],
                 });
                 return;
             }
@@ -237,6 +261,7 @@ fn parse_all_modules(
                     ParsedModule {
                         path: node.path.clone(),
                         file_path: file_path.clone(),
+                        source,
                         ast,
                         parse_meta,
                         mod_declarations,
@@ -248,7 +273,8 @@ fn parse_all_modules(
                 errors.push(ModuleGraphError::ParseError {
                     module_path: node.path.clone(),
                     file_path: file_path.clone(),
-                    errors: vec![e.to_string()],
+                    source,
+                    issues: e.issues().to_vec(),
                 });
             }
         }

@@ -473,6 +473,15 @@ impl VMState {
         self.program.set_fn_decl(id, decl);
     }
 
+    /// Returns the HirIds and names of all registered function declarations.
+    pub fn fn_decl_hir_ids(&self) -> Vec<(HirId, String)> {
+        self.program
+            .fn_decls
+            .iter()
+            .map(|(id, decl)| (*id, decl.name()))
+            .collect()
+    }
+
     pub fn get_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
         self.program.get_struct_decl(path)
     }
@@ -751,6 +760,22 @@ impl VMState {
 
     pub fn set_global(&mut self, name: String, value: TlangValue) {
         self.program.set_global(name, value);
+    }
+
+    /// Ensure a global slot exists for the given name and index.
+    /// Extends the slots vec if needed.
+    pub fn ensure_global_slot(&mut self, name: &str, slot: usize) {
+        if self.program.global_slots.len() <= slot {
+            self.program.global_slots.resize(slot + 1, TlangValue::Nil);
+        }
+        self.program.global_slot_map.insert(name.to_string(), slot);
+    }
+
+    /// Set a value directly at a specific global slot index.
+    pub fn set_global_slot(&mut self, slot: usize, value: TlangValue) {
+        if slot < self.program.global_slots.len() {
+            self.program.global_slots[slot] = value;
+        }
     }
 
     pub fn get_global(&self, name: &str) -> Option<TlangValue> {

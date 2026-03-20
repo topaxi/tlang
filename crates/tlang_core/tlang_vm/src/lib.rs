@@ -155,6 +155,15 @@ impl VM {
         Interpreter.eval(&mut self.state, module)
     }
 
+    /// Extend the global slot table to accommodate additional slots.
+    /// Used for multi-module projects where cross-module imports need
+    /// global slots beyond the standard builtins.
+    pub fn extend_global_slots(&mut self, slot_entries: impl IntoIterator<Item = (String, usize)>) {
+        for (name, slot) in slot_entries {
+            self.state.ensure_global_slot(&name, slot);
+        }
+    }
+
     pub fn eval_expr(&mut self, expr: &hir::Expr) -> tlang_interpreter::EvalResult {
         Interpreter.eval_expr(&mut self.state, expr)
     }

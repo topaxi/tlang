@@ -1,10 +1,11 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use tlang_ast_lowering::lower_to_hir;
+use tlang_ast_lowering::lower_to_hir_with_offset;
 use tlang_defs::DefKind;
 use tlang_hir as hir;
 use tlang_semantics::SemanticAnalyzer;
+use tlang_semantics::diagnostic::Diagnostic;
 
 use crate::module_graph::{ModuleGraphError, ParsedModule};
 use crate::resolver::{ModuleResolver, ResolvedImports};
@@ -16,6 +17,10 @@ pub struct MultiModuleCompileResult {
     pub modules: BTreeMap<ModulePath, CompiledModule>,
     /// The resolved imports for each module.
     pub imports: HashMap<ModulePath, ResolvedImports>,
+    /// Global slot assignments for cross-module imported symbols.
+    /// Maps (module_path, local_name) to global slot index.
+    /// Only populated when compiled with `compile_project_with_slots`.
+    pub import_slots: HashMap<(ModulePath, String), usize>,
 }
 
 pub struct CompiledModule {
@@ -25,14 +30,22 @@ pub struct CompiledModule {
     pub lower_meta: hir::LowerResultMeta,
 }
 
+/// Source information for a module, used for rendering source-aware diagnostics.
+pub type ModuleSourceInfo = BTreeMap<ModulePath, (PathBuf, String)>;
+
 /// Errors from multi-module compilation.
 #[derive(Debug)]
 pub enum CompileError {
     ModuleGraphErrors(Vec<ModuleGraphError>),
-    ImportErrors(Vec<ModuleGraphError>),
+    ImportErrors {
+        errors: Vec<ModuleGraphError>,
+        sources: ModuleSourceInfo,
+    },
     SemanticError {
         module_path: ModulePath,
-        errors: Vec<String>,
+        file_path: PathBuf,
+        source: String,
+        diagnostics: Vec<Diagnostic>,
     },
 }
 
@@ -45,7 +58,7 @@ impl std::fmt::Display for CompileError {
                 }
                 Ok(())
             }
-            CompileError::ImportErrors(errors) => {
+            CompileError::ImportErrors { errors, .. } => {
                 for e in errors {
                     writeln!(f, "{e}")?;
                 }
@@ -53,10 +66,11 @@ impl std::fmt::Display for CompileError {
             }
             CompileError::SemanticError {
                 module_path,
-                errors,
+                diagnostics,
+                ..
             } => {
-                for e in errors {
-                    writeln!(f, "error in module `{module_path}`: {e}")?;
+                for d in diagnostics {
+                    writeln!(f, "error in module `{module_path}`: {}", d.message())?;
                 }
                 Ok(())
             }
@@ -78,7 +92,11 @@ pub fn compile_project(
     // Phase 2: Resolve imports
     let (imports, import_errors) = ModuleResolver::resolve_imports(&graph);
     if !import_errors.is_empty() {
-        return Err(CompileError::ImportErrors(import_errors));
+        let sources = graph.source_info();
+        return Err(CompileError::ImportErrors {
+            errors: import_errors,
+            sources,
+        });
     }
 
     // Phase 3: Compile each module with cross-module symbol awareness
@@ -87,14 +105,29 @@ pub fn compile_project(
     // Collect exported symbols from all modules first (declaration pass)
     let exported_symbols = collect_exported_symbols(&graph);
 
+    // Track running HirId offset to avoid collisions between modules
+    let mut hir_id_offset: usize = 1;
+
     // Compile modules in order (root first, then children)
     for (module_path, parsed_module) in &mut graph.modules {
-        let compiled =
-            compile_single_module(parsed_module, &imports, &exported_symbols, builtin_symbols)
-                .map_err(|errors| CompileError::SemanticError {
-                    module_path: module_path.clone(),
-                    errors,
-                })?;
+        let file_path = parsed_module.file_path.clone();
+        let source = parsed_module.source.clone();
+        let compiled = compile_single_module(
+            parsed_module,
+            &imports,
+            &exported_symbols,
+            builtin_symbols,
+            hir_id_offset,
+        )
+        .map_err(|diagnostics| CompileError::SemanticError {
+            module_path: module_path.clone(),
+            file_path,
+            source,
+            diagnostics,
+        })?;
+
+        // Advance offset past all HirIds allocated by this module
+        hir_id_offset = compiled.lower_meta.hir_id_allocator.peek_next();
 
         compiled_modules.insert(module_path.clone(), compiled);
     }
@@ -102,6 +135,85 @@ pub fn compile_project(
     Ok(MultiModuleCompileResult {
         modules: compiled_modules,
         imports,
+        import_slots: HashMap::new(),
+    })
+}
+
+/// Compile a multi-module project with global slot assignments.
+///
+/// This variant is used by the interpreter backend, which needs global slot
+/// indices for symbol resolution. Cross-module imported symbols are assigned
+/// global slots starting after the last builtin slot.
+pub fn compile_project_with_slots<S: AsRef<str>>(
+    root_dir: &Path,
+    builtin_symbols: &[(S, DefKind, Option<usize>)],
+) -> Result<MultiModuleCompileResult, CompileError> {
+    // Phase 1: Build module graph
+    let mut graph = ModuleGraph::build(root_dir).map_err(CompileError::ModuleGraphErrors)?;
+
+    // Phase 2: Resolve imports
+    let (imports, import_errors) = ModuleResolver::resolve_imports(&graph);
+    if !import_errors.is_empty() {
+        let sources = graph.source_info();
+        return Err(CompileError::ImportErrors {
+            errors: import_errors,
+            sources,
+        });
+    }
+
+    // Phase 3: Assign global slots for cross-module imports
+    let max_builtin_slot = builtin_symbols
+        .iter()
+        .filter_map(|(_, _, slot)| *slot)
+        .max()
+        .map(|m| m + 1)
+        .unwrap_or(0);
+
+    let exported_symbols = collect_exported_symbols(&graph);
+    let mut next_slot = max_builtin_slot;
+    let mut import_slots: HashMap<(ModulePath, String), usize> = HashMap::new();
+
+    for (module_path, resolved) in &imports {
+        for local_name in resolved.symbols.keys() {
+            import_slots.insert((module_path.clone(), local_name.clone()), next_slot);
+            next_slot += 1;
+        }
+    }
+
+    // Phase 4: Compile each module with slot-aware symbol registration
+    let mut compiled_modules = BTreeMap::new();
+
+    // Track running HirId offset to avoid collisions between modules
+    let mut hir_id_offset: usize = 1;
+
+    for (module_path, parsed_module) in &mut graph.modules {
+        let file_path = parsed_module.file_path.clone();
+        let source = parsed_module.source.clone();
+        let compiled = compile_single_module_with_slots(
+            parsed_module,
+            &imports,
+            &exported_symbols,
+            builtin_symbols,
+            &import_slots,
+            hir_id_offset,
+        )
+        .map_err(|diagnostics| CompileError::SemanticError {
+            module_path: module_path.clone(),
+            file_path,
+            source,
+            diagnostics,
+        })?;
+
+        // Advance offset past all HirIds allocated by this module
+        hir_id_offset = compiled.lower_meta.hir_id_allocator.peek_next();
+
+        compiled_modules.insert(module_path.clone(), compiled);
+    }
+
+    Ok(MultiModuleCompileResult {
+        modules: compiled_modules,
+        imports,
+        import_slots,
     })
 }
 
@@ -169,7 +281,8 @@ fn compile_single_module(
     imports: &HashMap<ModulePath, ResolvedImports>,
     exported_symbols: &HashMap<ModulePath, Vec<(String, DefKind)>>,
     builtin_symbols: &[(&str, DefKind)],
-) -> Result<CompiledModule, Vec<String>> {
+    hir_id_start: usize,
+) -> Result<CompiledModule, Vec<Diagnostic>> {
     // Create semantic analyzer with builtins
     let mut analyzer = SemanticAnalyzer::default();
     analyzer.add_builtin_symbols(builtin_symbols);
@@ -202,15 +315,73 @@ fn compile_single_module(
     // Run semantic analysis
     analyzer
         .analyze(&mut parsed_module.ast)
-        .map_err(|diags| diags.iter().map(|d| d.to_string()).collect::<Vec<_>>())?;
+        .map_err(|diags| diags.to_vec())?;
 
-    // Lower to HIR
-    let (module, meta) = lower_to_hir(
+    // Lower to HIR with module-specific HirId offset to avoid collisions
+    let (module, meta) = lower_to_hir_with_offset(
         &parsed_module.ast,
         &parsed_module.parse_meta.constant_pool_node_ids,
         analyzer.symbol_id_allocator(),
         analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),
+        hir_id_start,
+    );
+
+    Ok(CompiledModule {
+        path: parsed_module.path.clone(),
+        hir: module,
+        constant_pool_ids: meta.constant_pool_ids.clone(),
+        lower_meta: meta,
+    })
+}
+
+/// Compile a single module with global slot assignments for builtins and imports.
+fn compile_single_module_with_slots<S: AsRef<str>>(
+    parsed_module: &mut ParsedModule,
+    imports: &HashMap<ModulePath, ResolvedImports>,
+    exported_symbols: &HashMap<ModulePath, Vec<(String, DefKind)>>,
+    builtin_symbols: &[(S, DefKind, Option<usize>)],
+    import_slots: &HashMap<(ModulePath, String), usize>,
+    hir_id_start: usize,
+) -> Result<CompiledModule, Vec<Diagnostic>> {
+    let mut analyzer = SemanticAnalyzer::default();
+    analyzer.add_builtin_symbols_with_slots(builtin_symbols);
+
+    // Register imported symbols with their assigned global slots
+    if let Some(resolved) = imports.get(&parsed_module.path) {
+        let mut import_symbols: Vec<(String, DefKind, Option<usize>)> = Vec::new();
+
+        for (local_name, resolved_sym) in &resolved.symbols {
+            if let Some(exports) = exported_symbols.get(&resolved_sym.source_module) {
+                for (name, kind) in exports {
+                    if name == &resolved_sym.original_name {
+                        let slot = import_slots
+                            .get(&(parsed_module.path.clone(), local_name.clone()))
+                            .copied();
+                        import_symbols.push((local_name.clone(), *kind, slot));
+                        break;
+                    }
+                }
+            }
+        }
+
+        if !import_symbols.is_empty() {
+            analyzer.add_builtin_symbols_with_slots(&import_symbols);
+        }
+    }
+
+    analyzer
+        .analyze(&mut parsed_module.ast)
+        .map_err(|diags| diags.to_vec())?;
+
+    // Lower to HIR with module-specific HirId offset to avoid collisions
+    let (module, meta) = lower_to_hir_with_offset(
+        &parsed_module.ast,
+        &parsed_module.parse_meta.constant_pool_node_ids,
+        analyzer.symbol_id_allocator(),
+        analyzer.root_symbol_table(),
+        analyzer.symbol_tables().clone(),
+        hir_id_start,
     );
 
     Ok(CompiledModule {

@@ -24,6 +24,10 @@ impl<T> Id<T> {
     pub const fn next(self) -> Self {
         Id::new(self.inner.get().saturating_add(1))
     }
+
+    pub const fn as_usize(self) -> usize {
+        self.inner.get()
+    }
 }
 
 impl<T> std::fmt::Display for Id<T> {
@@ -57,6 +61,11 @@ impl<T: Copy> IdAllocator<T> {
         let id = self.next_id;
         self.next_id = self.next_id.next();
         id
+    }
+
+    /// Returns the value of the next ID that will be allocated, without consuming it.
+    pub const fn peek_next(&self) -> usize {
+        self.next_id.as_usize()
     }
 }
 
