@@ -1,0 +1,4 @@
+pub fn double(x) { x * 2 }
+pub fn halve(x) { x / 2 }
+pub fn abs(x) if x < 0 { 0 - x }
+pub fn abs(x) { x }

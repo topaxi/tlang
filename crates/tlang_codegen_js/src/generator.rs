@@ -131,6 +131,8 @@ impl CodegenJS {
             ("Iterable::iter", DefKind::ProtocolMethod(1)),
             ("Iterator", DefKind::Protocol),
             ("Iterator::next", DefKind::ProtocolMethod(1)),
+            ("Display", DefKind::Protocol),
+            ("Display::to_string", DefKind::ProtocolMethod(1)),
             ("len", DefKind::Function(1)),
             ("log", DefKind::Function(u16::MAX)),
             ("math", DefKind::Module),
@@ -159,6 +161,12 @@ impl CodegenJS {
     /// Enable bundle mode: suppresses `export` keywords on public declarations.
     pub fn set_bundle_mode(&mut self, bundle: bool) {
         self.bundle_mode = bundle;
+    }
+
+    /// Register a user-defined protocol name so the codegen emits `$ProtocolName`
+    /// instead of `ProtocolName` when generating path expressions.
+    pub fn register_protocol(&mut self, name: &str) {
+        self.protocol_names.insert(name.to_string());
     }
 
     /// Generate code and produce a source map mapping generated JS back to the

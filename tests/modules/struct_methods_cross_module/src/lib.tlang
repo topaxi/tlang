@@ -1,0 +1,12 @@
+pub mod point;
+use point::{new, get_x, get_y, translate, manhattan};
+
+let p = new(3, 4);
+get_x(p) |> log();
+get_y(p) |> log();
+manhattan(p) |> log();
+
+let p2 = translate(p, 10, 20);
+get_x(p2) |> log();
+get_y(p2) |> log();
+manhattan(p2) |> log();

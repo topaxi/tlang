@@ -1,0 +1,8 @@
+pub fn classify(n) if n < 0 { "negative" }
+pub fn classify(0) { "zero" }
+pub fn classify(n) if n > 0 { "positive" }
+
+pub fn fizzbuzz(n) if n % 15 == 0 { "fizzbuzz" }
+pub fn fizzbuzz(n) if n % 3 == 0 { "fizz" }
+pub fn fizzbuzz(n) if n % 5 == 0 { "buzz" }
+pub fn fizzbuzz(n) { Display::to_string(n) }

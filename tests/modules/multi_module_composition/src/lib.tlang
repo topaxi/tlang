@@ -1,0 +1,15 @@
+pub mod transform;
+pub mod aggregate;
+use transform::numeric::{double, abs};
+use transform::text::repeat;
+use aggregate::process;
+
+// Numeric transforms composed across modules
+double(21) |> log();
+abs(-42) |> log();
+
+// Text transforms
+repeat("ab", 3) |> log();
+
+// Aggregation using imported functions from nested module
+process([1, -2, 3, -4, 5], 0) |> log();

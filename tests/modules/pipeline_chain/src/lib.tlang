@@ -1,0 +1,17 @@
+pub mod transforms;
+pub mod list_utils;
+use transforms::{double, increment, square, negate};
+use list_utils::sum;
+
+// Pipeline with single values
+5 |> double() |> increment() |> square() |> log();
+
+// Pipeline with list operations using imported functions
+[1, 2, 3, 4, 5]
+  |> map(double)
+  |> map(increment)
+  |> sum(0)
+  |> log();
+
+// Composing multiple transforms in pipeline
+10 |> negate() |> square() |> double() |> log();

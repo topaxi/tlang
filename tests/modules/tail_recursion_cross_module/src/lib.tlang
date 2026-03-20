@@ -1,0 +1,7 @@
+pub mod math;
+use math::{sum_to, power};
+
+sum_to(100) |> log();
+sum_to(10000) |> log();
+power(2, 10) |> log();
+power(3, 5) |> log();

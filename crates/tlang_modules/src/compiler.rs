@@ -18,6 +18,8 @@ pub struct MultiModuleCompileResult {
     pub modules: BTreeMap<ModulePath, CompiledModule>,
     /// The resolved imports for each module.
     pub imports: HashMap<ModulePath, ResolvedImports>,
+    /// Exported symbols for each module (name, DefKind).
+    pub exported_symbols: HashMap<ModulePath, Vec<(String, DefKind)>>,
     /// Global slot assignments for cross-module imported symbols.
     /// Maps (module_path, local_name) to global slot index.
     /// Only populated when compiled with `compile_project_with_slots`.
@@ -137,6 +139,7 @@ pub fn compile_project(
     Ok(MultiModuleCompileResult {
         modules: compiled_modules,
         imports,
+        exported_symbols,
         import_slots: HashMap::new(),
     })
 }
@@ -215,6 +218,7 @@ pub fn compile_project_with_slots<S: AsRef<str>>(
     Ok(MultiModuleCompileResult {
         modules: compiled_modules,
         imports,
+        exported_symbols,
         import_slots,
     })
 }
@@ -266,6 +270,13 @@ fn collect_exported_symbols(graph: &ModuleGraph) -> HashMap<ModulePath, Vec<(Str
                     if decl.visibility == tlang_ast::node::Visibility::Public =>
                 {
                     symbols.push((decl.name.as_str().to_string(), DefKind::Protocol));
+                    for method in &decl.methods {
+                        let qualified = format!("{}::{}", decl.name.as_str(), method.name.as_str());
+                        symbols.push((
+                            qualified,
+                            DefKind::ProtocolMethod(method.parameters.len() as u16),
+                        ));
+                    }
                 }
                 _ => {}
             }
@@ -275,6 +286,42 @@ fn collect_exported_symbols(graph: &ModuleGraph) -> HashMap<ModulePath, Vec<(Str
     }
 
     exports
+}
+
+/// Collect import symbols for a module, including auto-imported children
+/// (enum variants when an enum is imported, protocol methods when a protocol is imported).
+fn collect_import_symbols(
+    resolved: &ResolvedImports,
+    exported_symbols: &HashMap<ModulePath, Vec<(String, DefKind)>>,
+) -> Vec<(String, DefKind)> {
+    let mut import_symbols: Vec<(String, DefKind)> = Vec::new();
+
+    for (local_name, resolved_sym) in &resolved.symbols {
+        if let Some(exports) = exported_symbols.get(&resolved_sym.source_module) {
+            for (name, kind) in exports {
+                if name == &resolved_sym.original_name {
+                    import_symbols.push((local_name.clone(), *kind));
+
+                    // Auto-import child symbols for enums (variants) and protocols (methods)
+                    if matches!(kind, DefKind::Enum | DefKind::Protocol) {
+                        let prefix = format!("{}::", resolved_sym.original_name);
+                        for (child_name, child_kind) in exports {
+                            if child_name.starts_with(&prefix) {
+                                // Replace the original parent name with the local alias
+                                let local_child =
+                                    format!("{}::{}", local_name, &child_name[prefix.len()..]);
+                                import_symbols.push((local_child, *child_kind));
+                            }
+                        }
+                    }
+
+                    break;
+                }
+            }
+        }
+    }
+
+    import_symbols
 }
 
 /// Compile a single module with cross-module symbol awareness.
@@ -291,19 +338,7 @@ fn compile_single_module(
 
     // Register imported symbols from other modules
     if let Some(resolved) = imports.get(&parsed_module.path) {
-        let mut import_symbols: Vec<(String, DefKind)> = Vec::new();
-
-        for (local_name, resolved_sym) in &resolved.symbols {
-            // Find the DefKind of the imported symbol
-            if let Some(exports) = exported_symbols.get(&resolved_sym.source_module) {
-                for (name, kind) in exports {
-                    if name == &resolved_sym.original_name {
-                        import_symbols.push((local_name.clone(), *kind));
-                        break;
-                    }
-                }
-            }
-        }
+        let import_symbols = collect_import_symbols(resolved, exported_symbols);
 
         if !import_symbols.is_empty() {
             let symbol_refs: Vec<(&str, DefKind)> = import_symbols
@@ -351,20 +386,14 @@ fn compile_single_module_with_slots<S: AsRef<str>>(
 
     // Register imported symbols with their assigned global slots
     if let Some(resolved) = imports.get(&parsed_module.path) {
+        let base_symbols = collect_import_symbols(resolved, exported_symbols);
         let mut import_symbols: Vec<(String, DefKind, Option<usize>)> = Vec::new();
 
-        for (local_name, resolved_sym) in &resolved.symbols {
-            if let Some(exports) = exported_symbols.get(&resolved_sym.source_module) {
-                for (name, kind) in exports {
-                    if name == &resolved_sym.original_name {
-                        let slot = import_slots
-                            .get(&(parsed_module.path.clone(), local_name.clone()))
-                            .copied();
-                        import_symbols.push((local_name.clone(), *kind, slot));
-                        break;
-                    }
-                }
-            }
+        for (local_name, kind) in base_symbols {
+            let slot = import_slots
+                .get(&(parsed_module.path.clone(), local_name.clone()))
+                .copied();
+            import_symbols.push((local_name, kind, slot));
         }
 
         if !import_symbols.is_empty() {
