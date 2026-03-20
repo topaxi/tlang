@@ -1,0 +1,19 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: javascript"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/modules/cross_module_protocol/src/lib.tlang
+---
+file://[WORKSPACE_ROOT]/[eval1]:408
+console.log(Greet.greet(dog("Rex")));
+            ^
+
+ReferenceError: Greet is not defined
+    at file://[WORKSPACE_ROOT]/[eval1]:408:13
+    at ModuleJob.run (node:internal/modules/esm/module_job:303:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:269:26)
+    at async ModuleLoader.executeModuleJob (node:internal/modules/esm/loader:266:20)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:99:5)
+
+Node.js v24.0.2

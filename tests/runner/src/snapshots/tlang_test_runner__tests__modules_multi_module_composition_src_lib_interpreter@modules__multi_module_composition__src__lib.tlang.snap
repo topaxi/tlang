@@ -1,0 +1,10 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/modules/multi_module_composition/src/lib.tlang
+---
+42
+42
+ababab
+30
