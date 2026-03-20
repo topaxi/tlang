@@ -3,6 +3,7 @@ use clap::{ArgMatches, arg, command};
 mod commands;
 mod error;
 
+use commands::build::{BuildOptions, handle_build};
 use commands::compile::{CompileOptions, CompileTargetArg, OutputFormat, handle_compile};
 use commands::run::handle_run;
 
@@ -10,6 +11,7 @@ use commands::run::handle_run;
 enum Command {
     Run { input_file: String },
     Compile(CompileOptions),
+    Build(BuildOptions),
 }
 
 fn validate_compile_args(matches: &ArgMatches) -> Command {
@@ -72,6 +74,12 @@ fn get_args() -> Command {
                 .arg(arg!(silent: -s --"silent" "Flag to suppress output"))
                 .arg(arg!(quiet_warnings: -q --"quiet-warnings" "Flag to suppress warning output"))
                 .arg(arg!(source_map: --"source-map" "Emit a source map alongside JS output, or inline when writing to stdout")),
+        )
+        .subcommand(
+            command!("build")
+                .about("Build a multi-module tlang project")
+                .arg(arg!(project_dir: [PROJECT_DIR] "Project directory (defaults to current directory)").default_value("."))
+                .arg(arg!(output_file: -o --"output-file" <OUTPUT_FILE> "Output file").required(false)),
         );
 
     let matches = command.clone().get_matches();
@@ -81,6 +89,13 @@ fn get_args() -> Command {
             input_file: sub_matches.get_one::<String>("input_file").unwrap().clone(),
         },
         Some(("compile", sub_matches)) => validate_compile_args(sub_matches),
+        Some(("build", sub_matches)) => Command::Build(BuildOptions {
+            project_dir: sub_matches
+                .get_one::<String>("project_dir")
+                .unwrap()
+                .clone(),
+            output_file: sub_matches.get_one::<String>("output_file").cloned(),
+        }),
         _ => {
             let _ = command.print_help();
             std::process::exit(0);
@@ -99,6 +114,11 @@ fn main() {
     match command {
         Command::Compile(options) => {
             if !handle_compile(options) {
+                std::process::exit(1);
+            }
+        }
+        Command::Build(options) => {
+            if !handle_build(&options) {
                 std::process::exit(1);
             }
         }

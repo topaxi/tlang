@@ -16,6 +16,7 @@ tlang_hir = { path = "../tlang_hir", features = ["serde"] }
 tlang_hir_opt = { path = "../tlang_hir_opt" }
 tlang_hir_pretty = { path = "../tlang_hir_pretty" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }
+tlang_modules = { path = "../tlang_modules" }
 tlang_semantics = { path = "../tlang_semantics" }
 tlang_core = { path = "../tlang_core" }
 ron = { workspace = true }

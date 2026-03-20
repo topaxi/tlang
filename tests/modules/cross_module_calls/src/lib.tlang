@@ -1,0 +1,4 @@
+pub mod math;
+pub mod utils;
+use utils::double_add;
+double_add(3, 4) |> log();

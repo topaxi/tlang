@@ -286,8 +286,13 @@ mod tests {
         let tests_dir_clone = tests_dir.clone();
 
         insta::glob!(&tests_dir, "**/*.tlang", |path| {
+            // Skip multi-module test projects (handled by tlang_modules integration tests)
+            let relative_path = path.strip_prefix(&tests_dir_clone).unwrap();
+            if relative_path.starts_with("modules") {
+                return;
+            }
+
             for backend in Backend::values() {
-                let relative_path = path.strip_prefix(&tests_dir_clone).unwrap();
                 let path_str = relative_path
                     .with_extension("")
                     .to_string_lossy()

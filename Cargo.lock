@@ -1774,6 +1774,7 @@ dependencies = [
  "tlang_hir",
  "tlang_hir_opt",
  "tlang_hir_pretty",
+ "tlang_modules",
  "tlang_parser",
  "tlang_semantics",
 ]
@@ -1939,6 +1940,22 @@ dependencies = [
  "smallvec",
  "tlang_ast",
  "tlang_hir",
+ "tlang_span",
+]
+
+[[package]]
+name = "tlang_modules"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "tlang_ast",
+ "tlang_ast_lowering",
+ "tlang_codegen_js",
+ "tlang_defs",
+ "tlang_hir",
+ "tlang_hir_opt",
+ "tlang_parser",
+ "tlang_semantics",
  "tlang_span",
 ]
 

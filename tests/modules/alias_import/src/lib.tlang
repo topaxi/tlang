@@ -1,0 +1,4 @@
+pub mod math;
+use math::{add, multiply as mul};
+log(add(1, 2));
+log(mul(3, 4));

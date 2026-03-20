@@ -29,6 +29,8 @@ define_keywords! {
     Impl => "impl",
     Apply => "apply",
 
+    Mod => "mod",
+
     // Reserved keywords, unused at the moment
     Pub => "pub",
     SelfUpper => "Self",

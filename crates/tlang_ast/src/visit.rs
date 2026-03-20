@@ -232,6 +232,7 @@ pub fn walk_stmt<'ast, V: Visitor<'ast>>(
                 visitor.visit_fn_decl(decl, ctx);
             }
         }
+        node::StmtKind::UseDeclaration(_) | node::StmtKind::ModDeclaration(_) => {}
     }
 }
 

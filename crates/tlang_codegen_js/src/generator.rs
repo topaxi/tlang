@@ -29,6 +29,9 @@ pub struct CodegenJS {
     js_ast_json: String,
     source_map: Option<SourceMap>,
     protocol_names: HashSet<String>,
+    /// When true, suppress `export` keywords on public declarations.
+    /// Used when generating a bundled multi-module output.
+    bundle_mode: bool,
 }
 
 impl Default for CodegenJS {
@@ -50,6 +53,7 @@ impl CodegenJS {
             js_ast_json: String::new(),
             source_map: None,
             protocol_names,
+            bundle_mode: false,
         }
     }
 
@@ -152,6 +156,11 @@ impl CodegenJS {
         self.run_codegen(module, None, None);
     }
 
+    /// Enable bundle mode: suppresses `export` keywords on public declarations.
+    pub fn set_bundle_mode(&mut self, bundle: bool) {
+        self.bundle_mode = bundle;
+    }
+
     /// Generate code and produce a source map mapping generated JS back to the
     /// original tlang source. `source_name` is stored as the source file name in
     /// the map; `source_text` is the original tlang source used to build it.
@@ -184,6 +193,7 @@ impl CodegenJS {
         let allocator = Allocator::default();
         let ast = AstBuilder::new(&allocator);
         let mut inner = InnerCodegen::new(ast, self.protocol_names.clone());
+        inner.bundle_mode = self.bundle_mode;
         if let Some(st) = source_text {
             inner = inner.with_source_text(st.to_string());
         }
@@ -290,6 +300,8 @@ pub(crate) struct InnerCodegen<'a> {
     pub scopes: Scope,
     pub function_context_stack: Vec<FunctionContext>,
     pub protocol_names: HashSet<String>,
+    /// When true, suppress `export` keywords on public declarations.
+    pub bundle_mode: bool,
     /// Original tlang source text. When non-empty, it's prepended to
     /// `comment_source` as the combined `Program.source_text`, enabling OXC's
     /// built-in source map generation (which reads byte offsets from node spans).
@@ -312,6 +324,7 @@ impl<'a> InnerCodegen<'a> {
             scopes: Scope::default(),
             function_context_stack: Vec::new(),
             protocol_names,
+            bundle_mode: false,
             source_text: String::new(),
             comment_source: String::new(),
             oxc_comments: Vec::new(),

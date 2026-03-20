@@ -534,6 +534,43 @@ pub struct ImplBlock {
     pub apply_methods: Vec<Ident>,
 }
 
+/// A single import item within a `use` declaration.
+///
+/// Represents either `name` or `name as alias`.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct UseItem {
+    pub name: Ident,
+    pub alias: Option<Ident>,
+    pub span: Span,
+}
+
+/// A `use` declaration for importing symbols from other modules.
+///
+/// Supports:
+/// - `use string::parse::from_char_code`
+/// - `use string::parse::from_char_code as fcc`
+/// - `use string::{from_char_code, char_code_at}`
+/// - `use string::{from_char_code as fcc, char_code_at}`
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct UseDeclaration {
+    pub path: Vec<Ident>,
+    pub items: Vec<UseItem>,
+    pub span: Span,
+}
+
+/// A `pub mod` declaration for exposing submodules.
+///
+/// `pub mod parse, utils` exposes the `parse` and `utils` submodules.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct ModDeclaration {
+    pub visibility: Visibility,
+    pub names: Vec<Ident>,
+    pub span: Span,
+}
+
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum StmtKind {
@@ -549,6 +586,8 @@ pub enum StmtKind {
     StructDeclaration(Box<StructDeclaration>),
     ProtocolDeclaration(Box<ProtocolDeclaration>),
     ImplBlock(Box<ImplBlock>),
+    UseDeclaration(Box<UseDeclaration>),
+    ModDeclaration(Box<ModDeclaration>),
 }
 
 #[derive(Debug, Clone)]
