@@ -45,6 +45,9 @@ tsify = { version = "0.5.6", features = ["js"] }
 version = "=0.3.91"
 features = ['Document', 'Element', 'HtmlElement', 'Node', 'Window']
 
+[build-dependencies]
+tlang_codegen_js = { path = "../tlang_codegen_js" }
+
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 

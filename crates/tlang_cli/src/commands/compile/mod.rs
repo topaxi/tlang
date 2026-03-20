@@ -63,7 +63,8 @@ pub struct CompileOptions {
 }
 
 fn get_compiled_standard_library() -> &'static str {
-    CodegenJS::get_precompiled_stdlib_module()
+    static STDLIB: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    STDLIB.get_or_init(CodegenJS::compile_stdlib_module)
 }
 
 fn compile_to_hir(

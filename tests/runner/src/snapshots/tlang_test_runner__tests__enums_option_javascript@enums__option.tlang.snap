@@ -10,14 +10,14 @@ false
 true
 10
 
-file://[WORKSPACE_ROOT]/[eval1]:162
+file://[WORKSPACE_ROOT]/[eval1]:159
   throw new Error(msg);
         ^
 
 Error: Called unwrap on None
-    at panic (file://[WORKSPACE_ROOT]/[eval1]:162:9)
-    at Option.unwrap (file://[WORKSPACE_ROOT]/[eval1]:41:18)
-    at file://[WORKSPACE_ROOT]/[eval1]:386:20
+    at panic (file://[WORKSPACE_ROOT]/[eval1]:159:9)
+    at Option.unwrap (file://[WORKSPACE_ROOT]/[eval1]:38:18)
+    at file://[WORKSPACE_ROOT]/[eval1]:378:20
     at ModuleJob.run (node:internal/modules/esm/module_job:303:25)
     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:269:26)

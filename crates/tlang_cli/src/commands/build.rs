@@ -34,7 +34,12 @@ pub fn handle_build(options: &BuildOptions) -> bool {
     };
 
     // Generate JS for each module and bundle
-    let stdlib = CodegenJS::get_precompiled_stdlib_module();
+    let stdlib = {
+        static STDLIB: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+        STDLIB
+            .get_or_init(CodegenJS::compile_stdlib_module)
+            .as_str()
+    };
     let mut output_parts = vec![stdlib.to_string()];
 
     // Generate code for non-root modules first (they define exported functions)

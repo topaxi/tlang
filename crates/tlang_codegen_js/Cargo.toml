@@ -19,8 +19,10 @@ tlang_semantics = { path = "../tlang_semantics" }
 tlang_span = { path = "../tlang_span" }
 tlang_defs = { path = "../tlang_defs" }
 
+[dependencies.tlang_ast_lowering]
+path = "../tlang_ast_lowering"
+
 [dev-dependencies]
-tlang_ast_lowering = { path = "../tlang_ast_lowering" }
 ctor = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }

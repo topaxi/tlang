@@ -1,7 +1,5 @@
-import init, {
-  getStandardLibraryModule,
-  getStandardLibrarySource,
-} from 'tlang_bindings_js';
+import init, { getStandardLibrarySource } from 'tlang_bindings_js';
+import stdlibSource from 'tlang_bindings_js/stdlib.js?raw';
 
 await init();
 
@@ -22,5 +20,5 @@ export {
 export const standardLibrarySource = getStandardLibrarySource();
 
 export function getStandardLibraryCompiled(): string {
-  return getStandardLibraryModule();
+  return stdlibSource;
 }

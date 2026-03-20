@@ -40,8 +40,11 @@ fn compile_project_to_js(project_name: &str) -> String {
         })
         .collect();
 
-    let stdlib = CodegenJS::get_precompiled_stdlib_module();
-    let mut parts = vec![stdlib.to_string()];
+    let stdlib = {
+        static STDLIB: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+        STDLIB.get_or_init(CodegenJS::compile_stdlib_module).clone()
+    };
+    let mut parts = vec![stdlib];
 
     // Non-root modules first
     for (path, compiled) in &result.modules {
