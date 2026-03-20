@@ -88,7 +88,10 @@ fn build_bundle(compiled_js: &str) -> String {
 fn strip_imports(source: &str) -> String {
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, SourceType::mjs())
-        .with_options(ParseOptions { parse_regular_expression: false, ..Default::default() })
+        .with_options(ParseOptions {
+            parse_regular_expression: false,
+            ..Default::default()
+        })
         .parse();
 
     // Collect import spans in reverse order so removals don't shift offsets.
