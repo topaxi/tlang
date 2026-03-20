@@ -12,6 +12,7 @@ use crate::resolver::{ModuleResolver, ResolvedImports};
 use crate::{ModuleGraph, ModulePath};
 
 /// Result of compiling a multi-module project.
+#[derive(Debug)]
 pub struct MultiModuleCompileResult {
     /// Compiled HIR modules, keyed by module path, in topological order.
     pub modules: BTreeMap<ModulePath, CompiledModule>,
@@ -23,6 +24,7 @@ pub struct MultiModuleCompileResult {
     pub import_slots: HashMap<(ModulePath, String), usize>,
 }
 
+#[derive(Debug)]
 pub struct CompiledModule {
     pub path: ModulePath,
     pub hir: hir::Module,
@@ -409,6 +411,23 @@ mod tests {
         fs::write(src.join("math.tlang"), "pub fn add(a, b) { a + b }").unwrap();
     }
 
+    fn create_multi_module_project(dir: &Path) {
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        fs::write(
+            src.join("lib.tlang"),
+            "pub mod math;\npub mod utils;\nuse utils::double_add;\ndouble_add(3, 4) |> log();",
+        )
+        .unwrap();
+        fs::write(src.join("math.tlang"), "pub fn add(a, b) { a + b }").unwrap();
+        fs::write(
+            src.join("utils.tlang"),
+            "use math::add;\npub fn double_add(a, b) { add(a, b) + add(a, b) }",
+        )
+        .unwrap();
+    }
+
     #[test]
     fn test_compile_project() {
         let dir = std::env::temp_dir().join("tlang_test_compile_project");
@@ -429,5 +448,204 @@ mod tests {
         );
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_compile_project_with_slots() {
+        let dir = std::env::temp_dir().join("tlang_test_compile_with_slots");
+        let _ = fs::remove_dir_all(&dir);
+        create_test_project(&dir);
+
+        let builtins: Vec<(String, DefKind, Option<usize>)> =
+            vec![("log".to_string(), DefKind::Function(u16::MAX), Some(0))];
+
+        let result = compile_project_with_slots(&dir, &builtins).unwrap();
+
+        assert_eq!(result.modules.len(), 2);
+        // Import slots should be assigned for cross-module imports
+        assert!(!result.import_slots.is_empty());
+        // The root module imports `add` from `math`
+        assert!(
+            result
+                .import_slots
+                .contains_key(&(ModulePath::root(), "add".to_string()))
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_hir_ids_dont_collide_across_modules() {
+        let dir = std::env::temp_dir().join("tlang_test_hir_id_no_collision");
+        let _ = fs::remove_dir_all(&dir);
+        create_multi_module_project(&dir);
+
+        let builtins: Vec<(&str, DefKind)> = vec![("log", DefKind::Function(u16::MAX))];
+        let result = compile_project(&dir, &builtins).unwrap();
+
+        // Collect all HirIds from all modules' function declarations
+        let mut all_fn_hir_ids = std::collections::HashSet::new();
+        for compiled in result.modules.values() {
+            for stmt in &compiled.hir.block.stmts {
+                if let tlang_hir::StmtKind::FunctionDeclaration(decl) = &stmt.kind {
+                    let inserted = all_fn_hir_ids.insert(decl.hir_id);
+                    assert!(
+                        inserted,
+                        "HirId {:?} collision for function `{}`",
+                        decl.hir_id,
+                        decl.name()
+                    );
+                }
+            }
+        }
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_compile_project_with_slots_cross_module() {
+        let dir = std::env::temp_dir().join("tlang_test_slots_cross_module");
+        let _ = fs::remove_dir_all(&dir);
+        create_multi_module_project(&dir);
+
+        let builtins: Vec<(String, DefKind, Option<usize>)> =
+            vec![("log".to_string(), DefKind::Function(u16::MAX), Some(0))];
+
+        let result = compile_project_with_slots(&dir, &builtins).unwrap();
+
+        assert_eq!(result.modules.len(), 3);
+
+        // utils imports `add` from math
+        assert!(
+            result
+                .import_slots
+                .contains_key(&(ModulePath::from_str_segments(&["utils"]), "add".to_string()))
+        );
+        // root imports `double_add` from utils
+        assert!(
+            result
+                .import_slots
+                .contains_key(&(ModulePath::root(), "double_add".to_string()))
+        );
+
+        // All import slots should have distinct indices
+        let slot_values: std::collections::HashSet<_> =
+            result.import_slots.values().copied().collect();
+        assert_eq!(slot_values.len(), result.import_slots.len());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_compile_project_missing_pub_mod() {
+        let dir = std::env::temp_dir().join("tlang_test_missing_pub_mod");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // lib.tlang declares `pub mod math` but math.tlang doesn't exist
+        fs::write(src.join("lib.tlang"), "pub mod missing;").unwrap();
+
+        let builtins: Vec<(&str, DefKind)> = vec![];
+        let err = compile_project(&dir, &builtins).unwrap_err();
+
+        let msg = err.to_string();
+        assert!(
+            msg.contains("missing"),
+            "Error should mention missing module: {msg}"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_compile_project_private_symbol() {
+        let dir = std::env::temp_dir().join("tlang_test_private_symbol");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        fs::write(src.join("lib.tlang"), "pub mod math;\nuse math::secret;").unwrap();
+        // `secret` is not pub
+        fs::write(src.join("math.tlang"), "fn secret() { 42 }").unwrap();
+
+        let builtins: Vec<(&str, DefKind)> = vec![];
+        let err = compile_project(&dir, &builtins).unwrap_err();
+
+        let msg = err.to_string();
+        assert!(
+            msg.contains("not declared as `pub`"),
+            "Error should mention private symbol: {msg}"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_compile_project_name_collision() {
+        let dir = std::env::temp_dir().join("tlang_test_name_collision");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        fs::write(
+            src.join("lib.tlang"),
+            "pub mod math;\npub mod utils;\nuse math::add;\nuse utils::add;",
+        )
+        .unwrap();
+        fs::write(src.join("math.tlang"), "pub fn add(a, b) { a + b }").unwrap();
+        fs::write(src.join("utils.tlang"), "pub fn add(a, b) { a + b + 1 }").unwrap();
+
+        let builtins: Vec<(&str, DefKind)> = vec![];
+        let err = compile_project(&dir, &builtins).unwrap_err();
+
+        let msg = err.to_string();
+        assert!(
+            msg.contains("already imported"),
+            "Error should mention name collision: {msg}"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_compile_error_display_semantic() {
+        let err = CompileError::SemanticError {
+            module_path: ModulePath::from_str_segments(&["math"]),
+            file_path: PathBuf::from("src/math.tlang"),
+            source: String::new(),
+            diagnostics: vec![],
+        };
+        // Empty diagnostics should produce empty output
+        assert_eq!(err.to_string(), "");
+    }
+
+    #[test]
+    fn test_compile_error_display_module_graph() {
+        let err = CompileError::ModuleGraphErrors(vec![ModuleGraphError::CycleError {
+            cycle: vec![
+                ModulePath::from_str_segments(&["a"]),
+                ModulePath::from_str_segments(&["b"]),
+            ],
+            reason: "contains top-level expressions".to_string(),
+        }]);
+        let msg = err.to_string();
+        assert!(msg.contains("module cycle detected"));
+        assert!(msg.contains("top-level expressions"));
+    }
+
+    #[test]
+    fn test_compile_error_display_import() {
+        let err = CompileError::ImportErrors {
+            errors: vec![ModuleGraphError::ImportError {
+                module_path: ModulePath::root(),
+                symbol_name: "foo".to_string(),
+                reason: "module `bar` not found".to_string(),
+                span: tlang_span::Span::default(),
+            }],
+            sources: BTreeMap::new(),
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("cannot import `foo`"));
     }
 }

@@ -10,5 +10,5 @@ pub use compiler::{
 };
 pub use module_graph::{ModuleGraph, ModuleGraphError};
 pub use module_path::ModulePath;
-pub use module_tree::ModuleTree;
+pub use module_tree::{ModuleTree, ModuleTreeError};
 pub use resolver::{ModuleResolver, ResolvedImports, ResolvedSymbol};

@@ -302,4 +302,20 @@ mod tests {
           │             parameter `val` is defined here
         ");
     }
+
+    #[test]
+    fn renders_error_at_span() {
+        use super::render_error_at_span;
+
+        let source = "use math::secret;";
+        let span = Span::new(10, 16, LineColumn::new(0, 10), LineColumn::new(0, 16));
+
+        assert_snapshot!(render_error_at_span("lib.tlang", source, "symbol `secret` is not public", &span), @r"
+        error: symbol `secret` is not public
+          ┌─ lib.tlang:1:11
+          │
+        1 │ use math::secret;
+          │           ^^^^^^
+        ");
+    }
 }

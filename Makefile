@@ -12,11 +12,13 @@ test:
 
 test-coverage:
 	cargo llvm-cov clean --profraw-only
-	cargo llvm-cov nextest --profile=ci --workspace --exclude tlang_bindings_js --exclude tlang_test_runner --features tlang_vm/testing --no-report
+	cargo llvm-cov nextest --profile=ci --workspace --exclude tlang_bindings_js --exclude tlang_test_runner --exclude tlang_macros --exclude xtask --features tlang_vm/testing --no-report
 	# Quality gate: thresholds represent the current baseline coverage.
 	# Fail if coverage regresses below these values.
-	cargo llvm-cov report --fail-under-lines 80 --fail-under-functions 80 --fail-under-regions 80
-	cargo llvm-cov report --html
+	# Excludes proc macros (tlang_macros) and dev tools (xtask) which cannot be instrumented by llvm-cov.
+	# Also excludes binary entry points (main.rs) from the report.
+	cargo llvm-cov report --ignore-filename-regex '(^|/)(main\.rs|tlang_macros/|xtask/)' --fail-under-lines 80 --fail-under-functions 80 --fail-under-regions 80
+	cargo llvm-cov report --ignore-filename-regex '(^|/)(main\.rs|tlang_macros/|xtask/)' --html
 
 test-debug:
 	RUSTFLAGS="-C force-frame-pointers=yes -C opt-level=0" cargo build --release --bin tlang
