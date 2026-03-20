@@ -1,25 +1,31 @@
+use clap::{Parser, Subcommand};
 use oxc_allocator::Allocator;
 use oxc_ast::ast::Statement;
-use oxc_parser::{ParseOptions, Parser};
+use oxc_parser::{ParseOptions, Parser as OxcParser};
 use oxc_span::{GetSpan, SourceType};
 use tlang_ast_lowering::lower_to_hir;
 use tlang_codegen_js::{generator::CodegenJS, js_hir_opt::JsHirOptimizer};
 use tlang_hir_opt::hir_opt::HirOptContext;
 use tlang_semantics::SemanticAnalyzer;
 
-fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    let cmd = args.get(1).map(|s| s.as_str()).unwrap_or("");
+#[derive(Parser)]
+#[command(name = "xtask", about = "Development task runner for tlang")]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+}
 
-    match cmd {
-        "gen-stdlib" => gen_stdlib(),
-        _ => {
-            eprintln!("Usage: cargo xtask <command>");
-            eprintln!();
-            eprintln!("Commands:");
-            eprintln!("  gen-stdlib    Compile .tlang stdlib and bundle with native JS");
-            std::process::exit(1);
-        }
+#[derive(Subcommand)]
+enum Command {
+    /// Compile .tlang stdlib and bundle with native JS
+    GenStdlib,
+}
+
+fn main() {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Command::GenStdlib => gen_stdlib(),
     }
 }
 
@@ -87,7 +93,7 @@ fn build_bundle(compiled_js: &str) -> String {
 /// that multi-line imports are handled correctly.
 fn strip_imports(source: &str) -> String {
     let allocator = Allocator::default();
-    let parsed = Parser::new(&allocator, source, SourceType::mjs())
+    let parsed = OxcParser::new(&allocator, source, SourceType::mjs())
         .with_options(ParseOptions {
             parse_regular_expression: false,
             ..Default::default()
@@ -109,7 +115,7 @@ fn strip_imports(source: &str) -> String {
         })
         .collect();
 
-    import_ranges.sort_by(|a, b| b.0.cmp(&a.0));
+    import_ranges.sort_by_key(|b| std::cmp::Reverse(b.0));
 
     let mut result = source.to_string();
     for (start, end) in import_ranges {

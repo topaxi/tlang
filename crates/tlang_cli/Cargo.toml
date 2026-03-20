@@ -21,7 +21,7 @@ tlang_span = { path = "../tlang_span" }
 tlang_semantics = { path = "../tlang_semantics" }
 tlang_core = { path = "../tlang_core" }
 ron = { workspace = true }
-clap = { version = "4", features = ["cargo"] }
+clap = { workspace = true, features = ["cargo"] }
 indoc = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }

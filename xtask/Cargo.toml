@@ -9,6 +9,7 @@ name = "xtask"
 path = "src/main.rs"
 
 [dependencies]
+clap = { workspace = true }
 tlang_codegen_js = { path = "../crates/tlang_codegen_js" }
 tlang_parser = { path = "../crates/tlang_parser" }
 tlang_semantics = { path = "../crates/tlang_semantics" }
