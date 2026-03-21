@@ -10,18 +10,20 @@ false
 true
 10
 
-file://[WORKSPACE_ROOT]/[eval1]:159
+[stdin]:159
   throw new Error(msg);
-        ^
+  ^
 
 Error: Called unwrap on None
-    at panic (file://[WORKSPACE_ROOT]/[eval1]:159:9)
-    at Option.unwrap (file://[WORKSPACE_ROOT]/[eval1]:38:18)
-    at file://[WORKSPACE_ROOT]/[eval1]:378:20
-    at ModuleJob.run (node:internal/modules/esm/module_job:303:25)
-    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
-    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:269:26)
-    at async ModuleLoader.executeModuleJob (node:internal/modules/esm/loader:266:20)
-    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:99:5)
+    at panic ([stdin]:159:9)
+    at Option.unwrap ([stdin]:38:18)
+    at [stdin]:383:20
+    at runScriptInThisContext (node:internal/vm:218:10)
+    at node:internal/process/execution:456:12
+    at [stdin]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:454:60)
+    at evalFunction (node:internal/process/execution:286:30)
+    at evalTypeScript (node:internal/process/execution:298:3)
+    at node:internal/main/eval_stdin:51:5
 
 Node.js v24.0.2

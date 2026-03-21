@@ -1,10 +1,93 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
+use tlang_codegen_js::generator::{CodegenJS, shift_source_map_lines};
 use tlang_defs::DefKind;
+use tlang_parser::Parser;
+use tlang_semantics::SemanticAnalyzer;
 
 use self::common::CodegenOptions;
 
 mod common;
+
+fn hir_module_from(source: &str) -> tlang_hir::Module {
+    let mut parser = Parser::from_source(source);
+    let (mut ast, parse_meta) = parser.parse().expect("source should parse");
+    let mut analyzer = SemanticAnalyzer::default();
+    analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
+    analyzer
+        .analyze(&mut ast)
+        .expect("source should pass semantic analysis");
+    let (module, _) = tlang_ast_lowering::lower_to_hir(
+        &ast,
+        &parse_meta.constant_pool_node_ids,
+        analyzer.symbol_id_allocator(),
+        analyzer.root_symbol_table(),
+        analyzer.symbol_tables().clone(),
+    );
+    module
+}
+
+#[test]
+fn test_get_standard_library_native_js() {
+    let js = CodegenJS::get_standard_library_native_js();
+    assert!(!js.is_empty());
+}
+
+#[test]
+fn test_get_standard_library_native_js_files() {
+    let files = CodegenJS::get_standard_library_native_js_files();
+    assert!(!files.is_empty());
+    for (name, content) in files {
+        assert!(!name.is_empty());
+        assert!(!content.is_empty());
+    }
+}
+
+#[test]
+fn test_get_js_ast_json() {
+    let module = hir_module_from("let x = 1;");
+    let mut codegen = CodegenJS::default();
+    codegen.generate_code(&module);
+    let json = codegen.get_js_ast_json();
+    assert!(!json.is_empty());
+}
+
+#[test]
+fn test_generate_code_with_source_map() {
+    let source = "fn add(a, b) { a + b }";
+    let module = hir_module_from(source);
+    let mut codegen = CodegenJS::default();
+    codegen.generate_code_with_source_map(&module, "test.tlang", source);
+    assert!(!codegen.get_output().is_empty());
+    assert!(codegen.get_source_map().is_some());
+    assert!(codegen.get_source_map_json().is_some());
+}
+
+#[test]
+fn test_shift_source_map_lines_zero_offset() {
+    let source = "fn add(a, b) { a + b }";
+    let module = hir_module_from(source);
+    let mut codegen = CodegenJS::default();
+    codegen.generate_code_with_source_map(&module, "test.tlang", source);
+    let map_json = codegen.get_source_map_json().unwrap();
+    // Zero offset: the map should be returned unchanged.
+    let shifted = shift_source_map_lines(&map_json, 0);
+    assert_eq!(shifted, map_json);
+}
+
+#[test]
+fn test_shift_source_map_lines_with_offset() {
+    let source = "fn add(a, b) { a + b }";
+    let module = hir_module_from(source);
+    let mut codegen = CodegenJS::default();
+    codegen.generate_code_with_source_map(&module, "test.tlang", source);
+    let map_json = codegen.get_source_map_json().unwrap();
+    // Non-zero offset: the shifted map must differ from the original.
+    let shifted = shift_source_map_lines(&map_json, 100);
+    assert_ne!(shifted, map_json);
+    // The shifted map must still be valid JSON (not empty).
+    assert!(!shifted.is_empty());
+}
 
 #[test]
 fn test_codegen_not_expression() {

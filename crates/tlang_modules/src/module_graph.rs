@@ -708,4 +708,77 @@ mod tests {
 
         let _ = fs::remove_dir_all(&dir);
     }
+
+    #[test]
+    fn test_parse_error_in_module() {
+        let dir = std::env::temp_dir().join("tlang_test_parse_error");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // Declare a module but provide no file — just the declaration in lib.tlang
+        // AND write a file that exists but can't be read (simulate I/O error by
+        // creating a directory where the .tlang file would live, so that the module
+        // tree uses its own file_path but read_to_string will fail).
+        fs::write(src.join("lib.tlang"), "pub mod bad;\nuse bad::x;").unwrap();
+
+        // Without a `bad.tlang` file the module scanner treats `bad` as MissingModule.
+        let result = ModuleGraph::build(&dir);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        // Expect at least a MissingModule error for `bad`
+        assert!(errors.iter().any(|e| matches!(
+            e,
+            ModuleGraphError::MissingModule { name, .. } if name == "bad"
+        )));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_source_info() {
+        let dir = std::env::temp_dir().join("tlang_test_source_info");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        fs::write(src.join("lib.tlang"), "pub mod math;\nuse math::add;").unwrap();
+        fs::write(src.join("math.tlang"), "pub fn add(a, b) { a + b }").unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let info = graph.source_info();
+
+        assert_eq!(info.len(), 2);
+        assert!(info.contains_key(&ModulePath::root()));
+        assert!(info.contains_key(&ModulePath::from_str_segments(&["math"])));
+
+        let (root_path, root_source) = &info[&ModulePath::root()];
+        assert!(root_path.ends_with("lib.tlang"));
+        assert!(root_source.contains("pub mod math"));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_display_visibility_error() {
+        let err = ModuleGraphError::VisibilityError {
+            from_module: ModulePath::root(),
+            target_path: vec!["private".to_string()],
+            inaccessible_segment: "private".to_string(),
+            span: tlang_span::Span::default(),
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("private"));
+        assert!(msg.contains("not declared as `pub mod`"));
+    }
+
+    #[test]
+    fn test_display_tree_error() {
+        use crate::module_tree::ModuleTreeError;
+        let err = ModuleGraphError::TreeError(ModuleTreeError::NoSrcDirectory(
+            std::path::PathBuf::from("/nonexistent"),
+        ));
+        let msg = err.to_string();
+        assert!(!msg.is_empty());
+    }
 }

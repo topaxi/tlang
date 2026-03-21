@@ -697,4 +697,57 @@ mod tests {
         let msg = err.to_string();
         assert!(msg.contains("cannot import `foo`"));
     }
+
+    #[test]
+    fn test_compile_project_with_struct_export() {
+        let dir = std::env::temp_dir().join("tlang_test_struct_export");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        fs::write(
+            src.join("lib.tlang"),
+            "pub mod shapes;\nuse shapes::Point;\nlet p = Point { x: 1, y: 2 };\np.x |> log();",
+        )
+        .unwrap();
+        fs::write(
+            src.join("shapes.tlang"),
+            "pub struct Point {\n    x: int,\n    y: int,\n}",
+        )
+        .unwrap();
+
+        let builtins: Vec<(&str, DefKind)> = vec![("log", DefKind::Function(u16::MAX))];
+        let result = compile_project(&dir, &builtins).unwrap();
+
+        assert_eq!(result.modules.len(), 2);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_compile_project_with_protocol_export() {
+        let dir = std::env::temp_dir().join("tlang_test_protocol_export");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // Importing the protocol auto-imports its methods too (see collect_import_symbols)
+        fs::write(
+            src.join("lib.tlang"),
+            "pub mod protos;\nuse protos::Printable;",
+        )
+        .unwrap();
+        fs::write(
+            src.join("protos.tlang"),
+            "pub protocol Printable {\n  fn print(self)\n}",
+        )
+        .unwrap();
+
+        let builtins: Vec<(&str, DefKind)> = vec![("log", DefKind::Function(u16::MAX))];
+        let result = compile_project(&dir, &builtins).unwrap();
+
+        assert_eq!(result.modules.len(), 2);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
 }

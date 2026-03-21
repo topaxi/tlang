@@ -340,4 +340,63 @@ mod tests {
 
         let _ = fs::remove_dir_all(&dir);
     }
+
+    #[test]
+    fn test_visibility_error_private_module() {
+        let dir = std::env::temp_dir().join("tlang_test_visibility");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        let src_a = src.join("a");
+        fs::create_dir_all(&src_a).unwrap();
+
+        // Root declares both `a` (pub) and `app` (pub)
+        fs::write(src.join("lib.tlang"), "pub mod a;\npub mod app;").unwrap();
+        // Module `a` declares `private` WITHOUT pub — so it is not publicly accessible
+        fs::write(src.join("a.tlang"), "mod private;\npub fn helper() { 1 }").unwrap();
+        fs::write(src_a.join("private.tlang"), "pub fn secret() { 42 }").unwrap();
+        // Module `app` tries to use the private sub-module of `a`
+        fs::write(src.join("app.tlang"), "use a::private::secret;").unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let (_, errors) = ModuleResolver::resolve_imports(&graph);
+
+        assert!(!errors.is_empty(), "expected visibility error, got none");
+        assert!(errors.iter().any(|e| matches!(
+            e,
+            ModuleGraphError::VisibilityError { inaccessible_segment, .. }
+                if inaccessible_segment == "private"
+        )));
+
+        // Verify Display output
+        let msg = errors[0].to_string();
+        assert!(
+            msg.contains("private") || msg.contains("not declared as `pub mod`"),
+            "message: {msg}"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_module_not_found_import_error() {
+        let dir = std::env::temp_dir().join("tlang_test_module_not_found");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // `use nonexistent::symbol` where the module path doesn't resolve
+        fs::write(src.join("lib.tlang"), "use nonexistent::symbol;").unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let (_, errors) = ModuleResolver::resolve_imports(&graph);
+
+        assert!(!errors.is_empty());
+        assert!(errors.iter().any(|e| matches!(
+            e,
+            ModuleGraphError::ImportError { reason, .. }
+                if reason.contains("not found")
+        )));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
