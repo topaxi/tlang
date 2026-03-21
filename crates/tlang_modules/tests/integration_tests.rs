@@ -26,19 +26,7 @@ fn compile_project_to_js(project_name: &str) -> String {
     let result = compile_project(&dir, builtin_symbols()).expect("compilation should succeed");
 
     // Collect all protocol names across modules for codegen
-    let protocol_names: Vec<String> = result
-        .exported_symbols
-        .values()
-        .flat_map(|syms| {
-            syms.iter().filter_map(|(name, kind)| {
-                if matches!(kind, DefKind::Protocol) {
-                    Some(name.clone())
-                } else {
-                    None
-                }
-            })
-        })
-        .collect();
+    let protocol_names = result.protocol_names();
 
     let stdlib = {
         static STDLIB: std::sync::OnceLock<String> = std::sync::OnceLock::new();

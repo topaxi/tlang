@@ -33,6 +33,9 @@ pub fn handle_build(options: &BuildOptions) -> bool {
         }
     };
 
+    // Collect all protocol names across modules for codegen
+    let protocol_names = result.protocol_names();
+
     // Generate JS for each module and bundle
     let stdlib = {
         static STDLIB: std::sync::OnceLock<String> = std::sync::OnceLock::new();
@@ -57,6 +60,9 @@ pub fn handle_build(options: &BuildOptions) -> bool {
 
         let mut codegen = CodegenJS::default();
         codegen.set_bundle_mode(true);
+        for name in &protocol_names {
+            codegen.register_protocol(name);
+        }
         codegen.generate_code(&hir_module);
         let module_code = codegen.get_output().to_string();
 
@@ -89,6 +95,9 @@ pub fn handle_build(options: &BuildOptions) -> bool {
 
         let mut codegen = CodegenJS::default();
         codegen.set_bundle_mode(true);
+        for name in &protocol_names {
+            codegen.register_protocol(name);
+        }
         codegen.generate_code(&hir_module);
         let root_code = codegen.get_output().to_string();
 
