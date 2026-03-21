@@ -217,7 +217,6 @@ impl<'a> InnerCodegen<'a> {
         vec![self.let_array_destructuring(self.ast.vec_from_iter(elements), rest, init)]
     }
 
-    #[allow(clippy::too_many_lines)]
     pub fn generate_protocol_declaration(
         &mut self,
         decl: &hir::ProtocolDeclaration,
@@ -226,59 +225,42 @@ impl<'a> InnerCodegen<'a> {
         self.register_protocol(name);
         let js_name = CodegenJS::protocol_js_name(name);
 
-        let mut stmts = Vec::new();
-
-        // const $Protocol = {};
-        stmts.push(self.const_decl(&js_name, self.ast.expression_object(SPAN, self.ast.vec())));
-
-        // Generate dispatch function for each protocol method
-        for method in &decl.methods {
-            let method_name = method.name.as_str();
-
-            // $Protocol.methodName = $dispatch($Protocol, "methodName");
-            let dispatch_call = self.call_expr(
-                self.ident_expr("$dispatch"),
-                vec![
-                    Argument::from(self.ident_expr(&js_name)),
-                    Argument::from(self.str_expr(method_name)),
-                ],
-            );
-
-            let target = self.assignment_target_member(self.ident_expr(&js_name), method_name);
-            let assign = self.assign_expr(target, dispatch_call);
-            stmts.push(self.expr_stmt(assign));
-        }
-
-        // Generate default implementation functions for methods with bodies
-        for method in &decl.methods {
-            if method.body.is_some() {
+        // Build the definition object passed to $protocol({ method: null | fn, ... })
+        let props: Vec<ObjectPropertyKind<'a>> = decl
+            .methods
+            .iter()
+            .map(|method| {
                 let method_name = method.name.as_str();
+                let value = if method.body.is_some() {
+                    let fn_decl = self.build_fn_decl_from_protocol_method(method);
+                    self.generate_function_expression(&fn_decl)
+                } else {
+                    self.ast.expression_null_literal(SPAN)
+                };
+                ObjectPropertyKind::ObjectProperty(
+                    self.ast.alloc_object_property(
+                        SPAN,
+                        PropertyKind::Init,
+                        PropertyKey::StaticIdentifier(
+                            self.ast
+                                .alloc_identifier_name(SPAN, self.alloc_str(method_name)),
+                        ),
+                        value,
+                        false,
+                        false,
+                        false,
+                    ),
+                )
+            })
+            .collect();
 
-                // $Protocol.__default = $Protocol.__default || {};
-                let default_access =
-                    self.static_member_expr(self.ident_expr(&js_name), "__default");
-                let default_or_obj = self.ast.expression_logical(
-                    SPAN,
-                    default_access,
-                    LogicalOperator::Or,
-                    self.ast.expression_object(SPAN, self.ast.vec()),
-                );
-                let target = self.assignment_target_member(self.ident_expr(&js_name), "__default");
-                let assign = self.assign_expr(target, default_or_obj);
-                stmts.push(self.expr_stmt(assign));
+        let def_obj = self
+            .ast
+            .expression_object(SPAN, self.ast.vec_from_iter(props));
+        let protocol_call =
+            self.call_expr(self.ident_expr("$protocol"), vec![Argument::from(def_obj)]);
 
-                // $Protocol.__default.methodName = function(self, ...args) { <body> };
-                let fn_decl = self.build_fn_decl_from_protocol_method(method);
-                let fn_expr = self.generate_function_expression(&fn_decl);
-
-                let default_obj = self.static_member_expr(self.ident_expr(&js_name), "__default");
-                let target = self.assignment_target_member(default_obj, method_name);
-                let assign = self.assign_expr(target, fn_expr);
-                stmts.push(self.expr_stmt(assign));
-            }
-        }
-
-        stmts
+        vec![self.const_decl(&js_name, protocol_call)]
     }
 
     fn build_fn_decl_from_protocol_method(
@@ -314,32 +296,58 @@ impl<'a> InnerCodegen<'a> {
     pub fn generate_impl_block(&mut self, impl_block: &hir::ImplBlock) -> Vec<Statement<'a>> {
         let protocol_name = impl_block.protocol_name.to_string();
         let target_type = impl_block.target_type.to_string();
-        // Note: protocol_name.res.hir_id() and target_type.res.hir_id() carry
-        // the resolved node definitions, but JS output requires string names.
         let js_protocol_name = CodegenJS::protocol_js_name(&protocol_name);
+        // Only remap "List" → "Array" for builtin/unresolved types. A
+        // user-defined enum named List has a HIR ID and its JS class keeps the
+        // name "List".
+        let js_type_constructor = if impl_block.target_type.res.hir_id().is_none() {
+            js_constructor_for_type(&target_type)
+        } else {
+            target_type.clone()
+        };
 
         let mut stmts = Vec::new();
 
-        // $Protocol.TargetType = {};
-        let target =
-            self.assignment_target_member(self.ident_expr(&js_protocol_name), &target_type);
-        let assign = self.assign_expr(target, self.ast.expression_object(SPAN, self.ast.vec()));
-        stmts.push(self.expr_stmt(assign));
+        // $impl($Protocol, Type, { method: fn, ... })
+        let props: Vec<ObjectPropertyKind<'a>> = impl_block
+            .methods
+            .iter()
+            .map(|method| {
+                let method_name = match &method.name.kind {
+                    hir::ExprKind::Path(path) => path.last_ident().to_string(),
+                    hir::ExprKind::FieldAccess(_, ident) => ident.to_string(),
+                    _ => unreachable!(),
+                };
+                let func = self.generate_function_expression(method);
+                ObjectPropertyKind::ObjectProperty(
+                    self.ast.alloc_object_property(
+                        SPAN,
+                        PropertyKind::Init,
+                        PropertyKey::StaticIdentifier(
+                            self.ast
+                                .alloc_identifier_name(SPAN, self.alloc_str(&method_name)),
+                        ),
+                        func,
+                        false,
+                        false,
+                        false,
+                    ),
+                )
+            })
+            .collect();
 
-        for method in &impl_block.methods {
-            let method_name = match &method.name.kind {
-                hir::ExprKind::Path(path) => path.last_ident().to_string(),
-                hir::ExprKind::FieldAccess(_, ident) => ident.to_string(),
-                _ => unreachable!(),
-            };
-
-            let func = self.generate_function_expression(method);
-            let proto_type =
-                self.static_member_expr(self.ident_expr(&js_protocol_name), &target_type);
-            let target = self.assignment_target_member(proto_type, &method_name);
-            let assign = self.assign_expr(target, func);
-            stmts.push(self.expr_stmt(assign));
-        }
+        let methods_obj = self
+            .ast
+            .expression_object(SPAN, self.ast.vec_from_iter(props));
+        let impl_call = self.call_expr(
+            self.ident_expr("$impl"),
+            vec![
+                Argument::from(self.ident_expr(&js_protocol_name)),
+                Argument::from(self.ident_expr(&js_type_constructor)),
+                Argument::from(methods_obj),
+            ],
+        );
+        stmts.push(self.expr_stmt(impl_call));
 
         for apply_ident in &impl_block.apply_methods {
             let method_name = apply_ident.as_str();
@@ -373,6 +381,17 @@ fn is_builtin_type(type_name: &str) -> bool {
         type_name,
         "List" | "Option" | "Result" | "ListIterator" | "string::StringBuf"
     )
+}
+
+/// Maps a tlang type name to the JS constructor identifier used as the `$impl`
+/// key. Arrays have no custom class so "List" maps to the built-in `Array`
+/// constructor. All other user/stdlib types keep their name since their tlang
+/// class is compiled with the same identifier.
+fn js_constructor_for_type(type_name: &str) -> String {
+    match type_name {
+        "List" => "Array".to_string(),
+        other => other.to_string(),
+    }
 }
 
 fn js_prototype_for_type(type_name: &str) -> String {

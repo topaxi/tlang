@@ -1,16 +1,13 @@
 import { Option } from './option.tlang.js';
 import { $Functor, $Iterable, $Iterator } from './protocols.tlang.js';
 
-$Functor ??= {};
-$Functor.List ??= {};
-$Functor.List.map ??= function (self, f) {
-  const result = new Array(self.length);
-  for (let i = 0; i < self.length; i++) result[i] = f(self[i]);
-  return result;
-};
+$impl($Functor, Array, {
+  map(self, f) {
+    return self.map((v) => f(v));
+  },
+});
 
-$Iterable ??= {};
-$Iterable.List = class ListIterable {
+class ListIterable {
   static iter(self) {
     return new this(self);
   }
@@ -33,17 +30,15 @@ $Iterable.List = class ListIterable {
 
     return Option.None;
   }
-};
+}
 
-$Iterator ??= {};
-$Iterator[$Iterable.List.name] = class ListIterator {
-  /**
-   * @param {$Iterable.List} self
-   */
-  static next(self) {
+$impl($Iterable, Array, ListIterable);
+
+$impl($Iterator, ListIterable, {
+  next(self) {
     return self.next();
-  }
-};
+  },
+});
 
 export function $spread(value) {
   if (value[Symbol.iterator]) return value;

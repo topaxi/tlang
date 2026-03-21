@@ -18,10 +18,6 @@ pub protocol Match {
   fn matches(self, value)
 }
 
-impl Match for Regex {
-  fn matches(self, value) { self.test(value) }
-}
-
 pub protocol Iterable {
   fn iter(self)
 }

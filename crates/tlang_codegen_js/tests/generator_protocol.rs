@@ -13,8 +13,7 @@ fn test_protocol_declaration() {
         }
     "});
     let expected = indoc! {"
-        const $Showable = {};
-        $Showable.show = $dispatch($Showable, \"show\");
+        const $Showable = $protocol({ show: null });
     "};
     assert_eq!(output, expected);
 }
@@ -28,10 +27,10 @@ fn test_protocol_multiple_methods() {
             fn contains(self, value)
         }
     "});
-    assert!(output.contains("const $Container = {};"));
-    assert!(output.contains("$Container.empty = $dispatch($Container, \"empty\")"));
-    assert!(output.contains("$Container.insert = $dispatch($Container, \"insert\")"));
-    assert!(output.contains("$Container.contains = $dispatch($Container, \"contains\")"));
+    assert!(output.contains("const $Container = $protocol({"));
+    assert!(output.contains("empty: null"));
+    assert!(output.contains("insert: null"));
+    assert!(output.contains("contains: null"));
 }
 
 // ── Protocol impl block ───────────────────────────────────────────────────────
@@ -49,9 +48,9 @@ fn test_impl_block_for_struct() {
             fn describe(self) { self.x }
         }
     "});
-    assert!(output.contains("const $Describable = {};"));
-    assert!(output.contains("$Describable.Point = {};"));
-    assert!(output.contains("$Describable.Point.describe = "));
+    assert!(output.contains("const $Describable = $protocol({ describe: null });"));
+    assert!(output.contains("$impl($Describable, Point,"));
+    assert!(output.contains("describe:"));
 }
 
 #[test]
@@ -69,7 +68,7 @@ fn test_impl_block_method_body() {
             }
         }
     "});
-    assert!(output.contains("$Scalable.Vec2.scale = "));
+    assert!(output.contains("$impl($Scalable, Vec2,"));
     assert!(output.contains("Vec2"));
 }
 

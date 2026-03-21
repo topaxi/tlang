@@ -8,9 +8,26 @@ export function $getType(value) {
     : (value?.constructor?.name ?? typeof value);
 }
 
+export function $protocol(def) {
+  let protocol = { __default: def, __impls: new Map() };
+
+  for (let method in def) {
+    protocol[method] = $dispatch(protocol, method);
+  }
+
+  return protocol;
+}
+
+export function $impl(protocol, Type, methods) {
+  protocol.__impls.set(Type, methods);
+}
+
 export function $dispatch(protocol, method) {
   return function (self, ...args) {
-    const __impl = protocol[$getType(self)] ?? protocol.__default;
+    const __impl =
+      protocol.__impls.get(
+        Array.isArray(self) ? Array : self?.constructor,
+      ) ?? protocol.__default;
     return __impl[method](self, ...args);
   };
 }

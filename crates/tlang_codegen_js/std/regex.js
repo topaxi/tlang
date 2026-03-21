@@ -1,4 +1,5 @@
 import { Option } from './option.tlang.js';
+import { $Match } from './protocols.tlang.js';
 
 export const re = (parts, values) => {
   let source = parts[0];
@@ -7,7 +8,7 @@ export const re = (parts, values) => {
   }
   return new $TlangRegex(source);
 };
-export const $TlangRegex = class Regex {
+export class $TlangRegex {
   #source;
   #flags;
   #__re = null;
@@ -57,4 +58,10 @@ export const $TlangRegex = class Regex {
   [Symbol.for('nodejs.util.inspect.custom')]() {
     return this.toString();
   }
-};
+}
+
+$impl($Match, $TlangRegex, {
+  matches(self, value) {
+    return self.test(value);
+  },
+});
