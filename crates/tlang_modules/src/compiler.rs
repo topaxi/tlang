@@ -14,7 +14,9 @@ use crate::{ModuleGraph, ModulePath};
 /// Result of compiling a multi-module project.
 #[derive(Debug)]
 pub struct MultiModuleCompileResult {
-    /// Compiled HIR modules, keyed by module path, in topological order.
+    /// Compiled HIR modules, keyed by module path (ordered lexicographically by key).
+    /// For topological evaluation order, see [`MultiModuleCompiler::compile_project`] which
+    /// populates modules in dependency order.
     pub modules: BTreeMap<ModulePath, CompiledModule>,
     /// The resolved imports for each module.
     pub imports: HashMap<ModulePath, ResolvedImports>,

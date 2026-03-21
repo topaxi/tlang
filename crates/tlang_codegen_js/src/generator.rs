@@ -128,7 +128,9 @@ impl CodegenJS {
             bundle.push_str("// -- ");
             bundle.push_str(filename);
             bundle.push_str(" --\n");
-            bundle.push_str(&strip_js_imports(content));
+            let stripped = strip_js_imports(content);
+            let stripped = strip_js_exports(&stripped);
+            bundle.push_str(&stripped);
         }
         bundle
     }
@@ -355,6 +357,40 @@ fn strip_js_imports(source: &str) -> String {
     source
         .lines()
         .filter(|line| !line.trim_start().starts_with("import "))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Strip `export` keywords from a JS source string so that it can be
+/// concatenated into a non-module (script) bundle without triggering
+/// strict-mode identifier restrictions (e.g. `eval`, `arguments`).
+///
+/// Only strips `export` when it appears at the very start of a line
+/// (after optional whitespace), so `export` inside comments or string
+/// literals is not affected.
+fn strip_js_exports(source: &str) -> String {
+    source
+        .lines()
+        .map(|line| {
+            let trimmed = line.trim_start();
+            let indent = &line[..line.len() - trimmed.len()];
+            if let Some(rest) = trimmed.strip_prefix("export default ") {
+                // `export default X` → `X` (drop leading indent too)
+                rest.to_string()
+            } else if let Some(rest) = trimmed.strip_prefix("export ") {
+                // `export function/const/let/class ...` → strip `export `
+                if rest.starts_with("function ")
+                    || rest.starts_with("const ")
+                    || rest.starts_with("let ")
+                    || rest.starts_with("class ")
+                {
+                    return format!("{indent}{rest}");
+                }
+                line.to_string()
+            } else {
+                line.to_string()
+            }
+        })
         .collect::<Vec<_>>()
         .join("\n")
 }

@@ -434,15 +434,10 @@ fn detect_cycles(modules: &BTreeMap<ModulePath, ParsedModule>, errors: &mut Vec<
         let edges = adj.entry(path).or_default();
         for use_decl in &module.use_declarations {
             if !use_decl.path.is_empty() {
-                // The first segment(s) of the use path identify the target module
-                // Try progressively longer prefixes to find the target module
-                let mut target = ModulePath::root();
-                for segment in &use_decl.path {
-                    target = target.child(segment);
-                    if modules.contains_key(&target) {
-                        edges.insert(target.clone());
-                        break;
-                    }
+                // use_decl.path is already the exact module path of the target
+                let target = ModulePath::new(use_decl.path.clone());
+                if modules.contains_key(&target) {
+                    edges.insert(target);
                 }
             }
         }
