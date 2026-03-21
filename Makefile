@@ -26,12 +26,9 @@ test-coverage:
 	# Quality gate: thresholds represent the current baseline coverage.
 	# Fail if coverage regresses below these values.
 	# Excludes proc macros (tlang_macros) and dev tools (xtask) which cannot be instrumented by llvm-cov.
-	# Also excludes binary entry points (main.rs) and CLI command handlers (build.rs, run.rs,
-	# compile/) which are exercised by integration tests (make test) but not unit tests.
-	# Also excludes tlang_hir/src/fold.rs (generic HIR fold visitor infrastructure, analogous
-	# to visit.rs but for transformations — tested indirectly through optimisation passes).
-	cargo llvm-cov report --ignore-filename-regex '(^|/)(main\.rs|tlang_macros/|xtask/|fold\.rs|commands/(build|run)\.rs|commands/compile/)' --fail-under-lines 80 --fail-under-functions 80 --fail-under-regions 80
-	cargo llvm-cov report --ignore-filename-regex '(^|/)(main\.rs|tlang_macros/|xtask/|fold\.rs|commands/(build|run)\.rs|commands/compile/)' --html
+	# Also excludes binary entry points (main.rs) from the report.
+	cargo llvm-cov report --ignore-filename-regex '(^|/)(main\.rs|tlang_macros/|xtask/)' --fail-under-lines 80 --fail-under-functions 80 --fail-under-regions 80
+	cargo llvm-cov report --ignore-filename-regex '(^|/)(main\.rs|tlang_macros/|xtask/)' --html
 
 test-debug:
 	RUSTFLAGS="-C force-frame-pointers=yes -C opt-level=0" cargo build --release --bin tlang

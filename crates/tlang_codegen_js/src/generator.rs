@@ -373,20 +373,24 @@ fn strip_module_declarations(source: &str) -> String {
     // Collect byte ranges to exclude from the output (in source order).
     let mut exclude: Vec<(usize, usize)> = Vec::new();
 
+    // Helper: advance `end` past a trailing newline (`\n` or `\r\n`) so that
+    // removing a full-line statement doesn't leave a blank line behind.
+    let consume_trailing_newline = |mut end: usize| -> usize {
+        let bytes = source.as_bytes();
+        if bytes.get(end) == Some(&b'\r') && bytes.get(end + 1) == Some(&b'\n') {
+            end += 2;
+        } else if bytes.get(end) == Some(&b'\n') {
+            end += 1;
+        }
+        end
+    };
+
     for stmt in &ret.program.body {
         match stmt {
             Statement::ImportDeclaration(decl) => {
                 // Exclude the entire import declaration.
                 let start = decl.span.start as usize;
-                let mut end = decl.span.end as usize;
-                // Consume the immediately following newline so we don't leave a blank
-                // line.  Handle both Unix (`\n`) and Windows (`\r\n`) line endings.
-                let bytes = source.as_bytes();
-                if bytes.get(end) == Some(&b'\r') && bytes.get(end + 1) == Some(&b'\n') {
-                    end += 2;
-                } else if bytes.get(end) == Some(&b'\n') {
-                    end += 1;
-                }
+                let end = consume_trailing_newline(decl.span.end as usize);
                 exclude.push((start, end));
             }
             Statement::ExportNamedDeclaration(decl) => {
@@ -400,9 +404,34 @@ fn strip_module_declarations(source: &str) -> String {
                 }
             }
             Statement::ExportDefaultDeclaration(decl) => {
-                // Keep the inner value/declaration; strip `export default `.
-                let inner_start = decl.declaration.span().start as usize;
-                exclude.push((decl.span.start as usize, inner_start));
+                use oxc_ast::ast::ExportDefaultDeclarationKind;
+
+                match &decl.declaration {
+                    // Anonymous default function/class declarations would become invalid
+                    // statements (`function() {}` / `class {}`) if we stripped only the
+                    // `export default ` prefix. For these, exclude the entire statement,
+                    // including a trailing newline if present.
+                    ExportDefaultDeclarationKind::FunctionDeclaration(func)
+                        if func.id.is_none() =>
+                    {
+                        exclude.push((
+                            decl.span.start as usize,
+                            consume_trailing_newline(decl.span.end as usize),
+                        ));
+                    }
+                    ExportDefaultDeclarationKind::ClassDeclaration(class) if class.id.is_none() => {
+                        exclude.push((
+                            decl.span.start as usize,
+                            consume_trailing_newline(decl.span.end as usize),
+                        ));
+                    }
+                    // For named defaults and expression defaults, keep the inner
+                    // value/declaration and strip only `export default `.
+                    _ => {
+                        let inner_start = decl.declaration.span().start as usize;
+                        exclude.push((decl.span.start as usize, inner_start));
+                    }
+                }
             }
             _ => {}
         }

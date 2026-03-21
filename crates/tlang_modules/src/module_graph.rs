@@ -716,21 +716,24 @@ mod tests {
         let src = dir.join("src");
         fs::create_dir_all(&src).unwrap();
 
-        // Declare a module but provide no file — just the declaration in lib.tlang
-        // AND write a file that exists but can't be read (simulate I/O error by
-        // creating a directory where the .tlang file would live, so that the module
-        // tree uses its own file_path but read_to_string will fail).
-        fs::write(src.join("lib.tlang"), "pub mod bad;\nuse bad::x;").unwrap();
+        // Declare a module and provide a corresponding file with invalid syntax
+        // so that building the module graph triggers a parse error in that module.
+        fs::write(src.join("lib.tlang"), "pub mod bad;").unwrap();
 
-        // Without a `bad.tlang` file the module scanner treats `bad` as MissingModule.
+        // `html"{x y}";` triggers a parse error (extra token `y` inside the
+        // interpolation body) that is returned as an `Err` without panicking.
+        fs::write(src.join("bad.tlang"), r#"html"{x y}";"#).unwrap();
+
         let result = ModuleGraph::build(&dir);
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        // Expect at least a MissingModule error for `bad`
-        assert!(errors.iter().any(|e| matches!(
-            e,
-            ModuleGraphError::MissingModule { name, .. } if name == "bad"
-        )));
+        // Expect at least one parse error coming from the `bad` module.
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ModuleGraphError::ParseError { .. })),
+            "expected a ParseError, got: {errors:?}"
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
