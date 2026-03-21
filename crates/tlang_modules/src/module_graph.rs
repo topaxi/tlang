@@ -434,15 +434,10 @@ fn detect_cycles(modules: &BTreeMap<ModulePath, ParsedModule>, errors: &mut Vec<
         let edges = adj.entry(path).or_default();
         for use_decl in &module.use_declarations {
             if !use_decl.path.is_empty() {
-                // The first segment(s) of the use path identify the target module
-                // Try progressively longer prefixes to find the target module
-                let mut target = ModulePath::root();
-                for segment in &use_decl.path {
-                    target = target.child(segment);
-                    if modules.contains_key(&target) {
-                        edges.insert(target.clone());
-                        break;
-                    }
+                // use_decl.path is already the exact module path of the target
+                let target = ModulePath::new(use_decl.path.clone());
+                if modules.contains_key(&target) {
+                    edges.insert(target);
                 }
             }
         }
@@ -712,5 +707,81 @@ mod tests {
         ));
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_parse_error_in_module() {
+        let dir = std::env::temp_dir().join("tlang_test_parse_error");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // Declare a module and provide a corresponding file with invalid syntax
+        // so that building the module graph triggers a parse error in that module.
+        fs::write(src.join("lib.tlang"), "pub mod bad;").unwrap();
+
+        // `html"{x y}";` triggers a parse error (extra token `y` inside the
+        // interpolation body) that is returned as an `Err` without panicking.
+        fs::write(src.join("bad.tlang"), r#"html"{x y}";"#).unwrap();
+
+        let result = ModuleGraph::build(&dir);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        // Expect at least one parse error coming from the `bad` module.
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ModuleGraphError::ParseError { .. })),
+            "expected a ParseError, got: {errors:?}"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_source_info() {
+        let dir = std::env::temp_dir().join("tlang_test_source_info");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        fs::write(src.join("lib.tlang"), "pub mod math;\nuse math::add;").unwrap();
+        fs::write(src.join("math.tlang"), "pub fn add(a, b) { a + b }").unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let info = graph.source_info();
+
+        assert_eq!(info.len(), 2);
+        assert!(info.contains_key(&ModulePath::root()));
+        assert!(info.contains_key(&ModulePath::from_str_segments(&["math"])));
+
+        let (root_path, root_source) = &info[&ModulePath::root()];
+        assert!(root_path.ends_with("lib.tlang"));
+        assert!(root_source.contains("pub mod math"));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_display_visibility_error() {
+        let err = ModuleGraphError::VisibilityError {
+            from_module: ModulePath::root(),
+            target_path: vec!["private".to_string()],
+            inaccessible_segment: "private".to_string(),
+            span: tlang_span::Span::default(),
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("private"));
+        assert!(msg.contains("not declared as `pub mod`"));
+    }
+
+    #[test]
+    fn test_display_tree_error() {
+        use crate::module_tree::ModuleTreeError;
+        let err = ModuleGraphError::TreeError(ModuleTreeError::NoSrcDirectory(
+            std::path::PathBuf::from("/nonexistent"),
+        ));
+        let msg = err.to_string();
+        assert!(!msg.is_empty());
     }
 }

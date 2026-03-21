@@ -111,10 +111,21 @@ impl ModuleResolver {
                 continue;
             }
 
-            // Check that the symbol is declared as `pub` in the target module
+            // Check that the symbol exists and is declared as `pub` in the target module
             if let Some(target) = graph.modules.get(&target_module_path) {
-                let is_pub = is_symbol_public(&target.ast, &item.name);
-                if !is_pub {
+                if !is_symbol_declared(&target.ast, &item.name) {
+                    errors.push(ModuleGraphError::ImportError {
+                        module_path: from_module.clone(),
+                        symbol_name: item.name.clone(),
+                        reason: format!(
+                            "`{}` is not declared in module `{}`",
+                            item.name, target_module_path
+                        ),
+                        span: item.span,
+                    });
+                    continue;
+                }
+                if !is_symbol_public(&target.ast, &item.name) {
                     errors.push(ModuleGraphError::ImportError {
                         module_path: from_module.clone(),
                         symbol_name: item.name.clone(),
@@ -142,58 +153,55 @@ impl ModuleResolver {
 
     /// Resolve a use path to a module path.
     ///
-    /// Tries progressively longer prefixes of the path to find a matching module.
+    /// Requires an exact match: all segments of the path must correspond to a
+    /// registered module. Returns `None` if no module with that exact path exists.
     fn resolve_module_path(graph: &ModuleGraph, path: &[String]) -> Option<ModulePath> {
-        // Try the full path first, then progressively shorter
-        let mut candidate = ModulePath::root();
-        let mut last_match = None;
-
-        for segment in path {
-            candidate = candidate.child(segment);
-            if graph.modules.contains_key(&candidate) {
-                last_match = Some(candidate.clone());
-            }
+        let candidate = ModulePath::new(path.to_vec());
+        if graph.modules.contains_key(&candidate) {
+            Some(candidate)
+        } else {
+            None
         }
-
-        last_match
     }
+}
+
+/// Check if a symbol with the given name exists in a module's AST.
+///
+/// When `require_pub` is true, only symbols declared as `pub` match.
+fn symbol_visibility(ast: &tlang_ast::node::Module, name: &str, require_pub: bool) -> bool {
+    let vis_ok = |vis: &Visibility| !require_pub || *vis == Visibility::Public;
+    for stmt in &ast.statements {
+        let found = match &stmt.kind {
+            StmtKind::FunctionDeclaration(decl) if decl.name() == name => vis_ok(&decl.visibility),
+            StmtKind::FunctionDeclarations(decls) => decls
+                .iter()
+                .any(|d| d.name() == name && vis_ok(&d.visibility)),
+            StmtKind::EnumDeclaration(decl) if decl.name.as_str() == name => {
+                vis_ok(&decl.visibility)
+            }
+            StmtKind::StructDeclaration(decl) if decl.name.as_str() == name => {
+                vis_ok(&decl.visibility)
+            }
+            StmtKind::ProtocolDeclaration(decl) if decl.name.as_str() == name => {
+                vis_ok(&decl.visibility)
+            }
+            _ => false,
+        };
+        if found {
+            return true;
+        }
+    }
+    false
+}
+
+/// Check if a symbol is declared (with any visibility) in a module's AST.
+fn is_symbol_declared(ast: &tlang_ast::node::Module, name: &str) -> bool {
+    symbol_visibility(ast, name, false)
 }
 
 /// Check if a symbol is declared as `pub` in a module's AST.
 fn is_symbol_public(ast: &tlang_ast::node::Module, name: &str) -> bool {
-    for stmt in &ast.statements {
-        match &stmt.kind {
-            StmtKind::FunctionDeclaration(decl)
-                if decl.visibility == Visibility::Public && decl.name() == name =>
-            {
-                return true;
-            }
-            StmtKind::FunctionDeclarations(decls)
-                if decls
-                    .iter()
-                    .any(|d| d.visibility == Visibility::Public && d.name() == name) =>
-            {
-                return true;
-            }
-            StmtKind::EnumDeclaration(decl)
-                if decl.visibility == Visibility::Public && decl.name.as_str() == name =>
-            {
-                return true;
-            }
-            StmtKind::StructDeclaration(decl)
-                if decl.visibility == Visibility::Public && decl.name.as_str() == name =>
-            {
-                return true;
-            }
-            StmtKind::ProtocolDeclaration(decl)
-                if decl.visibility == Visibility::Public && decl.name.as_str() == name =>
-            {
-                return true;
-            }
-            _ => {}
-        }
-    }
-    false
+    symbol_visibility(ast, name, true)
 }
 
 #[cfg(test)]
@@ -271,7 +279,35 @@ mod tests {
         assert!(!errors.is_empty());
         assert!(errors.iter().any(|e| matches!(
             e,
-            ModuleGraphError::ImportError { symbol_name, .. } if symbol_name == "internal"
+            ModuleGraphError::ImportError { symbol_name, reason, .. }
+                if symbol_name == "internal" && reason.contains("not declared as `pub`")
+        )));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_undeclared_symbol_import_error() {
+        let dir = std::env::temp_dir().join("tlang_test_undeclared_import");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        fs::write(
+            src.join("lib.tlang"),
+            "pub mod math;\nuse math::nonexistent;",
+        )
+        .unwrap();
+        fs::write(src.join("math.tlang"), "pub fn add(a, b) { a + b }").unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let (_, errors) = ModuleResolver::resolve_imports(&graph);
+
+        assert!(!errors.is_empty());
+        assert!(errors.iter().any(|e| matches!(
+            e,
+            ModuleGraphError::ImportError { symbol_name, reason, .. }
+                if symbol_name == "nonexistent" && reason.contains("is not declared in module")
         )));
 
         let _ = fs::remove_dir_all(&dir);
@@ -301,6 +337,65 @@ mod tests {
                 |e| matches!(e, ModuleGraphError::NameCollision { name, .. } if name == "foo")
             )
         );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_visibility_error_private_module() {
+        let dir = std::env::temp_dir().join("tlang_test_visibility");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        let src_a = src.join("a");
+        fs::create_dir_all(&src_a).unwrap();
+
+        // Root declares both `a` (pub) and `app` (pub)
+        fs::write(src.join("lib.tlang"), "pub mod a;\npub mod app;").unwrap();
+        // Module `a` declares `private` WITHOUT pub — so it is not publicly accessible
+        fs::write(src.join("a.tlang"), "mod private;\npub fn helper() { 1 }").unwrap();
+        fs::write(src_a.join("private.tlang"), "pub fn secret() { 42 }").unwrap();
+        // Module `app` tries to use the private sub-module of `a`
+        fs::write(src.join("app.tlang"), "use a::private::secret;").unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let (_, errors) = ModuleResolver::resolve_imports(&graph);
+
+        assert!(!errors.is_empty(), "expected visibility error, got none");
+        assert!(errors.iter().any(|e| matches!(
+            e,
+            ModuleGraphError::VisibilityError { inaccessible_segment, .. }
+                if inaccessible_segment == "private"
+        )));
+
+        // Verify Display output
+        let msg = errors[0].to_string();
+        assert!(
+            msg.contains("private") || msg.contains("not declared as `pub mod`"),
+            "message: {msg}"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_module_not_found_import_error() {
+        let dir = std::env::temp_dir().join("tlang_test_module_not_found");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // `use nonexistent::symbol` where the module path doesn't resolve
+        fs::write(src.join("lib.tlang"), "use nonexistent::symbol;").unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let (_, errors) = ModuleResolver::resolve_imports(&graph);
+
+        assert!(!errors.is_empty());
+        assert!(errors.iter().any(|e| matches!(
+            e,
+            ModuleGraphError::ImportError { reason, .. }
+                if reason.contains("not found")
+        )));
 
         let _ = fs::remove_dir_all(&dir);
     }

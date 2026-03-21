@@ -119,6 +119,9 @@ impl CodegenJS {
         optimizer.optimize_hir(&mut module, &mut ctx);
 
         let mut generator = Self::new();
+        // Bundle mode: suppress `export` on public declarations so the compiled
+        // tlang code is script-compatible (no ES-module syntax).
+        generator.set_bundle_mode(true);
         generator.generate_code(&module);
         let compiled_tlang = generator.get_output().to_string();
 
@@ -128,7 +131,7 @@ impl CodegenJS {
             bundle.push_str("// -- ");
             bundle.push_str(filename);
             bundle.push_str(" --\n");
-            bundle.push_str(&strip_js_imports(content));
+            bundle.push_str(&strip_module_declarations(content));
         }
         bundle
     }
@@ -346,19 +349,111 @@ pub fn shift_source_map_lines(map_json: &str, line_offset: usize) -> String {
     shifted.to_json_string()
 }
 
-/// Remove all top-level `import` declarations from a JS source string.
+/// Transform a native JS ES-module source into a script-compatible form by
+/// removing `import` declarations and stripping the `export` keyword from
+/// named exports.  Import statements are removed entirely; `export function f`
+/// becomes `function f`, `export const x` becomes `const x`, and so on.
 ///
-/// The native JS stdlib files import from the compiled `.tlang.js` modules for
-/// development convenience, but those imports must be stripped when bundling
-/// everything into a single self-contained file.
-fn strip_js_imports(source: &str) -> String {
-    source
-        .lines()
-        .filter(|line| !line.trim_start().starts_with("import "))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
+/// The transformation is driven by the OXC parser so that only genuine module
+/// declarations are touched — identical text inside comments or string literals
+/// is left alone.  If OXC reports parse errors the source is returned unchanged
+/// rather than silently producing output from a partial AST.
+fn strip_module_declarations(source: &str) -> String {
+    use oxc_parser::Parser;
+    use oxc_span::{GetSpan, SourceType};
 
+    let allocator = Allocator::default();
+    let ret = Parser::new(&allocator, source, SourceType::mjs()).parse();
+
+    // If parsing failed, fall back to the original source unchanged.
+    if !ret.errors.is_empty() {
+        return source.to_string();
+    }
+
+    // Collect byte ranges to exclude from the output (in source order).
+    let mut exclude: Vec<(usize, usize)> = Vec::new();
+
+    // Helper: advance `end` past a trailing newline (`\n` or `\r\n`) so that
+    // removing a full-line statement doesn't leave a blank line behind.
+    let consume_trailing_newline = |mut end: usize| -> usize {
+        let bytes = source.as_bytes();
+        if bytes.get(end) == Some(&b'\r') && bytes.get(end + 1) == Some(&b'\n') {
+            end += 2;
+        } else if bytes.get(end) == Some(&b'\n') {
+            end += 1;
+        }
+        end
+    };
+
+    for stmt in &ret.program.body {
+        match stmt {
+            Statement::ImportDeclaration(decl) => {
+                // Exclude the entire import declaration.
+                let start = decl.span.start as usize;
+                let end = consume_trailing_newline(decl.span.end as usize);
+                exclude.push((start, end));
+            }
+            Statement::ExportNamedDeclaration(decl) => {
+                if let Some(inner_decl) = &decl.declaration {
+                    // Strip only the `export ` prefix; keep the inner declaration.
+                    exclude.push((decl.span.start as usize, inner_decl.span().start as usize));
+                } else {
+                    // Re-export with no inner declaration (e.g. `export { foo } from 'bar'`):
+                    // exclude the whole statement.
+                    exclude.push((decl.span.start as usize, decl.span.end as usize));
+                }
+            }
+            Statement::ExportDefaultDeclaration(decl) => {
+                use oxc_ast::ast::ExportDefaultDeclarationKind;
+
+                match &decl.declaration {
+                    // Anonymous default function/class declarations would become invalid
+                    // statements (`function() {}` / `class {}`) if we stripped only the
+                    // `export default ` prefix. For these, exclude the entire statement,
+                    // including a trailing newline if present.
+                    ExportDefaultDeclarationKind::FunctionDeclaration(func)
+                        if func.id.is_none() =>
+                    {
+                        exclude.push((
+                            decl.span.start as usize,
+                            consume_trailing_newline(decl.span.end as usize),
+                        ));
+                    }
+                    ExportDefaultDeclarationKind::ClassDeclaration(class) if class.id.is_none() => {
+                        exclude.push((
+                            decl.span.start as usize,
+                            consume_trailing_newline(decl.span.end as usize),
+                        ));
+                    }
+                    // For named defaults and expression defaults, keep the inner
+                    // value/declaration and strip only `export default `.
+                    _ => {
+                        let inner_start = decl.declaration.span().start as usize;
+                        exclude.push((decl.span.start as usize, inner_start));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if exclude.is_empty() {
+        return source.to_string();
+    }
+
+    // Reconstruct the output by copying everything except the excluded ranges.
+    let bytes = source.as_bytes();
+    let mut out = Vec::with_capacity(source.len());
+    let mut pos = 0usize;
+
+    for (start, end) in exclude {
+        out.extend_from_slice(&bytes[pos..start]);
+        pos = end;
+    }
+    out.extend_from_slice(&bytes[pos..]);
+
+    String::from_utf8(out).unwrap_or_else(|_| source.to_string())
+}
 // ---------------------------------------------------------------------------
 // InnerCodegen: arena-scoped codegen that builds an OXC AST
 // ---------------------------------------------------------------------------
