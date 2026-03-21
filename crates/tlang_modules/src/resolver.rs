@@ -61,7 +61,7 @@ impl ModuleResolver {
         // `use a::b::c` means import `c` from module `a::b`
         // `use a::b::{c, d}` means import `c` and `d` from module `a::b`
 
-        // Find the target module by trying progressively longer prefixes
+        // Find the target module by exact match on the full path.
         let target_module_path = Self::resolve_module_path(graph, &use_decl.path);
 
         let target_module_path = match target_module_path {
@@ -396,6 +396,46 @@ mod tests {
             ModuleGraphError::ImportError { reason, .. }
                 if reason.contains("not found")
         )));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Verifies that `resolve_module_path` requires an exact match on the full
+    /// path.  A partial prefix that exists as a module (e.g. `math`) must NOT
+    /// silently match an import like `use math::oops::add` — the intermediate
+    /// segment `oops` doesn't exist, so the whole import must fail with a
+    /// "module not found" error instead of resolving to the `math` module.
+    #[test]
+    fn test_partial_path_does_not_resolve() {
+        let dir = std::env::temp_dir().join("tlang_test_partial_path_resolve");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // `math` module exists, but `math::oops` does not.
+        fs::write(src.join("lib.tlang"), "pub mod math;\nuse math::oops::add;").unwrap();
+        fs::write(src.join("math.tlang"), "pub fn add(a, b) { a + b }").unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let (imports, errors) = ModuleResolver::resolve_imports(&graph);
+
+        // The resolution must fail — `math::oops` doesn't exist.
+        assert!(
+            !errors.is_empty(),
+            "expected an import error for non-existent sub-path, got none"
+        );
+        assert!(errors.iter().any(|e| matches!(
+            e,
+            ModuleGraphError::ImportError { reason, .. }
+                if reason.contains("not found")
+        )));
+
+        // The root module must NOT have `add` resolved under any name.
+        let root = imports.get(&ModulePath::root()).unwrap();
+        assert!(
+            !root.symbols.contains_key("add"),
+            "partial path must not silently resolve to the nearest prefix module"
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
