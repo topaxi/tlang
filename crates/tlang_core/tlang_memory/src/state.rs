@@ -764,11 +764,19 @@ impl VMState {
 
     /// Ensure a global slot exists for the given name and index.
     /// Extends the slots vec if needed.
+    ///
+    /// If the name is already mapped to an existing slot (e.g. a builtin
+    /// like `log`), the existing mapping is preserved and not overwritten.
+    /// Cross-module imports are accessed by slot index directly, so the
+    /// name→slot registration is only needed for new, previously unknown names.
     pub fn ensure_global_slot(&mut self, name: &str, slot: usize) {
         if self.program.global_slots.len() <= slot {
             self.program.global_slots.resize(slot + 1, TlangValue::Nil);
         }
-        self.program.global_slot_map.insert(name.to_string(), slot);
+        self.program
+            .global_slot_map
+            .entry(name.to_string())
+            .or_insert(slot);
     }
 
     /// Set a value directly at a specific global slot index.
@@ -1420,5 +1428,55 @@ mod tests {
         // After GC, heap should be empty (no roots)
         state.collect_garbage();
         assert_eq!(state.object_count(), 0);
+    }
+
+    #[test]
+    fn test_ensure_global_slot_does_not_overwrite_existing_mapping() {
+        let mut state = VMState::new();
+
+        // Simulate a builtin registered at slot 0 with slot-based lookup.
+        state.init_global_slots([("log", 0)]);
+        let log_value = TlangValue::I64(42);
+        state.set_global_slot(0, log_value);
+
+        // A cross-module import tries to register the same name "log" at a
+        // different slot (slot 1). The existing mapping must be preserved so
+        // the builtin is not silently shadowed.
+        state.ensure_global_slot("log", 1);
+
+        // The slot 1 should be allocated (resize happened), but the name "log"
+        // must still point to slot 0, keeping the builtin value intact.
+        assert_eq!(
+            state.get_global("log"),
+            Some(log_value),
+            "ensure_global_slot must not overwrite an existing name→slot mapping"
+        );
+    }
+
+    #[test]
+    fn test_ensure_global_slot_registers_new_name() {
+        let mut state = VMState::new();
+
+        // Register a new name that doesn't yet exist in the slot map.
+        state.ensure_global_slot("my_fn", 0);
+
+        // The slot vec should be extended to accommodate index 0.
+        let val = TlangValue::I64(99);
+        state.set_global_slot(0, val);
+
+        assert_eq!(state.get_global("my_fn"), Some(val));
+    }
+
+    #[test]
+    fn test_ensure_global_slot_idempotent_same_slot() {
+        let mut state = VMState::new();
+
+        // Registering the same name at the same slot twice must be a no-op.
+        state.ensure_global_slot("fn_a", 0);
+        state.ensure_global_slot("fn_a", 0);
+
+        let val = TlangValue::I64(7);
+        state.set_global_slot(0, val);
+        assert_eq!(state.get_global("fn_a"), Some(val));
     }
 }
