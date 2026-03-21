@@ -1,0 +1,10 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/modules/tail_recursion_cross_module/src/lib.tlang
+---
+5050
+50005000
+1024
+243

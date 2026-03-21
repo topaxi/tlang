@@ -1,0 +1,10 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/modules/private_helpers/src/lib.tlang
+---
+120
+3628800
+55
+6765

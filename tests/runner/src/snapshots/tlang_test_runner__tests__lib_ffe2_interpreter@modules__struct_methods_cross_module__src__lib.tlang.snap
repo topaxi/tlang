@@ -1,0 +1,12 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/modules/struct_methods_cross_module/src/lib.tlang
+---
+3
+4
+7
+13
+24
+37

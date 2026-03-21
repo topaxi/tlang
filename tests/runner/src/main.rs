@@ -11,7 +11,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use std::process::{Command, Stdio};
     use std::sync::LazyLock;
 
@@ -123,16 +123,34 @@ mod tests {
         println!("✓ Node.js version {} verified", required_version);
     }
 
+    /// Detect whether a `.tlang` file is the entry point of a multi-module
+    /// project (i.e. `<project>/src/lib.tlang`). Returns `Some(project_dir)`
+    /// if so, `None` otherwise.
+    fn detect_module_project(file_path: &Path) -> Option<PathBuf> {
+        if file_path.file_name()? != "lib.tlang" {
+            return None;
+        }
+        let src_dir = file_path.parent()?;
+        if src_dir.file_name()? != "src" {
+            return None;
+        }
+        Some(src_dir.parent()?.to_path_buf())
+    }
+
     fn run_test_with_backend(file_path: &Path, backend: Backend) -> Result<String, String> {
         let start = std::time::Instant::now();
         let exec_start;
+
+        let project_dir = detect_module_project(file_path);
+        let run_path = project_dir.as_deref().unwrap_or(file_path);
+
         let output = match backend {
             Backend::Interpreter => {
                 exec_start = std::time::Instant::now();
 
                 Command::new("./target/release/tlang")
                     .arg("run")
-                    .arg(file_path)
+                    .arg(run_path)
                     .output()
                     .map_err(|e| {
                         format!(
@@ -143,9 +161,15 @@ mod tests {
                     })?
             }
             Backend::JavaScript => {
+                // Use `tlang build` for module projects, `tlang compile` for single files
+                let js_subcommand = if project_dir.is_some() {
+                    "build"
+                } else {
+                    "compile"
+                };
                 let tlang_js_compiler_output = Command::new("./target/release/tlang")
-                    .arg("compile")
-                    .arg(file_path)
+                    .arg(js_subcommand)
+                    .arg(run_path)
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
                     .spawn()
@@ -286,10 +310,16 @@ mod tests {
         let tests_dir_clone = tests_dir.clone();
 
         insta::glob!(&tests_dir, "**/*.tlang", |path| {
-            // Skip multi-module test projects (handled by tlang_modules integration tests)
             let relative_path = path.strip_prefix(&tests_dir_clone).unwrap();
+
+            // For multi-module projects under tests/modules/, only run the
+            // entry point (src/lib.tlang) and skip all other .tlang files
+            // in the project — they are sub-modules, not standalone tests.
             if relative_path.starts_with("modules") {
-                return;
+                let file_name = relative_path.file_name().unwrap_or_default();
+                if file_name != "lib.tlang" {
+                    return;
+                }
             }
 
             for backend in Backend::values() {

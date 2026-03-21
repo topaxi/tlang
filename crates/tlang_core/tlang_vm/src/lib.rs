@@ -155,6 +155,15 @@ impl VM {
         Interpreter.eval(&mut self.state, module)
     }
 
+    /// Evaluate a module in its own scope frame.
+    ///
+    /// Unlike [`eval`], this creates a new scope for the module so that
+    /// module-local slot indices don't collide with declarations from
+    /// other modules that were previously evaluated in the same VM.
+    pub fn eval_module(&mut self, module: &hir::Module) -> TlangValue {
+        Interpreter.eval_module(&mut self.state, module)
+    }
+
     /// Extend the global slot table to accommodate additional slots.
     /// Used for multi-module projects where cross-module imports need
     /// global slots beyond the standard builtins.

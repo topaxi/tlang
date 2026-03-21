@@ -23,5 +23,6 @@ benchmark_report.md
 binaryen-version_*
 binaryen-version_*.tar.gz
 
-# Generated JS stdlib bundle
-crates/tlang_codegen_js/std/dist/
+# Generated JS stdlib bundle – produced by the tlang_bindings_js build script
+# (build.rs) or manually via `cargo xtask gen-stdlib`.
+crates/tlang_bindings_js/pkg/stdlib.js

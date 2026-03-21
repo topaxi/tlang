@@ -1,10 +1,20 @@
-.PHONY: all clean test test-coverage test-debug test-review test-accept test-bindings-js tlangdi-release-debug
+.PHONY: all clean verify test test-coverage test-debug test-review test-accept test-bindings-js tlangdi-release-debug
 
 all:
 	cargo +nightly make
 
 clean:
 	cargo +nightly make clean
+
+verify:
+	cargo fmt
+	cargo clippy
+	npm ci
+	npm run lint
+	$(MAKE) test-coverage
+	$(MAKE) test
+	npm run build
+	npm run test:e2e
 
 test:
 	cargo build --release --bin tlang

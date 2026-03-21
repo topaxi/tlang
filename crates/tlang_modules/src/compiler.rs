@@ -26,6 +26,24 @@ pub struct MultiModuleCompileResult {
     pub import_slots: HashMap<(ModulePath, String), usize>,
 }
 
+impl MultiModuleCompileResult {
+    /// Collect all protocol names exported across all modules.
+    pub fn protocol_names(&self) -> Vec<String> {
+        self.exported_symbols
+            .values()
+            .flat_map(|syms| {
+                syms.iter().filter_map(|(name, kind)| {
+                    if matches!(kind, DefKind::Protocol) {
+                        Some(name.clone())
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect()
+    }
+}
+
 #[derive(Debug)]
 pub struct CompiledModule {
     pub path: ModulePath,

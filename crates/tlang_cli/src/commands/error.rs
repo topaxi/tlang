@@ -103,6 +103,7 @@ fn render_module_graph_errors(errors: &[ModuleGraphError]) -> String {
 
 /// Render module graph errors that have source context available.
 /// This is used when the ModuleGraph is still available and we can look up sources.
+#[allow(clippy::too_many_lines)]
 fn render_module_graph_errors_with_sources(
     errors: &[ModuleGraphError],
     sources: &tlang_modules::ModuleSourceInfo,

@@ -33,8 +33,16 @@ pub fn handle_build(options: &BuildOptions) -> bool {
         }
     };
 
+    // Collect all protocol names across modules for codegen
+    let protocol_names = result.protocol_names();
+
     // Generate JS for each module and bundle
-    let stdlib = CodegenJS::get_precompiled_stdlib_module();
+    let stdlib = {
+        static STDLIB: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+        STDLIB
+            .get_or_init(CodegenJS::compile_stdlib_module)
+            .as_str()
+    };
     let mut output_parts = vec![stdlib.to_string()];
 
     // Generate code for non-root modules first (they define exported functions)
@@ -52,6 +60,9 @@ pub fn handle_build(options: &BuildOptions) -> bool {
 
         let mut codegen = CodegenJS::default();
         codegen.set_bundle_mode(true);
+        for name in &protocol_names {
+            codegen.register_protocol(name);
+        }
         codegen.generate_code(&hir_module);
         let module_code = codegen.get_output().to_string();
 
@@ -84,6 +95,9 @@ pub fn handle_build(options: &BuildOptions) -> bool {
 
         let mut codegen = CodegenJS::default();
         codegen.set_bundle_mode(true);
+        for name in &protocol_names {
+            codegen.register_protocol(name);
+        }
         codegen.generate_code(&hir_module);
         let root_code = codegen.get_output().to_string();
 

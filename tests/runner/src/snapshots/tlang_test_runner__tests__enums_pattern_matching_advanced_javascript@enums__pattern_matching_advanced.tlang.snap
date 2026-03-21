@@ -4,7 +4,7 @@ description: "Backend: javascript"
 expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/enums/pattern_matching_advanced.tlang
 ---
-file://[WORKSPACE_ROOT]/[eval1]:407
+file://[WORKSPACE_ROOT]/[eval1]:399
 function eval(expr) {
          ^^^^
 

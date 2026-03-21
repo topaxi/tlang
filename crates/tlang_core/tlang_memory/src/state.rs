@@ -772,6 +772,8 @@ impl VMState {
     }
 
     /// Set a value directly at a specific global slot index.
+    /// # Panics
+    /// If the slot index is out of bounds of the allocated global slots.
     pub fn set_global_slot(&mut self, slot: usize, value: TlangValue) {
         assert!(
             slot < self.program.global_slots.len(),

@@ -148,6 +148,18 @@ impl Interpreter {
         self.eval_block_inner(state, &input.block).unwrap_value()
     }
 
+    /// Evaluate a module in its own scope frame.
+    ///
+    /// Unlike [`eval`], which evaluates directly in the current (global) scope,
+    /// this method creates a new scope for the module block. This prevents
+    /// scope-slot collisions when multiple modules are evaluated sequentially
+    /// (e.g. in multi-module projects).
+    pub fn eval_module(&self, state: &mut VMState, input: &hir::Module) -> TlangValue {
+        self.with_new_scope(state, input, |this, state| {
+            this.eval_block_inner(state, &input.block).unwrap_value()
+        })
+    }
+
     #[inline(always)]
     fn eval_block_inner(&self, state: &mut VMState, block: &hir::Block) -> EvalResult {
         propagate!(self.eval_stmts(state, &block.stmts));

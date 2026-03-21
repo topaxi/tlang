@@ -1079,29 +1079,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "oxc_parser"
-version = "0.120.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d30b87449d18c4920f3da507ebc781e0a7027c1997004706ee8a721ed8c2437"
-dependencies = [
- "bitflags",
- "cow-utils",
- "memchr",
- "num-bigint",
- "num-traits",
- "oxc_allocator",
- "oxc_ast",
- "oxc_data_structures",
- "oxc_diagnostics",
- "oxc_ecmascript",
- "oxc_regular_expression",
- "oxc_span",
- "oxc_syntax",
- "rustc-hash",
- "seq-macro",
-]
-
-[[package]]
 name = "oxc_regular_expression"
 version = "0.120.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1535,12 +1512,6 @@ name = "semver"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
-
-[[package]]
-name = "seq-macro"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bc711410fbe7399f390ca1c3b60ad0f53f80e95c5eb935e52268a0e2cd49acc"
 
 [[package]]
 name = "serde"
@@ -2542,15 +2513,7 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "clap",
- "oxc_allocator",
- "oxc_ast",
- "oxc_parser",
- "oxc_span",
- "tlang_ast_lowering",
  "tlang_codegen_js",
- "tlang_hir_opt",
- "tlang_parser",
- "tlang_semantics",
 ]
 
 [[package]]
