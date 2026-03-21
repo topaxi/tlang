@@ -119,6 +119,9 @@ impl CodegenJS {
         optimizer.optimize_hir(&mut module, &mut ctx);
 
         let mut generator = Self::new();
+        // Bundle mode: suppress `export` on public declarations so the compiled
+        // tlang code is script-compatible (no ES-module syntax).
+        generator.set_bundle_mode(true);
         generator.generate_code(&module);
         let compiled_tlang = generator.get_output().to_string();
 
@@ -128,9 +131,7 @@ impl CodegenJS {
             bundle.push_str("// -- ");
             bundle.push_str(filename);
             bundle.push_str(" --\n");
-            let stripped = strip_js_imports(content);
-            let stripped = strip_js_exports(&stripped);
-            bundle.push_str(&stripped);
+            bundle.push_str(&strip_module_declarations(content));
         }
         bundle
     }
@@ -348,53 +349,82 @@ pub fn shift_source_map_lines(map_json: &str, line_offset: usize) -> String {
     shifted.to_json_string()
 }
 
-/// Remove all top-level `import` declarations from a JS source string.
+/// Transform a native JS ES-module source into a script-compatible form by
+/// removing `import` declarations and stripping the `export` keyword from
+/// named exports.  Import statements are removed entirely; `export function f`
+/// becomes `function f`, `export const x` becomes `const x`, and so on.
 ///
-/// The native JS stdlib files import from the compiled `.tlang.js` modules for
-/// development convenience, but those imports must be stripped when bundling
-/// everything into a single self-contained file.
-fn strip_js_imports(source: &str) -> String {
-    source
-        .lines()
-        .filter(|line| !line.trim_start().starts_with("import "))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
+/// The transformation is driven by the OXC parser so that only genuine module
+/// declarations are touched — identical text inside comments or string literals
+/// is left alone.  If OXC reports parse errors the source is returned unchanged
+/// rather than silently producing output from a partial AST.
+fn strip_module_declarations(source: &str) -> String {
+    use oxc_parser::Parser;
+    use oxc_span::{GetSpan, SourceType};
 
-/// Strip `export` keywords from a JS source string so that it can be
-/// concatenated into a non-module (script) bundle without triggering
-/// strict-mode identifier restrictions (e.g. `eval`, `arguments`).
-///
-/// Only strips `export` when it appears at the very start of a line
-/// (after optional whitespace), so `export` inside comments or string
-/// literals is not affected.
-fn strip_js_exports(source: &str) -> String {
-    source
-        .lines()
-        .map(|line| {
-            let trimmed = line.trim_start();
-            let indent = &line[..line.len() - trimmed.len()];
-            if let Some(rest) = trimmed.strip_prefix("export default ") {
-                // `export default X` → `X` (drop leading indent too)
-                rest.to_string()
-            } else if let Some(rest) = trimmed.strip_prefix("export ") {
-                // `export function/const/let/class ...` → strip `export `
-                if rest.starts_with("function ")
-                    || rest.starts_with("const ")
-                    || rest.starts_with("let ")
-                    || rest.starts_with("class ")
-                {
-                    return format!("{indent}{rest}");
+    let allocator = Allocator::default();
+    let ret = Parser::new(&allocator, source, SourceType::mjs()).parse();
+
+    // If parsing failed, fall back to the original source unchanged.
+    if !ret.errors.is_empty() {
+        return source.to_string();
+    }
+
+    // Collect byte ranges to exclude from the output (in source order).
+    let mut exclude: Vec<(usize, usize)> = Vec::new();
+
+    for stmt in &ret.program.body {
+        match stmt {
+            Statement::ImportDeclaration(decl) => {
+                // Exclude the entire import declaration.
+                let start = decl.span.start as usize;
+                let mut end = decl.span.end as usize;
+                // Consume the immediately following newline so we don't leave a blank
+                // line.  Handle both Unix (`\n`) and Windows (`\r\n`) line endings.
+                let bytes = source.as_bytes();
+                if bytes.get(end) == Some(&b'\r') && bytes.get(end + 1) == Some(&b'\n') {
+                    end += 2;
+                } else if bytes.get(end) == Some(&b'\n') {
+                    end += 1;
                 }
-                line.to_string()
-            } else {
-                line.to_string()
+                exclude.push((start, end));
             }
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
-}
+            Statement::ExportNamedDeclaration(decl) => {
+                if let Some(inner_decl) = &decl.declaration {
+                    // Strip only the `export ` prefix; keep the inner declaration.
+                    exclude.push((decl.span.start as usize, inner_decl.span().start as usize));
+                } else {
+                    // Re-export with no inner declaration (e.g. `export { foo } from 'bar'`):
+                    // exclude the whole statement.
+                    exclude.push((decl.span.start as usize, decl.span.end as usize));
+                }
+            }
+            Statement::ExportDefaultDeclaration(decl) => {
+                // Keep the inner value/declaration; strip `export default `.
+                let inner_start = decl.declaration.span().start as usize;
+                exclude.push((decl.span.start as usize, inner_start));
+            }
+            _ => {}
+        }
+    }
 
+    if exclude.is_empty() {
+        return source.to_string();
+    }
+
+    // Reconstruct the output by copying everything except the excluded ranges.
+    let bytes = source.as_bytes();
+    let mut out = Vec::with_capacity(source.len());
+    let mut pos = 0usize;
+
+    for (start, end) in exclude {
+        out.extend_from_slice(&bytes[pos..start]);
+        pos = end;
+    }
+    out.extend_from_slice(&bytes[pos..]);
+
+    String::from_utf8(out).unwrap_or_else(|_| source.to_string())
+}
 // ---------------------------------------------------------------------------
 // InnerCodegen: arena-scoped codegen that builds an OXC AST
 // ---------------------------------------------------------------------------

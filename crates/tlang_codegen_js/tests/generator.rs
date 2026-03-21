@@ -499,3 +499,24 @@ fn test_dict_literal_shorthand() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_compile_stdlib_module_is_script_compatible() {
+    // The bundle must be a plain script — no ES-module import/export declarations.
+    // We check for `export ` (with space), `export{`, and `export*` which together
+    // cover all valid ES module export forms: named, default, re-export, etc.
+    let bundle = tlang_codegen_js::generator::CodegenJS::compile_stdlib_module();
+    for line in bundle.lines() {
+        let trimmed = line.trim_start();
+        assert!(
+            !trimmed.starts_with("export ")
+                && !trimmed.starts_with("export{")
+                && !trimmed.starts_with("export*"),
+            "Stdlib bundle should not contain export declarations, but found: {line:?}"
+        );
+        assert!(
+            !trimmed.starts_with("import ") && !trimmed.starts_with("import{"),
+            "Stdlib bundle should not contain import declarations, but found: {line:?}"
+        );
+    }
+}
