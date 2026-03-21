@@ -235,92 +235,17 @@ impl<'a> InnerCodegen<'a> {
         for method in &decl.methods {
             let method_name = method.name.as_str();
 
-            // $Protocol.methodName = function(self, ...args) {
-            //   const __type = Array.isArray(self) ? "List" : self?.constructor?.name ?? typeof self;
-            //   const __impl = $Protocol[__type] ?? $Protocol.__default;
-            //   return __impl.methodName(self, ...args);
-            // };
-            let self_param = self.formal_param("self");
-            let rest_binding = self.binding_pattern_ident("args");
-            let rest_elem = self.ast.binding_rest_element(SPAN, rest_binding);
-            let rest = self
-                .ast
-                .formal_parameter_rest(SPAN, self.ast.vec(), rest_elem, NONE);
-            let params = self.ast.formal_parameters(
-                SPAN,
-                FormalParameterKind::FormalParameter,
-                self.ast.vec1(self_param),
-                Some(rest),
-            );
-
-            // const __type = Array.isArray(self) ? "List" : self?.constructor?.name ?? typeof self;
-            let is_array_call = self.call_expr(
-                self.static_member_expr(self.ident_expr("Array"), "isArray"),
-                vec![Argument::from(self.ident_expr("self"))],
-            );
-            let constructor_name = self.chain_expr(self.optional_static_member_expr(
-                self.optional_static_member_expr(self.ident_expr("self"), "constructor"),
-                "name",
-            ));
-            let typeof_self =
-                self.ast
-                    .expression_unary(SPAN, UnaryOperator::Typeof, self.ident_expr("self"));
-            let nullish = self.ast.expression_logical(
-                SPAN,
-                constructor_name,
-                LogicalOperator::Coalesce,
-                typeof_self,
-            );
-            let type_expr = self.ast.expression_conditional(
-                SPAN,
-                is_array_call,
-                self.str_expr("List"),
-                nullish,
-            );
-            let type_decl = self.const_decl("__type", type_expr);
-
-            // const __impl = $Protocol[__type] ?? $Protocol.__default;
-            let proto_type_access =
-                self.computed_member_expr(self.ident_expr(&js_name), self.ident_expr("__type"));
-            let proto_default_access =
-                self.static_member_expr(self.ident_expr(&js_name), "__default");
-            let impl_expr = self.ast.expression_logical(
-                SPAN,
-                proto_type_access,
-                LogicalOperator::Coalesce,
-                proto_default_access,
-            );
-            let impl_decl = self.const_decl("__impl", impl_expr);
-
-            // return __impl.methodName(self, ...args);
-            let method_access = self.static_member_expr(self.ident_expr("__impl"), method_name);
-            let spread_args = Argument::SpreadElement(
-                self.ast.alloc_spread_element(SPAN, self.ident_expr("args")),
-            );
+            // $Protocol.methodName = $dispatch($Protocol, "methodName");
             let dispatch_call = self.call_expr(
-                method_access,
-                vec![Argument::from(self.ident_expr("self")), spread_args],
-            );
-            let return_stmt = self.ast.statement_return(SPAN, Some(dispatch_call));
-
-            let body = self.fn_body(self.ast.vec_from_iter([type_decl, impl_decl, return_stmt]));
-            let func = self.ast.expression_function(
-                SPAN,
-                FunctionType::FunctionExpression,
-                None,
-                false,
-                false,
-                false,
-                NONE,
-                NONE,
-                params,
-                NONE,
-                Some(body),
+                self.ident_expr("$dispatch"),
+                vec![
+                    Argument::from(self.ident_expr(&js_name)),
+                    Argument::from(self.str_expr(method_name)),
+                ],
             );
 
-            // $Protocol.method = func;
             let target = self.assignment_target_member(self.ident_expr(&js_name), method_name);
-            let assign = self.assign_expr(target, func);
+            let assign = self.assign_expr(target, dispatch_call);
             stmts.push(self.expr_stmt(assign));
         }
 

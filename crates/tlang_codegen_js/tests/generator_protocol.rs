@@ -14,11 +14,7 @@ fn test_protocol_declaration() {
     "});
     let expected = indoc! {"
         const $Showable = {};
-        $Showable.show = function(self, ...args) {
-            const __type = Array.isArray(self) ? \"List\" : self?.constructor?.name ?? typeof self;
-            const __impl = $Showable[__type] ?? $Showable.__default;
-            return __impl.show(self, ...args);
-        };
+        $Showable.show = $dispatch($Showable, \"show\");
     "};
     assert_eq!(output, expected);
 }
@@ -33,9 +29,9 @@ fn test_protocol_multiple_methods() {
         }
     "});
     assert!(output.contains("const $Container = {};"));
-    assert!(output.contains("$Container.empty = function(self, ...args)"));
-    assert!(output.contains("$Container.insert = function(self, ...args)"));
-    assert!(output.contains("$Container.contains = function(self, ...args)"));
+    assert!(output.contains("$Container.empty = $dispatch($Container, \"empty\")"));
+    assert!(output.contains("$Container.insert = $dispatch($Container, \"insert\")"));
+    assert!(output.contains("$Container.contains = $dispatch($Container, \"contains\")"));
 }
 
 // ── Protocol impl block ───────────────────────────────────────────────────────

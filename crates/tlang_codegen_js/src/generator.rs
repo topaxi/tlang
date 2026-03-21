@@ -706,28 +706,6 @@ impl<'a> InnerCodegen<'a> {
         ))
     }
 
-    /// Build `object?.property` (optional chaining member access).
-    pub fn optional_static_member_expr(
-        &self,
-        object: Expression<'a>,
-        property: &str,
-    ) -> Expression<'a> {
-        Expression::StaticMemberExpression(self.ast.alloc_static_member_expression(
-            SPAN,
-            object,
-            self.ident_name(property),
-            true,
-        ))
-    }
-
-    /// Wrap an expression in `ChainExpression` for optional chaining.
-    pub fn chain_expr(&self, inner: Expression<'a>) -> Expression<'a> {
-        let chain_element = inner
-            .into_chain_element()
-            .expect("expected chainable expression");
-        self.ast.expression_chain(SPAN, chain_element)
-    }
-
     pub fn computed_member_expr(
         &self,
         object: Expression<'a>,
