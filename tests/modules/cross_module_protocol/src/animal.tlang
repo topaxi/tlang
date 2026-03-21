@@ -1,0 +1,16 @@
+enum Animal {
+  Dog(name),
+  Cat(name),
+}
+
+pub protocol Greet {
+  fn greet(self)
+}
+
+impl Greet for Animal {
+  fn greet(Animal::Dog(name)) { "Woof! I'm " + name }
+  fn greet(Animal::Cat(name)) { "Meow! I'm " + name }
+}
+
+pub fn dog(name) { Animal::Dog(name) }
+pub fn cat(name) { Animal::Cat(name) }

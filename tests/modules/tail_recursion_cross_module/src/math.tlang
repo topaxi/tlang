@@ -1,0 +1,7 @@
+pub fn sum_to(n) { sum_to(n, 0) }
+fn sum_to(0, acc) { acc }
+fn sum_to(n, acc) { rec sum_to(n - 1, acc + n) }
+
+pub fn power(base, exp) { power(base, exp, 1) }
+fn power(_, 0, acc) { acc }
+fn power(base, exp, acc) { rec power(base, exp - 1, acc * base) }

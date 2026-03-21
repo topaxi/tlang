@@ -229,6 +229,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b193af5b67834b676abd72466a96c1024e6a6ad978a1f484bd90b85c94041351"
 dependencies = [
  "clap_builder",
+ "clap_derive",
 ]
 
 [[package]]
@@ -241,6 +242,18 @@ dependencies = [
  "anstyle",
  "clap_lex",
  "strsim",
+]
+
+[[package]]
+name = "clap_derive"
+version = "4.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1110bd8a634a1ab8cb04345d8d878267d57c3cf1b38d91b71af6686408bbca6a"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1066,6 +1079,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "oxc_parser"
+version = "0.120.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d30b87449d18c4920f3da507ebc781e0a7027c1997004706ee8a721ed8c2437"
+dependencies = [
+ "bitflags",
+ "cow-utils",
+ "memchr",
+ "num-bigint",
+ "num-traits",
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_data_structures",
+ "oxc_diagnostics",
+ "oxc_ecmascript",
+ "oxc_regular_expression",
+ "oxc_span",
+ "oxc_syntax",
+ "rustc-hash",
+ "seq-macro",
+]
+
+[[package]]
 name = "oxc_regular_expression"
 version = "0.120.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1501,6 +1537,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
 
 [[package]]
+name = "seq-macro"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bc711410fbe7399f390ca1c3b60ad0f53f80e95c5eb935e52268a0e2cd49acc"
+
+[[package]]
 name = "serde"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1774,8 +1816,10 @@ dependencies = [
  "tlang_hir",
  "tlang_hir_opt",
  "tlang_hir_pretty",
+ "tlang_modules",
  "tlang_parser",
  "tlang_semantics",
+ "tlang_span",
 ]
 
 [[package]]
@@ -1790,6 +1834,7 @@ dependencies = [
  "oxc_ast",
  "oxc_codegen",
  "oxc_estree",
+ "oxc_parser",
  "oxc_sourcemap",
  "oxc_span",
  "pretty_assertions",
@@ -1939,6 +1984,22 @@ dependencies = [
  "smallvec",
  "tlang_ast",
  "tlang_hir",
+ "tlang_span",
+]
+
+[[package]]
+name = "tlang_modules"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "tlang_ast",
+ "tlang_ast_lowering",
+ "tlang_codegen_js",
+ "tlang_defs",
+ "tlang_hir",
+ "tlang_hir_opt",
+ "tlang_parser",
+ "tlang_semantics",
  "tlang_span",
 ]
 
@@ -2475,6 +2536,14 @@ dependencies = [
  "serde_json",
  "unicode-xid",
  "wasmparser",
+]
+
+[[package]]
+name = "xtask"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "tlang_codegen_js",
 ]
 
 [[package]]

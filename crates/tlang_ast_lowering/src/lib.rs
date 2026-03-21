@@ -456,6 +456,21 @@ pub fn lower_to_hir(
     )
 }
 
+/// Like [`lower_to_hir`], but starts HirId allocation at `hir_id_start`
+/// to avoid collisions when lowering multiple modules into the same program.
+pub fn lower_to_hir_with_offset(
+    tlang_ast: &ast::node::Module,
+    constant_pool_node_ids: &[NodeId],
+    symbol_id_allocator: DefIdAllocator,
+    root_symbol_table: Rc<RefCell<DefScope>>,
+    symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>>,
+    hir_id_start: usize,
+) -> hir::LowerResult {
+    let mut ctx = LoweringContext::new(symbol_id_allocator, root_symbol_table, symbol_tables);
+    ctx.hir_id_allocator = HirIdAllocator::new(hir_id_start);
+    lower(&mut ctx, tlang_ast, constant_pool_node_ids)
+}
+
 pub fn lower(
     ctx: &mut LoweringContext,
     tlang_ast: &ast::node::Module,

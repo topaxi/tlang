@@ -1,0 +1,7 @@
+pub mod math;
+use math::{factorial, fibonacci};
+
+factorial(5) |> log();
+factorial(10) |> log();
+fibonacci(10) |> log();
+fibonacci(20) |> log();

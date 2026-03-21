@@ -1,0 +1,2 @@
+use math::add;
+pub fn double_add(a, b) { add(a, b) * 2 }

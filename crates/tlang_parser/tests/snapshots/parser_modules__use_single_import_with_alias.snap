@@ -1,0 +1,130 @@
+---
+source: crates/tlang_parser/tests/parser_modules.rs
+expression: "parse! (\"use string::parse::from_char_code as fcc;\")"
+---
+Module(
+  id: 2,
+  statements: [
+    Stmt(
+      id: 3,
+      kind: UseDeclaration(UseDeclaration(
+        path: [
+          Ident(
+            name: "string",
+            span: Span(
+              start: 4,
+              end: 10,
+              start_lc: LineColumn(
+                line: 0,
+                column: 4,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 10,
+              ),
+            ),
+          ),
+          Ident(
+            name: "parse",
+            span: Span(
+              start: 12,
+              end: 17,
+              start_lc: LineColumn(
+                line: 0,
+                column: 12,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 17,
+              ),
+            ),
+          ),
+        ],
+        items: [
+          UseItem(
+            name: Ident(
+              name: "from_char_code",
+              span: Span(
+                start: 19,
+                end: 33,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 19,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 33,
+                ),
+              ),
+            ),
+            alias: Some(Ident(
+              name: "fcc",
+              span: Span(
+                start: 37,
+                end: 40,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 37,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 40,
+                ),
+              ),
+            )),
+            span: Span(
+              start: 19,
+              end: 40,
+              start_lc: LineColumn(
+                line: 0,
+                column: 19,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 40,
+              ),
+            ),
+          ),
+        ],
+        span: Span(
+          start: 0,
+          end: 0,
+          start_lc: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end_lc: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+        ),
+      )),
+      span: Span(
+        start: 0,
+        end: 41,
+        start_lc: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end_lc: LineColumn(
+          line: 0,
+          column: 41,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: 0,
+    end: 41,
+    start_lc: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end_lc: LineColumn(
+      line: 0,
+      column: 41,
+    ),
+  ),
+)

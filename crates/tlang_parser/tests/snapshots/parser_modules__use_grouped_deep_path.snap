@@ -1,0 +1,161 @@
+---
+source: crates/tlang_parser/tests/parser_modules.rs
+expression: "parse! (\"use a::b::c::{d, e};\")"
+---
+Module(
+  id: 2,
+  statements: [
+    Stmt(
+      id: 3,
+      kind: UseDeclaration(UseDeclaration(
+        path: [
+          Ident(
+            name: "a",
+            span: Span(
+              start: 4,
+              end: 5,
+              start_lc: LineColumn(
+                line: 0,
+                column: 4,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 5,
+              ),
+            ),
+          ),
+          Ident(
+            name: "b",
+            span: Span(
+              start: 7,
+              end: 8,
+              start_lc: LineColumn(
+                line: 0,
+                column: 7,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 8,
+              ),
+            ),
+          ),
+          Ident(
+            name: "c",
+            span: Span(
+              start: 10,
+              end: 11,
+              start_lc: LineColumn(
+                line: 0,
+                column: 10,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 11,
+              ),
+            ),
+          ),
+        ],
+        items: [
+          UseItem(
+            name: Ident(
+              name: "d",
+              span: Span(
+                start: 14,
+                end: 15,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 14,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 15,
+                ),
+              ),
+            ),
+            alias: None,
+            span: Span(
+              start: 14,
+              end: 15,
+              start_lc: LineColumn(
+                line: 0,
+                column: 14,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 15,
+              ),
+            ),
+          ),
+          UseItem(
+            name: Ident(
+              name: "e",
+              span: Span(
+                start: 17,
+                end: 18,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 17,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 18,
+                ),
+              ),
+            ),
+            alias: None,
+            span: Span(
+              start: 17,
+              end: 18,
+              start_lc: LineColumn(
+                line: 0,
+                column: 17,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 18,
+              ),
+            ),
+          ),
+        ],
+        span: Span(
+          start: 0,
+          end: 0,
+          start_lc: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end_lc: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+        ),
+      )),
+      span: Span(
+        start: 0,
+        end: 20,
+        start_lc: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end_lc: LineColumn(
+          line: 0,
+          column: 20,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: 0,
+    end: 20,
+    start_lc: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end_lc: LineColumn(
+      line: 0,
+      column: 20,
+    ),
+  ),
+)

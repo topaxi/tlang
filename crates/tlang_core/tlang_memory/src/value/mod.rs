@@ -425,6 +425,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn test_as_primitive_f64() {
         assert!(
             matches!(TlangValue::F64(3.14).as_primitive(), TlangPrimitive::Float(f) if (f - 3.14).abs() < 1e-10)
@@ -619,6 +620,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn test_display_f64() {
         assert_eq!(TlangValue::F64(3.14).to_string(), "3.14");
     }

@@ -1,0 +1,11 @@
+pub mod classify;
+use classify::{classify, fizzbuzz};
+
+classify(-5) |> log();
+classify(0) |> log();
+classify(42) |> log();
+
+fizzbuzz(1) |> log();
+fizzbuzz(3) |> log();
+fizzbuzz(5) |> log();
+fizzbuzz(15) |> log();

@@ -1,0 +1,5 @@
+pub mod animal;
+use animal::{dog, cat, Greet};
+
+Greet::greet(dog("Rex")) |> log();
+Greet::greet(cat("Whiskers")) |> log();

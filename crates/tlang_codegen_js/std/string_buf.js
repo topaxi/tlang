@@ -1,4 +1,7 @@
-const $StringBuf = class StringBuf {
+import { $assert } from './globals.js';
+import { string } from './string.tlang.js';
+
+export const $StringBuf = class StringBuf {
   #buf;
 
   constructor(initial = '') {

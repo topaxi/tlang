@@ -1,5 +1,5 @@
 // random_int(isize) -> isize
-fn random_int(max) { math::random() * max |> math::floor() }
+pub fn random_int(max) { math::random() * max |> math::floor() }
 
 // compose(fn(a) -> b, fn(b) -> c) -> fn(a) -> c
-fn compose(f, g) { fn(x) { f(g(x)) } }
+pub fn compose(f, g) { fn(x) { f(g(x)) } }

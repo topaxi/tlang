@@ -1,0 +1,6 @@
+use transform::numeric::{double, abs};
+
+pub fn process([], acc) { acc }
+pub fn process([x, ...xs], acc) {
+  rec process(xs, acc + abs(double(x)))
+}

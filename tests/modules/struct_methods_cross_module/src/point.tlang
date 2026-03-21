@@ -1,0 +1,10 @@
+struct Point {
+    x: isize,
+    y: isize,
+}
+
+pub fn new(x, y) { Point { x, y } }
+pub fn get_x(p) { p.x }
+pub fn get_y(p) { p.y }
+pub fn translate(p, dx, dy) { Point { x: p.x + dx, y: p.y + dy } }
+pub fn manhattan(p) { p.x + p.y }

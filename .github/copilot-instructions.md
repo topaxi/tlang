@@ -66,6 +66,7 @@ This automated setup ensures a consistent development environment and eliminates
 - **Build playground**: `npm run build` -- takes ~13s. NEVER CANCEL. Set timeout to 30+ minutes.
 - **Build interpreter**: `cargo build --release --features=tlang_vm/binary --bin tlangdi` -- takes ~30s. NEVER CANCEL. Set timeout to 60+ minutes.
 - **Build CLI**: `cargo build --release --bin tlang` -- takes ~21s. NEVER CANCEL. Set timeout to 60+ minutes.
+- **Code coverage**: `make test-coverage` -- takes ~90s. Enforces 80% minimum for lines, functions, and regions. Excludes proc macros, binary entry points, and dev tools from coverage report. NEVER CANCEL. Set timeout to 30+ minutes.
 
 ### Run Applications
 
@@ -155,6 +156,12 @@ ALWAYS manually validate any code changes through complete end-to-end scenarios:
    make test                       # NEVER CANCEL - takes ~64s (integration tests with interpreter + JS backends, **REQUIRES Node.js 24.0.2 exactly**)
    ```
 
+2. **Verify code coverage meets thresholds:**
+
+   ```bash
+   make test-coverage              # NEVER CANCEL - takes ~90s, enforces 80% min for lines/functions/regions
+   ```
+
 2. **Test WebAssembly bindings:**
 
    ```bash
@@ -212,6 +219,7 @@ npm run typecheck   # ~0.3s - TypeScript check
 - **tlang_hir**: High-level intermediate representation
 - **tlang_hir_opt**: HIR optimizations
 - **tlang_codegen_js**: JavaScript code generation
+- **tlang_modules**: Filesystem-based module system (module graph, visibility, import resolution, multi-module compilation)
 - **tlang_interpreter**: Direct execution interpreter
 - **tlang_bindings_js**: WebAssembly bindings for browser
 - **tlang_cli_js**: Command-line compiler tool

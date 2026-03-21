@@ -1,0 +1,13 @@
+enum Shape {
+  Circle(r),
+  Rectangle(w, h),
+}
+
+pub fn circle(r) { Shape::Circle(r) }
+pub fn rectangle(w, h) { Shape::Rectangle(w, h) }
+
+pub fn area(Shape::Circle(r)) { r * r * 3 }
+pub fn area(Shape::Rectangle(w, h)) { w * h }
+
+pub fn describe(Shape::Circle(r)) { "circle(" + Display::to_string(r) + ")" }
+pub fn describe(Shape::Rectangle(w, h)) { "rect(" + Display::to_string(w) + "," + Display::to_string(h) + ")" }

@@ -1,0 +1,13 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/modules/guards_cross_module/src/lib.tlang
+---
+negative
+zero
+positive
+1
+fizz
+buzz
+fizzbuzz

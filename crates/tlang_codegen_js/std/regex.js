@@ -1,11 +1,13 @@
-const re = (parts, values) => {
+import { Option } from './option.tlang.js';
+
+export const re = (parts, values) => {
   let source = parts[0];
   for (let i = 0; i < values.length; i++) {
     source += String(values[i]) + parts[i + 1];
   }
   return new $TlangRegex(source);
 };
-const $TlangRegex = class Regex {
+export const $TlangRegex = class Regex {
   #source;
   #flags;
   #__re = null;

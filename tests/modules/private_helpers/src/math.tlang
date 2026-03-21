@@ -1,0 +1,7 @@
+pub fn factorial(n) { factorial(n, 1) }
+fn factorial(0, acc) { acc }
+fn factorial(n, acc) { rec factorial(n - 1, n * acc) }
+
+pub fn fibonacci(n) { fibonacci(n, 0, 1) }
+fn fibonacci(0, a, _) { a }
+fn fibonacci(n, a, b) { rec fibonacci(n - 1, b, a + b) }

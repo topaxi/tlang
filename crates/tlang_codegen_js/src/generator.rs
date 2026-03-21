@@ -29,6 +29,9 @@ pub struct CodegenJS {
     js_ast_json: String,
     source_map: Option<SourceMap>,
     protocol_names: HashSet<String>,
+    /// When true, suppress `export` keywords on public declarations.
+    /// Used when generating a bundled multi-module output.
+    bundle_mode: bool,
 }
 
 impl Default for CodegenJS {
@@ -50,6 +53,7 @@ impl CodegenJS {
             js_ast_json: String::new(),
             source_map: None,
             protocol_names,
+            bundle_mode: false,
         }
     }
 
@@ -72,18 +76,88 @@ impl CodegenJS {
         format!("{notice}\n{}", parts.join("\n"))
     }
 
+    /// Compiles the stdlib `.tlang` sources to JS and concatenates the native JS
+    /// files (with `import` declarations stripped), producing a complete
+    /// standalone stdlib bundle.
+    ///
+    /// This performs a full parse → semantic analysis → HIR lowering → codegen
+    /// pipeline at runtime, so callers that need the result repeatedly should
+    /// cache it (e.g. via `std::sync::OnceLock`).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the embedded stdlib `.tlang` sources fail to parse or pass
+    /// semantic analysis, which would indicate a bug in the stdlib source.
+    pub fn compile_stdlib_module() -> String {
+        use tlang_ast_lowering::lower_to_hir;
+        use tlang_hir_opt::hir_opt::HirOptContext;
+        use tlang_semantics::SemanticAnalyzer;
+
+        let source = Self::get_standard_library_source();
+
+        let mut parser = tlang_parser::Parser::from_source(&source);
+        let (mut ast, parse_meta) = parser
+            .parse()
+            .expect("stdlib .tlang source should parse without errors");
+
+        let mut semantic_analyzer = SemanticAnalyzer::default();
+        semantic_analyzer.add_builtin_symbols(Self::get_standard_library_symbols());
+        semantic_analyzer
+            .analyze(&mut ast)
+            .expect("stdlib .tlang source should pass semantic analysis");
+
+        let (mut module, meta) = lower_to_hir(
+            &ast,
+            &parse_meta.constant_pool_node_ids,
+            semantic_analyzer.symbol_id_allocator(),
+            semantic_analyzer.root_symbol_table(),
+            semantic_analyzer.symbol_tables().clone(),
+        );
+        let mut ctx: HirOptContext = meta.into();
+
+        let mut optimizer = crate::js_hir_opt::JsHirOptimizer::default();
+        optimizer.optimize_hir(&mut module, &mut ctx);
+
+        let mut generator = Self::new();
+        // Bundle mode: suppress `export` on public declarations so the compiled
+        // tlang code is script-compatible (no ES-module syntax).
+        generator.set_bundle_mode(true);
+        generator.generate_code(&module);
+        let compiled_tlang = generator.get_output().to_string();
+
+        let mut bundle = compiled_tlang;
+        for (filename, content) in Self::get_standard_library_native_js_files() {
+            bundle.push('\n');
+            bundle.push_str("// -- ");
+            bundle.push_str(filename);
+            bundle.push_str(" --\n");
+            bundle.push_str(&strip_module_declarations(content));
+        }
+        bundle
+    }
+
     /// Returns native JavaScript code appended after the compiled standard library.
     /// This provides imperative implementations for protocol methods that would
     /// stack overflow if implemented recursively in tlang.
     pub fn get_standard_library_native_js() -> String {
-        let parts: &[&str] = &[
-            include_str!("../std/globals.js"),
-            include_str!("../std/collections.js"),
-            include_str!("../std/string.js"),
-            include_str!("../std/regex.js"),
-            include_str!("../std/string_buf.js"),
-        ];
-        parts.join("\n")
+        Self::get_standard_library_native_js_files()
+            .iter()
+            .map(|(_, content)| *content)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Returns each native JS stdlib file as `(filename, content)`, with the
+    /// content embedded at compile time.  Used by `cargo xtask gen-stdlib` to
+    /// build the precompiled bundle.
+    pub fn get_standard_library_native_js_files() -> &'static [(&'static str, &'static str)] {
+        &[
+            ("globals.js", include_str!("../std/globals.js")),
+            ("collections.js", include_str!("../std/collections.js")),
+            ("string.js", include_str!("../std/string.js")),
+            ("regex.js", include_str!("../std/regex.js")),
+            ("string_buf.js", include_str!("../std/string_buf.js")),
+        ]
     }
 
     pub fn get_standard_library_symbols() -> &'static [(&'static str, DefKind)] {
@@ -107,6 +181,8 @@ impl CodegenJS {
             ("Iterable::iter", DefKind::ProtocolMethod(1)),
             ("Iterator", DefKind::Protocol),
             ("Iterator::next", DefKind::ProtocolMethod(1)),
+            ("Display", DefKind::Protocol),
+            ("Display::to_string", DefKind::ProtocolMethod(1)),
             ("len", DefKind::Function(1)),
             ("log", DefKind::Function(u16::MAX)),
             ("math", DefKind::Module),
@@ -130,6 +206,17 @@ impl CodegenJS {
 
     pub fn generate_code(&mut self, module: &hir::Module) {
         self.run_codegen(module, None, None);
+    }
+
+    /// Enable bundle mode: suppresses `export` keywords on public declarations.
+    pub fn set_bundle_mode(&mut self, bundle: bool) {
+        self.bundle_mode = bundle;
+    }
+
+    /// Register a user-defined protocol name so the codegen emits `$ProtocolName`
+    /// instead of `ProtocolName` when generating path expressions.
+    pub fn register_protocol(&mut self, name: &str) {
+        self.protocol_names.insert(name.to_string());
     }
 
     /// Generate code and produce a source map mapping generated JS back to the
@@ -164,6 +251,7 @@ impl CodegenJS {
         let allocator = Allocator::default();
         let ast = AstBuilder::new(&allocator);
         let mut inner = InnerCodegen::new(ast, self.protocol_names.clone());
+        inner.bundle_mode = self.bundle_mode;
         if let Some(st) = source_text {
             inner = inner.with_source_text(st.to_string());
         }
@@ -261,6 +349,111 @@ pub fn shift_source_map_lines(map_json: &str, line_offset: usize) -> String {
     shifted.to_json_string()
 }
 
+/// Transform a native JS ES-module source into a script-compatible form by
+/// removing `import` declarations and stripping the `export` keyword from
+/// named exports.  Import statements are removed entirely; `export function f`
+/// becomes `function f`, `export const x` becomes `const x`, and so on.
+///
+/// The transformation is driven by the OXC parser so that only genuine module
+/// declarations are touched — identical text inside comments or string literals
+/// is left alone.  If OXC reports parse errors the source is returned unchanged
+/// rather than silently producing output from a partial AST.
+fn strip_module_declarations(source: &str) -> String {
+    use oxc_parser::Parser;
+    use oxc_span::{GetSpan, SourceType};
+
+    let allocator = Allocator::default();
+    let ret = Parser::new(&allocator, source, SourceType::mjs()).parse();
+
+    // If parsing failed, fall back to the original source unchanged.
+    if !ret.errors.is_empty() {
+        return source.to_string();
+    }
+
+    // Collect byte ranges to exclude from the output (in source order).
+    let mut exclude: Vec<(usize, usize)> = Vec::new();
+
+    // Helper: advance `end` past a trailing newline (`\n` or `\r\n`) so that
+    // removing a full-line statement doesn't leave a blank line behind.
+    let consume_trailing_newline = |mut end: usize| -> usize {
+        let bytes = source.as_bytes();
+        if bytes.get(end) == Some(&b'\r') && bytes.get(end + 1) == Some(&b'\n') {
+            end += 2;
+        } else if bytes.get(end) == Some(&b'\n') {
+            end += 1;
+        }
+        end
+    };
+
+    for stmt in &ret.program.body {
+        match stmt {
+            Statement::ImportDeclaration(decl) => {
+                // Exclude the entire import declaration.
+                let start = decl.span.start as usize;
+                let end = consume_trailing_newline(decl.span.end as usize);
+                exclude.push((start, end));
+            }
+            Statement::ExportNamedDeclaration(decl) => {
+                if let Some(inner_decl) = &decl.declaration {
+                    // Strip only the `export ` prefix; keep the inner declaration.
+                    exclude.push((decl.span.start as usize, inner_decl.span().start as usize));
+                } else {
+                    // Re-export with no inner declaration (e.g. `export { foo } from 'bar'`):
+                    // exclude the whole statement.
+                    exclude.push((decl.span.start as usize, decl.span.end as usize));
+                }
+            }
+            Statement::ExportDefaultDeclaration(decl) => {
+                use oxc_ast::ast::ExportDefaultDeclarationKind;
+
+                match &decl.declaration {
+                    // Anonymous default function/class declarations would become invalid
+                    // statements (`function() {}` / `class {}`) if we stripped only the
+                    // `export default ` prefix. For these, exclude the entire statement,
+                    // including a trailing newline if present.
+                    ExportDefaultDeclarationKind::FunctionDeclaration(func)
+                        if func.id.is_none() =>
+                    {
+                        exclude.push((
+                            decl.span.start as usize,
+                            consume_trailing_newline(decl.span.end as usize),
+                        ));
+                    }
+                    ExportDefaultDeclarationKind::ClassDeclaration(class) if class.id.is_none() => {
+                        exclude.push((
+                            decl.span.start as usize,
+                            consume_trailing_newline(decl.span.end as usize),
+                        ));
+                    }
+                    // For named defaults and expression defaults, keep the inner
+                    // value/declaration and strip only `export default `.
+                    _ => {
+                        let inner_start = decl.declaration.span().start as usize;
+                        exclude.push((decl.span.start as usize, inner_start));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if exclude.is_empty() {
+        return source.to_string();
+    }
+
+    // Reconstruct the output by copying everything except the excluded ranges.
+    let bytes = source.as_bytes();
+    let mut out = Vec::with_capacity(source.len());
+    let mut pos = 0usize;
+
+    for (start, end) in exclude {
+        out.extend_from_slice(&bytes[pos..start]);
+        pos = end;
+    }
+    out.extend_from_slice(&bytes[pos..]);
+
+    String::from_utf8(out).unwrap_or_else(|_| source.to_string())
+}
 // ---------------------------------------------------------------------------
 // InnerCodegen: arena-scoped codegen that builds an OXC AST
 // ---------------------------------------------------------------------------
@@ -270,6 +463,8 @@ pub(crate) struct InnerCodegen<'a> {
     pub scopes: Scope,
     pub function_context_stack: Vec<FunctionContext>,
     pub protocol_names: HashSet<String>,
+    /// When true, suppress `export` keywords on public declarations.
+    pub bundle_mode: bool,
     /// Original tlang source text. When non-empty, it's prepended to
     /// `comment_source` as the combined `Program.source_text`, enabling OXC's
     /// built-in source map generation (which reads byte offsets from node spans).
@@ -292,6 +487,7 @@ impl<'a> InnerCodegen<'a> {
             scopes: Scope::default(),
             function_context_stack: Vec::new(),
             protocol_names,
+            bundle_mode: false,
             source_text: String::new(),
             comment_source: String::new(),
             oxc_comments: Vec::new(),

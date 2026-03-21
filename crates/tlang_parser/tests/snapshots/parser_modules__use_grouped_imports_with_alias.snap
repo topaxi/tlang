@@ -1,0 +1,145 @@
+---
+source: crates/tlang_parser/tests/parser_modules.rs
+expression: "parse! (\"use string::{from_char_code as fcc, char_code_at};\")"
+---
+Module(
+  id: 2,
+  statements: [
+    Stmt(
+      id: 3,
+      kind: UseDeclaration(UseDeclaration(
+        path: [
+          Ident(
+            name: "string",
+            span: Span(
+              start: 4,
+              end: 10,
+              start_lc: LineColumn(
+                line: 0,
+                column: 4,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 10,
+              ),
+            ),
+          ),
+        ],
+        items: [
+          UseItem(
+            name: Ident(
+              name: "from_char_code",
+              span: Span(
+                start: 13,
+                end: 27,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 13,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 27,
+                ),
+              ),
+            ),
+            alias: Some(Ident(
+              name: "fcc",
+              span: Span(
+                start: 31,
+                end: 34,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 31,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 34,
+                ),
+              ),
+            )),
+            span: Span(
+              start: 13,
+              end: 34,
+              start_lc: LineColumn(
+                line: 0,
+                column: 13,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 34,
+              ),
+            ),
+          ),
+          UseItem(
+            name: Ident(
+              name: "char_code_at",
+              span: Span(
+                start: 36,
+                end: 48,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 36,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 48,
+                ),
+              ),
+            ),
+            alias: None,
+            span: Span(
+              start: 36,
+              end: 48,
+              start_lc: LineColumn(
+                line: 0,
+                column: 36,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 48,
+              ),
+            ),
+          ),
+        ],
+        span: Span(
+          start: 0,
+          end: 0,
+          start_lc: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end_lc: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+        ),
+      )),
+      span: Span(
+        start: 0,
+        end: 50,
+        start_lc: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end_lc: LineColumn(
+          line: 0,
+          column: 50,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: 0,
+    end: 50,
+    start_lc: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end_lc: LineColumn(
+      line: 0,
+      column: 50,
+    ),
+  ),
+)

@@ -96,6 +96,11 @@ impl LoweringContext {
             // We might be losing some comments here, but this shouldn't be a problem within
             // HIR.
             ast::node::StmtKind::None => vec![],
+
+            // Use and mod declarations are resolved before lowering and do not produce HIR.
+            ast::node::StmtKind::UseDeclaration(_) | ast::node::StmtKind::ModDeclaration(_) => {
+                vec![]
+            }
         }
     }
 

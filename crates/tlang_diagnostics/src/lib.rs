@@ -116,6 +116,33 @@ pub fn render_semantic_diagnostics(
     String::from_utf8_lossy(writer.as_slice()).into_owned()
 }
 
+/// Render a simple error message with source context at a given span.
+///
+/// This is useful for module-level errors (import errors, visibility errors, etc.)
+/// that have a span but are not full semantic diagnostics.
+///
+/// # Panics
+///
+/// Panics if writing to the internal buffer fails.
+pub fn render_error_at_span(source_name: &str, source: &str, message: &str, span: &Span) -> String {
+    let mut files = SimpleFiles::new();
+    let file_id = files.add(source_name, source);
+    let mut writer = Buffer::no_color();
+    let config = Config::default();
+
+    let report = ReportDiagnostic::new(ReportSeverity::Error)
+        .with_message(message)
+        .with_labels(vec![Label::primary(
+            file_id,
+            label_range(span, source.len()),
+        )]);
+
+    term::emit_to_write_style(&mut writer, &config, &files, &report)
+        .expect("codespan diagnostic rendering should succeed");
+
+    String::from_utf8_lossy(writer.as_slice()).into_owned()
+}
+
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
@@ -273,6 +300,22 @@ mod tests {
           │             ---    ^^
           │             │       
           │             parameter `val` is defined here
+        ");
+    }
+
+    #[test]
+    fn renders_error_at_span() {
+        use super::render_error_at_span;
+
+        let source = "use math::secret;";
+        let span = Span::new(10, 16, LineColumn::new(0, 10), LineColumn::new(0, 16));
+
+        assert_snapshot!(render_error_at_span("lib.tlang", source, "symbol `secret` is not public", &span), @r"
+        error: symbol `secret` is not public
+          ┌─ lib.tlang:1:11
+          │
+        1 │ use math::secret;
+          │           ^^^^^^
         ");
     }
 }

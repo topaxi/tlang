@@ -79,6 +79,9 @@ impl<'a> InnerCodegen<'a> {
     /// a declaration (function, class, variable), it becomes
     /// `export <declaration>`. Otherwise the statement is returned unchanged.
     fn wrap_export_named(&self, stmt: Statement<'a>) -> Statement<'a> {
+        if self.bundle_mode {
+            return stmt;
+        }
         let declaration = match stmt {
             Statement::FunctionDeclaration(func) => Declaration::FunctionDeclaration(func),
             Statement::ClassDeclaration(class) => Declaration::ClassDeclaration(class),

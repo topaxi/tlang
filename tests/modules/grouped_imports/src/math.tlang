@@ -1,0 +1,2 @@
+pub fn add(a, b) { a + b }
+pub fn multiply(a, b) { a * b }

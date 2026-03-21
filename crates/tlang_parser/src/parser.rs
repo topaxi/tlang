@@ -3,9 +3,9 @@ use tlang_ast::node::{
     self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
     EnumDeclaration, EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression,
     FunctionDeclaration, FunctionParameter, Ident, IfElseExpression, ImplBlock,
-    IndexAccessExpression, LetDeclaration, MatchArm, MatchExpression, Module, OperatorInfo, Pat,
-    Path, ProtocolDeclaration, ProtocolMethodSignature, Stmt, StmtKind, StructDeclaration,
-    StructField, Ty, TyKind, UnaryOp, Visibility,
+    IndexAccessExpression, LetDeclaration, MatchArm, MatchExpression, ModDeclaration, Module,
+    OperatorInfo, Pat, Path, ProtocolDeclaration, ProtocolMethodSignature, Stmt, StmtKind,
+    StructDeclaration, StructField, Ty, TyKind, UnaryOp, UseDeclaration, UseItem, Visibility,
 };
 use tlang_ast::token::{CommentKind, CommentToken, Literal, TaggedStringPart, Token, TokenKind};
 use tlang_intern::intern;
@@ -323,6 +323,8 @@ impl<'src> Parser<'src> {
             Visibility::Private
         };
         let mut node = match self.current_token.kind {
+            TokenKind::Keyword(Keyword::Use) => self.parse_use_declaration(),
+            TokenKind::Keyword(Keyword::Mod) => self.parse_mod_declaration(visibility),
             TokenKind::Keyword(Keyword::Let) => self.parse_variable_declaration(),
             TokenKind::Keyword(Keyword::Fn)
                 // If the next token is an identifier, we assume a function declaration.
@@ -628,6 +630,130 @@ impl<'src> Parser<'src> {
                 target_type,
                 methods,
                 apply_methods,
+            }))
+        )
+    }
+
+    /// Parse a `use` declaration.
+    ///
+    /// Supports:
+    /// - `use string::parse::from_char_code`
+    /// - `use string::parse::from_char_code as alias`
+    /// - `use string::{from_char_code, char_code_at}`
+    /// - `use string::{from_char_code as fcc, char_code_at}`
+    fn parse_use_declaration(&mut self) -> Stmt {
+        self.consume_keyword_token(Keyword::Use);
+
+        let mut path_segments = Vec::new();
+
+        // Parse the path prefix: `a::b::c` or `a::b::{...}`
+        path_segments.push(self.parse_identifier());
+
+        while matches!(self.current_token_kind(), TokenKind::PathSeparator) {
+            self.advance(); // consume `::`
+
+            // Check for grouped imports: `use path::{a, b}`
+            if matches!(self.current_token_kind(), TokenKind::LBrace) {
+                self.advance(); // consume `{`
+                let mut items = Vec::new();
+
+                loop {
+                    let mut item_span = self.create_span_from_current_token();
+                    let name = self.parse_identifier();
+                    let alias =
+                        if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::As)) {
+                            self.advance();
+                            Some(self.parse_identifier())
+                        } else {
+                            None
+                        };
+                    self.end_span_from_previous_token(&mut item_span);
+                    items.push(UseItem {
+                        name,
+                        alias,
+                        span: item_span,
+                    });
+
+                    if matches!(self.current_token_kind(), TokenKind::Comma) {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+
+                self.consume_token(TokenKind::RBrace);
+
+                return node::stmt!(
+                    self.unique_id(),
+                    UseDeclaration(Box::new(UseDeclaration {
+                        path: path_segments,
+                        items,
+                        span: Span::default(),
+                    }))
+                );
+            }
+
+            path_segments.push(self.parse_identifier());
+        }
+
+        // Single import: `use a::b::c` or `use a::b::c as alias`
+        // The last segment is the imported symbol name
+        let last = path_segments
+            .pop()
+            .expect("use path must have at least one segment");
+        let alias = if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::As)) {
+            self.advance();
+            Some(self.parse_identifier())
+        } else {
+            None
+        };
+
+        let item_span = if let Some(ref a) = alias {
+            Span {
+                start: last.span.start,
+                end: a.span.end,
+                start_lc: last.span.start_lc,
+                end_lc: a.span.end_lc,
+            }
+        } else {
+            last.span
+        };
+
+        node::stmt!(
+            self.unique_id(),
+            UseDeclaration(Box::new(UseDeclaration {
+                path: path_segments,
+                items: vec![UseItem {
+                    name: last,
+                    alias,
+                    span: item_span,
+                }],
+                span: Span::default(),
+            }))
+        )
+    }
+
+    /// Parse a `mod` declaration (with optional `pub` visibility).
+    ///
+    /// `pub mod parse, utils`
+    /// `mod internal`
+    fn parse_mod_declaration(&mut self, visibility: Visibility) -> Stmt {
+        self.consume_keyword_token(Keyword::Mod);
+
+        let mut names = Vec::new();
+        names.push(self.parse_identifier());
+
+        while matches!(self.current_token_kind(), TokenKind::Comma) {
+            self.advance();
+            names.push(self.parse_identifier());
+        }
+
+        node::stmt!(
+            self.unique_id(),
+            ModDeclaration(Box::new(ModDeclaration {
+                visibility,
+                names,
+                span: Span::default(),
             }))
         )
     }

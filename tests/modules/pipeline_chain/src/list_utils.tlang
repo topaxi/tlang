@@ -1,0 +1,2 @@
+pub fn sum([], acc) { acc }
+pub fn sum([x, ...xs], acc) { rec sum(xs, acc + x) }

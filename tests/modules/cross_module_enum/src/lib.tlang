@@ -1,0 +1,10 @@
+pub mod shapes;
+use shapes::{circle, rectangle, area, describe};
+
+let c = circle(5);
+let r = rectangle(3, 4);
+
+describe(c) |> log();
+area(c) |> log();
+describe(r) |> log();
+area(r) |> log();
