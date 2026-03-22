@@ -125,8 +125,22 @@ impl CodegenJS {
         generator.generate_code(&module);
         let compiled_tlang = generator.get_output().to_string();
 
-        let mut bundle = compiled_tlang;
+        let mut bundle = String::new();
+
+        let global_js = Self::get_standard_library_native_js_files()
+            .iter()
+            .find(|(filename, _)| *filename == "globals.js")
+            .map(|(_, content)| content)
+            .unwrap();
+
+        bundle.push_str(&strip_module_declarations(global_js));
+        bundle.push_str(&compiled_tlang);
+
         for (filename, content) in Self::get_standard_library_native_js_files() {
+            if *filename == "globals.js" {
+                continue;
+            }
+
             bundle.push('\n');
             bundle.push_str("// -- ");
             bundle.push_str(filename);

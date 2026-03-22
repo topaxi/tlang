@@ -8,28 +8,41 @@ export function $getType(value) {
     : (value?.constructor?.name ?? typeof value);
 }
 
-export function $protocol(def) {
-  let protocol = { __default: def, __impls: new Map() };
+export class $Protocol {
+  #def;
+  #impls = new Map();
 
-  for (let method in def) {
-    protocol[method] = $dispatch(protocol, method);
+  constructor(def) {
+    this.#def = def;
+
+    for (let methodName in def) {
+      this[methodName] = this.#apply(methodName);
+    }
   }
 
-  return protocol;
+  $setImpl(Type, methods) {
+    this.#impls.set(Type, methods);
+  }
+
+  #apply(methodName) {
+    return (self, ...args) => this.#call(methodName, self, ...args);
+  }
+
+  #call(methodName, self, ...args) {
+    const Type = self?.constructor;
+    const impl = this.#impls.get(Type) ?? this.#def;
+    const method = impl[methodName] ?? this.#def[methodName];
+
+    return method.call(impl, self, ...args);
+  }
+}
+
+export function $protocol(def) {
+  return new $Protocol(def);
 }
 
 export function $impl(protocol, Type, methods) {
-  protocol.__impls.set(Type, methods);
-}
-
-export function $dispatch(protocol, method) {
-  return function (self, ...args) {
-    const __impl =
-      protocol.__impls.get(
-        Array.isArray(self) ? Array : self?.constructor,
-      ) ?? protocol.__default;
-    return __impl[method](self, ...args);
-  };
+  protocol.$setImpl(Type, methods);
 }
 
 export function $installMethod(proto, methodName, dispatch) {

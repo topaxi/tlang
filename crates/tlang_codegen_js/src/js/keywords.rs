@@ -11,6 +11,7 @@ macro_rules! define_js_keywords {
 }
 
 define_js_keywords! {
+    Arguments => "arguments",
     Await => "await",
     Async => "async",
     Break => "break",
@@ -25,6 +26,7 @@ define_js_keywords! {
     Do => "do",
     Else => "else",
     Enum => "enum",
+    Eval => "eval",
     Export => "export",
     Extends => "extends",
     False => "false",
