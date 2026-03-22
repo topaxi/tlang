@@ -1,3 +1,5 @@
+use std::io::IsTerminal;
+
 use tlang_diagnostics::{render_parse_issues, render_semantic_diagnostics};
 use tlang_parser::error::ParseIssue;
 use tlang_semantics::diagnostic::Diagnostic;
@@ -24,10 +26,13 @@ impl From<Vec<Diagnostic>> for ParserError {
 
 impl ParserError {
     pub fn render(&self, source_name: &str, source: &str) -> String {
+        let ansi = std::io::stderr().is_terminal();
         match self {
-            ParserError::ParseError(issues) => render_parse_issues(source_name, source, issues),
+            ParserError::ParseError(issues) => {
+                render_parse_issues(source_name, source, issues, ansi)
+            }
             ParserError::DiagnosticError(diagnostics) => {
-                render_semantic_diagnostics(source_name, source, diagnostics)
+                render_semantic_diagnostics(source_name, source, diagnostics, ansi)
             }
         }
     }

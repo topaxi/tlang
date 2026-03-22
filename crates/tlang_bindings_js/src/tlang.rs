@@ -460,7 +460,7 @@ impl Tlang {
         if diagnostics.is_empty() {
             return String::new();
         }
-        render_semantic_diagnostics("playground.tlang", &self.source, &diagnostics)
+        render_semantic_diagnostics("playground.tlang", &self.source, &diagnostics, true)
     }
 
     #[wasm_bindgen(js_name = "renderErrorDiagnostics")]
@@ -474,7 +474,7 @@ impl Tlang {
         if diagnostics.is_empty() {
             return String::new();
         }
-        render_semantic_diagnostics("playground.tlang", &self.source, &diagnostics)
+        render_semantic_diagnostics("playground.tlang", &self.source, &diagnostics, true)
     }
 
     #[wasm_bindgen(js_name = "renderWarningDiagnostics")]
@@ -488,7 +488,7 @@ impl Tlang {
         if diagnostics.is_empty() {
             return String::new();
         }
-        render_semantic_diagnostics("playground.tlang", &self.source, &diagnostics)
+        render_semantic_diagnostics("playground.tlang", &self.source, &diagnostics, true)
     }
 
     #[wasm_bindgen(js_name = "renderParseErrors")]
@@ -498,7 +498,7 @@ impl Tlang {
         if issues.is_empty() {
             return String::new();
         }
-        render_parse_issues("playground.tlang", &source, issues)
+        render_parse_issues("playground.tlang", &source, issues, true)
     }
 
     #[wasm_bindgen(js_name = "getDiagnostics")]

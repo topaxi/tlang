@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::io::IsTerminal;
 use std::process;
 
 use tlang_ast_lowering::lower_to_hir;
@@ -43,7 +44,15 @@ fn main() {
     let (mut ast, parse_meta) = match parse_result {
         Ok(Ok(result)) => result,
         Ok(Err(err)) => {
-            eprint!("{}", render_parse_issues(filename, &code, err.issues()));
+            eprint!(
+                "{}",
+                render_parse_issues(
+                    filename,
+                    &code,
+                    err.issues(),
+                    std::io::stderr().is_terminal()
+                )
+            );
             process::exit(1);
         }
         Err(_) => {
@@ -59,7 +68,12 @@ fn main() {
         Err(diagnostics) => {
             eprint!(
                 "{}",
-                render_semantic_diagnostics(filename, &code, &diagnostics)
+                render_semantic_diagnostics(
+                    filename,
+                    &code,
+                    &diagnostics,
+                    std::io::stderr().is_terminal()
+                )
             );
 
             if diagnostics.iter().any(Diagnostic::is_error) {

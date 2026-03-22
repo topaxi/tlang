@@ -1,3 +1,4 @@
+use std::io::IsTerminal;
 use std::path::Path;
 use std::{fs::File, io::Read};
 
@@ -162,7 +163,12 @@ fn compile(input_file: &str) -> (hir::Module, std::collections::HashSet<tlang_hi
         Ok(Err(err)) => {
             eprint!(
                 "{}",
-                render_parse_issues(&path.to_string_lossy(), &source, err.issues())
+                render_parse_issues(
+                    &path.to_string_lossy(),
+                    &source,
+                    err.issues(),
+                    std::io::stderr().is_terminal()
+                )
             );
             std::process::exit(1);
         }
@@ -173,7 +179,12 @@ fn compile(input_file: &str) -> (hir::Module, std::collections::HashSet<tlang_hi
             }
             eprint!(
                 "{}",
-                render_parse_issues(&path.to_string_lossy(), &source, issues)
+                render_parse_issues(
+                    &path.to_string_lossy(),
+                    &source,
+                    issues,
+                    std::io::stderr().is_terminal()
+                )
             );
             std::process::exit(1);
         }
@@ -184,7 +195,12 @@ fn compile(input_file: &str) -> (hir::Module, std::collections::HashSet<tlang_hi
     if let Err(err) = semantic_analyzer.analyze(&mut ast) {
         eprint!(
             "{}",
-            render_semantic_diagnostics(&path.to_string_lossy(), &source, &err)
+            render_semantic_diagnostics(
+                &path.to_string_lossy(),
+                &source,
+                &err,
+                std::io::stderr().is_terminal()
+            )
         );
         std::process::exit(1);
     }
@@ -197,7 +213,12 @@ fn compile(input_file: &str) -> (hir::Module, std::collections::HashSet<tlang_hi
     if !warnings.is_empty() {
         eprint!(
             "{}",
-            render_semantic_diagnostics(&path.to_string_lossy(), &source, &warnings)
+            render_semantic_diagnostics(
+                &path.to_string_lossy(),
+                &source,
+                &warnings,
+                std::io::stderr().is_terminal()
+            )
         );
     }
 

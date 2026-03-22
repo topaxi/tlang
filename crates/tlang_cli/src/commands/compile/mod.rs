@@ -105,7 +105,12 @@ fn compile_to_hir(
         if !warnings.is_empty() {
             eprint!(
                 "{}",
-                tlang_diagnostics::render_semantic_diagnostics(source_name, source, &warnings)
+                tlang_diagnostics::render_semantic_diagnostics(
+                    source_name,
+                    source,
+                    &warnings,
+                    std::io::IsTerminal::is_terminal(&std::io::stderr())
+                )
             );
         }
     }

@@ -69,14 +69,26 @@ fn parse_issue_report(
 /// Render parse issues from a failed parse into a human-readable, source-aware
 /// string using `codespan_reporting`.
 ///
+/// Set `ansi` to `true` to emit ANSI color/style escape sequences (e.g. for
+/// terminals or downstream ANSI-to-HTML conversion).
+///
 /// # Panics
 ///
 /// Panics if writing to the internal buffer fails, which cannot happen with
 /// the in-memory [`Buffer`] used internally.
-pub fn render_parse_issues(source_name: &str, source: &str, issues: &[ParseIssue]) -> String {
+pub fn render_parse_issues(
+    source_name: &str,
+    source: &str,
+    issues: &[ParseIssue],
+    ansi: bool,
+) -> String {
     let mut files = SimpleFiles::new();
     let file_id = files.add(source_name, source);
-    let mut writer = Buffer::no_color();
+    let mut writer = if ansi {
+        Buffer::ansi()
+    } else {
+        Buffer::no_color()
+    };
     let config = Config::default();
 
     for issue in issues {
@@ -92,6 +104,9 @@ pub fn render_parse_issues(source_name: &str, source: &str, issues: &[ParseIssue
 /// Render semantic diagnostics into a human-readable, source-aware string using
 /// `codespan_reporting`.
 ///
+/// Set `ansi` to `true` to emit ANSI color/style escape sequences (e.g. for
+/// terminals or downstream ANSI-to-HTML conversion).
+///
 /// # Panics
 ///
 /// Panics if writing to the internal buffer fails, which cannot happen with
@@ -100,10 +115,15 @@ pub fn render_semantic_diagnostics(
     source_name: &str,
     source: &str,
     diagnostics: &[Diagnostic],
+    ansi: bool,
 ) -> String {
     let mut files = SimpleFiles::new();
     let file_id = files.add(source_name, source);
-    let mut writer = Buffer::no_color();
+    let mut writer = if ansi {
+        Buffer::ansi()
+    } else {
+        Buffer::no_color()
+    };
     let config = Config::default();
 
     for diagnostic in diagnostics {
@@ -121,13 +141,25 @@ pub fn render_semantic_diagnostics(
 /// This is useful for module-level errors (import errors, visibility errors, etc.)
 /// that have a span but are not full semantic diagnostics.
 ///
+/// Set `ansi` to `true` to emit ANSI color/style escape sequences.
+///
 /// # Panics
 ///
 /// Panics if writing to the internal buffer fails.
-pub fn render_error_at_span(source_name: &str, source: &str, message: &str, span: &Span) -> String {
+pub fn render_error_at_span(
+    source_name: &str,
+    source: &str,
+    message: &str,
+    span: &Span,
+    ansi: bool,
+) -> String {
     let mut files = SimpleFiles::new();
     let file_id = files.add(source_name, source);
-    let mut writer = Buffer::no_color();
+    let mut writer = if ansi {
+        Buffer::ansi()
+    } else {
+        Buffer::no_color()
+    };
     let config = Config::default();
 
     let report = ReportDiagnostic::new(ReportSeverity::Error)
@@ -188,7 +220,7 @@ mod tests {
             9,
         )];
 
-        assert_snapshot!(render_parse_issues("test.tlang", source, &issues), @r"
+        assert_snapshot!(render_parse_issues("test.tlang", source, &issues, false), @r"
         error: Expected expression, found Semicolon
           ┌─ test.tlang:1:9
           │
@@ -207,7 +239,7 @@ mod tests {
             make_parse_issue("Expected expression, found Semicolon", 18, 19, 0, 18, 0, 19),
         ];
 
-        assert_snapshot!(render_parse_issues("test.tlang", source, &issues), @r"
+        assert_snapshot!(render_parse_issues("test.tlang", source, &issues, false), @r"
         error: Expected expression, found Semicolon
           ┌─ test.tlang:1:9
           │
@@ -238,6 +270,7 @@ mod tests {
             "test.tlang",
             source,
             &analyzer.get_diagnostics(),
+            false,
         ), @r"
         error: Use of undeclared variable `missing`
           ┌─ test.tlang:2:5
@@ -268,7 +301,7 @@ mod tests {
             .filter(|d| d.is_warning())
             .collect();
 
-        assert_snapshot!(render_semantic_diagnostics("test.tlang", source, &warnings), @r"
+        assert_snapshot!(render_semantic_diagnostics("test.tlang", source, &warnings, false), @r"
         warning: Unused variable `unused_var`, if this is intentional, prefix the name with an underscore: `_unused_var`
           ┌─ test.tlang:1:5
           │
@@ -292,7 +325,7 @@ mod tests {
             .filter(|d| d.is_error())
             .collect();
 
-        assert_snapshot!(render_semantic_diagnostics("test.tlang", source, &errors), @r"
+        assert_snapshot!(render_semantic_diagnostics("test.tlang", source, &errors, false), @r"
         error: Use of undeclared variable `va`, did you mean the parameter `val`?
           ┌─ test.tlang:1:20
           │
@@ -310,7 +343,7 @@ mod tests {
         let source = "use math::secret;";
         let span = Span::new(10, 16, LineColumn::new(0, 10), LineColumn::new(0, 16));
 
-        assert_snapshot!(render_error_at_span("lib.tlang", source, "symbol `secret` is not public", &span), @r"
+        assert_snapshot!(render_error_at_span("lib.tlang", source, "symbol `secret` is not public", &span, false), @r"
         error: symbol `secret` is not public
           ┌─ lib.tlang:1:11
           │

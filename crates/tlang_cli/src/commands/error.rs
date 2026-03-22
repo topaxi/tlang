@@ -1,12 +1,19 @@
+use std::io::IsTerminal;
+
 use tlang_diagnostics::{render_error_at_span, render_parse_issues, render_semantic_diagnostics};
 use tlang_modules::{CompileError, ModuleGraphError};
 
+fn stderr_is_tty() -> bool {
+    std::io::stderr().is_terminal()
+}
+
 /// Render a multi-module compilation error with source-aware diagnostics.
 pub fn render_compile_error(err: &CompileError) -> String {
+    let ansi = stderr_is_tty();
     match err {
-        CompileError::ModuleGraphErrors(errors) => render_module_graph_errors(errors),
+        CompileError::ModuleGraphErrors(errors) => render_module_graph_errors(errors, ansi),
         CompileError::ImportErrors { errors, sources } => {
-            render_module_graph_errors_with_sources(errors, sources)
+            render_module_graph_errors_with_sources(errors, sources, ansi)
         }
         CompileError::SemanticError {
             file_path,
@@ -15,12 +22,12 @@ pub fn render_compile_error(err: &CompileError) -> String {
             ..
         } => {
             let source_name = file_path.to_string_lossy();
-            render_semantic_diagnostics(&source_name, source, diagnostics)
+            render_semantic_diagnostics(&source_name, source, diagnostics, ansi)
         }
     }
 }
 
-fn render_module_graph_errors(errors: &[ModuleGraphError]) -> String {
+fn render_module_graph_errors(errors: &[ModuleGraphError], ansi: bool) -> String {
     let mut parts = Vec::new();
 
     for error in errors {
@@ -32,7 +39,7 @@ fn render_module_graph_errors(errors: &[ModuleGraphError]) -> String {
                 ..
             } => {
                 let source_name = file_path.to_string_lossy();
-                parts.push(render_parse_issues(&source_name, source, issues));
+                parts.push(render_parse_issues(&source_name, source, issues, ansi));
             }
             ModuleGraphError::MissingModule {
                 declared_in,
@@ -107,6 +114,7 @@ fn render_module_graph_errors(errors: &[ModuleGraphError]) -> String {
 fn render_module_graph_errors_with_sources(
     errors: &[ModuleGraphError],
     sources: &tlang_modules::ModuleSourceInfo,
+    ansi: bool,
 ) -> String {
     let mut parts = Vec::new();
 
@@ -119,7 +127,7 @@ fn render_module_graph_errors_with_sources(
                 ..
             } => {
                 let source_name = file_path.to_string_lossy();
-                parts.push(render_parse_issues(&source_name, source, issues));
+                parts.push(render_parse_issues(&source_name, source, issues, ansi));
             }
             ModuleGraphError::MissingModule {
                 declared_in,
@@ -133,6 +141,7 @@ fn render_module_graph_errors_with_sources(
                         source,
                         &format!("`mod {name}` declared but no corresponding file found"),
                         span,
+                        ansi,
                     ));
                     parts.push(format!(
                         "  hint: create `src/{}.tlang` to define this module\n\n",
@@ -165,6 +174,7 @@ fn render_module_graph_errors_with_sources(
                             target_path.join("::")
                         ),
                         span,
+                        ansi,
                     ));
                     parts.push(format!(
                         "  hint: add `pub mod {inaccessible_segment}` to the parent module\n\n"
@@ -189,6 +199,7 @@ fn render_module_graph_errors_with_sources(
                         source,
                         &format!("cannot import `{symbol_name}`: {reason}"),
                         span,
+                        ansi,
                     ));
                 } else {
                     parts.push(format!(
@@ -209,6 +220,7 @@ fn render_module_graph_errors_with_sources(
                         source,
                         &format!("`{name}` is already imported, use `as` to rename"),
                         second_span,
+                        ansi,
                     ));
                 } else {
                     parts.push(format!(
@@ -248,7 +260,7 @@ mod tests {
             source: "fn add(a, b { a + b }".to_string(),
             issues: vec![],
         }];
-        let _output = render_module_graph_errors(&errors);
+        let _output = render_module_graph_errors(&errors, false);
     }
 
     #[test]
@@ -258,7 +270,7 @@ mod tests {
             name: "utils".to_string(),
             span: Span::default(),
         }];
-        let output = render_module_graph_errors(&errors);
+        let output = render_module_graph_errors(&errors, false);
         assert!(output.contains("mod utils"));
         assert!(output.contains("no corresponding file"));
         assert!(output.contains("src/utils.tlang"));
@@ -271,7 +283,7 @@ mod tests {
             name: "parse".to_string(),
             span: Span::default(),
         }];
-        let output = render_module_graph_errors(&errors);
+        let output = render_module_graph_errors(&errors, false);
         assert!(output.contains("mod parse"));
         assert!(output.contains("string/parse.tlang"));
     }
@@ -284,7 +296,7 @@ mod tests {
             inaccessible_segment: "parse".to_string(),
             span: Span::default(),
         }];
-        let output = render_module_graph_errors(&errors);
+        let output = render_module_graph_errors(&errors, false);
         assert!(output.contains("cannot access"));
         assert!(output.contains("string::parse"));
         assert!(output.contains("pub mod parse"));
@@ -298,7 +310,7 @@ mod tests {
             reason: "not found".to_string(),
             span: Span::default(),
         }];
-        let output = render_module_graph_errors(&errors);
+        let output = render_module_graph_errors(&errors, false);
         assert!(output.contains("cannot import `foo`"));
         assert!(output.contains("not found"));
     }
@@ -311,7 +323,7 @@ mod tests {
             first_span: Span::default(),
             second_span: Span::default(),
         }];
-        let output = render_module_graph_errors(&errors);
+        let output = render_module_graph_errors(&errors, false);
         assert!(output.contains("name collision"));
         assert!(output.contains("`add`"));
         assert!(output.contains("use `as`"));
@@ -326,7 +338,7 @@ mod tests {
             ],
             reason: "contains top-level expressions".to_string(),
         }];
-        let output = render_module_graph_errors(&errors);
+        let output = render_module_graph_errors(&errors, false);
         assert!(output.contains("module cycle detected"));
         assert!(output.contains("top-level expressions"));
     }
@@ -336,7 +348,7 @@ mod tests {
         let errors = vec![ModuleGraphError::TreeError(
             tlang_modules::ModuleTreeError::NoSrcDirectory(PathBuf::from("/missing")),
         )];
-        let output = render_module_graph_errors(&errors);
+        let output = render_module_graph_errors(&errors, false);
         assert!(output.contains("error:"));
     }
 
@@ -394,7 +406,7 @@ mod tests {
             name: "missing".to_string(),
             span: Span::default(),
         }];
-        let output = render_module_graph_errors_with_sources(&errors, &sources);
+        let output = render_module_graph_errors_with_sources(&errors, &sources, false);
         assert!(output.contains("no corresponding file found"));
         assert!(output.contains("src/missing.tlang"));
     }
@@ -406,7 +418,7 @@ mod tests {
             name: "sub".to_string(),
             span: Span::default(),
         }];
-        let output = render_module_graph_errors_with_sources(&errors, &BTreeMap::new());
+        let output = render_module_graph_errors_with_sources(&errors, &BTreeMap::new(), false);
         assert!(output.contains("mod sub"));
         assert!(output.contains("no corresponding file"));
     }
@@ -429,7 +441,7 @@ mod tests {
             inaccessible_segment: "internal".to_string(),
             span: Span::default(),
         }];
-        let output = render_module_graph_errors_with_sources(&errors, &sources);
+        let output = render_module_graph_errors_with_sources(&errors, &sources, false);
         assert!(output.contains("not declared as `pub mod`"));
     }
 
@@ -441,7 +453,7 @@ mod tests {
             inaccessible_segment: "x".to_string(),
             span: Span::default(),
         }];
-        let output = render_module_graph_errors_with_sources(&errors, &BTreeMap::new());
+        let output = render_module_graph_errors_with_sources(&errors, &BTreeMap::new(), false);
         assert!(output.contains("cannot access"));
     }
 
@@ -463,7 +475,7 @@ mod tests {
             reason: "not declared as `pub`".to_string(),
             span: Span::default(),
         }];
-        let output = render_module_graph_errors_with_sources(&errors, &sources);
+        let output = render_module_graph_errors_with_sources(&errors, &sources, false);
         assert!(output.contains("cannot import `secret`"));
     }
 
@@ -475,7 +487,7 @@ mod tests {
             reason: "not found".to_string(),
             span: Span::default(),
         }];
-        let output = render_module_graph_errors_with_sources(&errors, &BTreeMap::new());
+        let output = render_module_graph_errors_with_sources(&errors, &BTreeMap::new(), false);
         assert!(output.contains("cannot import `x`"));
     }
 
@@ -497,7 +509,7 @@ mod tests {
             first_span: Span::default(),
             second_span: Span::default(),
         }];
-        let output = render_module_graph_errors_with_sources(&errors, &sources);
+        let output = render_module_graph_errors_with_sources(&errors, &sources, false);
         assert!(output.contains("already imported"));
     }
 
@@ -509,7 +521,7 @@ mod tests {
             first_span: Span::default(),
             second_span: Span::default(),
         }];
-        let output = render_module_graph_errors_with_sources(&errors, &BTreeMap::new());
+        let output = render_module_graph_errors_with_sources(&errors, &BTreeMap::new(), false);
         assert!(output.contains("name collision"));
     }
 
@@ -519,7 +531,7 @@ mod tests {
             cycle: vec![ModulePath::from_str_segments(&["a"])],
             reason: "bad".to_string(),
         }];
-        let output = render_module_graph_errors_with_sources(&errors, &BTreeMap::new());
+        let output = render_module_graph_errors_with_sources(&errors, &BTreeMap::new(), false);
         assert!(output.contains("module cycle detected"));
     }
 
@@ -528,7 +540,7 @@ mod tests {
         let errors = vec![ModuleGraphError::TreeError(
             tlang_modules::ModuleTreeError::NoSrcDirectory(PathBuf::from("/x")),
         )];
-        let output = render_module_graph_errors_with_sources(&errors, &BTreeMap::new());
+        let output = render_module_graph_errors_with_sources(&errors, &BTreeMap::new(), false);
         assert!(output.contains("error:"));
     }
 
@@ -540,7 +552,7 @@ mod tests {
             source: "fn bad {".to_string(),
             issues: vec![],
         }];
-        let _output = render_module_graph_errors_with_sources(&errors, &BTreeMap::new());
+        let _output = render_module_graph_errors_with_sources(&errors, &BTreeMap::new(), false);
     }
 
     #[test]
@@ -560,7 +572,7 @@ mod tests {
             name: "parse".to_string(),
             span: Span::default(),
         }];
-        let output = render_module_graph_errors_with_sources(&errors, &sources);
+        let output = render_module_graph_errors_with_sources(&errors, &sources, false);
         assert!(output.contains("string/parse.tlang"));
     }
 }
