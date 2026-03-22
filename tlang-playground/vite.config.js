@@ -18,6 +18,15 @@ export default defineConfig({
             return 'examples';
           }
 
+          if (id.includes('tlang_bindings')) {
+            return 'tlang_bindings_js';
+          }
+
+          let vendor_ui = ['@lit', 'lit-html', '@floating'];
+          if (vendor_ui.some((path) => id.includes(path))) {
+            return 'vendor-ui';
+          }
+
           let cmt;
           if (
             (cmt =
