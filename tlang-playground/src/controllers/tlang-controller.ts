@@ -12,6 +12,7 @@ import {
   parseSourceMap,
   remapStack,
 } from '../utils/source-map';
+import { ansiToHtml, DiagnosticHtml } from '../utils/ansi-to-html';
 
 type CodemirrorSeverity = 'hint' | 'info' | 'warning' | 'error';
 
@@ -100,17 +101,26 @@ export class TlangController {
 
     const renderedParseErrors = this.tlang.renderParseErrors();
     if (renderedParseErrors) {
-      this.logToConsole('error', renderedParseErrors);
+      this.logToConsole(
+        'error',
+        new DiagnosticHtml(ansiToHtml(renderedParseErrors)),
+      );
     }
 
     const renderedErrors = this.tlang.renderErrorDiagnostics();
     if (renderedErrors) {
-      this.logToConsole('error', renderedErrors);
+      this.logToConsole(
+        'error',
+        new DiagnosticHtml(ansiToHtml(renderedErrors)),
+      );
     }
 
     const renderedWarnings = this.tlang.renderWarningDiagnostics();
     if (renderedWarnings) {
-      this.logToConsole('warn', renderedWarnings);
+      this.logToConsole(
+        'warn',
+        new DiagnosticHtml(ansiToHtml(renderedWarnings)),
+      );
     }
 
     return this.tlang.getCodemirrorDiagnostics();
