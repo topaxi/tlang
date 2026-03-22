@@ -160,14 +160,12 @@ fn test_maximum_depth_tree() {
             });
         }
         function maximum_depth(tree) {
-            let $anf$0;
             let left, right;
             if (tree.tag === Tree.Leaf) {
-                $anf$0 = 1;
+                return 1;
             } else if (tree.tag === Tree.Node && (left = tree.left, true) && (right = tree.right, true)) {
-                $anf$0 = 1 + Math.max(maximum_depth(left), maximum_depth(right));
+                return 1 + Math.max(maximum_depth(left), maximum_depth(right));
             }
-            return $anf$0;
         }
         function main() {
             let x = Tree.Node({
@@ -209,14 +207,12 @@ fn test_maximum_depth_tree_positional() {
             });
         }
         function maximum_depth(tree) {
-            let $anf$0;
             let left, right;
             if (tree.tag === Tree.Leaf) {
-                $anf$0 = 1;
+                return 1;
             } else if (tree.tag === Tree.Node && (left = tree[0], true) && (right = tree[1], true)) {
-                $anf$0 = 1 + Math.max(maximum_depth(left), maximum_depth(right));
+                return 1 + Math.max(maximum_depth(left), maximum_depth(right));
             }
-            return $anf$0;
         }
     "};
     assert_eq!(output, expected_output);
