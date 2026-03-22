@@ -1,5 +1,7 @@
 import { css, html, LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import { DiagnosticHtml } from '../utils/ansi-to-html';
 import './t-button';
 import './t-menu';
 import './t-toggle-button';
@@ -179,6 +181,10 @@ export class ConsoleMessageElement extends LitElement {
   }
 
   protected renderConsoleMessageArg(arg: unknown) {
+    if (arg instanceof DiagnosticHtml) {
+      return html`<span part="arg">${unsafeHTML(arg.html)}</span>`;
+    }
+
     switch (typeof arg) {
       case 'string':
         return html`<span part="arg">${arg}</span>`;

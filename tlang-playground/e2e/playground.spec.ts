@@ -180,6 +180,60 @@ test.describe('Diagnostics in console', () => {
       0,
     );
   });
+
+  test('semantic error diagnostic is rendered as HTML, not ANSI escape codes', async ({
+    page,
+  }) => {
+    // Source: `missing_var;` — triggers "Use of undeclared variable" error
+    await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
+
+    const errorMessage = page.locator('t-console-message[type="error"]');
+    await expect(errorMessage).toHaveCount(1);
+
+    // The diagnostic should contain styled <span> elements from ansiToHtml
+    const styledSpan = errorMessage.locator('span[style]');
+    await expect(styledSpan).not.toHaveCount(0);
+
+    // ANSI escape codes (ESC [ ... m) must NOT be present in the rendered text
+    const textContent = await errorMessage.textContent();
+    expect(textContent).not.toContain('\x1b[');
+  });
+
+  test('parse error diagnostic is rendered as HTML, not ANSI escape codes', async ({
+    page,
+  }) => {
+    // Source: `let x = ;` — triggers a parse error
+    await gotoPlayground(page, '#source=DYUwLgBAHhC8EG4g');
+
+    const errorMessage = page.locator('t-console-message[type="error"]');
+    await expect(errorMessage).toHaveCount(1);
+
+    // The diagnostic should contain styled <span> elements from ansiToHtml
+    const styledSpan = errorMessage.locator('span[style]');
+    await expect(styledSpan).not.toHaveCount(0);
+
+    // ANSI escape codes (ESC [ ... m) must NOT be present in the rendered text
+    const textContent = await errorMessage.textContent();
+    expect(textContent).not.toContain('\x1b[');
+  });
+
+  test('warning diagnostic is rendered as HTML, not ANSI escape codes', async ({
+    page,
+  }) => {
+    // Source: `let x = 42;` — triggers "Unused variable" warning only
+    await gotoPlayground(page, '#source=DYUwLgBAHhC8EBYBMBuIA');
+
+    const warnMessage = page.locator('t-console-message[type="warn"]');
+    await expect(warnMessage).toHaveCount(1);
+
+    // The diagnostic should contain styled <span> elements from ansiToHtml
+    const styledSpan = warnMessage.locator('span[style]');
+    await expect(styledSpan).not.toHaveCount(0);
+
+    // ANSI escape codes (ESC [ ... m) must NOT be present in the rendered text
+    const textContent = await warnMessage.textContent();
+    expect(textContent).not.toContain('\x1b[');
+  });
 });
 
 test.describe('Optimization options URL persistence', () => {
