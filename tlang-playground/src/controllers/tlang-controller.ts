@@ -45,6 +45,7 @@ export class TlangController {
   private optimizationOptions: JsOptimizationOptions = {
     constantFolding: true,
     anfTransform: undefined,
+    anfReturnOpt: true,
   };
 
   /**

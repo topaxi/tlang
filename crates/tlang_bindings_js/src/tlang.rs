@@ -5,6 +5,7 @@ use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
+use tlang_codegen_js::js_anf_return_opt::JsAnfReturnOpt;
 use tlang_codegen_js::js_anf_transform::JsAnfTransform;
 use tlang_codegen_js::js_hir_opt::JsHirOptimizer;
 use tlang_defs::{DefKind, DefScope};
@@ -94,6 +95,9 @@ pub struct JsOptimizationOptions {
     pub constant_folding: Option<bool>,
     /// ANF transform mode: `"off"`, `"minimal"` (JS-only lifting), or `"full"`.
     pub anf_transform: Option<String>,
+    /// Replace ANF temporaries in return position with direct `return` statements.
+    /// Defaults to `true` when the JS ANF transform is active.
+    pub anf_return_opt: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -160,6 +164,7 @@ impl Tlang {
             optimization_options: JsOptimizationOptions {
                 constant_folding: Some(true),
                 anf_transform: None,
+                anf_return_opt: Some(true),
             },
             build: BuildArtifacts::default(),
             analyzer,
@@ -304,6 +309,10 @@ impl Tlang {
                         // "minimal" or any other value: use JS-specific filter
                         _ => vec![Box::new(JsAnfTransform::default())],
                     };
+
+                    if self.optimization_options.anf_return_opt.unwrap_or(true) {
+                        passes.push(Box::new(JsAnfReturnOpt::default()));
+                    }
 
                     passes.push(Box::new(
                         tlang_hir_opt::symbol_resolution::SymbolResolution::default(),

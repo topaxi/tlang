@@ -135,7 +135,7 @@ async function updateDisplayHashparam(display: string) {
 
 // Optimization options are serialized as comma-separated `key:value` pairs in
 // the `opt` hash param.  Only non-default values are stored to keep URLs clean.
-// Short keys:  cf → constantFolding,  anf → anfTransform
+// Short keys:  cf → constantFolding,  anf → anfTransform,  ro → anfReturnOpt
 function serializeOptimizations(options: JsOptimizationOptions): string {
   let parts: string[] = [];
 
@@ -144,6 +144,9 @@ function serializeOptimizations(options: JsOptimizationOptions): string {
   }
   if (options.anfTransform === 'full') {
     parts.push('anf:full');
+  }
+  if (options.anfReturnOpt === false) {
+    parts.push('ro:false');
   }
 
   return parts.join(',');
@@ -157,6 +160,7 @@ function deserializeOptimizations(
   const options: JsOptimizationOptions = {
     constantFolding: true,
     anfTransform: undefined,
+    anfReturnOpt: true,
   };
 
   for (const part of raw.split(',')) {
@@ -166,6 +170,8 @@ function deserializeOptimizations(
       options.constantFolding = value !== 'false';
     } else if (key === 'anf') {
       options.anfTransform = value;
+    } else if (key === 'ro') {
+      options.anfReturnOpt = value !== 'false';
     }
   }
 
@@ -178,6 +184,7 @@ function defaultOptimizationOptions(): JsOptimizationOptions {
     deserializeOptimizations(params.get('opt')) ?? {
       constantFolding: true,
       anfTransform: undefined,
+      anfReturnOpt: true,
     }
   );
 }
@@ -551,26 +558,33 @@ export class TlangPlayground extends LitElement {
                     ANF transform
                   </t-menuitem-checkbox>`
                 : html`<t-menuitem-group class="anf-mode">
-                    <label id="anf-mode__label">ANF</label>
-                    <t-menuitem-radio
-                      aria-labelledby="anf-mode__label"
-                      @click=${() =>
-                        this.setOptimizationOption('anfTransform', 'minimal')}
-                      .checked=${this.optimizationOptions.anfTransform !==
-                      'full'}
+                      <label id="anf-mode__label">ANF</label>
+                      <t-menuitem-radio
+                        aria-labelledby="anf-mode__label"
+                        @click=${() =>
+                          this.setOptimizationOption('anfTransform', 'minimal')}
+                        .checked=${this.optimizationOptions.anfTransform !==
+                        'full'}
+                      >
+                        Minimal
+                      </t-menuitem-radio>
+                      <t-menuitem-radio
+                        aria-labelledby="anf-mode__label"
+                        @click=${() =>
+                          this.setOptimizationOption('anfTransform', 'full')}
+                        .checked=${this.optimizationOptions.anfTransform ===
+                        'full'}
+                      >
+                        Full
+                      </t-menuitem-radio>
+                    </t-menuitem-group>
+                    <t-menuitem-checkbox
+                      @change=${() => this.toggleOptimization('anfReturnOpt')}
+                      .checked=${this.optimizationOptions.anfReturnOpt !==
+                      false}
                     >
-                      Minimal
-                    </t-menuitem-radio>
-                    <t-menuitem-radio
-                      aria-labelledby="anf-mode__label"
-                      @click=${() =>
-                        this.setOptimizationOption('anfTransform', 'full')}
-                      .checked=${this.optimizationOptions.anfTransform ===
-                      'full'}
-                    >
-                      Full
-                    </t-menuitem-radio>
-                  </t-menuitem-group>`}
+                      Return position optimization
+                    </t-menuitem-checkbox>`}
             </t-menu>
             <t-button @click=${this.share}>Share</t-button>
             <t-select
