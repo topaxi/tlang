@@ -273,6 +273,7 @@ impl<'a> InnerCodegen<'a> {
                 vec![hir::PathSegment::new(method.name)],
                 method.span,
             ))),
+            ty: hir::Ty::unknown(),
             span: method.span,
         };
 

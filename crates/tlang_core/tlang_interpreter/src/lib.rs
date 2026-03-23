@@ -862,6 +862,7 @@ impl Interpreter {
                 let name_expr = hir::Expr {
                     hir_id: method.hir_id,
                     kind: hir::ExprKind::Path(Box::new(name_path)),
+                    ty: hir::Ty::unknown(),
                     span: method.span,
                 };
                 let fn_decl = hir::FunctionDeclaration {

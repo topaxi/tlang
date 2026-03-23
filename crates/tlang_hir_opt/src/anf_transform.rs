@@ -123,6 +123,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
         hir::Expr {
             hir_id,
             kind: hir::ExprKind::Path(Box::new(path)),
+            ty: hir::Ty::unknown(),
             span: Span::default(),
         }
     }
@@ -132,6 +133,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
         hir::Expr {
             hir_id,
             kind: hir::ExprKind::Literal(Box::new(Literal::None)),
+            ty: hir::Ty::unknown(),
             span: Span::default(),
         }
     }
@@ -153,6 +155,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                     Box::new(lhs),
                     Box::new(value),
                 ),
+                ty: hir::Ty::unknown(),
                 span: Span::default(),
             })),
             Span::default(),
@@ -174,6 +177,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                         pat_hir_id,
                         Box::new(Ident::new(name, Span::default())),
                     ),
+                    ty: hir::Ty::unknown(),
                     span: Span::default(),
                 }),
                 Box::new(init),
@@ -209,6 +213,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
         block: &mut hir::Block,
     ) {
         if let Some(completion) = block.expr.take() {
+            let completion_ty = completion.ty.clone();
             match completion.kind {
                 hir::ExprKind::IfElse(cond, mut then_block, mut else_branches) => {
                     self.rewrite_if_else_completions(
@@ -222,6 +227,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                         hir::StmtKind::Expr(Box::new(hir::Expr {
                             hir_id: completion.hir_id,
                             kind: hir::ExprKind::IfElse(cond, then_block, else_branches),
+                            ty: completion_ty,
                             span: completion.span,
                         })),
                         completion.span,
@@ -235,6 +241,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                         hir::StmtKind::Expr(Box::new(hir::Expr {
                             hir_id: completion.hir_id,
                             kind: hir::ExprKind::Match(scrutinee, arms),
+                            ty: completion_ty,
                             span: completion.span,
                         })),
                         completion.span,
@@ -289,6 +296,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
     /// a Path reference to the temp variable.
     pub(crate) fn lift_expr(&mut self, expr: hir::Expr) -> hir::Expr {
         let (temp_name, pat_hir_id) = self.fresh_anf_var();
+        let expr_ty = expr.ty.clone();
 
         match expr.kind {
             // Control-flow constructs need the nil-init + branch-assignment
@@ -309,6 +317,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                     hir::StmtKind::Expr(Box::new(hir::Expr {
                         hir_id: expr.hir_id,
                         kind: hir::ExprKind::IfElse(cond, then_block, else_branches),
+                        ty: expr_ty,
                         span: expr.span,
                     })),
                     expr.span,
@@ -326,6 +335,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                     hir::StmtKind::Expr(Box::new(hir::Expr {
                         hir_id: expr.hir_id,
                         kind: hir::ExprKind::Match(scrutinee, arms),
+                        ty: expr_ty,
                         span: expr.span,
                     })),
                     expr.span,
@@ -351,6 +361,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                     hir::StmtKind::Expr(Box::new(hir::Expr {
                         hir_id: expr.hir_id,
                         kind: hir::ExprKind::Loop(block),
+                        ty: expr_ty,
                         span: expr.span,
                     })),
                     expr.span,
@@ -424,6 +435,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
 
     /// Fold the children of an expression without lifting the expression itself.
     pub(crate) fn fold_children(&mut self, expr: hir::Expr) -> hir::Expr {
+        let expr_ty = expr.ty.clone();
         let kind = match expr.kind {
             hir::ExprKind::IfElse(cond, then_block, else_branches) => {
                 let cond = self.normalize_expr(*cond);
@@ -456,6 +468,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                                         pat,
                                         Box::new(self.normalize_expr(*inner)),
                                     ),
+                                    ty: g.ty,
                                     span: g.span,
                                 }
                             } else {
@@ -492,6 +505,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                     hir::Expr {
                         hir_id: expr.hir_id,
                         kind: other,
+                        ty: expr_ty,
                         span: expr.span,
                     },
                 );
@@ -500,6 +514,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
         hir::Expr {
             hir_id: expr.hir_id,
             kind,
+            ty: expr_ty,
             span: expr.span,
         }
     }
@@ -559,6 +574,7 @@ fn rewrite_break_values_in_expr<F: AnfFilter>(
                 hir::Expr {
                     hir_id: folder.alloc_hir_id(),
                     kind: hir::ExprKind::Wildcard,
+                    ty: hir::Ty::unknown(),
                     span: Span::default(),
                 },
             );
@@ -568,6 +584,7 @@ fn rewrite_break_values_in_expr<F: AnfFilter>(
                 hir::StmtKind::Expr(Box::new(hir::Expr {
                     hir_id: expr.hir_id,
                     kind: hir::ExprKind::Break(None),
+                    ty: expr.ty.clone(),
                     span: expr.span,
                 })),
                 expr.span,
@@ -700,6 +717,7 @@ impl<F: AnfFilter> Folder for AnfFolder<'_, F> {
             return hir::Expr {
                 hir_id: expr.hir_id,
                 kind: hir::ExprKind::FunctionExpression(Box::new(folded_decl)),
+                ty: expr.ty,
                 span: expr.span,
             };
         }

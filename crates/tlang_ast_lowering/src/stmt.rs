@@ -551,6 +551,7 @@ impl LoweringContext {
                 Some(hir::Expr {
                     hir_id: this.unique_id(),
                     kind: hir::ExprKind::Match(Box::new(match_value), match_arms),
+                    ty: hir::Ty::unknown(),
                     span: tlang_span::Span::default(),
                 }),
                 tlang_span::Span::default(),
@@ -596,6 +597,7 @@ impl LoweringContext {
 
                 hir::Pat {
                     kind: hir::PatKind::List(params),
+                    ty: hir::Ty::unknown(),
                     span: decl.span,
                 }
             } else {
