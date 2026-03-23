@@ -6,7 +6,7 @@ use tlang_hir::{
 };
 use tlang_span::HirId;
 
-use crate::hir_opt::{HirOptContext, HirPass};
+use crate::hir_opt::{HirOptContext, HirOptError, HirPass};
 
 pub struct ConstantFolder {
     folded_exprs: HashMap<HirId, Literal>,
@@ -282,9 +282,13 @@ impl<'hir> Visitor<'hir> for ConstantFolder {
 }
 
 impl HirPass for ConstantFolder {
-    fn optimize_hir(&mut self, module: &mut hir::Module, _ctx: &mut HirOptContext) -> bool {
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        _ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
         self.changed = false;
         self.visit_module(module, &mut ());
-        self.changed
+        Ok(self.changed)
     }
 }

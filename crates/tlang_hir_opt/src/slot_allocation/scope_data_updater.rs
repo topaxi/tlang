@@ -2,7 +2,7 @@ use log::debug;
 use tlang_hir::{self as hir, HirScope, Visitor};
 
 use crate::HirPass;
-use crate::hir_opt::HirOptContext;
+use crate::hir_opt::{HirOptContext, HirOptError};
 
 /// A HIR pass that updates scope data (locals count) for HIR nodes after slot allocation.
 /// This pass should run after `SlotAllocator` to ensure accurate locals count for memory pre-allocation.
@@ -125,8 +125,12 @@ impl<'hir> Visitor<'hir> for ScopeDataUpdater {
 }
 
 impl HirPass for ScopeDataUpdater {
-    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
         self.visit_module(module, ctx);
-        false // This pass doesn't change the HIR structure, just updates metadata
+        Ok(false) // This pass doesn't change the HIR structure, just updates metadata
     }
 }

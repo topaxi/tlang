@@ -12,8 +12,8 @@ use tlang_codegen_js::{
     generator::{CodegenJS, shift_source_map_lines},
     js_hir_opt::JsHirOptimizer,
 };
-use tlang_diagnostics::{Diagnostic, diagnostics_from_parse_error, render_diagnostics};
-use tlang_hir_opt::{HirOptimizer, HirPass};
+use tlang_diagnostics::{Diagnostic, diagnostics_from_parse_error, render_diagnostics, render_ice};
+use tlang_hir_opt::{HirOptError, HirOptimizer, HirPass};
 use tlang_semantics::SemanticAnalyzer;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -39,7 +39,7 @@ impl HirPass for CompileTargetHirOptimizer {
         &mut self,
         module: &mut tlang_hir::Module,
         ctx: &mut tlang_hir_opt::hir_opt::HirOptContext,
-    ) -> bool {
+    ) -> Result<bool, HirOptError> {
         match self {
             CompileTargetHirOptimizer::Interpreter(optimizer) => {
                 optimizer.optimize_hir(module, ctx)
@@ -117,7 +117,10 @@ fn compile_to_hir(
         CompileTargetHirOptimizer::Interpreter(HirOptimizer::default())
     };
 
-    optimizer.optimize_hir(&mut module, &mut ctx);
+    if let Err(err) = optimizer.optimize_hir(&mut module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        std::process::exit(1);
+    }
 
     Ok(module)
 }

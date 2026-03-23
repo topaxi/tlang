@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use tlang_codegen_js::generator::CodegenJS;
+use tlang_diagnostics::render_ice;
 use tlang_hir_opt::HirPass;
 use tlang_modules::{ModulePath, compile_project};
 
@@ -56,7 +57,10 @@ pub fn handle_build(options: &BuildOptions) -> bool {
             tlang_codegen_js::js_hir_opt::JsHirOptimizer::default(),
         );
         let mut ctx = compiled.lower_meta.clone().into();
-        optimizer.optimize_hir(&mut hir_module, &mut ctx);
+        if let Err(err) = optimizer.optimize_hir(&mut hir_module, &mut ctx) {
+            eprint!("{}", render_ice(&err));
+            return false;
+        }
 
         let mut codegen = CodegenJS::default();
         codegen.set_bundle_mode(true);
@@ -91,7 +95,10 @@ pub fn handle_build(options: &BuildOptions) -> bool {
             tlang_codegen_js::js_hir_opt::JsHirOptimizer::default(),
         );
         let mut ctx = compiled.lower_meta.clone().into();
-        optimizer.optimize_hir(&mut hir_module, &mut ctx);
+        if let Err(err) = optimizer.optimize_hir(&mut hir_module, &mut ctx) {
+            eprint!("{}", render_ice(&err));
+            return false;
+        }
 
         let mut codegen = CodegenJS::default();
         codegen.set_bundle_mode(true);

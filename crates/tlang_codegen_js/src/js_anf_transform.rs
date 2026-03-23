@@ -1,6 +1,6 @@
 use tlang_hir::{self as hir};
 use tlang_hir_opt::anf_transform::{AnfFilter, AnfTransform};
-use tlang_hir_opt::hir_opt::{HirOptContext, HirPass};
+use tlang_hir_opt::hir_opt::{HirOptContext, HirOptError, HirPass};
 
 /// Returns true if the expression can be directly emitted as a JavaScript expression.
 /// Mirrors `expr_can_render_as_js_expr` in the codegen.
@@ -87,7 +87,11 @@ impl HirPass for JsAnfTransform {
         "JsAnfTransform"
     }
 
-    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
         self.0.optimize_hir(module, ctx)
     }
 }

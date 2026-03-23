@@ -1,7 +1,6 @@
 use clap::{ArgMatches, arg, command};
 
 mod commands;
-mod error;
 
 use commands::build::{BuildOptions, handle_build};
 use commands::compile::{CompileOptions, CompileTargetArg, OutputFormat, handle_compile};

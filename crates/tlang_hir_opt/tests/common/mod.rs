@@ -94,7 +94,9 @@ pub fn compile_with_interpreter_builtins_and_optimize(
 ) -> hir::Module {
     let (mut module, meta) = compile_with_interpreter_builtins(source);
     let mut ctx = meta.into();
-    optimizer.optimize_hir(&mut module, &mut ctx);
+    optimizer
+        .optimize_hir(&mut module, &mut ctx)
+        .expect("HIR optimization failed");
     module
 }
 
@@ -111,7 +113,9 @@ pub fn pretty_print_with_unresolved_markers(module: &hir::Module) -> String {
 pub fn compile_and_optimize(source: &str, optimizer: &mut HirOptimizer) -> hir::Module {
     let (mut module, meta) = compile(source);
     let mut ctx = meta.into();
-    optimizer.optimize_hir(&mut module, &mut ctx);
+    optimizer
+        .optimize_hir(&mut module, &mut ctx)
+        .expect("HIR optimization failed");
     module
 }
 

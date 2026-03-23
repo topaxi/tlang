@@ -7,7 +7,7 @@ use tlang_hir::{
 };
 use tlang_span::HirId;
 
-use crate::hir_opt::{HirOptContext, HirPass};
+use crate::hir_opt::{HirOptContext, HirOptError, HirPass};
 
 #[derive(Default)]
 pub struct AssignmentCollector {
@@ -101,12 +101,16 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
 }
 
 impl HirPass for ConstantPropagator {
-    fn optimize_hir(&mut self, module: &mut hir::Module, _ctx: &mut HirOptContext) -> bool {
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        _ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
         self.constants.clear();
         self.reassigned_variables = AssignmentCollector::collect(module);
 
         self.changed = false;
         self.visit_module(module, &mut ());
-        self.changed
+        Ok(self.changed)
     }
 }

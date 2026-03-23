@@ -1,5 +1,5 @@
 use tlang_hir as hir;
-use tlang_hir_opt::hir_opt::{HirOptContext, HirOptGroup};
+use tlang_hir_opt::hir_opt::{HirOptContext, HirOptError, HirOptGroup};
 use tlang_hir_opt::{self as hir_opt, HirPass};
 
 use crate::js_anf_return_opt::JsAnfReturnOpt;
@@ -28,7 +28,11 @@ impl JsHirOptimizer {
         self.0.add_pass(pass);
     }
 
-    pub fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+    pub fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
         HirPass::optimize_hir(self, module, ctx)
     }
 }
@@ -38,7 +42,11 @@ impl HirPass for JsHirOptimizer {
         self.0.init_context(ctx);
     }
 
-    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
         self.init_context(ctx);
         self.0.optimize_hir(module, ctx)
     }

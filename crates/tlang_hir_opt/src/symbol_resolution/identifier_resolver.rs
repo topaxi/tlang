@@ -5,7 +5,7 @@ use tlang_hir::{self as hir, Visitor};
 use tlang_span::HirId;
 
 use crate::HirPass;
-use crate::hir_opt::HirOptContext;
+use crate::hir_opt::{HirOptContext, HirOptError};
 
 /// Primitive type names that are builtin to the language and have no
 /// declaration node in the symbol table.
@@ -228,9 +228,13 @@ impl HirPass for IdentifierResolver {
         self.enter_scope(ctx.current_scope, ctx);
     }
 
-    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
         self.visit_module(module, ctx);
 
-        false
+        Ok(false)
     }
 }

@@ -38,7 +38,9 @@ mod helpers {
 
         let mut optimizer = HirOptimizer::default();
         let mut ctx = meta.into();
-        optimizer.optimize_hir(&mut module, &mut ctx);
+        optimizer
+            .optimize_hir(&mut module, &mut ctx)
+            .expect("HIR optimization failed");
 
         module
     }

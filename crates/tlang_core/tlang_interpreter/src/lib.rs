@@ -2028,7 +2028,9 @@ mod tests {
             debug!("LowerResultMeta = {:?}", meta);
             let constant_pool_ids = meta.constant_pool_ids.clone();
             let mut ctx = meta.into();
-            optimizer.optimize_hir(&mut module, &mut ctx);
+            optimizer
+                .optimize_hir(&mut module, &mut ctx)
+                .expect("internal compiler error: HIR optimizer failed to converge");
 
             self.state.register_constant_pool_ids(constant_pool_ids);
 

@@ -8,6 +8,30 @@ use tlang_diagnostics::Diagnostic;
 use tlang_hir as hir;
 use tlang_span::{HirId, HirIdAllocator};
 
+pub const MAX_ITERATIONS: u32 = 10;
+
+#[derive(Debug)]
+pub enum HirOptError {
+    ConvergenceFailure { pass_name: String, iteration: u32 },
+}
+
+impl std::fmt::Display for HirOptError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HirOptError::ConvergenceFailure {
+                pass_name,
+                iteration,
+            } => write!(
+                f,
+                "HIR optimizer pass '{}' did not converge after {} iterations",
+                pass_name, iteration
+            ),
+        }
+    }
+}
+
+impl std::error::Error for HirOptError {}
+
 #[derive(Debug)]
 pub struct HirOptContext {
     pub symbols: HashMap<HirId, Rc<RefCell<DefScope>>>,
@@ -41,7 +65,11 @@ pub trait HirPass {
     #[allow(unused_variables)]
     fn init_context(&mut self, ctx: &mut HirOptContext) {}
 
-    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool;
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError>;
 }
 
 #[derive(Default)]
@@ -73,25 +101,31 @@ impl HirPass for HirOptGroup {
         }
     }
 
-    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
-        let mut iteration = 0;
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
+        let mut iteration = 0u32;
         let mut changed = true;
 
         while changed {
             iteration += 1;
-            assert!(
-                iteration <= 10,
-                "Too many optimization iterations, likely an infinite loop"
-            );
+            if iteration > MAX_ITERATIONS {
+                return Err(HirOptError::ConvergenceFailure {
+                    pass_name: self.name().to_string(),
+                    iteration,
+                });
+            }
 
             changed = false;
             for pass in &mut self.passes {
                 debug!("Running pass: {}", pass.name());
 
-                changed |= pass.optimize_hir(module, ctx);
+                changed |= pass.optimize_hir(module, ctx)?;
             }
         }
-        false
+        Ok(false)
     }
 }
 
@@ -117,7 +151,11 @@ impl HirOptimizer {
         self.0.add_pass(pass);
     }
 
-    pub fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+    pub fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
         HirPass::optimize_hir(self, module, ctx)
     }
 }
@@ -127,8 +165,71 @@ impl HirPass for HirOptimizer {
         self.0.init_context(ctx);
     }
 
-    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
         self.init_context(ctx);
         self.0.optimize_hir(module, ctx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct AlwaysChangedPass;
+
+    impl HirPass for AlwaysChangedPass {
+        fn name(&self) -> &'static str {
+            "AlwaysChangedPass"
+        }
+
+        fn optimize_hir(
+            &mut self,
+            _module: &mut hir::Module,
+            _ctx: &mut HirOptContext,
+        ) -> Result<bool, HirOptError> {
+            Ok(true) // always reports a change, causing infinite convergence
+        }
+    }
+
+    fn make_ctx() -> HirOptContext {
+        HirOptContext {
+            symbols: HashMap::new(),
+            hir_id_allocator: HirIdAllocator::default(),
+            current_scope: HirId::new(1),
+        }
+    }
+
+    #[test]
+    fn convergence_failure_returns_error() {
+        let mut group = HirOptGroup::new("test_group", vec![Box::new(AlwaysChangedPass)]);
+        let mut module = hir::Module::default();
+        let mut ctx = make_ctx();
+        let result = HirPass::optimize_hir(&mut group, &mut module, &mut ctx);
+        match result {
+            Err(HirOptError::ConvergenceFailure {
+                pass_name,
+                iteration,
+            }) => {
+                assert_eq!(pass_name, "test_group");
+                assert_eq!(iteration, MAX_ITERATIONS + 1);
+            }
+            Ok(_) => panic!("expected ConvergenceFailure, got Ok"),
+        }
+    }
+
+    #[test]
+    fn convergence_failure_display() {
+        let err = HirOptError::ConvergenceFailure {
+            pass_name: "my_pass".to_string(),
+            iteration: 11,
+        };
+        assert_eq!(
+            err.to_string(),
+            "HIR optimizer pass 'my_pass' did not converge after 11 iterations"
+        );
     }
 }

@@ -1,6 +1,6 @@
 use tlang_ast::token::Literal;
 use tlang_hir::{self as hir};
-use tlang_hir_opt::hir_opt::{HirOptContext, HirPass};
+use tlang_hir_opt::hir_opt::{HirOptContext, HirOptError, HirPass};
 
 /// Post-ANF cleanup pass that detects the "return via ANF temp" pattern and
 /// replaces it with direct `return` statements in each control-flow branch.
@@ -26,10 +26,14 @@ impl HirPass for JsAnfReturnOpt {
         "JsAnfReturnOpt"
     }
 
-    fn optimize_hir(&mut self, module: &mut hir::Module, _ctx: &mut HirOptContext) -> bool {
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        _ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
         self.changed = false;
         self.visit_block(&mut module.block);
-        self.changed
+        Ok(self.changed)
     }
 }
 

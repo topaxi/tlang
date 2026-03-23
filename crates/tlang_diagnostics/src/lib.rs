@@ -270,6 +270,16 @@ pub fn render_semantic_diagnostics(
     render_diagnostics(source_name, source, diagnostics, ansi)
 }
 
+/// Render an internal compiler error (ICE) message without source context.
+///
+/// ICEs indicate a compiler bug rather than a user error, so no source
+/// location is shown. The message is followed by a link to file an issue.
+pub fn render_ice(err: &dyn std::error::Error) -> String {
+    format!(
+        "error: internal compiler error: {err}\n\nThis is a compiler bug. Please file an issue at https://github.com/topaxi/tlang/issues\n"
+    )
+}
+
 /// Render a simple error message with source context at a given span.
 ///
 /// This is useful for module-level errors (import errors, visibility errors, etc.)

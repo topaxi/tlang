@@ -325,7 +325,11 @@ impl Tlang {
                     }
 
                     let mut optimizer = JsHirOptimizer::new(passes);
-                    optimizer.optimize_hir(&mut module, &mut ctx);
+                    optimizer
+                        .optimize_hir(&mut module, &mut ctx)
+                        .unwrap_or_else(|err| {
+                            panic!("internal compiler error: {err}\n\nThis is a compiler bug. Please file an issue at https://github.com/topaxi/tlang/issues")
+                        });
                 }
                 RunnerKind::Interpreter => {
                     let mut passes: Vec<Box<dyn HirPass>> = Vec::new();
@@ -359,7 +363,11 @@ impl Tlang {
                     ));
 
                     let mut optimizer = HirOptimizer::new(passes);
-                    optimizer.optimize_hir(&mut module, &mut ctx);
+                    optimizer
+                        .optimize_hir(&mut module, &mut ctx)
+                        .unwrap_or_else(|err| {
+                            panic!("internal compiler error: {err}\n\nThis is a compiler bug. Please file an issue at https://github.com/topaxi/tlang/issues")
+                        });
                 }
             }
 
