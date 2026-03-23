@@ -59,6 +59,28 @@ pub struct TailCall {
     pub args: SmallVec<[TlangValue; 4]>,
 }
 
+// ─── ExecutionError and constants ────────────────────────────────────────────────
+
+pub const MAX_CALL_STACK_DEPTH: usize = 10_000;
+
+#[derive(Debug)]
+pub enum ExecutionError {
+    CallStackOverflow,
+}
+
+impl std::error::Error for ExecutionError {}
+
+impl std::fmt::Display for ExecutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExecutionError::CallStackOverflow => write!(
+                f,
+                "stack overflow: maximum call stack depth of {MAX_CALL_STACK_DEPTH} exceeded",
+            ),
+        }
+    }
+}
+
 // ─── ExecutionContext ─────────────────────────────────────────────────────────
 
 /// Per-execution runtime state: the scope stack and call frames.
@@ -81,8 +103,13 @@ impl ExecutionContext {
         }
     }
 
-    pub fn push_call_stack(&mut self, entry: CallStackEntry) {
+    pub fn push_call_stack(&mut self, entry: CallStackEntry) -> Result<(), ExecutionError> {
+        if self.call_stack.len() >= MAX_CALL_STACK_DEPTH {
+            return Err(ExecutionError::CallStackOverflow);
+        }
+
         self.call_stack.push(entry);
+        Ok(())
     }
 
     /// # Panics

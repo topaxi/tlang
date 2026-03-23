@@ -229,8 +229,7 @@ impl VMState {
         let native_fn = self.heap.native_fns.get(&fn_id)?.clone();
         let name = self.heap.native_fns_meta.get(&fn_id)?.name.clone();
 
-        self.execution
-            .push_call_stack(CallStackEntry::new_native_call(&name));
+        self.push_call_stack(CallStackEntry::new_native_call(&name));
         let result = native_fn(self, args);
         self.execution.pop_call_stack();
 
@@ -823,7 +822,10 @@ impl VMState {
 
     /// # Panics
     #[allow(clippy::needless_pass_by_value)]
-    pub fn panic(&self, message: String) -> ! {
+    pub fn panic<M>(&self, message: M) -> !
+    where
+        M: std::fmt::Display,
+    {
         let mut call_stack = String::new();
 
         for entry in self.execution.call_stack.iter().rev() {
@@ -848,7 +850,9 @@ impl VMState {
     }
 
     pub fn push_call_stack(&mut self, entry: CallStackEntry) {
-        self.execution.push_call_stack(entry);
+        if let Err(err) = self.execution.push_call_stack(entry) {
+            self.panic(err);
+        }
     }
 
     /// # Panics
