@@ -40,10 +40,9 @@ fn main() {
     };
 
     let mut parser = tlang_parser::Parser::from_source(&code);
-    let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| parser.parse()));
-    let (mut ast, parse_meta) = match parse_result {
-        Ok(Ok(result)) => result,
-        Ok(Err(err)) => {
+    let (mut ast, parse_meta) = match parser.parse() {
+        Ok(result) => result,
+        Err(err) => {
             eprint!(
                 "{}",
                 render_parse_issues(
@@ -53,10 +52,6 @@ fn main() {
                     std::io::stderr().is_terminal()
                 )
             );
-            process::exit(1);
-        }
-        Err(_) => {
-            eprintln!("parse error");
             process::exit(1);
         }
     };

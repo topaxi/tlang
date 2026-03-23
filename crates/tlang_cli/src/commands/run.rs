@@ -154,35 +154,15 @@ fn compile(input_file: &str) -> (hir::Module, std::collections::HashSet<tlang_hi
     }
 
     let mut parser = tlang_parser::Parser::from_source(&source);
-    let prev_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(|_| {}));
-    let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| parser.parse()));
-    std::panic::set_hook(prev_hook);
-    let (mut ast, parse_meta) = match parse_result {
-        Ok(Ok(result)) => result,
-        Ok(Err(err)) => {
+    let (mut ast, parse_meta) = match parser.parse() {
+        Ok(result) => result,
+        Err(err) => {
             eprint!(
                 "{}",
                 render_parse_issues(
                     &path.to_string_lossy(),
                     &source,
                     err.issues(),
-                    std::io::stderr().is_terminal()
-                )
-            );
-            std::process::exit(1);
-        }
-        Err(payload) => {
-            let issues = parser.errors();
-            if issues.is_empty() {
-                std::panic::resume_unwind(payload);
-            }
-            eprint!(
-                "{}",
-                render_parse_issues(
-                    &path.to_string_lossy(),
-                    &source,
-                    issues,
                     std::io::stderr().is_terminal()
                 )
             );

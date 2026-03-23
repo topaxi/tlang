@@ -215,7 +215,7 @@ impl Tlang {
 
     fn parse(&mut self) -> Result<&ast::Module, &ParseError> {
         if self.build.parse_result.is_none() {
-            let mut parser = Parser::from_source(&self.source).set_recoverable(true);
+            let mut parser = Parser::from_source(&self.source);
             match parser.parse() {
                 Ok((module, parse_meta)) => {
                     self.build.constant_pool_node_ids = parse_meta.constant_pool_node_ids;

@@ -16,10 +16,6 @@ macro_rules! expect_token_matches {
         match $parser.current_token_kind() {
             $pattern $(if $guard)? => (),
             _ => {
-                if !$parser.recoverable() {
-                    $parser.panic_unexpected_token(&format!("{:?}", stringify!($pattern)), $parser.current_token);
-                }
-
                 // At EOF, only push the first error — further mismatches are cascades.
                 if !$parser.at_eof() || $parser.errors.is_empty() {
                     $parser.push_unexpected_token_error(
@@ -37,10 +33,6 @@ macro_rules! expect_token_matches {
         match $parser.current_token_kind() {
             $pattern $(if $guard)? => (),
             _ => {
-                if !$parser.recoverable() {
-                    $parser.panic_unexpected_token($message, $parser.current_token);
-                }
-
                 // At EOF, only push the first error — further mismatches are cascades.
                 if !$parser.at_eof() || $parser.errors.is_empty() {
                     $parser.push_unexpected_token_error(

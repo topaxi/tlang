@@ -74,21 +74,7 @@ fn compile_to_hir(
     show_warnings: bool,
 ) -> Result<tlang_hir::Module, ParserError> {
     let mut parser = tlang_parser::Parser::from_source(source);
-    let prev_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(|_| {}));
-    let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| parser.parse()));
-    std::panic::set_hook(prev_hook);
-    let (mut ast, parse_meta) = match parse_result {
-        Ok(Ok(result)) => result,
-        Ok(Err(err)) => return Err(err.into()),
-        Err(payload) => {
-            let issues = parser.errors();
-            if issues.is_empty() {
-                std::panic::resume_unwind(payload);
-            }
-            return Err(ParserError::ParseError(issues.to_vec()));
-        }
-    };
+    let (mut ast, parse_meta) = parser.parse()?;
 
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());

@@ -36,8 +36,6 @@ pub struct Parser<'src> {
     current_token: Token,
     next_token: Token,
 
-    recoverable: bool,
-
     node_id_allocator: NodeIdAllocator,
 
     errors: Vec<ParseIssue>,
@@ -59,7 +57,6 @@ impl<'src> Parser<'src> {
             next_token: Token::default(),
             node_id_allocator: NodeIdAllocator::default(),
             errors: Vec::new(),
-            recoverable: false,
             trailing_comments_buffer: Vec::new(),
             constant_pool_node_ids: Vec::new(),
         }
@@ -72,15 +69,6 @@ impl<'src> Parser<'src> {
 
     pub fn with_byte_offset(mut self, byte_offset: u32) -> Self {
         self.lexer.set_byte_offset(byte_offset);
-        self
-    }
-
-    pub fn recoverable(&self) -> bool {
-        self.recoverable
-    }
-
-    pub fn set_recoverable(mut self, recoverable: bool) -> Self {
-        self.recoverable = recoverable;
         self
     }
 
@@ -1413,17 +1401,13 @@ impl<'src> Parser<'src> {
             TokenKind::Keyword(Keyword::_Self) => self.parse_self_expression(),
             TokenKind::Identifier => self.parse_identifier_expr(),
             _ => {
-                if self.recoverable() {
-                    // `expect_token_matches!` above already pushed an error and advanced
-                    // past the unexpected token.  Return a placeholder so the caller
-                    // can continue recovering.
-                    node::expr!(
-                        self.unique_id(),
-                        Literal(Box::new(Literal::UnsignedInteger(0)))
-                    )
-                } else {
-                    self.panic_unexpected_token("primary expression", self.current_token);
-                }
+                // `expect_token_matches!` above already pushed an error and advanced
+                // past the unexpected token.  Return a placeholder so the caller
+                // can continue recovering.
+                node::expr!(
+                    self.unique_id(),
+                    Literal(Box::new(Literal::UnsignedInteger(0)))
+                )
             }
         };
 
