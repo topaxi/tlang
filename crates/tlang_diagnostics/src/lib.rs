@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::ops::Range;
 
 use codespan_reporting::{
@@ -5,9 +6,150 @@ use codespan_reporting::{
     files::SimpleFiles,
     term::{self, Config, termcolor::Buffer},
 };
-use tlang_parser::error::ParseIssue;
-use tlang_semantics::diagnostic::{Diagnostic, Severity};
+use tlang_parser::error::{ParseError, ParseIssue};
 use tlang_span::Span;
+
+#[cfg(feature = "serde")]
+use serde::Serialize;
+
+/// The severity of a diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub enum Severity {
+    Error,
+    Warning,
+}
+
+impl Display for Severity {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Severity::Error => write!(f, "error"),
+            Severity::Warning => write!(f, "warning"),
+        }
+    }
+}
+
+/// A secondary labeled span attached to a [`Diagnostic`].
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct DiagnosticLabel {
+    pub message: String,
+    pub span: Span,
+}
+
+/// A structured diagnostic message with severity, primary span, and optional
+/// secondary labeled spans.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct Diagnostic {
+    /// The message to display to the user.
+    message: String,
+    /// The primary location of the error.
+    span: Span,
+    /// The severity of the error.
+    severity: Severity,
+    /// Optional secondary labeled spans (e.g. "defined here" pointers).
+    labels: Vec<DiagnosticLabel>,
+}
+
+impl Diagnostic {
+    pub fn new(severity: Severity, message: String, span: Span) -> Self {
+        Diagnostic {
+            message,
+            span,
+            severity,
+            labels: Vec::new(),
+        }
+    }
+
+    pub fn warn(message: &str, span: Span) -> Self {
+        Diagnostic::new(Severity::Warning, message.to_string(), span)
+    }
+
+    pub fn error(message: &str, span: Span) -> Self {
+        Diagnostic::new(Severity::Error, message.to_string(), span)
+    }
+
+    /// Attach a secondary labeled span to this diagnostic (builder-style).
+    pub fn with_label(mut self, message: impl Into<String>, span: Span) -> Self {
+        self.labels.push(DiagnosticLabel {
+            message: message.into(),
+            span,
+        });
+        self
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    pub fn severity(&self) -> Severity {
+        self.severity
+    }
+
+    pub fn span(&self) -> &Span {
+        &self.span
+    }
+
+    pub fn labels(&self) -> &[DiagnosticLabel] {
+        &self.labels
+    }
+
+    pub fn is_error(&self) -> bool {
+        self.severity == Severity::Error
+    }
+
+    pub fn is_warning(&self) -> bool {
+        self.severity == Severity::Warning
+    }
+}
+
+impl Display for Diagnostic {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}: {} on line {}:{}",
+            self.severity.to_string().to_uppercase(),
+            self.message,
+            self.span.start_lc.line + 1,
+            self.span.start_lc.column + 1
+        )
+    }
+}
+
+impl From<ParseIssue> for Diagnostic {
+    fn from(issue: ParseIssue) -> Self {
+        Diagnostic::error(&issue.msg, issue.span)
+    }
+}
+
+impl From<&ParseIssue> for Diagnostic {
+    fn from(issue: &ParseIssue) -> Self {
+        Diagnostic::error(&issue.msg, issue.span)
+    }
+}
+
+/// Convert a [`ParseError`] (which may contain multiple parse issues) into a
+/// `Vec<Diagnostic>`, one per issue.
+pub fn diagnostics_from_parse_error(err: &ParseError) -> Vec<Diagnostic> {
+    err.issues().iter().map(Diagnostic::from).collect()
+}
+
+#[macro_export]
+macro_rules! warn_at {
+    ($span:expr, $fmt:expr, $($arg:tt)*) => {{
+        let msg = format!($fmt, $($arg)*);
+        $crate::Diagnostic::warn(&msg, $span)
+    }};
+}
+
+#[macro_export]
+macro_rules! error_at {
+    ($span:expr, $fmt:expr, $($arg:tt)*) => {{
+        let msg = format!($fmt, $($arg)*);
+        $crate::Diagnostic::error(&msg, $span)
+    }};
+}
 
 fn label_range(span: &Span, source_len: usize) -> Range<usize> {
     let mut start = usize::min(span.start as usize, source_len);
@@ -53,21 +195,9 @@ fn diagnostic_report(
         .with_labels(labels)
 }
 
-fn parse_issue_report(
-    file_id: usize,
-    source_len: usize,
-    issue: &ParseIssue,
-) -> ReportDiagnostic<usize> {
-    ReportDiagnostic::new(ReportSeverity::Error)
-        .with_message(&issue.msg)
-        .with_labels(vec![Label::primary(
-            file_id,
-            label_range(&issue.span, source_len),
-        )])
-}
-
-/// Render parse issues from a failed parse into a human-readable, source-aware
-/// string using `codespan_reporting`.
+/// Render diagnostics into a human-readable, source-aware string using
+/// `codespan_reporting`. This is the unified render entry point for all
+/// diagnostic types.
 ///
 /// Set `ansi` to `true` to emit ANSI color/style escape sequences (e.g. for
 /// terminals or downstream ANSI-to-HTML conversion).
@@ -76,42 +206,7 @@ fn parse_issue_report(
 ///
 /// Panics if writing to the internal buffer fails, which cannot happen with
 /// the in-memory [`Buffer`] used internally.
-pub fn render_parse_issues(
-    source_name: &str,
-    source: &str,
-    issues: &[ParseIssue],
-    ansi: bool,
-) -> String {
-    let mut files = SimpleFiles::new();
-    let file_id = files.add(source_name, source);
-    let mut writer = if ansi {
-        Buffer::ansi()
-    } else {
-        Buffer::no_color()
-    };
-    let config = Config::default();
-
-    for issue in issues {
-        let report = parse_issue_report(file_id, source.len(), issue);
-        // SimpleFiles never returns an error; the expect is unreachable.
-        term::emit_to_write_style(&mut writer, &config, &files, &report)
-            .expect("codespan diagnostic rendering should succeed");
-    }
-
-    String::from_utf8_lossy(writer.as_slice()).into_owned()
-}
-
-/// Render semantic diagnostics into a human-readable, source-aware string using
-/// `codespan_reporting`.
-///
-/// Set `ansi` to `true` to emit ANSI color/style escape sequences (e.g. for
-/// terminals or downstream ANSI-to-HTML conversion).
-///
-/// # Panics
-///
-/// Panics if writing to the internal buffer fails, which cannot happen with
-/// the in-memory [`Buffer`] used internally.
-pub fn render_semantic_diagnostics(
+pub fn render_diagnostics(
     source_name: &str,
     source: &str,
     diagnostics: &[Diagnostic],
@@ -136,6 +231,45 @@ pub fn render_semantic_diagnostics(
     String::from_utf8_lossy(writer.as_slice()).into_owned()
 }
 
+/// Render parse issues from a failed parse into a human-readable, source-aware
+/// string using `codespan_reporting`.
+///
+/// Set `ansi` to `true` to emit ANSI color/style escape sequences (e.g. for
+/// terminals or downstream ANSI-to-HTML conversion).
+///
+/// # Panics
+///
+/// Panics if writing to the internal buffer fails, which cannot happen with
+/// the in-memory [`Buffer`] used internally.
+pub fn render_parse_issues(
+    source_name: &str,
+    source: &str,
+    issues: &[ParseIssue],
+    ansi: bool,
+) -> String {
+    let diagnostics: Vec<Diagnostic> = issues.iter().map(Diagnostic::from).collect();
+    render_diagnostics(source_name, source, &diagnostics, ansi)
+}
+
+/// Render semantic diagnostics into a human-readable, source-aware string using
+/// `codespan_reporting`.
+///
+/// Set `ansi` to `true` to emit ANSI color/style escape sequences (e.g. for
+/// terminals or downstream ANSI-to-HTML conversion).
+///
+/// # Panics
+///
+/// Panics if writing to the internal buffer fails, which cannot happen with
+/// the in-memory [`Buffer`] used internally.
+pub fn render_semantic_diagnostics(
+    source_name: &str,
+    source: &str,
+    diagnostics: &[Diagnostic],
+    ansi: bool,
+) -> String {
+    render_diagnostics(source_name, source, diagnostics, ansi)
+}
+
 /// Render a simple error message with source context at a given span.
 ///
 /// This is useful for module-level errors (import errors, visibility errors, etc.)
@@ -153,38 +287,21 @@ pub fn render_error_at_span(
     span: &Span,
     ansi: bool,
 ) -> String {
-    let mut files = SimpleFiles::new();
-    let file_id = files.add(source_name, source);
-    let mut writer = if ansi {
-        Buffer::ansi()
-    } else {
-        Buffer::no_color()
-    };
-    let config = Config::default();
-
-    let report = ReportDiagnostic::new(ReportSeverity::Error)
-        .with_message(message)
-        .with_labels(vec![Label::primary(
-            file_id,
-            label_range(span, source.len()),
-        )]);
-
-    term::emit_to_write_style(&mut writer, &config, &files, &report)
-        .expect("codespan diagnostic rendering should succeed");
-
-    String::from_utf8_lossy(writer.as_slice()).into_owned()
+    let diagnostic = Diagnostic::error(message, *span);
+    render_diagnostics(source_name, source, &[diagnostic], ansi)
 }
 
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
     use insta::assert_snapshot;
-    use tlang_parser::Parser;
     use tlang_parser::error::{ParseIssue, ParseIssueKind};
-    use tlang_semantics::SemanticAnalyzer;
     use tlang_span::{LineColumn, Span};
 
-    use super::{render_parse_issues, render_semantic_diagnostics};
+    use super::{
+        Diagnostic, diagnostics_from_parse_error, render_diagnostics, render_parse_issues,
+        render_semantic_diagnostics,
+    };
 
     /// Build a `ParseIssue` with explicit byte + line/column info, without
     /// needing to drive the parser in recoverable mode.
@@ -202,6 +319,10 @@ mod tests {
             kind: ParseIssueKind::UnexpectedEof,
             span: Span::new(start, end, LineColumn::new(sl, sc), LineColumn::new(el, ec)),
         }
+    }
+
+    fn span(start: u32, end: u32, sl: u32, sc: u32, el: u32, ec: u32) -> Span {
+        Span::new(start, end, LineColumn::new(sl, sc), LineColumn::new(el, ec))
     }
 
     #[test]
@@ -256,20 +377,29 @@ mod tests {
 
     #[test]
     fn renders_semantic_diagnostics_with_source_context() {
+        // Simulate diagnostics similar to what SemanticAnalyzer would produce.
+        // Source: "fn unused() {\n    missing;\n}\n"
+        // Byte offsets (0-indexed):
+        //   "fn " = 0-2, "unused" = 3-8, "() {\n" = 9-13
+        //   "    " = 14-17, "missing" = 18-24, ";\n" = 25-26, "}\n" = 27-28
         let source = indoc! {"
             fn unused() {
                 missing;
             }
         "};
-        let mut parser = Parser::from_source(source);
-        let (mut ast, _) = parser.parse().expect("source should parse");
-        let mut analyzer = SemanticAnalyzer::default();
-        let _ = analyzer.analyze(&mut ast);
+
+        // error: undeclared `missing` at line 1 (0-indexed), cols 4-11
+        let error_diag = Diagnostic::error(
+            "Use of undeclared variable `missing`",
+            span(18, 25, 1, 4, 1, 11),
+        );
+        // warning: unused function `unused` at line 0, cols 3-9
+        let warn_diag = Diagnostic::warn("Unused function `unused/0`", span(3, 9, 0, 3, 0, 9));
 
         assert_snapshot!(render_semantic_diagnostics(
             "test.tlang",
             source,
-            &analyzer.get_diagnostics(),
+            &[error_diag, warn_diag],
             false,
         ), @r"
         error: Use of undeclared variable `missing`
@@ -288,20 +418,17 @@ mod tests {
 
     #[test]
     fn renders_only_warnings() {
+        // Source: "let unused_var = 42;\n"
+        // "unused_var" at bytes 4-13 (line 0, cols 4-13)
         let source = indoc! {"
             let unused_var = 42;
         "};
-        let mut parser = Parser::from_source(source);
-        let (mut ast, _) = parser.parse().expect("source should parse");
-        let mut analyzer = SemanticAnalyzer::default();
-        let _ = analyzer.analyze(&mut ast);
-        let warnings: Vec<_> = analyzer
-            .get_diagnostics()
-            .into_iter()
-            .filter(|d| d.is_warning())
-            .collect();
+        let warning = Diagnostic::warn(
+            "Unused variable `unused_var`, if this is intentional, prefix the name with an underscore: `_unused_var`",
+            span(4, 14, 0, 4, 0, 14),
+        );
 
-        assert_snapshot!(render_semantic_diagnostics("test.tlang", source, &warnings, false), @r"
+        assert_snapshot!(render_semantic_diagnostics("test.tlang", source, &[warning], false), @r"
         warning: Unused variable `unused_var`, if this is intentional, prefix the name with an underscore: `_unused_var`
           ┌─ test.tlang:1:5
           │
@@ -312,20 +439,22 @@ mod tests {
 
     #[test]
     fn renders_did_you_mean_with_secondary_label() {
+        // Source: "fn evaluate(val) { va }"
+        // "va" is at bytes 19-21 (line 0, cols 19-21)
+        // "val" is at bytes 12-15 (line 0, cols 12-15)
         let source = indoc! {"
             fn evaluate(val) { va }
         "};
-        let mut parser = Parser::from_source(source);
-        let (mut ast, _) = parser.parse().expect("source should parse");
-        let mut analyzer = SemanticAnalyzer::default();
-        let _ = analyzer.analyze(&mut ast);
-        let errors: Vec<_> = analyzer
-            .get_diagnostics()
-            .into_iter()
-            .filter(|d| d.is_error())
-            .collect();
+        let error = Diagnostic::error(
+            "Use of undeclared variable `va`, did you mean the parameter `val`?",
+            span(19, 21, 0, 19, 0, 21),
+        )
+        .with_label(
+            "parameter `val` is defined here",
+            span(12, 15, 0, 12, 0, 15),
+        );
 
-        assert_snapshot!(render_semantic_diagnostics("test.tlang", source, &errors, false), @r"
+        assert_snapshot!(render_semantic_diagnostics("test.tlang", source, &[error], false), @r"
         error: Use of undeclared variable `va`, did you mean the parameter `val`?
           ┌─ test.tlang:1:20
           │
@@ -341,14 +470,41 @@ mod tests {
         use super::render_error_at_span;
 
         let source = "use math::secret;";
-        let span = Span::new(10, 16, LineColumn::new(0, 10), LineColumn::new(0, 16));
+        let sp = Span::new(10, 16, LineColumn::new(0, 10), LineColumn::new(0, 16));
 
-        assert_snapshot!(render_error_at_span("lib.tlang", source, "symbol `secret` is not public", &span, false), @r"
+        assert_snapshot!(render_error_at_span("lib.tlang", source, "symbol `secret` is not public", &sp, false), @r"
         error: symbol `secret` is not public
           ┌─ lib.tlang:1:11
           │
         1 │ use math::secret;
           │           ^^^^^^
         ");
+    }
+
+    #[test]
+    fn render_diagnostics_unifies_parse_and_semantic() {
+        // Verify that parse issues convert to diagnostics and render identically
+        // to using render_parse_issues directly.
+        let source = "let x = ;";
+        let issues = vec![make_parse_issue(
+            "Expected expression, found Semicolon",
+            8,
+            9,
+            0,
+            8,
+            0,
+            9,
+        )];
+        let diagnostics: Vec<Diagnostic> = issues.iter().map(Diagnostic::from).collect();
+
+        let via_parse_issues = render_parse_issues("test.tlang", source, &issues, false);
+        let via_diagnostics = render_diagnostics("test.tlang", source, &diagnostics, false);
+        assert_eq!(via_parse_issues, via_diagnostics);
+
+        // Also verify diagnostics_from_parse_error helper
+        let err = tlang_parser::error::ParseError::new(issues);
+        let converted = diagnostics_from_parse_error(&err);
+        let via_converted = render_diagnostics("test.tlang", source, &converted, false);
+        assert_eq!(via_parse_issues, via_converted);
     }
 }

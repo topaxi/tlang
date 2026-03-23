@@ -1,5 +1,5 @@
 use super::CompileTarget;
-use crate::error::ParserError;
+use tlang_diagnostics::{Diagnostic, diagnostics_from_parse_error};
 
 pub struct AstTarget;
 
@@ -8,9 +8,11 @@ impl CompileTarget for AstTarget {
         &self,
         source: &str,
         _module: &mut tlang_hir::Module,
-    ) -> Result<String, ParserError> {
+    ) -> Result<String, Vec<Diagnostic>> {
         let mut parser = tlang_parser::Parser::from_source(source);
-        let (ast, _) = parser.parse()?;
+        let (ast, _) = parser
+            .parse()
+            .map_err(|e| diagnostics_from_parse_error(&e))?;
         Ok(ron::ser::to_string_pretty(&ast, ron::ser::PrettyConfig::default()).unwrap())
     }
 }

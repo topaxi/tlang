@@ -5,10 +5,11 @@ edition.workspace = true
 
 [features]
 default = []
-serde = ["dep:serde", "tlang_defs/serde"]
+serde = ["dep:serde", "tlang_defs/serde", "tlang_diagnostics/serde"]
 
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
+tlang_diagnostics = { path = "../tlang_diagnostics" }
 tlang_span = { path = "../tlang_span" }
 tlang_defs = { path = "../tlang_defs" }
 regex-syntax = "0.8"

@@ -1875,8 +1875,8 @@ dependencies = [
  "codespan-reporting",
  "indoc",
  "insta",
+ "serde",
  "tlang_parser",
- "tlang_semantics",
  "tlang_span",
 ]
 
@@ -1996,6 +1996,7 @@ dependencies = [
  "tlang_ast_lowering",
  "tlang_codegen_js",
  "tlang_defs",
+ "tlang_diagnostics",
  "tlang_hir",
  "tlang_hir_opt",
  "tlang_parser",
@@ -2033,6 +2034,7 @@ dependencies = [
  "serde",
  "tlang_ast",
  "tlang_defs",
+ "tlang_diagnostics",
  "tlang_parser",
  "tlang_span",
 ]

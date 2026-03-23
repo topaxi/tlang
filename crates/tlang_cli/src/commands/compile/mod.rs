@@ -12,10 +12,9 @@ use tlang_codegen_js::{
     generator::{CodegenJS, shift_source_map_lines},
     js_hir_opt::JsHirOptimizer,
 };
+use tlang_diagnostics::{Diagnostic, diagnostics_from_parse_error, render_diagnostics};
 use tlang_hir_opt::{HirOptimizer, HirPass};
 use tlang_semantics::SemanticAnalyzer;
-
-use crate::error::ParserError;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CompileTargetArg {
@@ -72,9 +71,11 @@ fn compile_to_hir(
     source: &str,
     target: &CompileTargetArg,
     show_warnings: bool,
-) -> Result<tlang_hir::Module, ParserError> {
+) -> Result<tlang_hir::Module, Vec<Diagnostic>> {
     let mut parser = tlang_parser::Parser::from_source(source);
-    let (mut ast, parse_meta) = parser.parse()?;
+    let (mut ast, parse_meta) = parser
+        .parse()
+        .map_err(|e| diagnostics_from_parse_error(&e))?;
 
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
@@ -91,7 +92,7 @@ fn compile_to_hir(
         if !warnings.is_empty() {
             eprint!(
                 "{}",
-                tlang_diagnostics::render_semantic_diagnostics(
+                render_diagnostics(
                     source_name,
                     source,
                     &warnings,
@@ -143,7 +144,15 @@ pub fn handle_compile(options: CompileOptions) -> bool {
         let (mut output, source_map) = match compile_source(path, &source, &options) {
             Ok(result) => result,
             Err(errors) => {
-                eprint!("{}", errors.render(&path.to_string_lossy(), &source));
+                eprint!(
+                    "{}",
+                    render_diagnostics(
+                        &path.to_string_lossy(),
+                        &source,
+                        &errors,
+                        std::io::IsTerminal::is_terminal(&std::io::stderr()),
+                    )
+                );
                 return false;
             }
         };
@@ -178,7 +187,7 @@ fn compile_source(
     path: &Path,
     source: &str,
     options: &CompileOptions,
-) -> Result<(String, Option<String>), ParserError> {
+) -> Result<(String, Option<String>), Vec<Diagnostic>> {
     let source_name = path.to_string_lossy();
     // Holds the unshifted source map JSON; shifted once we know the stdlib
     // preamble line count.

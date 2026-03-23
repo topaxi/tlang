@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 
 use tlang_ast_lowering::lower_to_hir_with_offset;
 use tlang_defs::DefKind;
+use tlang_diagnostics::Diagnostic;
 use tlang_hir as hir;
 use tlang_semantics::SemanticAnalyzer;
-use tlang_semantics::diagnostic::Diagnostic;
 
 use crate::module_graph::{ModuleGraphError, ParsedModule};
 use crate::resolver::{ModuleResolver, ResolvedImports};
