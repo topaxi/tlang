@@ -1905,6 +1905,7 @@ dependencies = [
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_defs",
+ "tlang_diagnostics",
  "tlang_hir",
  "tlang_hir_pretty",
  "tlang_parser",
