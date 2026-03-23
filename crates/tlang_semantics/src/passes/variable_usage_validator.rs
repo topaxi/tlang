@@ -42,10 +42,6 @@ impl VariableUsageValidator {
     }
 
     /// Report unused symbols in the given symbol table
-    ///
-    /// # Panics
-    /// Panics if a function symbol has no arity information when calling `kind.arity().unwrap()`.
-    /// This should not happen in practice as all function symbols are expected to have arity information.
     pub fn report_unused_symbols(
         &mut self,
         symbol_table: &Rc<RefCell<DefScope>>,
@@ -67,12 +63,17 @@ impl VariableUsageValidator {
 
         for unused_symbol in &unused_symbols {
             if unused_symbol.is_any_fn() {
+                debug_assert!(
+                    unused_symbol.kind.arity().is_some(),
+                    "All function symbols are expected to have arity information"
+                );
+
                 ctx.add_diagnostic(diagnostic::warn_at!(
                     unused_symbol.defined_at,
                     "Unused {} `{}/{}`",
                     unused_symbol.kind,
                     unused_symbol.name,
-                    unused_symbol.kind.arity().unwrap(),
+                    unused_symbol.kind.arity().unwrap_or(0),
                 ));
             } else {
                 ctx.add_diagnostic(diagnostic::warn_at!(
