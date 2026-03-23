@@ -235,6 +235,7 @@ pub fn fold_expr<F: Folder>(folder: &mut F, expr: hir::Expr) -> hir::Expr {
     hir::Expr {
         hir_id: expr.hir_id,
         kind,
+        ty: folder.fold_ty(expr.ty),
         span: expr.span,
     }
 }
@@ -259,6 +260,7 @@ pub fn fold_pat<F: Folder>(folder: &mut F, pat: hir::Pat) -> hir::Pat {
 
     hir::Pat {
         kind,
+        ty: folder.fold_ty(pat.ty),
         span: pat.span,
     }
 }

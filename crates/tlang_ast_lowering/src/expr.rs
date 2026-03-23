@@ -106,6 +106,7 @@ impl LoweringContext {
         hir::Expr {
             hir_id: self.lower_node_id(node.id),
             kind,
+            ty: hir::Ty::unknown(),
             span: node.span,
         }
     }
@@ -206,6 +207,7 @@ impl LoweringContext {
                 hir_id: block.hir_id,
                 pat: hir::Pat {
                     kind: hir::PatKind::Wildcard,
+                    ty: hir::Ty::unknown(),
                     span: Default::default(),
                 },
                 guard,
@@ -352,6 +354,7 @@ impl LoweringContext {
         let callee = hir::Expr {
             hir_id: self.unique_id(),
             kind: hir::ExprKind::Path(Box::new(callee_path)),
+            ty: hir::Ty::unknown(),
             span,
         };
         let call = hir::Expr {
@@ -361,6 +364,7 @@ impl LoweringContext {
                 callee,
                 arguments: vec![rhs, lhs],
             })),
+            ty: hir::Ty::unknown(),
             span,
         };
 

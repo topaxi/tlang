@@ -26,6 +26,7 @@ impl LoweringContext {
                 iterator_binding_hir_id,
                 Box::new(iterator_binding_name),
             ),
+            ty: hir::Ty::unknown(),
             span: Default::default(),
         };
         (
@@ -59,6 +60,7 @@ impl LoweringContext {
                             accumulator_binding_hir_id,
                             Box::new(accumulator_binding_name),
                         ),
+                        ty: hir::Ty::unknown(),
                         span: Default::default(),
                     }),
                     Box::new(self.lower_expr(expr)),
@@ -246,6 +248,7 @@ impl LoweringContext {
                         )),
                         vec![(Ident::new("0", Default::default()), for_loop_pat)],
                     ),
+                    ty: hir::Ty::unknown(),
                     span: Default::default(),
                 },
                 guard: None,
@@ -305,6 +308,7 @@ impl LoweringContext {
                         )),
                         vec![],
                     ),
+                    ty: hir::Ty::unknown(),
                     span: Default::default(),
                 },
                 guard: None,

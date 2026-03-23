@@ -537,6 +537,7 @@ pub enum StmtKind {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Pat {
     pub kind: PatKind,
+    pub ty: Ty,
     pub span: Span,
 }
 
@@ -657,6 +658,7 @@ impl CallExpression {
 pub struct Expr {
     pub hir_id: HirId,
     pub kind: ExprKind,
+    pub ty: Ty,
     pub span: Span,
 }
 
@@ -724,6 +726,12 @@ pub struct ElseClause {
 pub struct Ty {
     pub kind: TyKind,
     pub span: Span,
+}
+
+impl Ty {
+    pub fn unknown() -> Self {
+        Self::default()
+    }
 }
 
 #[derive(Debug, Default, Clone)]

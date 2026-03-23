@@ -213,6 +213,7 @@ impl LoweringContext {
         hir::Expr {
             hir_id: self.unique_id(),
             kind,
+            ty: hir::Ty::unknown(),
             span,
         }
     }
@@ -360,10 +361,12 @@ impl LoweringContext {
         match &node.kind {
             ast::node::PatKind::Wildcard => hir::Pat {
                 kind: hir::PatKind::Wildcard,
+                ty: hir::Ty::unknown(),
                 span: node.span,
             },
             ast::node::PatKind::Literal(box literal) => hir::Pat {
                 kind: hir::PatKind::Literal(Box::new(*literal)),
+                ty: hir::Ty::unknown(),
                 span: node.span,
             },
             ast::node::PatKind::Identifier(box ident) => {
@@ -382,15 +385,18 @@ impl LoweringContext {
 
                 hir::Pat {
                     kind: hir::PatKind::Identifier(hir_id, Box::new(*ident)),
+                    ty: hir::Ty::unknown(),
                     span: node.span,
                 }
             }
             ast::node::PatKind::List(patterns) => hir::Pat {
                 kind: hir::PatKind::List(patterns.iter().map(|pat| self.lower_pat(pat)).collect()),
+                ty: hir::Ty::unknown(),
                 span: node.span,
             },
             ast::node::PatKind::Rest(pattern) => hir::Pat {
                 kind: hir::PatKind::Rest(Box::new(self.lower_pat(pattern))),
+                ty: hir::Ty::unknown(),
                 span: node.span,
             },
             ast::node::PatKind::Enum(box EnumPattern { path, elements }) => {
@@ -402,6 +408,7 @@ impl LoweringContext {
 
                 hir::Pat {
                     kind: hir::PatKind::Enum(Box::new(path), elements),
+                    ty: hir::Ty::unknown(),
                     span: node.span,
                 }
             }
@@ -410,6 +417,7 @@ impl LoweringContext {
                     self.lower_node_id(node.id),
                     Box::new(Ident::new(kw::_Self, node.span)),
                 ),
+                ty: hir::Ty::unknown(),
                 span: node.span,
             },
             ast::node::PatKind::None => {
