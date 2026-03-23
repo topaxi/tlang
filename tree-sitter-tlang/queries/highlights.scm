@@ -24,6 +24,8 @@
   "or"
 ] @keyword
 
+(visibility_modifier) @keyword
+
 (continue_expression) @keyword
 
 ; Declarations

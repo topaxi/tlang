@@ -84,6 +84,8 @@ module.exports = grammar({
         $.impl_block,
       ),
 
+    visibility_modifier: (_) => 'pub',
+
     expression_statement: ($) => seq($._expression, optional(';')),
 
     return_statement: ($) =>
@@ -104,6 +106,7 @@ module.exports = grammar({
       prec.dynamic(
         1,
         seq(
+          optional(field('visibility', $.visibility_modifier)),
           'fn',
           field('name', $.function_name),
           field('parameters', $.parameter_list),
@@ -137,6 +140,7 @@ module.exports = grammar({
 
     enum_declaration: ($) =>
       seq(
+        optional(field('visibility', $.visibility_modifier)),
         'enum',
         field('name', $.type_identifier),
         '{',
@@ -161,6 +165,7 @@ module.exports = grammar({
 
     struct_declaration: ($) =>
       seq(
+        optional(field('visibility', $.visibility_modifier)),
         'struct',
         field('name', $.type_identifier),
         '{',
@@ -180,6 +185,7 @@ module.exports = grammar({
 
     protocol_declaration: ($) =>
       seq(
+        optional(field('visibility', $.visibility_modifier)),
         'protocol',
         field('name', $.type_identifier),
         '{',

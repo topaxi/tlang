@@ -22,7 +22,7 @@ let parserWithMetadata = parser.configure({
         t.propertyName,
       ),
       'if else return rec break continue loop for match': t.controlKeyword,
-      'let enum fn struct protocol impl': t.definitionKeyword,
+      'let enum fn struct protocol impl pub': t.definitionKeyword,
       'in with apply': t.keyword,
       'not and or': t.logicOperator,
       PropertyName: t.propertyName,
@@ -83,6 +83,7 @@ import { completeFromList } from '@codemirror/autocomplete';
 
 export const tlangCompletion = tlangLanguage.data.of({
   autocomplete: completeFromList([
+    { label: 'pub', type: 'keyword' },
     { label: 'fn', type: 'keyword' },
     { label: 'rec', type: 'keyword' },
     { label: 'return', type: 'keyword' },
