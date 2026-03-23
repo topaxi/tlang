@@ -259,6 +259,7 @@ impl CodegenJS {
             symbols: HashMap::new(),
             hir_id_allocator: HirIdAllocator::default(),
             current_scope: HirId::new(1),
+            diagnostics: Vec::new(),
         };
         anf.optimize_hir(&mut module, &mut ctx);
 

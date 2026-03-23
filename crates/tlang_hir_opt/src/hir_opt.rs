@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use log::debug;
 use tlang_defs::DefScope;
+use tlang_diagnostics::Diagnostic;
 use tlang_hir as hir;
 use tlang_span::{HirId, HirIdAllocator};
 
@@ -12,6 +13,7 @@ pub struct HirOptContext {
     pub symbols: HashMap<HirId, Rc<RefCell<DefScope>>>,
     pub hir_id_allocator: HirIdAllocator,
     pub current_scope: HirId,
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 impl HirOptContext {
@@ -26,6 +28,7 @@ impl From<hir::LowerResultMeta> for HirOptContext {
             current_scope: lower_result_meta.root_symbol_table,
             symbols: lower_result_meta.symbol_tables,
             hir_id_allocator: lower_result_meta.hir_id_allocator,
+            diagnostics: Vec::new(),
         }
     }
 }
@@ -97,6 +100,7 @@ pub struct HirOptimizer(HirOptGroup);
 impl Default for HirOptimizer {
     fn default() -> Self {
         Self::new(vec![
+            Box::new(crate::tail_call_validation::TailPositionAnalysis),
             Box::new(crate::symbol_resolution::SymbolResolution::default()),
             Box::new(crate::constant_folding::ConstantFolding::default()),
             Box::new(crate::slot_allocation::SlotAllocation::default()),

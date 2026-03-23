@@ -10,6 +10,7 @@ pub struct JsHirOptimizer(HirOptGroup);
 impl Default for JsHirOptimizer {
     fn default() -> Self {
         Self::new(vec![
+            Box::new(hir_opt::tail_call_validation::TailPositionAnalysis),
             Box::new(JsAnfTransform::default()),
             Box::new(JsAnfReturnOpt::default()),
             Box::new(hir_opt::symbol_resolution::SymbolResolution::default()),
