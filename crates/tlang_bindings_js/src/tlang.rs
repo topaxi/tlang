@@ -257,6 +257,7 @@ impl Tlang {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn lower_to_hir(&mut self) {
         let _ = self.parse();
 
