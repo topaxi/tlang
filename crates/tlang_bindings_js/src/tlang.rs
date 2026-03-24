@@ -9,7 +9,7 @@ use tlang_codegen_js::js_anf_return_opt::JsAnfReturnOpt;
 use tlang_codegen_js::js_anf_transform::JsAnfTransform;
 use tlang_codegen_js::js_hir_opt::JsHirOptimizer;
 use tlang_defs::{DefKind, DefScope};
-use tlang_diagnostics::{render_parse_issues, render_semantic_diagnostics};
+use tlang_diagnostics::{render_ice, render_parse_issues, render_semantic_diagnostics};
 use tlang_hir as hir;
 use tlang_hir_opt::HirPass;
 use tlang_hir_opt::hir_opt::HirOptimizer;
@@ -327,9 +327,7 @@ impl Tlang {
                     let mut optimizer = JsHirOptimizer::new(passes);
                     optimizer
                         .optimize_hir(&mut module, &mut ctx)
-                        .unwrap_or_else(|err| {
-                            panic!("internal compiler error: {err}\n\nThis is a compiler bug. Please file an issue at https://github.com/topaxi/tlang/issues")
-                        });
+                        .unwrap_or_else(|err| panic!("{}", render_ice(&err)));
                 }
                 RunnerKind::Interpreter => {
                     let mut passes: Vec<Box<dyn HirPass>> = Vec::new();
@@ -365,9 +363,7 @@ impl Tlang {
                     let mut optimizer = HirOptimizer::new(passes);
                     optimizer
                         .optimize_hir(&mut module, &mut ctx)
-                        .unwrap_or_else(|err| {
-                            panic!("internal compiler error: {err}\n\nThis is a compiler bug. Please file an issue at https://github.com/topaxi/tlang/issues")
-                        });
+                        .unwrap_or_else(|err| panic!("{}", render_ice(&err)));
                 }
             }
 

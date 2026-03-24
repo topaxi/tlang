@@ -108,13 +108,14 @@ impl HirPass for HirOptGroup {
     ) -> Result<bool, HirOptError> {
         let mut iteration = 0u32;
         let mut changed = true;
+        let mut any_changed = false;
 
         while changed {
             iteration += 1;
             if iteration > MAX_ITERATIONS {
                 return Err(HirOptError::ConvergenceFailure {
                     pass_name: self.name().to_string(),
-                    iteration,
+                    iteration: MAX_ITERATIONS,
                 });
             }
 
@@ -122,10 +123,12 @@ impl HirPass for HirOptGroup {
             for pass in &mut self.passes {
                 debug!("Running pass: {}", pass.name());
 
-                changed |= pass.optimize_hir(module, ctx)?;
+                let pass_changed = pass.optimize_hir(module, ctx)?;
+                changed |= pass_changed;
+                any_changed |= pass_changed;
             }
         }
-        Ok(false)
+        Ok(any_changed)
     }
 }
 
@@ -216,7 +219,7 @@ mod tests {
                 iteration,
             }) => {
                 assert_eq!(pass_name, "test_group");
-                assert_eq!(iteration, MAX_ITERATIONS + 1);
+                assert_eq!(iteration, MAX_ITERATIONS);
             }
             Ok(_) => panic!("expected ConvergenceFailure, got Ok"),
         }
@@ -226,11 +229,11 @@ mod tests {
     fn convergence_failure_display() {
         let err = HirOptError::ConvergenceFailure {
             pass_name: "my_pass".to_string(),
-            iteration: 11,
+            iteration: 10,
         };
         assert_eq!(
             err.to_string(),
-            "HIR optimizer pass 'my_pass' did not converge after 11 iterations"
+            "HIR optimizer pass 'my_pass' did not converge after 10 iterations"
         );
     }
 }
