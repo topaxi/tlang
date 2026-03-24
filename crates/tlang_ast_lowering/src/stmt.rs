@@ -6,7 +6,7 @@ use tlang_ast::node::{FunctionDeclaration, Ident, LetDeclaration};
 use tlang_defs::DefKind;
 use tlang_hir as hir;
 
-use crate::{LoweringContext, LoweringError};
+use crate::LoweringContext;
 
 impl LoweringContext {
     pub(crate) fn lower_stmt(&mut self, node: &ast::node::Stmt) -> Vec<hir::Stmt> {
@@ -198,12 +198,7 @@ impl LoweringContext {
             };
 
             let last_decl_id = decls.last().map(|d| d.id);
-            let fn_name_str = first_declaration.name().unwrap_or_else(|| {
-                self.errors.push(LoweringError::InvalidFunctionName {
-                    span: first_declaration.name.span,
-                });
-                String::new()
-            });
+            let fn_name_str = self.fn_name_or_error(first_declaration);
             self.define_symbol_after(
                 dyn_fn_decl.hir_id,
                 &fn_name_str,
@@ -336,12 +331,7 @@ impl LoweringContext {
         // Group methods by name so multi-clause methods get lowered via pattern matching
         let mut method_groups: Vec<(String, Vec<&ast::node::FunctionDeclaration>)> = Vec::new();
         for method in &impl_block.methods {
-            let name = method.name().unwrap_or_else(|| {
-                self.errors.push(LoweringError::InvalidFunctionName {
-                    span: method.name.span,
-                });
-                String::new()
-            });
+            let name = self.fn_name_or_error(method);
             if let Some(group) = method_groups.iter_mut().find(|(n, _)| *n == name) {
                 group.1.push(method);
             } else {
@@ -451,12 +441,7 @@ impl LoweringContext {
         first_declaration: &FunctionDeclaration,
         params: &[hir::FunctionParameter],
     ) {
-        let fn_name_str = first_declaration.name().unwrap_or_else(|| {
-            self.errors.push(LoweringError::InvalidFunctionName {
-                span: first_declaration.name.span,
-            });
-            String::new()
-        });
+        let fn_name_str = self.fn_name_or_error(first_declaration);
         self.define_symbol(
             hir_id,
             &fn_name_str,

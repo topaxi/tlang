@@ -234,9 +234,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
     }
 
     fn visit_fn_decl(&mut self, declaration: &'ast FunctionDeclaration, ctx: &mut Self::Context) {
-        let name_as_str = declaration
-            .name()
-            .unwrap_or_else(|| "<invalid>".to_string());
+        let name_as_str = declaration.name_or_invalid();
         self.declare_symbol(
             ctx,
             declaration.id,
@@ -290,7 +288,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             }
             ExprKind::FunctionExpression(decl) => {
                 // Declare the function self-reference symbol first
-                let name_as_str = decl.name().unwrap_or_else(|| "<invalid>".to_string());
+                let name_as_str = decl.name_or_invalid();
                 self.enter_scope(decl.id, ctx);
                 self.declare_symbol(
                     ctx,

@@ -128,6 +128,14 @@ impl FunctionDeclaration {
             _ => None,
         }
     }
+
+    /// Like [`name()`](Self::name), but returns `"<invalid>"` instead of
+    /// `None` when the name expression is not a recognised form.  Useful in
+    /// diagnostic messages and symbol-table entries where an absent name would
+    /// produce confusing output.
+    pub fn name_or_invalid(&self) -> String {
+        self.name().unwrap_or_else(|| "<invalid>".to_string())
+    }
 }
 
 #[derive(Debug, Clone)]

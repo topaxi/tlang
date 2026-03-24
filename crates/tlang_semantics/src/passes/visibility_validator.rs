@@ -46,7 +46,7 @@ impl<'ast> Visitor<'ast> for VisibilityValidator {
             let arity = decl.parameters.len();
             match arity_groups.get(&arity) {
                 Some(Some(expected_vis)) if *expected_vis != decl.visibility => {
-                    let fn_name = decl.name().unwrap_or_else(|| "<invalid>".to_string());
+                    let fn_name = decl.name_or_invalid();
                     let vis_label = match decl.visibility {
                         Visibility::Public => "public",
                         Visibility::Private => "private",

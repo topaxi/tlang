@@ -133,6 +133,19 @@ impl LoweringContext {
         self.current_symbol_table.clone()
     }
 
+    /// Extract the function name from `decl`, pushing an
+    /// [`InvalidFunctionName`](LoweringError::InvalidFunctionName) error and
+    /// returning `"<invalid>"` when the name expression is not a recognised
+    /// form.
+    pub(crate) fn fn_name_or_error(&mut self, decl: &ast::node::FunctionDeclaration) -> String {
+        decl.name().unwrap_or_else(|| {
+            self.errors.push(LoweringError::InvalidFunctionName {
+                span: decl.name.span,
+            });
+            "<invalid>".to_string()
+        })
+    }
+
     fn has_multi_arity_fn(&self, name: &str, arity: usize) -> bool {
         self.scope().borrow().has_multi_arity_fn(name, arity)
     }
