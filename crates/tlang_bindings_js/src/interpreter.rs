@@ -184,6 +184,10 @@ fn js_value_to_tlang_value(state: &mut VMState, value: &JsValue) -> TlangValue {
         return TlangValue::F64(i);
     }
 
+    if let Some(s) = value.as_string() {
+        return state.new_string(s);
+    }
+
     if let Some(array) = value.dyn_ref::<js_sys::Array>() {
         let mut values = Vec::with_capacity(array.length() as usize);
 
@@ -195,5 +199,10 @@ fn js_value_to_tlang_value(state: &mut VMState, value: &JsValue) -> TlangValue {
         return state.new_list(values);
     }
 
-    todo!()
+    // BigInt values (produced by JsValue::from(i64/u64))
+    if let Ok(i) = i64::try_from(value.clone()) {
+        return TlangValue::I64(i);
+    }
+
+    TlangValue::Nil
 }
