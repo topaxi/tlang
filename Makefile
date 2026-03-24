@@ -13,6 +13,7 @@ verify:
 	npm run lint
 	$(MAKE) test-coverage
 	$(MAKE) test
+	$(MAKE) test-bindings-js
 	npm run build
 	npm run test:e2e
 

@@ -90,6 +90,21 @@ jobs:
       - name: Test Runner
         run: make test
 
+  test-bindings-js:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    needs: [setup-rust]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-cargo
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.0.2"
+
       - name: Test JS bindings
         run: make test-bindings-js
 
@@ -118,7 +133,7 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
-    needs: [lint-js, lint-rust, test, coverage]
+    needs: [lint-js, lint-rust, test, test-bindings-js, coverage]
 
     steps:
       - uses: actions/checkout@v6
