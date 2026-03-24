@@ -85,8 +85,10 @@ impl CodegenJS {
     ///
     /// # Panics
     ///
-    /// Panics if the embedded stdlib `.tlang` sources fail to parse or pass
-    /// semantic analysis, which would indicate a bug in the stdlib source.
+    /// Panics if the embedded stdlib `.tlang` sources fail to parse, fail
+    /// semantic analysis, fail to lower to HIR, or fail to generate JavaScript
+    /// successfully — any of which would indicate a bug in the stdlib source or
+    /// the compiler.
     pub fn compile_stdlib_module() -> String {
         use tlang_ast_lowering::lower_to_hir;
         use tlang_hir_opt::hir_opt::HirOptContext;
@@ -265,6 +267,11 @@ impl CodegenJS {
         let program = inner.generate_module(module);
 
         if !inner.errors.is_empty() {
+            // Clear any stale output from a previous successful run so that
+            // callers cannot accidentally use old output after an error.
+            self.output.clear();
+            self.js_ast_json.clear();
+            self.source_map = None;
             return Err(inner.errors);
         }
 

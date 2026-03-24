@@ -1,9 +1,12 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
+use tlang_ast::node::Ident;
 use tlang_codegen_js::generator::{CodegenJS, shift_source_map_lines};
 use tlang_defs::DefKind;
+use tlang_hir as hir;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
+use tlang_span::{HirId, Span};
 
 use self::common::CodegenOptions;
 
@@ -611,4 +614,220 @@ fn test_compile_stdlib_module_is_script_compatible() {
             "Stdlib bundle should not contain import declarations, but found: {line:?}"
         );
     }
+}
+
+// -- Helpers for error-path tests -------------------------------------------
+
+fn make_expr(hir_id: u64, kind: hir::ExprKind) -> hir::Expr {
+    hir::Expr {
+        hir_id: HirId::new(hir_id as usize),
+        kind,
+        ty: hir::Ty::unknown(),
+        span: Span::default(),
+    }
+}
+
+fn make_pat(kind: hir::PatKind) -> hir::Pat {
+    hir::Pat {
+        kind,
+        ty: hir::Ty::unknown(),
+        span: Span::default(),
+    }
+}
+
+fn module_with_stmts(stmts: Vec<hir::Stmt>) -> hir::Module {
+    let mut m = hir::Module::default();
+    m.block.stmts = stmts;
+    m
+}
+
+fn expr_stmt(hir_id: u64, expr: hir::Expr) -> hir::Stmt {
+    hir::Stmt::new(
+        HirId::new(hir_id as usize),
+        hir::StmtKind::Expr(Box::new(expr)),
+        Span::default(),
+    )
+}
+
+// -- Error-accumulation tests ------------------------------------------------
+
+#[test]
+fn test_let_expr_returns_err() {
+    let pat = make_pat(hir::PatKind::Identifier(
+        HirId::new(10),
+        Box::new(Ident::new("x", Span::default())),
+    ));
+    let inner = make_expr(
+        11,
+        hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Integer(1))),
+    );
+    let let_expr = make_expr(12, hir::ExprKind::Let(Box::new(pat), Box::new(inner)));
+    let module = module_with_stmts(vec![expr_stmt(13, let_expr)]);
+
+    let mut codegen = CodegenJS::default();
+    let result = codegen.generate_code(&module);
+    assert!(result.is_err(), "expected Err for ExprKind::Let");
+    let errors = result.unwrap_err();
+    assert_eq!(errors.len(), 1);
+    assert!(
+        errors[0].message.contains("let expressions"),
+        "unexpected message: {}",
+        errors[0].message
+    );
+    // Stale output must be cleared after an error.
+    assert!(codegen.get_output().is_empty());
+}
+
+#[test]
+fn test_range_expr_returns_err() {
+    let start = make_expr(
+        10,
+        hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Integer(1))),
+    );
+    let end = make_expr(
+        11,
+        hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Integer(10))),
+    );
+    let range_expr = make_expr(
+        12,
+        hir::ExprKind::Range(Box::new(hir::RangeExpression {
+            start,
+            end,
+            inclusive: false,
+        })),
+    );
+    let module = module_with_stmts(vec![expr_stmt(13, range_expr)]);
+
+    let mut codegen = CodegenJS::default();
+    let result = codegen.generate_code(&module);
+    assert!(result.is_err(), "expected Err for ExprKind::Range");
+    let errors = result.unwrap_err();
+    assert_eq!(errors.len(), 1);
+    assert!(
+        errors[0].message.contains("range expressions"),
+        "unexpected message: {}",
+        errors[0].message
+    );
+    assert!(codegen.get_output().is_empty());
+}
+
+#[test]
+fn test_unsupported_let_pattern_returns_err() {
+    // PatKind::Enum is not handled by generate_variable_declaration.
+    let path = hir::Path::new(
+        vec![hir::PathSegment::from_str("Some", Span::default())],
+        Span::default(),
+    );
+    let inner_pat = make_pat(hir::PatKind::Identifier(
+        HirId::new(10),
+        Box::new(Ident::new("x", Span::default())),
+    ));
+    let enum_pat = make_pat(hir::PatKind::Enum(
+        Box::new(path),
+        vec![(Ident::new("0", Span::default()), inner_pat)],
+    ));
+    let value = make_expr(
+        11,
+        hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Integer(42))),
+    );
+    let stmt = hir::Stmt::new(
+        HirId::new(12),
+        hir::StmtKind::Let(
+            Box::new(enum_pat),
+            Box::new(value),
+            Box::new(hir::Ty::unknown()),
+        ),
+        Span::default(),
+    );
+    let module = module_with_stmts(vec![stmt]);
+
+    let mut codegen = CodegenJS::default();
+    let result = codegen.generate_code(&module);
+    assert!(result.is_err(), "expected Err for unsupported let pattern");
+    let errors = result.unwrap_err();
+    assert_eq!(errors.len(), 1);
+    assert!(
+        errors[0]
+            .message
+            .contains("variable declaration pattern matching"),
+        "unexpected message: {}",
+        errors[0].message
+    );
+    assert!(codegen.get_output().is_empty());
+}
+
+#[test]
+fn test_multiple_unsupported_features_all_collected() {
+    // Two unsupported nodes in a single module: both errors must be collected.
+    let pat = make_pat(hir::PatKind::Identifier(
+        HirId::new(10),
+        Box::new(Ident::new("x", Span::default())),
+    ));
+    let inner = make_expr(
+        11,
+        hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Integer(1))),
+    );
+    let let_expr = make_expr(12, hir::ExprKind::Let(Box::new(pat), Box::new(inner)));
+
+    let start = make_expr(
+        13,
+        hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Integer(1))),
+    );
+    let end = make_expr(
+        14,
+        hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Integer(5))),
+    );
+    let range_expr = make_expr(
+        15,
+        hir::ExprKind::Range(Box::new(hir::RangeExpression {
+            start,
+            end,
+            inclusive: false,
+        })),
+    );
+
+    let module = module_with_stmts(vec![expr_stmt(20, let_expr), expr_stmt(21, range_expr)]);
+
+    let mut codegen = CodegenJS::default();
+    let result = codegen.generate_code(&module);
+    assert!(result.is_err());
+    let errors = result.unwrap_err();
+    assert_eq!(errors.len(), 2, "expected exactly 2 errors, got {errors:?}");
+    assert!(errors[0].message.contains("let expressions"));
+    assert!(errors[1].message.contains("range expressions"));
+    assert!(codegen.get_output().is_empty());
+}
+
+#[test]
+fn test_stale_output_cleared_after_error() {
+    // First, succeed so output is non-empty.
+    let module_ok = hir_module_from("let x = 1;");
+    let mut codegen = CodegenJS::default();
+    codegen
+        .generate_code(&module_ok)
+        .expect("first codegen should succeed");
+    assert!(
+        !codegen.get_output().is_empty(),
+        "output should be non-empty after success"
+    );
+
+    // Now run again with an unsupported node — the stale output must be cleared.
+    let pat = make_pat(hir::PatKind::Identifier(
+        HirId::new(10),
+        Box::new(Ident::new("y", Span::default())),
+    ));
+    let inner = make_expr(
+        11,
+        hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Integer(0))),
+    );
+    let let_expr = make_expr(12, hir::ExprKind::Let(Box::new(pat), Box::new(inner)));
+    let module_err = module_with_stmts(vec![expr_stmt(13, let_expr)]);
+
+    let result = codegen.generate_code(&module_err);
+    assert!(result.is_err());
+    assert!(
+        codegen.get_output().is_empty(),
+        "stale output was not cleared: {}",
+        codegen.get_output()
+    );
 }
