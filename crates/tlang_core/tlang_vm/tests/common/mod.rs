@@ -49,7 +49,9 @@ pub fn compile(source: &str, analyzer: &mut SemanticAnalyzer) -> (hir::Module, H
     let mut optimizer = tlang_hir_opt::HirOptimizer::default();
     let constant_pool_ids = meta.constant_pool_ids.clone();
     let mut ctx = meta.into();
-    optimizer.optimize_hir(&mut module, &mut ctx);
+    optimizer
+        .optimize_hir(&mut module, &mut ctx)
+        .expect("HIR optimization failed");
     (module, constant_pool_ids)
 }
 

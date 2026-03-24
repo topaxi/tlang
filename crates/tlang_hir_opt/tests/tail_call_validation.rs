@@ -8,7 +8,9 @@ mod common;
 fn run_validation(source: &str) -> Vec<tlang_diagnostics::Diagnostic> {
     let (mut module, meta) = common::compile(source);
     let mut ctx: HirOptContext = meta.into();
-    TailPositionAnalysis.optimize_hir(&mut module, &mut ctx);
+    TailPositionAnalysis
+        .optimize_hir(&mut module, &mut ctx)
+        .expect("TailPositionAnalysis is infallible");
     ctx.diagnostics
 }
 

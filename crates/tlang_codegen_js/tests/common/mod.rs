@@ -66,7 +66,9 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
             if options.optimize {
                 let mut optimizer = JsHirOptimizer::default();
                 let mut ctx = meta.into();
-                optimizer.optimize_hir(&mut module, &mut ctx);
+                optimizer
+                    .optimize_hir(&mut module, &mut ctx)
+                    .expect("HIR optimization failed");
             }
 
             let mut codegen = CodegenJS::default();

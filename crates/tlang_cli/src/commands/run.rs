@@ -4,7 +4,7 @@ use std::{fs::File, io::Read};
 
 use tlang_ast_lowering::lower_to_hir;
 use tlang_core::{memory::TlangValue, vm::VM};
-use tlang_diagnostics::{render_parse_issues, render_semantic_diagnostics};
+use tlang_diagnostics::{render_ice, render_parse_issues, render_semantic_diagnostics};
 use tlang_hir as hir;
 use tlang_hir_opt::HirOptimizer;
 use tlang_modules::{ModulePath, compile_project_with_slots};
@@ -78,7 +78,10 @@ fn handle_run_project(project_dir: &Path) {
         let mut hir_module = compiled.hir.clone();
         let mut optimizer = HirOptimizer::default();
         let mut ctx = compiled.lower_meta.clone().into();
-        optimizer.optimize_hir(&mut hir_module, &mut ctx);
+        if let Err(err) = optimizer.optimize_hir(&mut hir_module, &mut ctx) {
+            eprint!("{}", render_ice(&err));
+            std::process::exit(1);
+        }
 
         vm.eval_module(&hir_module);
 
@@ -91,7 +94,10 @@ fn handle_run_project(project_dir: &Path) {
         let mut hir_module = compiled.hir.clone();
         let mut optimizer = HirOptimizer::default();
         let mut ctx = compiled.lower_meta.clone().into();
-        optimizer.optimize_hir(&mut hir_module, &mut ctx);
+        if let Err(err) = optimizer.optimize_hir(&mut hir_module, &mut ctx) {
+            eprint!("{}", render_ice(&err));
+            std::process::exit(1);
+        }
 
         // Copy exported function values for root module imports
         populate_import_slots(&mut vm, &ModulePath::root(), &result);
@@ -213,7 +219,10 @@ fn compile(input_file: &str) -> (hir::Module, std::collections::HashSet<tlang_hi
     let mut optimizer = HirOptimizer::default();
     let constant_pool_ids = meta.constant_pool_ids.clone();
     let mut ctx = meta.into();
-    optimizer.optimize_hir(&mut module, &mut ctx);
+    if let Err(err) = optimizer.optimize_hir(&mut module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        std::process::exit(1);
+    }
 
     (module, constant_pool_ids)
 }

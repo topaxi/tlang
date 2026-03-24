@@ -1,7 +1,7 @@
 use tlang_hir as hir;
 
 use crate::HirPass;
-use crate::hir_opt::{HirOptContext, HirOptGroup};
+use crate::hir_opt::{HirOptContext, HirOptError, HirOptGroup};
 
 mod scope_data_updater;
 mod slot_allocator;
@@ -34,7 +34,11 @@ impl HirPass for SlotAllocation {
         self.0.init_context(ctx);
     }
 
-    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
         self.0.optimize_hir(module, ctx)
     }
 }

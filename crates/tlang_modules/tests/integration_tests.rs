@@ -43,7 +43,9 @@ fn compile_project_to_js(project_name: &str) -> String {
         let mut hir_module = compiled.hir.clone();
         let mut optimizer = JsHirOptimizer::default();
         let mut ctx: HirOptContext = compiled.lower_meta.clone().into();
-        optimizer.optimize_hir(&mut hir_module, &mut ctx);
+        optimizer
+            .optimize_hir(&mut hir_module, &mut ctx)
+            .expect("HIR optimization failed");
 
         let mut codegen = CodegenJS::default();
         codegen.set_bundle_mode(true);
@@ -76,7 +78,9 @@ fn compile_project_to_js(project_name: &str) -> String {
         let mut hir_module = compiled.hir.clone();
         let mut optimizer = JsHirOptimizer::default();
         let mut ctx: HirOptContext = compiled.lower_meta.clone().into();
-        optimizer.optimize_hir(&mut hir_module, &mut ctx);
+        optimizer
+            .optimize_hir(&mut hir_module, &mut ctx)
+            .expect("HIR optimization failed");
 
         let mut codegen = CodegenJS::default();
         codegen.set_bundle_mode(true);

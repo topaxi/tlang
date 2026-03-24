@@ -4,7 +4,7 @@ use tlang_hir::{self as hir, Visitor};
 use tlang_span::HirId;
 
 use crate::HirPass;
-use crate::hir_opt::HirOptContext;
+use crate::hir_opt::{HirOptContext, HirOptError};
 
 #[derive(Debug, Default)]
 pub struct SlotAllocator {
@@ -134,9 +134,13 @@ impl HirPass for SlotAllocator {
         self.scopes.push(ctx.current_scope);
     }
 
-    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
         self.visit_module(module, ctx);
 
-        false
+        Ok(false)
     }
 }

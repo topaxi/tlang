@@ -4,7 +4,7 @@ use tlang_hir::fold::{self, Folder, SmallVec};
 use tlang_hir::{self as hir};
 use tlang_span::Span;
 
-use crate::hir_opt::{HirOptContext, HirPass};
+use crate::hir_opt::{HirOptContext, HirOptError, HirPass};
 
 /// Trait that controls which expressions the ANF pass lifts out of value
 /// positions. Implementors return `true` for expressions that *cannot* remain
@@ -752,7 +752,11 @@ impl<F: AnfFilter + Default> HirPass for AnfTransform<F> {
         std::any::type_name::<Self>()
     }
 
-    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
         self.changed = false;
         let mut folder = AnfFolder {
             ctx,
@@ -765,6 +769,6 @@ impl<F: AnfFilter + Default> HirPass for AnfTransform<F> {
 
         let old_module = std::mem::take(module);
         *module = folder.fold_module(old_module);
-        self.changed
+        Ok(self.changed)
     }
 }

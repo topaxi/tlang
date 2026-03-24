@@ -116,7 +116,9 @@ impl CodegenJS {
         let mut ctx: HirOptContext = meta.into();
 
         let mut optimizer = crate::js_hir_opt::JsHirOptimizer::default();
-        optimizer.optimize_hir(&mut module, &mut ctx);
+        optimizer
+            .optimize_hir(&mut module, &mut ctx)
+            .expect("internal compiler error: stdlib HIR optimizer failed to converge");
 
         let mut generator = Self::new();
         // Bundle mode: suppress `export` on public declarations so the compiled
@@ -261,7 +263,8 @@ impl CodegenJS {
             current_scope: HirId::new(1),
             diagnostics: Vec::new(),
         };
-        anf.optimize_hir(&mut module, &mut ctx);
+        anf.optimize_hir(&mut module, &mut ctx)
+            .expect("internal compiler error: stdlib ANF transform failed to converge");
 
         let allocator = Allocator::default();
         let ast = AstBuilder::new(&allocator);

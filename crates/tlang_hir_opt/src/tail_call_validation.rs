@@ -1,7 +1,7 @@
 use tlang_diagnostics::Diagnostic;
 use tlang_hir as hir;
 
-use crate::hir_opt::{HirOptContext, HirPass};
+use crate::hir_opt::{HirOptContext, HirOptError, HirPass};
 
 /// A HIR pass that validates `rec`-annotated tail calls.
 ///
@@ -10,14 +10,18 @@ use crate::hir_opt::{HirOptContext, HirPass};
 /// the direct return value of the enclosing function (or the completion
 /// expression of an `if`/`match`/block that is itself in tail position).
 ///
-/// The pass never modifies the HIR; it always returns `false`.
+/// The pass never modifies the HIR; it always returns `Ok(false)`.
 #[derive(Default)]
 pub struct TailPositionAnalysis;
 
 impl HirPass for TailPositionAnalysis {
-    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
         check_block(&module.block, false, &mut ctx.diagnostics);
-        false
+        Ok(false)
     }
 }
 
