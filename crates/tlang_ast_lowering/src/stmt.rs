@@ -198,7 +198,7 @@ impl LoweringContext {
             };
 
             let last_decl_id = decls.last().map(|d| d.id);
-            let fn_name_str = self.fn_name_or_error(first_declaration);
+            let fn_name_str = first_declaration.name_or_invalid();
             self.define_symbol_after(
                 dyn_fn_decl.hir_id,
                 &fn_name_str,
@@ -331,7 +331,7 @@ impl LoweringContext {
         // Group methods by name so multi-clause methods get lowered via pattern matching
         let mut method_groups: Vec<(String, Vec<&ast::node::FunctionDeclaration>)> = Vec::new();
         for method in &impl_block.methods {
-            let name = self.fn_name_or_error(method);
+            let name = method.name_or_invalid();
             if let Some(group) = method_groups.iter_mut().find(|(n, _)| *n == name) {
                 group.1.push(method);
             } else {
@@ -438,13 +438,13 @@ impl LoweringContext {
     fn define_function_symbols(
         &mut self,
         hir_id: tlang_span::HirId,
+        fn_name: &str,
         first_declaration: &FunctionDeclaration,
         params: &[hir::FunctionParameter],
     ) {
-        let fn_name_str = self.fn_name_or_error(first_declaration);
         self.define_symbol(
             hir_id,
-            &fn_name_str,
+            fn_name,
             DefKind::FunctionSelfRef(params.len() as u16),
             first_declaration.span.start,
         );
@@ -541,7 +541,8 @@ impl LoweringContext {
             let (hir_id, fn_name, params, span) =
                 this.setup_function_declaration_metadata(decls, all_param_names);
 
-            this.define_function_symbols(hir_id, &decls[0], &params);
+            let fn_name_str = this.fn_name_or_error(&decls[0]);
+            this.define_function_symbols(hir_id, &fn_name_str, &decls[0], &params);
 
             let match_value = this.create_match_value(&params, span);
 

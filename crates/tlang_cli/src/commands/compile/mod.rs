@@ -111,7 +111,7 @@ fn compile_to_hir(
     )
     .map_err(|errs| {
         errs.iter()
-            .map(|e| Diagnostic::error(&e.to_string(), Default::default()))
+            .map(|e| Diagnostic::error(&e.to_string(), e.span()))
             .collect::<Vec<_>>()
     })?;
     let mut ctx = meta.into();

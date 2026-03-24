@@ -15,21 +15,22 @@ use tlang_span::{HirId, HirIdAllocator, NodeId, Span};
 /// Errors that can occur during AST-to-HIR lowering.
 #[derive(Debug, Clone)]
 pub enum LoweringError {
-    /// A `NodeId` could not be mapped to a `HirId` during symbol table translation.
-    UnmappedNodeId {
-        node_id: NodeId,
-        context: &'static str,
-    },
     /// A function declaration has an invalid name expression (not a path or field expression).
     InvalidFunctionName { span: Span },
+}
+
+impl LoweringError {
+    /// Return the source span associated with this error, if any.
+    pub fn span(&self) -> Span {
+        match self {
+            LoweringError::InvalidFunctionName { span } => *span,
+        }
+    }
 }
 
 impl fmt::Display for LoweringError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LoweringError::UnmappedNodeId { node_id, context } => {
-                write!(f, "unable to map {node_id:?} to HirId: {context}")
-            }
             LoweringError::InvalidFunctionName { span } => {
                 write!(
                     f,

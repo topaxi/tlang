@@ -284,17 +284,29 @@ impl Tlang {
                 .cloned()
                 .unwrap_or_default();
 
-            let (mut module, meta) = tlang_ast_lowering::lower_to_hir(
+            let (mut module, meta) = match tlang_ast_lowering::lower_to_hir(
                 ast,
                 &self.build.constant_pool_node_ids,
                 self.analyzer.symbol_id_allocator(),
                 root_symbol_table,
                 symbol_tables,
-            )
-            .unwrap_or_else(|errs| {
-                let msgs: Vec<String> = errs.iter().map(|e| e.to_string()).collect();
-                panic!("lowering failed: {}", msgs.join("; "));
-            });
+            ) {
+                Ok(result) => result,
+                Err(errs) => {
+                    let diagnostics: Vec<_> = errs
+                        .iter()
+                        .map(|e| tlang_diagnostics::Diagnostic::error(&e.to_string(), e.span()))
+                        .collect();
+                    let rendered = render_semantic_diagnostics(
+                        "playground.tlang",
+                        &self.source,
+                        &diagnostics,
+                        false,
+                    );
+                    log::error!("{rendered}");
+                    return;
+                }
+            };
             let constant_pool_ids = meta.constant_pool_ids.clone();
             let mut ctx = meta.into();
 
