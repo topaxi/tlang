@@ -44,7 +44,8 @@ pub fn compile(source: &str, analyzer: &mut SemanticAnalyzer) -> (hir::Module, H
         analyzer.symbol_id_allocator(),
         analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),
-    );
+    )
+    .expect("lowering should succeed");
 
     let mut optimizer = tlang_hir_opt::HirOptimizer::default();
     let constant_pool_ids = meta.constant_pool_ids.clone();

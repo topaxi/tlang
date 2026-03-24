@@ -82,7 +82,13 @@ fn main() {
         analyzer.symbol_id_allocator(),
         analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),
-    );
+    )
+    .unwrap_or_else(|errs| {
+        for err in &errs {
+            eprintln!("error: {err}");
+        }
+        process::exit(1);
+    });
 
     let mut optimizer = HirOptimizer::default();
     let constant_pool_ids = meta.constant_pool_ids.clone();

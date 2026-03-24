@@ -34,7 +34,8 @@ mod helpers {
             analyzer.symbol_id_allocator(),
             analyzer.root_symbol_table(),
             analyzer.symbol_tables().clone(),
-        );
+        )
+        .expect("lowering should succeed");
 
         let mut optimizer = HirOptimizer::default();
         let mut ctx = meta.into();

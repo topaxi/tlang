@@ -108,7 +108,12 @@ fn compile_to_hir(
         semantic_analyzer.symbol_id_allocator(),
         semantic_analyzer.root_symbol_table(),
         semantic_analyzer.symbol_tables().clone(),
-    );
+    )
+    .map_err(|errs| {
+        errs.iter()
+            .map(|e| Diagnostic::error(&e.to_string(), e.span()))
+            .collect::<Vec<_>>()
+    })?;
     let mut ctx = meta.into();
 
     let mut optimizer = if matches!(target, CompileTargetArg::Js) {

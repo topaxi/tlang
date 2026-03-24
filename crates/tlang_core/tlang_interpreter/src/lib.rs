@@ -2022,7 +2022,8 @@ mod tests {
                 &mut lowering_context,
                 module,
                 &parse_meta.constant_pool_node_ids,
-            );
+            )
+            .expect("lowering should succeed");
 
             let mut optimizer = HirOptimizer::default();
             debug!("LowerResultMeta = {:?}", meta);

@@ -264,7 +264,7 @@ fn analyze_impl_methods(source: &str, method_name: &str) -> Vec<FunctionDeclarat
                 let methods: Vec<FunctionDeclaration> = impl_block
                     .methods
                     .into_iter()
-                    .filter(|m| m.name() == method_name)
+                    .filter(|m| m.name().is_some_and(|n| n == method_name))
                     .collect();
                 if !methods.is_empty() {
                     Some(methods)

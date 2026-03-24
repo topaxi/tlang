@@ -332,7 +332,7 @@ impl<'ast> Visitor<'ast> for VariableUsageValidator {
                     let method_name = apply_ident.as_str();
                     let qualified_name = format!("{protocol_name}::{method_name}");
                     for method in &impl_block.methods {
-                        if method.name() == method_name {
+                        if method.name().is_some_and(|n| n == method_name) {
                             let arity = method.parameters.len();
                             self.mark_as_used_by_name_and_arity(
                                 &qualified_name,

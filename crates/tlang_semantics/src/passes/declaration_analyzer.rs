@@ -67,7 +67,9 @@ impl DeclarationAnalyzer {
         let protocol_name = impl_block.protocol_name.to_string();
         for method in &impl_block.methods {
             // Register the protocol-qualified path (e.g., Greet::greet)
-            let method_name = method.name();
+            let Some(method_name) = method.name() else {
+                continue;
+            };
             let qualified_name = format!("{protocol_name}::{method_name}");
             self.declare_symbol(
                 ctx,
@@ -232,8 +234,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
     }
 
     fn visit_fn_decl(&mut self, declaration: &'ast FunctionDeclaration, ctx: &mut Self::Context) {
-        let name_as_str = declaration.name();
-
+        let name_as_str = declaration.name_or_invalid();
         self.declare_symbol(
             ctx,
             declaration.id,
@@ -287,7 +288,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             }
             ExprKind::FunctionExpression(decl) => {
                 // Declare the function self-reference symbol first
-                let name_as_str = decl.name();
+                let name_as_str = decl.name_or_invalid();
                 self.enter_scope(decl.id, ctx);
                 self.declare_symbol(
                     ctx,

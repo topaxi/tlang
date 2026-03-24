@@ -119,15 +119,22 @@ pub struct FunctionDeclaration {
 }
 
 impl FunctionDeclaration {
-    /// # Panics
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> Option<String> {
         match &self.name.kind {
-            ExprKind::Path(path) => path.to_string(),
+            ExprKind::Path(path) => Some(path.to_string()),
             ExprKind::FieldExpression(expr) if let Some(path) = expr.base.path() => {
-                format!("{}.{}", path, expr.field)
+                Some(format!("{}.{}", path, expr.field))
             }
-            _ => panic!("Expected identifier, found {:?}", self.name.kind),
+            _ => None,
         }
+    }
+
+    /// Like [`name()`](Self::name), but returns `"<invalid>"` instead of
+    /// `None` when the name expression is not a recognised form.  Useful in
+    /// diagnostic messages and symbol-table entries where an absent name would
+    /// produce confusing output.
+    pub fn name_or_invalid(&self) -> String {
+        self.name().unwrap_or_else(|| "<invalid>".to_string())
     }
 }
 

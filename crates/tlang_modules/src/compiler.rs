@@ -257,14 +257,18 @@ fn collect_exported_symbols(graph: &ModuleGraph) -> HashMap<ModulePath, Vec<(Str
                 StmtKind::FunctionDeclaration(decl)
                     if decl.visibility == tlang_ast::node::Visibility::Public =>
                 {
-                    let arity = decl.parameters.len() as u16;
-                    symbols.push((decl.name(), DefKind::Function(arity)));
+                    if let Some(name) = decl.name() {
+                        let arity = decl.parameters.len() as u16;
+                        symbols.push((name, DefKind::Function(arity)));
+                    }
                 }
                 StmtKind::FunctionDeclarations(decls) => {
                     for decl in decls {
-                        if decl.visibility == tlang_ast::node::Visibility::Public {
+                        if decl.visibility == tlang_ast::node::Visibility::Public
+                            && let Some(name) = decl.name()
+                        {
                             let arity = decl.parameters.len() as u16;
-                            symbols.push((decl.name(), DefKind::Function(arity)));
+                            symbols.push((name, DefKind::Function(arity)));
                         }
                     }
                 }
@@ -382,7 +386,12 @@ fn compile_single_module(
         analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),
         hir_id_start,
-    );
+    )
+    .map_err(|errs| {
+        errs.iter()
+            .map(|e| Diagnostic::error(&e.to_string(), e.span()))
+            .collect::<Vec<_>>()
+    })?;
 
     Ok(CompiledModule {
         path: parsed_module.path.clone(),
@@ -433,7 +442,12 @@ fn compile_single_module_with_slots<S: AsRef<str>>(
         analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),
         hir_id_start,
-    );
+    )
+    .map_err(|errs| {
+        errs.iter()
+            .map(|e| Diagnostic::error(&e.to_string(), e.span()))
+            .collect::<Vec<_>>()
+    })?;
 
     Ok(CompiledModule {
         path: parsed_module.path.clone(),

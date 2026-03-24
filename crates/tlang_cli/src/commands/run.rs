@@ -214,7 +214,13 @@ fn compile(input_file: &str) -> (hir::Module, std::collections::HashSet<tlang_hi
         semantic_analyzer.symbol_id_allocator(),
         semantic_analyzer.root_symbol_table(),
         semantic_analyzer.symbol_tables().clone(),
-    );
+    )
+    .unwrap_or_else(|errs| {
+        for err in &errs {
+            eprintln!("error: {err}");
+        }
+        std::process::exit(1);
+    });
 
     let mut optimizer = HirOptimizer::default();
     let constant_pool_ids = meta.constant_pool_ids.clone();

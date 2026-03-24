@@ -33,6 +33,7 @@ pub fn compile(source: &str) -> hir::LowerResult {
         semantic_analyzer.root_symbol_table(),
         semantic_analyzer.symbol_tables().clone(),
     )
+    .expect("lowering should succeed")
 }
 
 /// Like [`compile`] but registers a representative set of interpreter-style
@@ -86,6 +87,7 @@ pub fn compile_with_interpreter_builtins(source: &str) -> hir::LowerResult {
         semantic_analyzer.root_symbol_table(),
         semantic_analyzer.symbol_tables().clone(),
     )
+    .expect("lowering should succeed")
 }
 
 pub fn compile_with_interpreter_builtins_and_optimize(
