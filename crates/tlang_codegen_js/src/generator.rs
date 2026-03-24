@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use oxc_allocator::{Allocator, Vec as OxcVec};
 use oxc_ast::AstBuilder;
@@ -8,13 +8,11 @@ use oxc_codegen::{Codegen, CodegenOptions, IndentChar};
 use oxc_sourcemap::{SourceMap, Token};
 use oxc_span::SPAN;
 
-use crate::js_anf_transform::JsAnfTransform;
 use crate::scope::Scope;
 use oxc_estree::{ESTree, PrettyJSSerializer};
 use tlang_defs::DefKind;
 use tlang_hir as hir;
-use tlang_hir_opt::hir_opt::{HirOptContext, HirPass};
-use tlang_span::{HirId, HirIdAllocator, Span as TlangSpan};
+use tlang_span::Span as TlangSpan;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct FunctionContext {
@@ -254,19 +252,6 @@ impl CodegenJS {
         source_text: Option<&str>,
         source_name: Option<&str>,
     ) {
-        // ANF is required: the OXC-based codegen assumes all expressions in
-        // value positions are JS-expressible. Clone + ANF to guarantee this.
-        let mut module = module.clone();
-        let mut anf = JsAnfTransform::default();
-        let mut ctx = HirOptContext {
-            symbols: HashMap::new(),
-            hir_id_allocator: HirIdAllocator::default(),
-            current_scope: HirId::new(1),
-            diagnostics: Vec::new(),
-        };
-        anf.optimize_hir(&mut module, &mut ctx)
-            .expect("internal compiler error: stdlib ANF transform failed to converge");
-
         let allocator = Allocator::default();
         let ast = AstBuilder::new(&allocator);
         let mut inner = InnerCodegen::new(ast, self.protocol_names.clone());
@@ -274,7 +259,7 @@ impl CodegenJS {
         if let Some(st) = source_text {
             inner = inner.with_source_text(st.to_string());
         }
-        let program = inner.generate_module(&module);
+        let program = inner.generate_module(module);
 
         let mut serializer = PrettyJSSerializer::new(false);
         program.serialize(&mut serializer);

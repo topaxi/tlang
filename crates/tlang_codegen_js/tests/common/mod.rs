@@ -1,6 +1,8 @@
 use tlang_codegen_js::generator::CodegenJS;
+use tlang_codegen_js::js_anf_transform::JsAnfTransform;
 use tlang_codegen_js::js_hir_opt::JsHirOptimizer;
 use tlang_defs::DefKind;
+use tlang_hir_opt::HirPass;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 
@@ -70,6 +72,11 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
                 optimizer
                     .optimize_hir(&mut module, &mut ctx)
                     .expect("HIR optimization failed");
+            } else {
+                let mut anf = JsAnfTransform::default();
+                let mut ctx = meta.into();
+                anf.optimize_hir(&mut module, &mut ctx)
+                    .expect("internal compiler error: ANF transform failed to converge");
             }
 
             let mut codegen = CodegenJS::default();
