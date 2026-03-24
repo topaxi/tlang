@@ -76,7 +76,7 @@ impl LoweringContext {
         }
     }
 
-    pub fn symbol_tables(&mut self) -> HashMap<HirId, Rc<RefCell<DefScope>>> {
+    pub fn symbol_tables(&self) -> HashMap<HirId, Rc<RefCell<DefScope>>> {
         debug!("Translating symbol tables to HirIds");
 
         let mut symbol_tables = self.new_symbol_tables.clone();
@@ -87,7 +87,6 @@ impl LoweringContext {
 
                 let fn_node_id_to_hir_id = &self.fn_node_id_to_hir_id;
                 let node_id_to_hir_id = &self.node_id_to_hir_id;
-                let errors = &mut self.errors;
 
                 symbol_table
                     .borrow_mut()
@@ -106,20 +105,21 @@ impl LoweringContext {
                                     hir_id, symbol.name, symbol.defined_at.start, node_id
                                 );
                             } else {
-                                errors.push(LoweringError::UnmappedNodeId {
-                                    node_id,
-                                    context: "symbol table translation",
-                                });
+                                debug!(
+                                    "Unable to map {:?} to HirId for symbol {} \
+                                     (expected for builtin/external symbols)",
+                                    node_id, symbol.name
+                                );
                             }
                         }
                     });
 
                 symbol_tables.insert(*hir_id, symbol_table);
             } else {
-                self.errors.push(LoweringError::UnmappedNodeId {
-                    node_id: *node_id,
-                    context: "symbol table node lookup",
-                });
+                debug!(
+                    "No HirId found for NodeId: {node_id:?} \
+                     (expected for builtin/external symbol tables)"
+                );
             }
         }
 
