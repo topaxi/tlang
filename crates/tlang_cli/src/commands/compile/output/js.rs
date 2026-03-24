@@ -1,4 +1,4 @@
-use super::CompileTarget;
+use super::{CompileTarget, codegen_errors_to_diagnostics};
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_diagnostics::Diagnostic;
 
@@ -11,7 +11,9 @@ impl CompileTarget for JsTarget {
         module: &mut tlang_hir::Module,
     ) -> Result<String, Vec<Diagnostic>> {
         let mut generator = CodegenJS::default();
-        generator.generate_code(module);
+        generator
+            .generate_code(module)
+            .map_err(codegen_errors_to_diagnostics)?;
         Ok(generator.get_output().to_string())
     }
 }

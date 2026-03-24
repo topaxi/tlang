@@ -404,7 +404,11 @@ impl Tlang {
             self.lower_to_hir();
             if let Some(hir) = self.build.hir.as_ref() {
                 self.js
-                    .generate_code_with_source_map(hir, "playground.tlang", &self.source);
+                    .generate_code_with_source_map(hir, "playground.tlang", &self.source)
+                    .map_err(|errors| {
+                        let msgs: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
+                        JsError::new(&msgs.join("\n"))
+                    })?;
             }
         }
 

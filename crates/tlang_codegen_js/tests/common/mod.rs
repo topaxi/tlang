@@ -80,7 +80,9 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
             }
 
             let mut codegen = CodegenJS::default();
-            codegen.generate_code(&module);
+            codegen
+                .generate_code(&module)
+                .expect("codegen should succeed");
             codegen.get_output().to_string()
         }
         Err(diagnostics) => panic!("{diagnostics:#?}"),

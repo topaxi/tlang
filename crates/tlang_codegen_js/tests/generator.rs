@@ -48,7 +48,9 @@ fn test_get_standard_library_native_js_files() {
 fn test_get_js_ast_json() {
     let module = hir_module_from("let x = 1;");
     let mut codegen = CodegenJS::default();
-    codegen.generate_code(&module);
+    codegen
+        .generate_code(&module)
+        .expect("codegen should succeed");
     let json = codegen.get_js_ast_json();
     assert!(!json.is_empty());
 }
@@ -58,7 +60,9 @@ fn test_generate_code_with_source_map() {
     let source = "fn add(a, b) { a + b }";
     let module = hir_module_from(source);
     let mut codegen = CodegenJS::default();
-    codegen.generate_code_with_source_map(&module, "test.tlang", source);
+    codegen
+        .generate_code_with_source_map(&module, "test.tlang", source)
+        .expect("codegen should succeed");
     assert!(!codegen.get_output().is_empty());
     assert!(codegen.get_source_map().is_some());
     assert!(codegen.get_source_map_json().is_some());
@@ -69,7 +73,9 @@ fn test_shift_source_map_lines_zero_offset() {
     let source = "fn add(a, b) { a + b }";
     let module = hir_module_from(source);
     let mut codegen = CodegenJS::default();
-    codegen.generate_code_with_source_map(&module, "test.tlang", source);
+    codegen
+        .generate_code_with_source_map(&module, "test.tlang", source)
+        .expect("codegen should succeed");
     let map_json = codegen.get_source_map_json().unwrap();
     // Zero offset: the map should be returned unchanged.
     let shifted = shift_source_map_lines(&map_json, 0);
@@ -81,7 +87,9 @@ fn test_shift_source_map_lines_with_offset() {
     let source = "fn add(a, b) { a + b }";
     let module = hir_module_from(source);
     let mut codegen = CodegenJS::default();
-    codegen.generate_code_with_source_map(&module, "test.tlang", source);
+    codegen
+        .generate_code_with_source_map(&module, "test.tlang", source)
+        .expect("codegen should succeed");
     let map_json = codegen.get_source_map_json().unwrap();
     // Non-zero offset: the shifted map must differ from the original.
     let shifted = shift_source_map_lines(&map_json, 100);
