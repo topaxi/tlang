@@ -198,6 +198,8 @@ impl LoweringContext {
             };
 
             let last_decl_id = decls.last().map(|d| d.id);
+            // Use name_or_invalid() here — any error will be reported by
+            // fn_name_or_error() inside lower_fn_decl_matching for each arity variant.
             let fn_name_str = first_declaration.name_or_invalid();
             self.define_symbol_after(
                 dyn_fn_decl.hir_id,
@@ -328,7 +330,9 @@ impl LoweringContext {
         let protocol_name = self.lower_path(&impl_block.protocol_name);
         let target_type = self.lower_path(&impl_block.target_type);
 
-        // Group methods by name so multi-clause methods get lowered via pattern matching
+        // Group methods by name so multi-clause methods get lowered via pattern matching.
+        // Use name_or_invalid() for grouping only — any error for invalid names will be
+        // reported by fn_name_or_error() inside lower_fn_decl_matching.
         let mut method_groups: Vec<(String, Vec<&ast::node::FunctionDeclaration>)> = Vec::new();
         for method in &impl_block.methods {
             let name = method.name_or_invalid();
@@ -435,6 +439,11 @@ impl LoweringContext {
         (hir_id, fn_name, params, span)
     }
 
+    /// Register the function self-reference symbol and parameter symbols.
+    ///
+    /// `fn_name` should be obtained from [`fn_name_or_error`](Self::fn_name_or_error)
+    /// so that an [`InvalidFunctionName`](crate::LoweringError::InvalidFunctionName)
+    /// error is collected when the declaration has an invalid name expression.
     fn define_function_symbols(
         &mut self,
         hir_id: tlang_span::HirId,
