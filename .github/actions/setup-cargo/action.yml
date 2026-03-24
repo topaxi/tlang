@@ -11,7 +11,9 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Restore and save cargo cache
+    # ~/.cargo/ is branch-independent: registry downloads and installed binaries
+    # are identical regardless of which branch is being built.
+    - name: Restore and save cargo registry cache
       if: inputs.save-cache == 'true'
       uses: actions/cache@v5
       with:
@@ -24,14 +26,10 @@ runs:
           # contains package information of crates installed via `cargo install`.
           ~/.cargo/.crates.toml
           ~/.cargo/.crates2.json
-          # Cache build targets to avoid rebuilds in case not all crates
-          # changed. Especially useful while working on playground/non-rust
-          # code.
-          target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-6
-        restore-keys: ${{ runner.os }}-cargo-
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}-6
+        restore-keys: ${{ runner.os }}-cargo-registry-
 
-    - name: Restore cargo cache
+    - name: Restore cargo registry cache
       if: inputs.save-cache != 'true'
       uses: actions/cache/restore@v5
       with:
@@ -44,12 +42,41 @@ runs:
           # contains package information of crates installed via `cargo install`.
           ~/.cargo/.crates.toml
           ~/.cargo/.crates2.json
-          # Cache build targets to avoid rebuilds in case not all crates
-          # changed. Especially useful while working on playground/non-rust
-          # code.
-          target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-6
-        restore-keys: ${{ runner.os }}-cargo-
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}-6
+        restore-keys: ${{ runner.os }}-cargo-registry-
+
+    # target/ is branch-specific: compiled artifacts and incremental compilation
+    # data are tightly coupled to the source tree of the current branch. Sharing
+    # target/ across branches causes Rust's incremental compiler to re-type-check
+    # cached compilation units from files that no longer exist on the current
+    # branch, producing phantom errors (e.g. E0053 on a deleted file).
+    - name: Restore and save build cache
+      if: inputs.save-cache == 'true'
+      uses: actions/cache@v5
+      with:
+        path: target/
+        key: ${{ runner.os }}-cargo-target-${{ github.head_ref || github.ref }}-${{ hashFiles('**/Cargo.lock') }}-6
+        restore-keys: |
+          ${{ runner.os }}-cargo-target-${{ github.head_ref || github.ref }}-
+          ${{ runner.os }}-cargo-target-refs/heads/main-
+
+    - name: Restore build cache
+      if: inputs.save-cache != 'true'
+      uses: actions/cache/restore@v5
+      with:
+        path: target/
+        key: ${{ runner.os }}-cargo-target-${{ github.head_ref || github.ref }}-${{ hashFiles('**/Cargo.lock') }}-6
+        restore-keys: |
+          ${{ runner.os }}-cargo-target-${{ github.head_ref || github.ref }}-
+          ${{ runner.os }}-cargo-target-refs/heads/main-
+
+    # When a build cache from a different branch is seeded via the restore-keys
+    # fallback above, incremental compilation data may still reference source
+    # files that don't exist on the current branch. Clearing it is cheap and
+    # avoids those phantom compilation errors on the first run of a new branch.
+    - name: Clear incremental compilation data
+      shell: bash
+      run: find target -maxdepth 5 -name incremental -type d -exec rm -rf {} + 2>/dev/null || true
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
