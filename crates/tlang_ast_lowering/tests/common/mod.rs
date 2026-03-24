@@ -15,7 +15,8 @@ pub fn hir_from_str(input: &str) -> tlang_hir::Module {
         Default::default(),
         Default::default(),
         Default::default(),
-    );
+    )
+    .expect("lowering should succeed");
     module
 }
 
@@ -31,7 +32,8 @@ pub fn hir_from_str_analyzed(input: &str) -> tlang_hir::Module {
         analyzer.symbol_id_allocator(),
         analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),
-    );
+    )
+    .expect("lowering should succeed");
     module
 }
 

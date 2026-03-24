@@ -23,7 +23,8 @@ fn hir_module_from(source: &str) -> tlang_hir::Module {
         analyzer.symbol_id_allocator(),
         analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),
-    );
+    )
+    .expect("lowering should succeed");
     module
 }
 

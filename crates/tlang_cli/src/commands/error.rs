@@ -24,6 +24,16 @@ pub fn render_compile_error(err: &CompileError) -> String {
             let source_name = file_path.to_string_lossy();
             render_semantic_diagnostics(&source_name, source, diagnostics, ansi)
         }
+        CompileError::LoweringError {
+            module_path,
+            errors,
+        } => {
+            let mut parts = Vec::new();
+            for err in errors {
+                parts.push(format!("lowering error in module `{module_path}`: {err}"));
+            }
+            parts.join("\n")
+        }
     }
 }
 

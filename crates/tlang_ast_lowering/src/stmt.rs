@@ -200,7 +200,7 @@ impl LoweringContext {
             let last_decl_id = decls.last().map(|d| d.id);
             self.define_symbol_after(
                 dyn_fn_decl.hir_id,
-                &first_declaration.name(),
+                &first_declaration.name().unwrap_or_default(),
                 DefKind::Variable, // TODO, add symbol type for dyn dispatch functions
                 first_declaration.span.start,
                 |symbol| symbol.node_id == last_decl_id,
@@ -330,7 +330,7 @@ impl LoweringContext {
         // Group methods by name so multi-clause methods get lowered via pattern matching
         let mut method_groups: Vec<(String, Vec<&ast::node::FunctionDeclaration>)> = Vec::new();
         for method in &impl_block.methods {
-            let name = method.name();
+            let name = method.name().unwrap_or_default();
             if let Some(group) = method_groups.iter_mut().find(|(n, _)| *n == name) {
                 group.1.push(method);
             } else {
@@ -442,7 +442,7 @@ impl LoweringContext {
     ) {
         self.define_symbol(
             hir_id,
-            &first_declaration.name(),
+            &first_declaration.name().unwrap_or_default(),
             DefKind::FunctionSelfRef(params.len() as u16),
             first_declaration.span.start,
         );

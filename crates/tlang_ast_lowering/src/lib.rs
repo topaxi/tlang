@@ -1,15 +1,46 @@
 #![feature(box_patterns)]
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt;
 use std::rc::Rc;
 
-use log::{debug, warn};
+use log::debug;
 use tlang_ast as ast;
 use tlang_ast::keyword::kw;
 use tlang_ast::node::{EnumPattern, FunctionDeclaration, Ident};
 use tlang_defs::{Def, DefIdAllocator, DefKind, DefScope};
 use tlang_hir as hir;
-use tlang_span::{HirId, HirIdAllocator, NodeId};
+use tlang_span::{HirId, HirIdAllocator, NodeId, Span};
+
+/// Errors that can occur during AST-to-HIR lowering.
+#[derive(Debug, Clone)]
+pub enum LoweringError {
+    /// A `NodeId` could not be mapped to a `HirId` during symbol table translation.
+    UnmappedNodeId {
+        node_id: NodeId,
+        context: &'static str,
+    },
+    /// A function declaration has an invalid name expression (not a path or field expression).
+    InvalidFunctionName { span: Span },
+}
+
+impl fmt::Display for LoweringError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LoweringError::UnmappedNodeId { node_id, context } => {
+                write!(f, "unable to map {node_id:?} to HirId: {context}")
+            }
+            LoweringError::InvalidFunctionName { span } => {
+                write!(
+                    f,
+                    "invalid function name expression at {}:{}",
+                    span.start_lc.line + 1,
+                    span.start_lc.column + 1
+                )
+            }
+        }
+    }
+}
 
 mod expr;
 mod r#loop;
@@ -24,6 +55,7 @@ pub struct LoweringContext {
     symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>>,
     new_symbol_tables: HashMap<HirId, Rc<RefCell<DefScope>>>,
     current_symbol_table: Rc<RefCell<DefScope>>,
+    errors: Vec<LoweringError>,
 }
 
 impl LoweringContext {
@@ -40,10 +72,11 @@ impl LoweringContext {
             symbol_tables,
             new_symbol_tables: HashMap::default(),
             current_symbol_table: root_symbol_table,
+            errors: Vec::new(),
         }
     }
 
-    pub fn symbol_tables(&self) -> HashMap<HirId, Rc<RefCell<DefScope>>> {
+    pub fn symbol_tables(&mut self) -> HashMap<HirId, Rc<RefCell<DefScope>>> {
         debug!("Translating symbol tables to HirIds");
 
         let mut symbol_tables = self.new_symbol_tables.clone();
@@ -52,16 +85,19 @@ impl LoweringContext {
             if let Some(hir_id) = self.node_id_to_hir_id.get(node_id) {
                 let symbol_table = symbol_table.clone();
 
+                let fn_node_id_to_hir_id = &self.fn_node_id_to_hir_id;
+                let node_id_to_hir_id = &self.node_id_to_hir_id;
+                let errors = &mut self.errors;
+
                 symbol_table
                     .borrow_mut()
                     .get_all_local_symbols_mut()
                     .iter_mut()
                     .for_each(|symbol| {
                         if let Some(node_id) = symbol.node_id {
-                            if let Some(hir_id) = self
-                                .fn_node_id_to_hir_id
+                            if let Some(hir_id) = fn_node_id_to_hir_id
                                 .get(&node_id)
-                                .or_else(|| self.node_id_to_hir_id.get(&node_id))
+                                .or_else(|| node_id_to_hir_id.get(&node_id))
                             {
                                 symbol.hir_id = Some(*hir_id);
 
@@ -70,17 +106,20 @@ impl LoweringContext {
                                     hir_id, symbol.name, symbol.defined_at.start, node_id
                                 );
                             } else {
-                                warn!(
-                                    "Unable to map {:?} to HirId for symbol {}",
-                                    node_id, symbol.name
-                                );
+                                errors.push(LoweringError::UnmappedNodeId {
+                                    node_id,
+                                    context: "symbol table translation",
+                                });
                             }
                         }
                     });
 
                 symbol_tables.insert(*hir_id, symbol_table);
             } else {
-                warn!("No HirId found for NodeId: {node_id:?}");
+                self.errors.push(LoweringError::UnmappedNodeId {
+                    node_id: *node_id,
+                    context: "symbol table node lookup",
+                });
             }
         }
 
@@ -456,7 +495,7 @@ pub fn lower_to_hir(
     symbol_id_allocator: DefIdAllocator,
     root_symbol_table: Rc<RefCell<DefScope>>,
     symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>>,
-) -> hir::LowerResult {
+) -> Result<hir::LowerResult, Vec<LoweringError>> {
     lower(
         &mut LoweringContext::new(symbol_id_allocator, root_symbol_table, symbol_tables),
         tlang_ast,
@@ -473,7 +512,7 @@ pub fn lower_to_hir_with_offset(
     root_symbol_table: Rc<RefCell<DefScope>>,
     symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>>,
     hir_id_start: usize,
-) -> hir::LowerResult {
+) -> Result<hir::LowerResult, Vec<LoweringError>> {
     let mut ctx = LoweringContext::new(symbol_id_allocator, root_symbol_table, symbol_tables);
     ctx.hir_id_allocator = HirIdAllocator::new(hir_id_start);
     lower(&mut ctx, tlang_ast, constant_pool_node_ids)
@@ -483,7 +522,7 @@ pub fn lower(
     ctx: &mut LoweringContext,
     tlang_ast: &ast::node::Module,
     constant_pool_node_ids: &[NodeId],
-) -> hir::LowerResult {
+) -> Result<hir::LowerResult, Vec<LoweringError>> {
     let root_symbol_table = ctx.lower_node_id(tlang_span::NodeId::new(1));
     let module = ctx.lower_module(tlang_ast);
     let symbol_tables = ctx.symbol_tables();
@@ -495,7 +534,11 @@ pub fn lower(
         .filter_map(|node_id| ctx.node_id_to_hir_id.get(node_id).copied())
         .collect();
 
-    (
+    if !ctx.errors.is_empty() {
+        return Err(std::mem::take(&mut ctx.errors));
+    }
+
+    Ok((
         module,
         hir::LowerResultMeta {
             root_symbol_table,
@@ -504,5 +547,5 @@ pub fn lower(
             symbol_id_allocator,
             constant_pool_ids,
         },
-    )
+    ))
 }

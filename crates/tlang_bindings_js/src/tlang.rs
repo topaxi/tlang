@@ -290,7 +290,11 @@ impl Tlang {
                 self.analyzer.symbol_id_allocator(),
                 root_symbol_table,
                 symbol_tables,
-            );
+            )
+            .unwrap_or_else(|errs| {
+                let msgs: Vec<String> = errs.iter().map(|e| e.to_string()).collect();
+                panic!("lowering failed: {}", msgs.join("; "));
+            });
             let constant_pool_ids = meta.constant_pool_ids.clone();
             let mut ctx = meta.into();
 

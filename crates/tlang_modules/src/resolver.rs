@@ -172,10 +172,12 @@ fn symbol_visibility(ast: &tlang_ast::node::Module, name: &str, require_pub: boo
     let vis_ok = |vis: &Visibility| !require_pub || *vis == Visibility::Public;
     for stmt in &ast.statements {
         let found = match &stmt.kind {
-            StmtKind::FunctionDeclaration(decl) if decl.name() == name => vis_ok(&decl.visibility),
+            StmtKind::FunctionDeclaration(decl) if decl.name().is_some_and(|n| n == name) => {
+                vis_ok(&decl.visibility)
+            }
             StmtKind::FunctionDeclarations(decls) => decls
                 .iter()
-                .any(|d| d.name() == name && vis_ok(&d.visibility)),
+                .any(|d| d.name().is_some_and(|n| n == name) && vis_ok(&d.visibility)),
             StmtKind::EnumDeclaration(decl) if decl.name.as_str() == name => {
                 vis_ok(&decl.visibility)
             }

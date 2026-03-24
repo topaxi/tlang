@@ -60,7 +60,7 @@ impl VisitorMut for FnParamTypeInference {
         // for top-level FunctionDeclarations.
         let mut groups: Vec<(String, Vec<usize>)> = Vec::new();
         for (i, decl) in impl_block.methods.iter().enumerate() {
-            let name = decl.name();
+            let name = decl.name().unwrap_or_default();
             if let Some(group) = groups.iter_mut().find(|(n, _)| *n == name) {
                 group.1.push(i);
             } else {

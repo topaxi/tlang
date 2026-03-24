@@ -112,7 +112,8 @@ impl CodegenJS {
             semantic_analyzer.symbol_id_allocator(),
             semantic_analyzer.root_symbol_table(),
             semantic_analyzer.symbol_tables().clone(),
-        );
+        )
+        .expect("stdlib lowering should succeed");
         let mut ctx: HirOptContext = meta.into();
 
         let mut optimizer = crate::js_hir_opt::JsHirOptimizer::default();

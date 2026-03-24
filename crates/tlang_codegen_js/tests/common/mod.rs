@@ -61,7 +61,8 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
                 semantic_analyzer.symbol_id_allocator(),
                 semantic_analyzer.root_symbol_table(),
                 semantic_analyzer.symbol_tables().clone(),
-            );
+            )
+            .expect("lowering should succeed");
 
             if options.optimize {
                 let mut optimizer = JsHirOptimizer::default();
