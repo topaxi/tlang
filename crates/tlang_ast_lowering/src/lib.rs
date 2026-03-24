@@ -49,7 +49,43 @@ mod stmt;
 
 #[derive(Debug)]
 pub struct LoweringContext {
+    /// Maps every AST `NodeId` to its corresponding `HirId`.
+    ///
+    /// Created lazily via [`Self::lower_node_id`]: the first call for a given
+    /// `NodeId` allocates a fresh `HirId`; subsequent calls return the same
+    /// one.  This map drives two things:
+    ///
+    /// 1. **Scope keying** – parser-created scopes (keyed by `NodeId`) are
+    ///    translated to `HirId`-keyed scopes in [`Self::symbol_tables`].  Each
+    ///    function *clause* gets its own unique `HirId` so that its parameter
+    ///    scope is reachable independently.
+    /// 2. **Constant-pool translation** – `NodeId`s of constant-pool nodes
+    ///    are converted to `HirId`s after lowering.
+    ///
+    /// **Invariant**: a function clause `NodeId` is always present in *both*
+    /// this map (unique per-clause `HirId`, established by the
+    /// `lower_node_id` calls at the top of [`Self::lower_fn_decls`]) *and* in
+    /// [`Self::fn_node_id_to_hir_id`] (shared `HirId` for the whole function
+    /// group).  Symbol-resolution lookups therefore check
+    /// `fn_node_id_to_hir_id` first so that symbols that *refer* to the
+    /// function get the canonical group `HirId`, while the per-clause `HirId`
+    /// in this map is used only for scope indexing.
     node_id_to_hir_id: HashMap<NodeId, HirId>,
+    /// Maps every function-clause `NodeId` to the *shared* `HirId` of the
+    /// logical function group it belongs to.
+    ///
+    /// A function defined with multiple pattern-matching clauses (e.g.
+    /// `fn fib(0) { … }` / `fn fib(n) { … }`) is lowered to a **single**
+    /// HIR `FunctionDeclaration`.  All clauses therefore share one `HirId`
+    /// so that call-site symbols resolve to the same declaration regardless
+    /// of which clause was matched.
+    ///
+    /// This map is populated in `setup_function_declaration_metadata` and
+    /// is queried *before* `node_id_to_hir_id` in symbol-resolution lookups
+    /// (see [`Self::symbol_tables`]).  Never collapse this map into
+    /// `node_id_to_hir_id`: doing so would overwrite the unique per-clause
+    /// `HirId`s that are needed for scope keying, causing parameter scopes
+    /// of multi-clause functions to collide.
     fn_node_id_to_hir_id: HashMap<NodeId, HirId>,
     hir_id_allocator: HirIdAllocator,
     symbol_id_allocator: DefIdAllocator,

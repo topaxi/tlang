@@ -398,6 +398,15 @@ impl LoweringContext {
         let first_declaration = &decls[0];
         let fn_name = self.lower_expr(&first_declaration.name);
 
+        // Map every clause NodeId to the shared HirId so that symbols
+        // referring to this function resolve to the same declaration
+        // regardless of which clause they came from.  Note that each clause
+        // NodeId has *already* been inserted into `node_id_to_hir_id` (with
+        // its own unique HirId) by the `lower_node_id` calls at the top of
+        // `lower_fn_decls`; that per-clause HirId is used for scope keying.
+        // We intentionally use a separate map here to avoid overwriting those
+        // scope-keying entries.  See the field documentation on
+        // `LoweringContext` for the full invariant.
         for decl in decls {
             self.fn_node_id_to_hir_id.insert(decl.id, hir_id);
         }
