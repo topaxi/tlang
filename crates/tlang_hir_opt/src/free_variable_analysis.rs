@@ -1,61 +1,136 @@
 //! Free variable analysis for closures.
 //!
-//! This pass runs after slot allocation and collects the set of upvar
-//! references inside each closure (FunctionExpression). It then:
+//! This pass runs after slot allocation. For each `FunctionExpression` (closure)
+//! and `FunctionDeclaration` (named nested function) in the HIR, it:
 //!
-//! 1. Stores a `Vec<CaptureInfo>` on the closure's `HirScopeData` so the
-//!    runtime knows exactly which bindings to capture for GC tracing.
-//! 2. Handles nested closures by lifting transitive captures: if an inner
-//!    closure needs a variable from an outer scope that passes through an
-//!    intermediate closure, the intermediate closure also captures it so
-//!    that GC can trace the full reference chain.
+//! 1. Collects all `Slot::Upvar` references in the body, normalizing their
+//!    `scope_index` relative to the closure's function scope (block depth 0).
+//! 2. Lifts transitive captures: if a nested closure captures a variable from
+//!    a scope above the current closure, the current closure also captures it.
+//! 3. Stores the resulting `Vec<CaptureInfo>` on `HirScopeData::captures`.
+//!
+//! ## Normalized `scope_index`
+//!
+//! `Slot::Upvar(slot, scope_index)` uses a scope_index relative to the
+//! *reference site* inside the closure body. The same captured variable gets
+//! different `scope_index` values depending on how many nested scopes surround
+//! the reference (e.g., 1 at the function body level, 2 inside a match arm).
+//!
+//! `CaptureInfo.scope_index` stores the *normalized* value:
+//!
+//! ```text
+//! normalized = raw_scope_index - block_depth_within_function
+//! ```
+//!
+//! This value is unique per captured variable and stable across reference sites,
+//! making it usable as a key for selective capture in a later phase.
 
 use std::collections::BTreeSet;
 
-use tlang_hir::visit::walk_expr;
+use tlang_hir::visit::{walk_block, walk_expr, walk_pat, walk_stmt};
 use tlang_hir::{self as hir, CaptureInfo, Visitor};
 
 use crate::HirPass;
 use crate::hir_opt::{HirOptContext, HirOptError};
 
-/// Per-capture lift entry: `(capture_idx, (scope_index, slot_index))`.
-type LiftEntry = (usize, (hir::ScopeIndex, hir::SlotIndex));
-
-/// Per-closure lift info: `(closure_index, Vec<LiftEntry>)`.
-type ClosureLiftInfo = Vec<(usize, Vec<LiftEntry>)>;
-
 // ---------------------------------------------------------------------------
-// ShallowUpvarCollector: gathers Slot::Upvar references WITHOUT entering
-// nested FunctionExpressions (each closure manages its own captures).
+// CaptureCollector
 // ---------------------------------------------------------------------------
 
-struct ShallowUpvarCollector {
-    /// Deduplicated set of (scope_index, slot_index) as found in the HIR.
+/// Single-pass collector that walks a closure body and accumulates
+/// normalized capture information.
+///
+/// Must be driven with [`walk_block`] (not [`Visitor::visit_block`]) on the
+/// function body so the body block itself does not increment `block_depth`.
+struct CaptureCollector {
+    /// Deduplicated `(normalized_scope_index, slot_index)` captures.
     upvars: BTreeSet<(hir::ScopeIndex, hir::SlotIndex)>,
+    /// Runtime-scope depth relative to the closure's function body (depth 0).
+    block_depth: u16,
 }
 
-impl ShallowUpvarCollector {
+impl CaptureCollector {
     fn new() -> Self {
         Self {
             upvars: BTreeSet::new(),
+            block_depth: 0,
+        }
+    }
+
+    fn add_upvar(&mut self, slot_index: hir::SlotIndex, scope_index: hir::ScopeIndex) {
+        let normalized = scope_index.saturating_sub(self.block_depth);
+        self.upvars.insert((normalized, slot_index));
+    }
+
+    /// Lift transitive captures from a directly-nested function.
+    ///
+    /// If the nested function has a capture with `scope_index > 1`, that
+    /// variable comes from a scope above *this* closure, so we also capture
+    /// it at `scope_index - 1` to ensure GC can trace the full chain.
+    fn lift_from(&mut self, nested: &hir::FunctionDeclaration) {
+        for cap in nested.body.scope.captures() {
+            if cap.scope_index > 1 {
+                self.upvars.insert((cap.scope_index - 1, cap.slot_index));
+            }
         }
     }
 }
 
-impl<'hir> Visitor<'hir> for ShallowUpvarCollector {
+impl<'hir> Visitor<'hir> for CaptureCollector {
     type Context = ();
 
-    fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut ()) {
-        // Stop at nested FunctionExpressions — they have their own captures.
-        if matches!(expr.kind, hir::ExprKind::FunctionExpression(_)) {
+    fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut ()) {
+        if let hir::StmtKind::FunctionDeclaration(nested) = &stmt.kind {
+            // Named nested function — stop recursion, lift transitive captures.
+            self.lift_from(nested);
             return;
         }
-        walk_expr(self, expr, ctx);
+        walk_stmt(self, stmt, ctx);
+    }
+
+    fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut ()) {
+        match &mut expr.kind {
+            hir::ExprKind::FunctionExpression(nested) => {
+                // Anonymous closure — stop recursion, lift transitive captures.
+                self.lift_from(nested);
+            }
+            hir::ExprKind::Match(discriminant, arms) => {
+                self.visit_expr(discriminant, ctx);
+                for arm in arms {
+                    let has_pat_scope = arm.hir_id != arm.block.hir_id;
+                    // The arm scope is always pushed before pattern binding and
+                    // guard evaluation, regardless of whether it's separate from
+                    // the block scope.
+                    self.block_depth += 1;
+                    walk_pat(self, &mut arm.pat, ctx);
+                    if let Some(guard) = &mut arm.guard {
+                        self.visit_expr(guard, ctx);
+                    }
+                    if has_pat_scope {
+                        // Separate block scope inside the arm scope; visit_block
+                        // adds another level.
+                        self.visit_block(&mut arm.block, ctx);
+                    } else {
+                        // Arm scope and block scope are the same scope; walk
+                        // directly to avoid a redundant depth increment.
+                        walk_block(self, &mut arm.block, ctx);
+                    }
+                    self.block_depth -= 1;
+                }
+            }
+            _ => walk_expr(self, expr, ctx),
+        }
+    }
+
+    fn visit_block(&mut self, block: &'hir mut hir::Block, ctx: &mut ()) {
+        self.block_depth += 1;
+        walk_block(self, block, ctx);
+        self.block_depth -= 1;
     }
 
     fn visit_path(&mut self, path: &'hir mut hir::Path, _ctx: &mut ()) {
         if let hir::Slot::Upvar(slot_index, scope_index) = path.res.slot() {
-            self.upvars.insert((scope_index, slot_index));
+            self.add_upvar(slot_index, scope_index);
         }
     }
 }
@@ -69,29 +144,20 @@ pub struct FreeVariableAnalysis;
 
 impl FreeVariableAnalysis {
     fn process_function_decl(decl: &mut hir::FunctionDeclaration) {
-        // 1. Collect direct upvar references in the body (NOT entering nested
-        //    FunctionExpressions — each manages its own captures).
-        let mut collector = ShallowUpvarCollector::new();
-        collector.visit_block(&mut decl.body, &mut ());
-        let mut all_upvars = collector.upvars;
+        // Clear any stale captures from a previous run.
+        decl.body.scope.set_captures(vec![]);
 
-        // 2. Lift transitive captures from immediate nested closures.
-        //    After inside-out processing, nested closures already have their
-        //    captures resolved. Any capture with scope_index > 1 passes
-        //    through this closure and needs to be lifted.
-        //
-        //    We collect nested closure info in two phases to satisfy the
-        //    borrow checker: first read captures, then write updates.
+        let mut collector = CaptureCollector::new();
+        // Use walk_block directly (not visit_block) so the function body itself
+        // does not increment block_depth — it is at depth 0.
+        walk_block(&mut collector, &mut decl.body, &mut ());
 
-        // Phase 2a: read nested closures' captures and decide what to lift.
-        let lifts_per_closure = Self::collect_lifts(&decl.body, &mut all_upvars);
-
-        if all_upvars.is_empty() {
+        if collector.upvars.is_empty() {
             return;
         }
 
-        // 3. Build the sorted capture list and index map.
-        let captures: Vec<CaptureInfo> = all_upvars
+        let captures: Vec<CaptureInfo> = collector
+            .upvars
             .iter()
             .map(|&(scope_index, slot_index)| CaptureInfo {
                 slot_index,
@@ -99,157 +165,29 @@ impl FreeVariableAnalysis {
             })
             .collect();
 
-        let capture_map: std::collections::HashMap<(hir::ScopeIndex, hir::SlotIndex), usize> =
-            all_upvars
-                .iter()
-                .enumerate()
-                .map(|(idx, &key)| (key, idx))
-                .collect();
-
-        // 4. Store captures on scope data.
         decl.body.scope.set_captures(captures);
-
-        // 5. Update nested closures' capture info for lifted variables.
-        Self::apply_lifts(&mut decl.body, &lifts_per_closure, &capture_map);
-    }
-
-    /// Walk the body's immediate children looking for FunctionExpressions.
-    /// For each nested closure whose captures have scope > 1, record a
-    /// `LiftInfo` and insert the adjusted key into `all_upvars`.
-    fn collect_lifts(
-        body: &hir::Block,
-        all_upvars: &mut BTreeSet<(hir::ScopeIndex, hir::SlotIndex)>,
-    ) -> ClosureLiftInfo {
-        let mut result: ClosureLiftInfo = Vec::new();
-
-        // Helper: inspect a single expression for nested closures.
-        fn inspect_expr(
-            expr: &hir::Expr,
-            all_upvars: &mut BTreeSet<(hir::ScopeIndex, hir::SlotIndex)>,
-            result: &mut ClosureLiftInfo,
-            idx: usize,
-        ) {
-            if let hir::ExprKind::FunctionExpression(nested_decl) = &expr.kind {
-                let mut lifts = Vec::new();
-                for (cap_idx, cap) in nested_decl.body.scope.captures().iter().enumerate() {
-                    if cap.scope_index > 1 {
-                        let our_key = (cap.scope_index - 1, cap.slot_index);
-                        all_upvars.insert(our_key);
-                        lifts.push((cap_idx, our_key));
-                    }
-                }
-                if !lifts.is_empty() {
-                    result.push((idx, lifts));
-                }
-            }
-            // Don't recurse — we only care about immediate children.
-        }
-
-        // Walk stmts' top-level expressions (shallow, no recursion into nested blocks).
-        Self::visit_exprs_shallow(body, |idx, expr| {
-            inspect_expr(expr, all_upvars, &mut result, idx);
-        });
-
-        result
-    }
-
-    /// Apply the lift updates to nested closures' capture info.
-    fn apply_lifts(
-        body: &mut hir::Block,
-        lifts_per_closure: &[(usize, Vec<LiftEntry>)],
-        capture_map: &std::collections::HashMap<(hir::ScopeIndex, hir::SlotIndex), usize>,
-    ) {
-        if lifts_per_closure.is_empty() {
-            return;
-        }
-
-        // Build a set of indices that need updating for fast lookup.
-        let lift_map: std::collections::HashMap<usize, &[LiftEntry]> = lifts_per_closure
-            .iter()
-            .map(|(idx, lifts)| (*idx, lifts.as_slice()))
-            .collect();
-
-        Self::visit_exprs_shallow_mut(body, |idx, expr| {
-            if let Some(lifts) = lift_map.get(&idx)
-                && let hir::ExprKind::FunctionExpression(nested_decl) = &mut expr.kind
-            {
-                let mut caps = nested_decl.body.scope.captures().to_vec();
-                for &(cap_idx, ref our_key) in *lifts {
-                    let our_capture_idx = capture_map[our_key];
-                    caps[cap_idx] = CaptureInfo {
-                        slot_index: our_capture_idx,
-                        scope_index: 2,
-                    };
-                }
-                nested_decl.body.scope.set_captures(caps);
-            }
-        });
-    }
-
-    /// Visit top-level expressions in a block shallowly (stmts + tail expr).
-    /// The callback receives a sequential index and a reference to each expression.
-    /// Does NOT recurse into sub-expressions or nested blocks.
-    fn visit_exprs_shallow<F>(body: &hir::Block, mut f: F)
-    where
-        F: FnMut(usize, &hir::Expr),
-    {
-        let mut idx = 0;
-        for stmt in &body.stmts {
-            match &stmt.kind {
-                hir::StmtKind::Expr(expr) => {
-                    f(idx, expr);
-                    idx += 1;
-                }
-                hir::StmtKind::Let(_, expr, _) => {
-                    f(idx, expr);
-                    idx += 1;
-                }
-                _ => {
-                    idx += 1;
-                }
-            }
-        }
-        if let Some(expr) = &body.expr {
-            f(idx, expr);
-        }
-    }
-
-    /// Mutable version of visit_exprs_shallow.
-    fn visit_exprs_shallow_mut<F>(body: &mut hir::Block, mut f: F)
-    where
-        F: FnMut(usize, &mut hir::Expr),
-    {
-        let mut idx = 0;
-        for stmt in &mut body.stmts {
-            match &mut stmt.kind {
-                hir::StmtKind::Expr(expr) => {
-                    f(idx, expr);
-                    idx += 1;
-                }
-                hir::StmtKind::Let(_, expr, _) => {
-                    f(idx, expr);
-                    idx += 1;
-                }
-                _ => {
-                    idx += 1;
-                }
-            }
-        }
-        if let Some(expr) = &mut body.expr {
-            f(idx, expr);
-        }
     }
 }
 
 impl<'hir> Visitor<'hir> for FreeVariableAnalysis {
     type Context = HirOptContext;
 
+    fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut HirOptContext) {
+        if let hir::StmtKind::FunctionDeclaration(decl) = &mut stmt.kind {
+            // Process the body first (inside-out) so nested closures/functions
+            // have their captures resolved before this function is processed.
+            self.visit_block(&mut decl.body, ctx);
+            Self::process_function_decl(decl);
+            return;
+        }
+        walk_stmt(self, stmt, ctx);
+    }
+
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut HirOptContext) {
-        // Process nested closures first (depth-first / inside-out) so that
-        // inner closures have their captures resolved before the outer one.
+        // Process nested closures first (inside-out) so inner closures have
+        // their captures resolved before the outer one is processed.
         if matches!(expr.kind, hir::ExprKind::FunctionExpression(_)) {
             walk_expr(self, expr, ctx);
-
             if let hir::ExprKind::FunctionExpression(decl) = &mut expr.kind {
                 Self::process_function_decl(decl);
             }
@@ -288,74 +226,214 @@ mod tests {
         }
     }
 
-    /// Helper: build a minimal FunctionDeclaration whose body contains a
-    /// single expression that references a path with the given slot.
-    fn fn_expr_with_upvar(slot_index: usize, scope_index: u16) -> hir::FunctionDeclaration {
+    fn make_name_expr(id: usize) -> hir::Expr {
         use tlang_span::Span;
-
-        let path = hir::Path {
-            segments: vec![],
-            res: hir::Res::new_upvar(HirId::new(10), slot_index, scope_index as usize),
-            span: Span::default(),
-        };
-
-        let expr = hir::Expr {
-            hir_id: HirId::new(11),
-            kind: hir::ExprKind::Path(Box::new(path)),
+        hir::Expr {
+            hir_id: HirId::new(id),
+            kind: hir::ExprKind::Path(Box::new(hir::Path {
+                segments: vec![],
+                res: hir::Res::default(),
+                span: Span::default(),
+            })),
             ty: hir::Ty::default(),
-            span: Span::default(),
-        };
-
-        let body = hir::Block {
-            hir_id: HirId::new(12),
-            stmts: vec![],
-            expr: Some(expr),
-            scope: hir::HirScopeData::default(),
-            span: Span::default(),
-        };
-
-        let name_path = hir::Path {
-            segments: vec![],
-            res: hir::Res::default(),
-            span: Span::default(),
-        };
-        let name_expr = hir::Expr {
-            hir_id: HirId::new(13),
-            kind: hir::ExprKind::Path(Box::new(name_path)),
-            ty: hir::Ty::default(),
-            span: Span::default(),
-        };
-
-        hir::FunctionDeclaration {
-            hir_id: HirId::new(14),
-            visibility: tlang_ast::node::Visibility::Private,
-            name: name_expr,
-            parameters: vec![],
-            return_type: hir::Ty::default(),
-            body,
             span: Span::default(),
         }
     }
 
+    fn make_upvar_path_expr(id: usize, slot_index: usize, scope_index: u16) -> hir::Expr {
+        use tlang_span::Span;
+        hir::Expr {
+            hir_id: HirId::new(id),
+            kind: hir::ExprKind::Path(Box::new(hir::Path {
+                segments: vec![],
+                res: hir::Res::new_upvar(HirId::new(id + 100), slot_index, scope_index as usize),
+                span: Span::default(),
+            })),
+            ty: hir::Ty::default(),
+            span: Span::default(),
+        }
+    }
+
+    /// Build a minimal `FunctionDeclaration` whose body's tail expression is `body_expr`.
+    fn fn_decl_with_body_expr(body_expr: hir::Expr) -> hir::FunctionDeclaration {
+        use tlang_span::Span;
+        hir::FunctionDeclaration {
+            hir_id: HirId::new(14),
+            visibility: tlang_ast::node::Visibility::Private,
+            name: make_name_expr(13),
+            parameters: vec![],
+            return_type: hir::Ty::default(),
+            body: hir::Block {
+                hir_id: HirId::new(12),
+                stmts: vec![],
+                expr: Some(body_expr),
+                scope: hir::HirScopeData::default(),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }
+    }
+
+    /// Helper: build a minimal FunctionDeclaration whose body contains a
+    /// single expression that references a path with the given slot.
+    fn fn_expr_with_upvar(slot_index: usize, scope_index: u16) -> hir::FunctionDeclaration {
+        fn_decl_with_body_expr(make_upvar_path_expr(11, slot_index, scope_index))
+    }
+
     #[test]
-    fn test_upvar_captured_without_remapping() {
+    fn test_upvar_captured_at_fn_body_level() {
+        // Reference is directly in the function body (block_depth = 0).
+        // raw scope_index = 2, normalized = 2 - 0 = 2.
         let mut decl = fn_expr_with_upvar(3, 2);
         FreeVariableAnalysis::process_function_decl(&mut decl);
 
-        // Check captures stored on scope data
         let captures = decl.body.scope.captures();
         assert_eq!(captures.len(), 1);
         assert_eq!(captures[0].slot_index, 3);
         assert_eq!(captures[0].scope_index, 2);
 
-        // The original upvar slot should be preserved (no remapping needed since
-        // execution still uses scope-swapping). Captures are only for GC tracing.
+        // The original Slot::Upvar in the HIR is unchanged (captures are GC-only).
         let body_expr = decl.body.expr.as_ref().unwrap();
         if let hir::ExprKind::Path(path) = &body_expr.kind {
             assert_eq!(path.res.slot(), hir::Slot::Upvar(3, 2));
         } else {
             panic!("expected Path expression");
         }
+    }
+
+    #[test]
+    fn test_upvar_normalized_from_nested_block() {
+        use tlang_span::Span;
+
+        // Build: fn () { { upvar(slot=0, scope_index=3) } }
+        // The upvar appears inside a Block expression (block_depth = 1).
+        // raw = 3, normalized = 3 - 1 = 2.
+        let inner_block = hir::Block {
+            hir_id: HirId::new(20),
+            stmts: vec![],
+            expr: Some(make_upvar_path_expr(21, 0, 3)),
+            scope: hir::HirScopeData::default(),
+            span: Span::default(),
+        };
+        let block_expr = hir::Expr {
+            hir_id: HirId::new(22),
+            kind: hir::ExprKind::Block(Box::new(inner_block)),
+            ty: hir::Ty::default(),
+            span: Span::default(),
+        };
+
+        let mut decl = fn_decl_with_body_expr(block_expr);
+        FreeVariableAnalysis::process_function_decl(&mut decl);
+
+        let captures = decl.body.scope.captures();
+        assert_eq!(captures.len(), 1);
+        assert_eq!(captures[0].slot_index, 0);
+        assert_eq!(captures[0].scope_index, 2, "normalized = 3 - 1 = 2");
+    }
+
+    #[test]
+    fn test_same_upvar_at_different_depths_deduplicates() {
+        use tlang_span::Span;
+
+        // Build: fn () {
+        //   upvar(slot=0, scope=1)       // at fn body (D=0), normalized = 1
+        //   { upvar(slot=0, scope=2) }   // inside block (D=1), normalized = 1
+        // }
+        // Both references should produce exactly ONE CaptureInfo entry.
+        let inner_block = hir::Block {
+            hir_id: HirId::new(30),
+            stmts: vec![],
+            expr: Some(make_upvar_path_expr(31, 0, 2)),
+            scope: hir::HirScopeData::default(),
+            span: Span::default(),
+        };
+        let block_expr = hir::Expr {
+            hir_id: HirId::new(32),
+            kind: hir::ExprKind::Block(Box::new(inner_block)),
+            ty: hir::Ty::default(),
+            span: Span::default(),
+        };
+        let top_ref = make_upvar_path_expr(33, 0, 1);
+
+        let mut decl = hir::FunctionDeclaration {
+            hir_id: HirId::new(34),
+            visibility: tlang_ast::node::Visibility::Private,
+            name: make_name_expr(35),
+            parameters: vec![],
+            return_type: hir::Ty::default(),
+            body: hir::Block {
+                hir_id: HirId::new(36),
+                stmts: vec![hir::Stmt::new(
+                    HirId::new(37),
+                    hir::StmtKind::Expr(Box::new(top_ref)),
+                    Span::default(),
+                )],
+                expr: Some(block_expr),
+                scope: hir::HirScopeData::default(),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        };
+
+        FreeVariableAnalysis::process_function_decl(&mut decl);
+
+        let captures = decl.body.scope.captures();
+        assert_eq!(
+            captures.len(),
+            1,
+            "same variable at different depths should produce one capture"
+        );
+        assert_eq!(captures[0].slot_index, 0);
+        assert_eq!(captures[0].scope_index, 1);
+    }
+
+    #[test]
+    fn test_stale_captures_cleared() {
+        // Pre-populate captures with stale data; after re-running with no
+        // upvars, captures should be empty.
+        use tlang_span::Span;
+
+        let path = hir::Path {
+            segments: vec![],
+            res: {
+                let mut res = hir::Res::new_local(HirId::new(10));
+                res.set_slot(hir::Slot::Local(0));
+                res
+            },
+            span: Span::default(),
+        };
+        let expr = hir::Expr {
+            hir_id: HirId::new(11),
+            kind: hir::ExprKind::Path(Box::new(path)),
+            ty: hir::Ty::default(),
+            span: Span::default(),
+        };
+        let mut scope = hir::HirScopeData::default();
+        scope.set_captures(vec![CaptureInfo {
+            slot_index: 99,
+            scope_index: 99,
+        }]);
+        let mut decl = hir::FunctionDeclaration {
+            hir_id: HirId::new(14),
+            visibility: tlang_ast::node::Visibility::Private,
+            name: make_name_expr(13),
+            parameters: vec![],
+            return_type: hir::Ty::default(),
+            body: hir::Block {
+                hir_id: HirId::new(12),
+                stmts: vec![],
+                expr: Some(expr),
+                scope,
+                span: Span::default(),
+            },
+            span: Span::default(),
+        };
+
+        FreeVariableAnalysis::process_function_decl(&mut decl);
+        assert!(
+            decl.body.scope.captures().is_empty(),
+            "stale captures should be cleared when there are no upvars"
+        );
     }
 
     #[test]
@@ -388,22 +466,10 @@ mod tests {
             span: Span::default(),
         };
 
-        let name_path = hir::Path {
-            segments: vec![],
-            res: hir::Res::default(),
-            span: Span::default(),
-        };
-        let name_expr = hir::Expr {
-            hir_id: HirId::new(13),
-            kind: hir::ExprKind::Path(Box::new(name_path)),
-            ty: hir::Ty::default(),
-            span: Span::default(),
-        };
-
         let mut decl = hir::FunctionDeclaration {
             hir_id: HirId::new(14),
             visibility: tlang_ast::node::Visibility::Private,
-            name: name_expr,
+            name: make_name_expr(13),
             parameters: vec![],
             return_type: hir::Ty::default(),
             body,
