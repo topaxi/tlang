@@ -60,6 +60,13 @@ impl DeclarationAnalyzer {
         new_symbol_table
     }
 
+    /// Pop the current scope from the symbol table stack.
+    ///
+    /// This is used for **both** function scopes (pushed via
+    /// `push_function_symbol_table`) and block scopes (pushed via
+    /// `push_symbol_table`).  The distinction between function and
+    /// non-function scopes is encoded in the `DefScope::is_function_scope`
+    /// flag, not in the push/pop path.
     fn pop_symbol_table(&mut self) -> Rc<RefCell<DefScope>> {
         debug!("Leaving scope");
 

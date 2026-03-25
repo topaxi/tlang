@@ -151,11 +151,18 @@ impl Slot {
 }
 
 /// Construct a `Slot` from a `(slot_index, scope_distance, crosses_function)` triple
-/// returned by `DefScope::get_slot()`.
+/// returned by [`DefScope::get_slot()`].
 ///
-/// - `(idx, 0, _)` → `Local(idx)`
-/// - `(idx, n, false)` → `BlockVar(idx, n)` (intra-function parent block)
-/// - `(idx, n, true)` → `Upvar(idx, n)` (cross-function capture)
+/// The third element (`crosses_function: bool`) indicates whether the lookup
+/// had to walk past at least one function-boundary scope
+/// ([`DefScope::is_function_scope`]) to reach the defining scope.  This is the
+/// key semantic distinction:
+///
+/// - `(idx, 0, _)` → `Local(idx)` — variable in the current scope.
+/// - `(idx, n, false)` → `BlockVar(idx, n)` — variable in a parent block
+///   within the **same** function; not a closure capture.
+/// - `(idx, n, true)` → `Upvar(idx, n)` — variable from an **enclosing
+///   function**; a true closure capture.
 impl From<(usize, usize, bool)> for Slot {
     fn from(slot_data: (usize, usize, bool)) -> Self {
         match slot_data {
