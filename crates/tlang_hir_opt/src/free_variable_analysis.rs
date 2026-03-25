@@ -338,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn single_upvar_is_captured() {
+    fn test_upvar_captured_without_remapping() {
         let mut decl = fn_expr_with_upvar(3, 2);
         FreeVariableAnalysis::process_function_decl(&mut decl);
 
@@ -415,7 +415,7 @@ mod tests {
     }
 
     #[test]
-    fn pass_does_not_report_changed() {
+    fn test_pass_reports_no_changes() {
         let mut module = hir::Module::default();
         let mut ctx = make_ctx();
         let mut pass = FreeVariableAnalysis;

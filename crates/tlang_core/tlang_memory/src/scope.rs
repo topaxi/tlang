@@ -104,41 +104,6 @@ impl ScopeStack {
         log::debug!("Popping scope");
     }
 
-    /// Push a "capture scope" pre-populated with the captured values.
-    ///
-    /// The capture scope sits one level above the function scope so that
-    /// `Slot::Upvar(capture_index, 1)` resolves correctly from within the
-    /// function body.
-    pub fn push_capture_scope(&mut self, captures: &[TlangValue]) {
-        let start = self.memory.len();
-        self.memory.extend_from_slice(captures);
-        let new_scope = Scope::new(start, captures.len());
-        self.scopes.push(new_scope);
-    }
-
-    /// Read the current values from the capture scope (second-to-last scope).
-    /// Used to detect mutations made by closure bodies for write-back.
-    pub fn read_capture_scope(&self, count: usize) -> Vec<TlangValue> {
-        // The capture scope is the second scope (index 1) in the current
-        // scope stack [root, capture, ...fn scopes...]. Since the fn scope
-        // has been popped by the time we call this, the capture scope is
-        // now the top of the stack. But to be safe, we search from the end.
-        if self.scopes.len() < 2 {
-            // No capture scope to read — return empty.
-            return Vec::new();
-        }
-        let capture_scope = &self.scopes[1]; // [root(0), capture(1)]
-        let start = capture_scope.start();
-        (0..count)
-            .map(|i| {
-                self.memory
-                    .get(start + i)
-                    .copied()
-                    .unwrap_or(TlangValue::Nil)
-            })
-            .collect()
-    }
-
     /// # Panics
     pub fn current_scope(&self) -> &Scope {
         self.scopes.last().expect("No current scope available")
@@ -224,14 +189,6 @@ impl ScopeStack {
     }
 
     fn get_upvar(&self, relative_scope_index: u16, index: usize) -> Option<TlangValue> {
-        self.get_upvar_raw(relative_scope_index, index)
-    }
-
-    /// Read a value from a parent scope.
-    ///
-    /// `relative_scope_index` is the number of scopes up from the current
-    /// (top) scope.  `index` is the slot within that scope.
-    pub fn get_upvar_raw(&self, relative_scope_index: u16, index: usize) -> Option<TlangValue> {
         let scope_index = self.scope_index(relative_scope_index);
 
         if scope_index == 0 {

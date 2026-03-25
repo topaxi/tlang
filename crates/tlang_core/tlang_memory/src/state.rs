@@ -182,17 +182,24 @@ impl VMState {
             .entry(decl.hir_id)
             .or_insert_with(|| decl.clone().into());
 
-        // Snapshot values from the scopes that the closure captures.
-        // The FreeVariableAnalysis pass has populated CaptureInfo on the
-        // closure's HirScopeData, telling us which (scope_index, slot_index)
-        // pairs the closure body references.  However, those indices are
-        // relative to the *runtime* scope stack inside the closure body —
-        // not relative to the creation-time stack.  Rather than trying to
-        // reverse-map them, we snapshot all live scope memory (global +
-        // local up to the current scope's end).  This is cheaper than the
-        // old capture_all_memory because it only goes up to the live end,
-        // not the entire memory vector (which may contain stale data from
-        // exited scopes).
+        // Snapshot values from the scopes that the closure captures for GC.
+        //
+        // The FreeVariableAnalysis pass populates CaptureInfo on the closure's
+        // HirScopeData, recording which (scope_index, slot_index) pairs the
+        // closure body references.  However, those indices are relative to the
+        // *runtime* scope stack inside the closure body (which includes
+        // match-arm and block scopes that don't exist at creation time), so
+        // they cannot be used to selectively read values from the creation-time
+        // scope stack.
+        //
+        // As a pragmatic intermediate step, we snapshot all live scope memory
+        // (global + local up to the current scope's end).  This is already an
+        // improvement over the old `capture_all_memory` because `memory_iter()`
+        // only iterates up to the live end of the last scope, excluding stale
+        // values from exited scopes.
+        //
+        // A future optimisation can map CaptureInfo entries to absolute
+        // creation-time positions to enable truly selective capture.
         let captures: Vec<TlangValue> = self.execution.scope_stack.memory_iter().collect();
 
         self.new_object(TlangObjectKind::Closure(TlangClosure {
