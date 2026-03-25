@@ -377,6 +377,10 @@ impl Tlang {
                         tlang_hir_opt::slot_allocation::SlotAllocation::default(),
                     ));
 
+                    passes.push(Box::new(
+                        tlang_hir_opt::free_variable_analysis::FreeVariableAnalysis,
+                    ));
+
                     let mut optimizer = HirOptimizer::new(passes);
                     optimizer
                         .optimize_hir(&mut module, &mut ctx)
