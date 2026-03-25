@@ -315,3 +315,66 @@ fn test_tagged_enum_res() {
         ]
     );
 }
+
+#[test]
+fn test_closure_capture_is_upvar_not_blockvar() {
+    // A closure that captures a variable from the outer function should use
+    // Slot::Upvar (cross-function capture), while accessing a variable from
+    // a parent block within the same function should use Slot::BlockVar.
+    let mut hir = compile(
+        r#"
+            fn outer(x) {
+                fn inner() { x }
+                inner
+            }
+        "#,
+    );
+
+    let slots = collect_slots(&mut hir);
+
+    // Verify that 'x' inside inner() is an Upvar (cross-function capture)
+    let inner_x = slots
+        .iter()
+        .filter(|(name, slot)| name == "x" && slot.is_upvar())
+        .count();
+    assert!(
+        inner_x > 0,
+        "Expected at least one Upvar for 'x' captured by inner(), got slots: {slots:?}"
+    );
+
+    // Verify no BlockVar for 'x' (it should be Upvar since it crosses a function boundary)
+    let blockvar_x = slots
+        .iter()
+        .filter(|(name, slot)| name == "x" && slot.is_blockvar())
+        .count();
+    assert_eq!(
+        blockvar_x, 0,
+        "Expected no BlockVar for 'x' (should be Upvar), got slots: {slots:?}"
+    );
+}
+
+#[test]
+fn test_upvar_only_for_cross_function_access() {
+    // Slot::Upvar should only appear for variables from an enclosing function.
+    // Intra-function block accesses should use Slot::BlockVar or Slot::Local.
+    let mut hir = compile(
+        r#"
+            fn foo(x) {
+                let a = x + 1;
+                a
+            }
+        "#,
+    );
+
+    let slots = collect_slots(&mut hir);
+
+    // All slots within a single function should be Local (no Upvar or BlockVar needed
+    // because there are no nested blocks or closures).
+    for (name, slot) in &slots {
+        assert!(
+            !slot.is_upvar(),
+            "Did not expect Upvar for '{}' in a single-function body: {:?}",
+            name, slot
+        );
+    }
+}

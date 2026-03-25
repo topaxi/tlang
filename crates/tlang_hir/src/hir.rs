@@ -94,7 +94,18 @@ pub type ScopeIndex = u16;
 #[derive(Debug, Default, Eq, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum Slot {
+    /// Variable in the current (innermost) scope.
     Local(SlotIndex),
+    /// Variable in a parent scope within the **same** function.
+    ///
+    /// At runtime this behaves identically to `Upvar` (the scope-stack
+    /// distance is used to locate the value), but it is semantically
+    /// distinct: no closure capture is involved.
+    BlockVar(SlotIndex, ScopeIndex),
+    /// Variable from an **enclosing function** — a true closure capture.
+    ///
+    /// `scope_index` is the scope-stack distance from the reference point
+    /// to the defining scope, crossing at least one function boundary.
     Upvar(SlotIndex, ScopeIndex),
     Global(SlotIndex),
     #[default]
@@ -106,6 +117,12 @@ impl Slot {
         Slot::Local(slot_index)
     }
 
+    pub fn new_blockvar(slot_index: usize, scope_index: usize) -> Self {
+        debug_assert!(scope_index <= ScopeIndex::MAX as usize);
+
+        Slot::BlockVar(slot_index, scope_index as ScopeIndex)
+    }
+
     pub fn new_upvar(slot_index: usize, scope_index: usize) -> Self {
         debug_assert!(scope_index <= ScopeIndex::MAX as usize);
 
@@ -114,6 +131,10 @@ impl Slot {
 
     pub fn is_local(self) -> bool {
         matches!(self, Slot::Local(..))
+    }
+
+    pub fn is_blockvar(self) -> bool {
+        matches!(self, Slot::BlockVar(..))
     }
 
     pub fn is_upvar(self) -> bool {
@@ -129,11 +150,18 @@ impl Slot {
     }
 }
 
-impl From<(usize, usize)> for Slot {
-    fn from(slot_data: (usize, usize)) -> Self {
+/// Construct a `Slot` from a `(slot_index, scope_distance, crosses_function)` triple
+/// returned by `DefScope::get_slot()`.
+///
+/// - `(idx, 0, _)` → `Local(idx)`
+/// - `(idx, n, false)` → `BlockVar(idx, n)` (intra-function parent block)
+/// - `(idx, n, true)` → `Upvar(idx, n)` (cross-function capture)
+impl From<(usize, usize, bool)> for Slot {
+    fn from(slot_data: (usize, usize, bool)) -> Self {
         match slot_data {
-            (slot_index, 0) => Slot::new_local(slot_index),
-            (slot_index, scope_index) => Slot::new_upvar(slot_index, scope_index),
+            (slot_index, 0, _) => Slot::new_local(slot_index),
+            (slot_index, scope_index, false) => Slot::new_blockvar(slot_index, scope_index),
+            (slot_index, scope_index, true) => Slot::new_upvar(slot_index, scope_index),
         }
     }
 }
