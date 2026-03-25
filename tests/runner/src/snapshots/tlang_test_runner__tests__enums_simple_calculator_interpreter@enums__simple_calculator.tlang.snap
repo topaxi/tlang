@@ -1,7 +1,7 @@
 ---
 source: tests/runner/src/main.rs
 description: "Backend: interpreter"
-expression: apply_redactions(&output)
+expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/enums/simple_calculator.tlang
 ---
 === Simple Calculator Demo ===

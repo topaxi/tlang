@@ -81,7 +81,18 @@ impl<'a> InnerCodegen<'a> {
 
         let mut result = if self.is_protocol(first_name) {
             self.ident_expr(&CodegenJS::protocol_js_name(first_name))
+        } else if let Some(identifier) = self.current_scope().resolve_variable(first_name) {
+            // First segment resolves individually (e.g. `Option` → `Option`).
+            self.ident_expr(&js::safe_js_variable_name(&identifier))
+        } else if !path.res.is_unresolved() {
+            // The semantic analyser resolved this reference (e.g. a cross-module
+            // import or a semantic-builtin hint) even though the codegen scope
+            // does not have a local entry yet.  Emit the JS-safe first segment
+            // name as-is so the bundled output remains correct.
+            self.ident_expr(&js::safe_js_variable_name(first_name))
         } else {
+            // Truly unresolved: the semantic analyser never found this binding.
+            // This is a compiler bug — emit an error and a safe fallback.
             self.generate_identifier(&first_segment.ident)
         };
 
@@ -213,9 +224,17 @@ impl<'a> InnerCodegen<'a> {
         let properties: Vec<ObjectPropertyKind<'a>> = kvs
             .iter()
             .map(|(key, value)| {
-                let key_expr = self.generate_expr(key);
-                let value_expr = self.generate_expr(value);
                 let shorthand = key.path() == value.path();
+                // Dict keys are always property names, not variable references.
+                // For path keys (simple identifiers like `a` in `{ a: 1 }`),
+                // emit the raw name directly without scope lookup.
+                let key_expr = match &key.kind {
+                    hir::ExprKind::Path(path) => {
+                        self.ident_expr(&js::safe_js_variable_name(path.first_ident().as_str()))
+                    }
+                    _ => self.generate_expr(key),
+                };
+                let value_expr = self.generate_expr(value);
                 let property_key = PropertyKey::from(key_expr);
                 ObjectPropertyKind::ObjectProperty(self.ast.alloc_object_property(
                     SPAN,

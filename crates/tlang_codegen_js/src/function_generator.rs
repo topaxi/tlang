@@ -11,9 +11,14 @@ impl<'a> InnerCodegen<'a> {
         &mut self,
         declaration: &hir::FunctionDeclaration,
     ) -> Vec<Statement<'a>> {
+        let js_name = fn_identifier_to_string(&declaration.name);
+        // Use the name that was pre-registered by `pre_register_declarations` if
+        // available; otherwise fall back to declaring it now (e.g. nested functions
+        // inside blocks that were not visited by the pre-registration pass).
         let name_as_str = self
             .current_scope()
-            .declare_local_variable(&fn_identifier_to_string(&declaration.name));
+            .resolve_variable(&js_name)
+            .unwrap_or_else(|| self.current_scope().declare_local_variable(&js_name));
         let is_tail_recursive =
             is_function_body_tail_recursive_block(&name_as_str, &declaration.body);
         self.push_function_context(
@@ -79,9 +84,11 @@ impl<'a> InnerCodegen<'a> {
         declaration: &hir::DynFunctionDeclaration,
     ) -> Vec<Statement<'a>> {
         let is_method = matches!(declaration.name.kind, hir::ExprKind::FieldAccess(_, _));
+        let js_name = fn_identifier_to_string(&declaration.name);
         let name_as_str = self
             .current_scope()
-            .declare_local_variable(&fn_identifier_to_string(&declaration.name));
+            .resolve_variable(&js_name)
+            .unwrap_or_else(|| self.current_scope().declare_local_variable(&js_name));
 
         // Build the dispatcher body: if/else chain on arguments.length
         let mut if_chain: Option<Statement<'a>> = None;
@@ -586,6 +593,17 @@ pub(crate) fn fn_identifier_to_string(expr: &hir::Expr) -> String {
     match &expr.kind {
         hir::ExprKind::Path(path) => js::safe_js_variable_name(&path.join("__")),
         hir::ExprKind::FieldAccess(_base, field) => js::safe_js_variable_name(&field.to_string()),
+        _ => unreachable!(),
+    }
+}
+
+/// Returns the raw (pre-`safe_js_variable_name`) name for a function
+/// identifier expression.  Used during pre-registration to register aliases
+/// for arity-qualified names (e.g. `factorial/2` → `factorial$$2`).
+pub(crate) fn fn_identifier_raw_to_string(expr: &hir::Expr) -> String {
+    match &expr.kind {
+        hir::ExprKind::Path(path) => path.join("__"),
+        hir::ExprKind::FieldAccess(_base, field) => field.to_string(),
         _ => unreachable!(),
     }
 }

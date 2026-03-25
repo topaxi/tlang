@@ -10,6 +10,11 @@ use crate::generator::{CodegenJS, InnerCodegen};
 
 impl<'a> InnerCodegen<'a> {
     pub fn generate_stmts(&mut self, stmts: &[hir::Stmt]) -> Vec<Statement<'a>> {
+        // Pre-register all declaration names before generating bodies so that
+        // forward references (e.g. a function calling a sibling multi-clause
+        // variant) resolve correctly without the silent passthrough.
+        self.pre_register_declarations(stmts);
+
         let mut result = Vec::new();
         for stmt in stmts {
             let comments = &stmt.leading_comments;
@@ -22,6 +27,56 @@ impl<'a> InnerCodegen<'a> {
             result.extend(generated);
         }
         result
+    }
+
+    /// Scan `stmts` and register the JS name of every function, struct, and
+    /// enum declaration into the current scope **before** any body is
+    /// generated.  This ensures that forward references (e.g. a function body
+    /// that calls a sibling arity-variant declared later in the same block)
+    /// can be resolved without falling back to the silent passthrough.
+    fn pre_register_declarations(&mut self, stmts: &[hir::Stmt]) {
+        use crate::function_generator::{fn_identifier_raw_to_string, fn_identifier_to_string};
+
+        for stmt in stmts {
+            match &stmt.kind {
+                hir::StmtKind::FunctionDeclaration(decl) => {
+                    let raw_name = fn_identifier_raw_to_string(&decl.name);
+                    let js_name = crate::js::safe_js_variable_name(&raw_name);
+                    // Only pre-register if not already declared locally (avoids
+                    // double-registration when the declaration generator runs).
+                    if !self.current_scope().has_local_variable(&js_name) {
+                        let declared = self.current_scope().declare_local_variable(&js_name);
+                        // When the raw tlang name differs from the JS name
+                        // (e.g. `factorial/2` → `factorial$$2`), also register
+                        // the raw name as an alias so it can be resolved from
+                        // within sibling function bodies.
+                        if raw_name != declared {
+                            self.current_scope()
+                                .declare_variable_alias(&raw_name, &declared);
+                        }
+                    }
+                }
+                hir::StmtKind::DynFunctionDeclaration(decl) => {
+                    let js_name = fn_identifier_to_string(&decl.name);
+                    if !self.current_scope().has_local_variable(&js_name) {
+                        self.current_scope().declare_local_variable(&js_name);
+                    }
+                }
+                hir::StmtKind::StructDeclaration(decl) => {
+                    let name = decl.name.as_str();
+                    if !self.current_scope().has_local_variable(name) {
+                        self.current_scope().declare_local_variable(name);
+                    }
+                }
+                hir::StmtKind::EnumDeclaration(decl) => {
+                    let name = decl.name.as_str();
+                    if !self.current_scope().has_local_variable(name) {
+                        self.current_scope().declare_local_variable(name);
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
     pub fn generate_stmt(&mut self, statement: &hir::Stmt) -> Vec<Statement<'a>> {

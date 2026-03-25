@@ -13,7 +13,13 @@ impl<'a> InnerCodegen<'a> {
     /// as we would have to track the type of variables/paths to know whether we should
     /// generate a create struct call (using `new`) or normal function call.
     pub fn generate_struct_declaration(&mut self, decl: &hir::StructDeclaration) -> Statement<'a> {
-        let name = js::safe_js_variable_name(decl.name.as_str());
+        let raw_name = decl.name.as_str();
+        // Use the pre-registered scope name if available; otherwise declare it
+        // now (handles structs declared outside of generate_stmts flow).
+        let name = self
+            .current_scope()
+            .resolve_variable(raw_name)
+            .unwrap_or_else(|| self.current_scope().declare_local_variable(raw_name));
 
         let mut body_stmts = Vec::new();
 
