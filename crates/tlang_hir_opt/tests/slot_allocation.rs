@@ -374,7 +374,8 @@ fn test_upvar_only_for_cross_function_access() {
         assert!(
             !slot.is_upvar(),
             "Did not expect Upvar for '{}' in a single-function body: {:?}",
-            name, slot
+            name,
+            slot
         );
     }
 }
