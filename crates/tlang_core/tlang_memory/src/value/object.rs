@@ -35,9 +35,9 @@ pub struct TlangClosure {
     /// back.  Positions remain valid because `ScopeStack::pop()` never
     /// truncates memory.
     pub capture_positions: CapturePositionVec,
-    // Captured cells for mutable upvar bindings.
-    // Key: (scope_index, var_index) in the captured scope stack
-    // Value: TlangObjectId of a Cell object
+    // Key: (scope_index, var_index) identifying the original binding in the
+    //      interpreter's scope stack at the time the closure was created.
+    // Value: TlangObjectId of the Cell object holding the shared mutable value.
     pub captured_cells: std::collections::HashMap<(usize, usize), TlangObjectId>,
 }
 

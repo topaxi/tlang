@@ -178,6 +178,16 @@ impl ScopeStack {
         self.memory[start..start + count].into()
     }
 
+    /// Truncate the local memory buffer to the given length.
+    ///
+    /// Used by `with_closure_scope` to reclaim the temporary capture-scope
+    /// (and any nested-body) memory after modified captures have been read
+    /// back.  Without truncation every closure invocation would permanently
+    /// grow the memory buffer.
+    pub fn truncate_memory(&mut self, len: usize) {
+        self.memory.truncate(len);
+    }
+
     /// Take capture origin metadata, leaving the field empty.
     ///
     /// Used by `with_closure_scope` to save origin before replacing the

@@ -174,6 +174,12 @@ impl Interpreter {
             .execution
             .scope_stack
             .read_back_captures(cap_start, captures.len());
+        // Truncate the memory buffer back to where it was before the capture
+        // scope was pushed.  All capture-scope and closure-body memory is
+        // temporary; we've already read back the modified captures above.
+        // Without this truncation, every closure invocation permanently grows
+        // the memory buffer.
+        state.execution.scope_stack.truncate_memory(cap_start);
         state.execution.scope_stack.scopes = old_scopes;
         state
             .execution
