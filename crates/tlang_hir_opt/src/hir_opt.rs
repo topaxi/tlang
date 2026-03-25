@@ -141,6 +141,7 @@ impl Default for HirOptimizer {
             Box::new(crate::symbol_resolution::SymbolResolution::default()),
             Box::new(crate::constant_folding::ConstantFolding::default()),
             Box::new(crate::slot_allocation::SlotAllocation::default()),
+            Box::new(crate::free_variable_analysis::FreeVariableAnalysis),
         ])
     }
 }

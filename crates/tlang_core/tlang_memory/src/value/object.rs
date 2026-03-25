@@ -9,23 +9,19 @@ use super::TlangValue;
 #[derive(Debug)]
 pub struct TlangClosure {
     pub id: HirId,
-    // Scope metadata at closure creation time. Used during execution to
-    // restore the correct scope context when the closure is called.
-    pub scope_stack: Vec<crate::scope::Scope>,
+    // Captured values from parent scopes, one per entry in the closure's
+    // `CaptureInfo` list.  At invocation the runtime pushes a single
+    // "capture scope" containing these values so that the remapped
+    // `Slot::Upvar(capture_index, 1)` references resolve correctly.
+    pub captures: Vec<TlangValue>,
     // Captured cells for mutable upvar bindings.
-    // Key: (scope_index, var_index) - where scope_index is the absolute scope index
+    // Key: capture_index — position in `captures`
     // Value: TlangObjectId of a Cell object
     //
     // When a closure captures an upvar, instead of copying the value, we create a
     // Cell object and store references in both the closure and the original memory.
     // This enables mutations to be visible in both places.
-    pub captured_cells: std::collections::HashMap<(usize, usize), TlangObjectId>,
-    // Captured values from parent scopes, stored contiguously (global + local).
-    // Used for GC tracing to find all reachable objects from this closure.
-    pub captured_memory: Vec<TlangValue>,
-    // Length of global memory at capture time, used to split captured_memory
-    // into global and local portions for GC tracing.
-    pub global_memory_len: usize,
+    pub captured_cells: std::collections::HashMap<usize, TlangObjectId>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -281,7 +277,7 @@ impl TlangObjectKind {
             TlangObjectKind::Enum(e) => ReferencedValuesIter::Slice(e.field_values.iter()),
             TlangObjectKind::Slice(s) => ReferencedValuesIter::Single(Some(s.of)),
             TlangObjectKind::Closure(c) => ReferencedValuesIter::Closure {
-                memory_iter: c.captured_memory.iter(),
+                memory_iter: c.captures.iter(),
                 cells_iter: c.captured_cells.values(),
             },
             TlangObjectKind::Cell(c) => ReferencedValuesIter::Single(Some(c.value)),
@@ -303,10 +299,10 @@ pub enum ReferencedValuesIter<'a> {
     Single(Option<TlangValue>),
     /// Multiple referenced values (for structs, enums)
     Slice(std::slice::Iter<'a, TlangValue>),
-    /// Closure referenced values: both captured memory and captured cell object IDs
+    /// Closure referenced values: both captured values and captured cell object IDs
     Closure {
         memory_iter: std::slice::Iter<'a, TlangValue>,
-        cells_iter: std::collections::hash_map::Values<'a, (usize, usize), TlangObjectId>,
+        cells_iter: std::collections::hash_map::Values<'a, usize, TlangObjectId>,
     },
 }
 
@@ -422,7 +418,6 @@ mod tests {
 
     #[test]
     fn test_closure_referenced_values() {
-        use crate::scope::Scope;
         use tlang_span::HirId;
 
         // Create a closure with some captured values
@@ -433,10 +428,8 @@ mod tests {
         ];
         let closure = TlangClosure {
             id: HirId::new(1),
-            scope_stack: vec![Scope::default()],
+            captures: captured.clone(),
             captured_cells: std::collections::HashMap::new(),
-            captured_memory: captured.clone(),
-            global_memory_len: 1,
         };
         let obj = TlangObjectKind::Closure(closure);
 
@@ -447,27 +440,24 @@ mod tests {
 
     #[test]
     fn test_closure_referenced_values_includes_cells() {
-        use crate::scope::Scope;
         use std::collections::HashMap;
         use tlang_span::HirId;
 
-        // Create a closure with captured memory and captured cells
-        let captured_memory = vec![TlangValue::I64(42)];
+        // Create a closure with captured values and captured cells
+        let captures = vec![TlangValue::I64(42)];
         let mut captured_cells = HashMap::new();
-        captured_cells.insert((0, 0), 100.into()); // Cell at scope 0, var 0 -> object ID 100
-        captured_cells.insert((1, 2), 200.into()); // Cell at scope 1, var 2 -> object ID 200
+        captured_cells.insert(0, 100.into()); // Cell at capture index 0 -> object ID 100
+        captured_cells.insert(1, 200.into()); // Cell at capture index 1 -> object ID 200
 
         let closure = TlangClosure {
             id: HirId::new(1),
-            scope_stack: vec![Scope::default()],
+            captures: captures.clone(),
             captured_cells,
-            captured_memory: captured_memory.clone(),
-            global_memory_len: 0,
         };
         let obj = TlangObjectKind::Closure(closure);
 
         let refs: Vec<_> = obj.referenced_values().collect();
-        // Should include: 1 captured memory value + 2 cell object references
+        // Should include: 1 captured value + 2 cell object references
         assert_eq!(refs.len(), 3);
         assert!(refs.contains(&TlangValue::I64(42)));
         assert!(refs.contains(&TlangValue::Object(100.into())));
@@ -475,17 +465,14 @@ mod tests {
     }
 
     #[test]
-    fn test_closure_empty_captured_memory() {
-        use crate::scope::Scope;
+    fn test_closure_empty_captures() {
         use tlang_span::HirId;
 
         // Closure with no captured values
         let closure = TlangClosure {
             id: HirId::new(1),
-            scope_stack: vec![Scope::default()],
+            captures: vec![],
             captured_cells: std::collections::HashMap::new(),
-            captured_memory: vec![],
-            global_memory_len: 0,
         };
         let obj = TlangObjectKind::Closure(closure);
 

@@ -104,6 +104,18 @@ impl ScopeStack {
         log::debug!("Popping scope");
     }
 
+    /// Push a "capture scope" pre-populated with the captured values.
+    ///
+    /// The capture scope sits one level above the function scope so that
+    /// `Slot::Upvar(capture_index, 1)` resolves correctly from within the
+    /// function body.
+    pub fn push_capture_scope(&mut self, captures: &[TlangValue]) {
+        let start = self.memory.len();
+        self.memory.extend_from_slice(captures);
+        let new_scope = Scope::new(start, captures.len());
+        self.scopes.push(new_scope);
+    }
+
     /// # Panics
     pub fn current_scope(&self) -> &Scope {
         self.scopes.last().expect("No current scope available")
@@ -189,6 +201,14 @@ impl ScopeStack {
     }
 
     fn get_upvar(&self, relative_scope_index: u16, index: usize) -> Option<TlangValue> {
+        self.get_upvar_raw(relative_scope_index, index)
+    }
+
+    /// Read a value from a parent scope.
+    ///
+    /// `relative_scope_index` is the number of scopes up from the current
+    /// (top) scope.  `index` is the slot within that scope.
+    pub fn get_upvar_raw(&self, relative_scope_index: u16, index: usize) -> Option<TlangValue> {
         let scope_index = self.scope_index(relative_scope_index);
 
         if scope_index == 0 {
@@ -308,65 +328,6 @@ impl ScopeStack {
 
             &self.memory[start..end]
         }
-    }
-
-    /// Capture all memory values from all scopes for closure creation.
-    /// Returns the global memory followed by all local scope memory.
-    ///
-    /// NOTE: This currently captures all memory, not just the variables actually
-    /// used by the closure. A future optimization could implement selective capture
-    /// based on actual variable usage analysis from the HIR.
-    ///
-    /// The captured memory is stored in the closure for future GC preparation.
-    /// Currently, closure execution still uses the original scope-swapping approach
-    /// with shared memory for correct mutable capture semantics.
-    pub fn capture_all_memory(&self) -> Vec<TlangValue> {
-        let mut captured = Vec::with_capacity(self.global_memory.len() + self.memory.len());
-        // Copy global memory first
-        captured.extend_from_slice(&self.global_memory);
-        // Then copy all local scope memory
-        captured.extend_from_slice(&self.memory);
-        captured
-    }
-
-    /// Get the current length of global memory.
-    /// Used to know where global memory ends and local memory begins in captured memory.
-    pub fn global_memory_len(&self) -> usize {
-        self.global_memory.len()
-    }
-
-    /// Replace all memory with captured values from a closure.
-    /// Returns the previous memory state (global_memory, memory) for restoration.
-    ///
-    /// The captured_memory is split at global_memory_len into:
-    /// - global_memory: captured_memory[..global_memory_len]
-    /// - memory: captured_memory[global_memory_len..]
-    ///
-    /// Note: This method is prepared for future GC work but is not currently used
-    /// because closure execution requires mutable capture semantics (scope-swapping).
-    #[allow(dead_code)]
-    pub fn replace_memory_with_captured(
-        &mut self,
-        captured_memory: &[TlangValue],
-        global_memory_len: usize,
-    ) -> (Vec<TlangValue>, Vec<TlangValue>) {
-        let (global_part, local_part) =
-            captured_memory.split_at(global_memory_len.min(captured_memory.len()));
-
-        let old_global = std::mem::replace(&mut self.global_memory, global_part.to_vec());
-        let old_local = std::mem::replace(&mut self.memory, local_part.to_vec());
-
-        (old_global, old_local)
-    }
-
-    /// Restore memory to previous state after closure execution.
-    ///
-    /// Note: This method is prepared for future GC work but is not currently used
-    /// because closure execution requires mutable capture semantics (scope-swapping).
-    #[allow(dead_code)]
-    pub fn restore_memory(&mut self, global_memory: Vec<TlangValue>, memory: Vec<TlangValue>) {
-        self.global_memory = global_memory;
-        self.memory = memory;
     }
 }
 

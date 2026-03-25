@@ -144,6 +144,31 @@ impl Interpreter {
         result
     }
 
+    /// Execute `f` with a capture scope pushed onto the current scope stack.
+    ///
+    /// The capture scope contains the closure's captured values and sits one
+    /// level above the function scope that `eval_fn_call` will push, so that
+    /// `Slot::Upvar(capture_index, 1)` resolves correctly.
+    #[inline(always)]
+    fn with_capture_scope<F, R>(
+        &self,
+        state: &mut VMState,
+        captures: &[TlangValue],
+        f: F,
+    ) -> R
+    where
+        F: FnOnce(&Interpreter, &mut VMState) -> R,
+    {
+        // Keep only the root (global) scope, then push the capture scope.
+        let root_scope = vec![*state.execution.scope_stack.root_scope()];
+        let old_scopes = std::mem::replace(&mut state.execution.scope_stack.scopes, root_scope);
+        state.execution.scope_stack.push_capture_scope(captures);
+        let result = f(self, state);
+        state.execution.scope_stack.pop(); // pop capture scope
+        state.execution.scope_stack.scopes = old_scopes;
+        result
+    }
+
     pub fn eval(&self, state: &mut VMState, input: &hir::Module) -> TlangValue {
         self.eval_block_inner(state, &input.block).unwrap_value()
     }
@@ -1018,16 +1043,11 @@ impl Interpreter {
         match state.get_object_by_id(id).unwrap() {
             TlangObjectKind::Closure(closure) => {
                 let closure_decl = state.get_closure_decl(closure.id).unwrap();
-                // Clone the captured scope stack so we can move it into `with_scope`
-                // without borrowing `closure` for the duration of the call.
-                //
-                // Note: We use with_scope (scope-swapping) rather than with_captured_scope
-                // because closures need to be able to mutate variables in parent scopes.
-                // The captured_memory field is used for GC tracing but not for execution,
-                // since using captured memory would prevent mutable capture semantics.
-                let scope_stack = closure.scope_stack.clone();
+                // Clone the captured values so we can move them without
+                // borrowing `closure` for the duration of the call.
+                let captures = closure.captures.clone();
 
-                self.with_scope(state, scope_stack, |this, state| {
+                self.with_capture_scope(state, &captures, |this, state| {
                     this.eval_fn_call(state, &closure_decl, callee, args)
                         .unwrap_value()
                 })
