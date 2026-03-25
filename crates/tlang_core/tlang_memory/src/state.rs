@@ -182,20 +182,18 @@ impl VMState {
             .entry(decl.hir_id)
             .or_insert_with(|| decl.clone().into());
 
-        // Resolve only the explicitly-captured free variables for GC tracing.
-        let captures: Vec<TlangValue> = decl
-            .body
-            .scope
-            .captures()
-            .iter()
-            .map(|cap| {
-                let runtime_scope = cap.scope_index.saturating_sub(1);
-                self.execution
-                    .scope_stack
-                    .get_upvar_raw(runtime_scope, cap.slot_index)
-                    .unwrap_or(TlangValue::Nil)
-            })
-            .collect();
+        // Snapshot values from the scopes that the closure captures.
+        // The FreeVariableAnalysis pass has populated CaptureInfo on the
+        // closure's HirScopeData, telling us which (scope_index, slot_index)
+        // pairs the closure body references.  However, those indices are
+        // relative to the *runtime* scope stack inside the closure body —
+        // not relative to the creation-time stack.  Rather than trying to
+        // reverse-map them, we snapshot all live scope memory (global +
+        // local up to the current scope's end).  This is cheaper than the
+        // old capture_all_memory because it only goes up to the live end,
+        // not the entire memory vector (which may contain stale data from
+        // exited scopes).
+        let captures: Vec<TlangValue> = self.execution.scope_stack.memory_iter().collect();
 
         self.new_object(TlangObjectKind::Closure(TlangClosure {
             id: decl.hir_id,

@@ -301,7 +301,7 @@ pub enum ReferencedValuesIter<'a> {
     /// Closure referenced values: both captured values and captured cell object IDs
     Closure {
         memory_iter: std::slice::Iter<'a, TlangValue>,
-        cells_iter: std::collections::hash_map::Values<'a, usize, TlangObjectId>,
+        cells_iter: std::collections::hash_map::Values<'a, (usize, usize), TlangObjectId>,
     },
 }
 
@@ -352,6 +352,7 @@ impl ExactSizeIterator for ReferencedValuesIter<'_> {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scope::Scope;
     use crate::shape::ShapeKey;
 
     #[test]
@@ -427,6 +428,7 @@ mod tests {
         ];
         let closure = TlangClosure {
             id: HirId::new(1),
+            scope_stack: vec![Scope::default()],
             captures: captured.clone(),
             captured_cells: std::collections::HashMap::new(),
         };
@@ -445,11 +447,12 @@ mod tests {
         // Create a closure with captured values and captured cells
         let captures = vec![TlangValue::I64(42)];
         let mut captured_cells = HashMap::new();
-        captured_cells.insert(0, 100.into()); // Cell at capture index 0 -> object ID 100
-        captured_cells.insert(1, 200.into()); // Cell at capture index 1 -> object ID 200
+        captured_cells.insert((0, 0), 100.into()); // Cell at scope 0, var 0 -> object ID 100
+        captured_cells.insert((1, 2), 200.into()); // Cell at scope 1, var 2 -> object ID 200
 
         let closure = TlangClosure {
             id: HirId::new(1),
+            scope_stack: vec![Scope::default()],
             captures: captures.clone(),
             captured_cells,
         };
@@ -470,6 +473,7 @@ mod tests {
         // Closure with no captured values
         let closure = TlangClosure {
             id: HirId::new(1),
+            scope_stack: vec![Scope::default()],
             captures: vec![],
             captured_cells: std::collections::HashMap::new(),
         };

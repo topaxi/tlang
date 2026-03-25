@@ -4,16 +4,11 @@
 //! references inside each closure (FunctionExpression). It then:
 //!
 //! 1. Stores a `Vec<CaptureInfo>` on the closure's `HirScopeData` so the
-//!    runtime knows exactly which bindings to capture.
-//! 2. Remaps every `Slot::Upvar(slot, scope)` inside the closure body to
-//!    `Slot::Upvar(capture_index, 1)` so the runtime can serve those reads
-//!    from a single flat capture scope pushed one level above the function
-//!    scope.
-//! 3. Handles nested closures by lifting transitive captures: if an inner
+//!    runtime knows exactly which bindings to capture for GC tracing.
+//! 2. Handles nested closures by lifting transitive captures: if an inner
 //!    closure needs a variable from an outer scope that passes through an
-//!    intermediate closure, the intermediate closure also captures it and
-//!    the inner closure's capture info is updated to reference the
-//!    intermediate closure's capture scope.
+//!    intermediate closure, the intermediate closure also captures it so
+//!    that GC can trace the full reference chain.
 
 use std::collections::BTreeSet;
 
@@ -22,6 +17,12 @@ use tlang_hir::{self as hir, CaptureInfo, Visitor};
 
 use crate::HirPass;
 use crate::hir_opt::{HirOptContext, HirOptError};
+
+/// Per-capture lift entry: `(capture_idx, (scope_index, slot_index))`.
+type LiftEntry = (usize, (hir::ScopeIndex, hir::SlotIndex));
+
+/// Per-closure lift info: `(closure_index, Vec<LiftEntry>)`.
+type ClosureLiftInfo = Vec<(usize, Vec<LiftEntry>)>;
 
 // ---------------------------------------------------------------------------
 // ShallowUpvarCollector: gathers Slot::Upvar references WITHOUT entering
@@ -55,48 +56,6 @@ impl<'hir> Visitor<'hir> for ShallowUpvarCollector {
     fn visit_path(&mut self, path: &'hir mut hir::Path, _ctx: &mut ()) {
         if let hir::Slot::Upvar(slot_index, scope_index) = path.res.slot() {
             self.upvars.insert((scope_index, slot_index));
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// ShallowUpvarRemapper: rewrites direct Slot::Upvar references (not in
-// nested FunctionExpressions) using the capture map.
-// ---------------------------------------------------------------------------
-
-struct ShallowUpvarRemapper<'a> {
-    capture_map: &'a std::collections::HashMap<(hir::ScopeIndex, hir::SlotIndex), usize>,
-}
-
-impl<'hir, 'a> Visitor<'hir> for ShallowUpvarRemapper<'a> {
-    type Context = ();
-
-    fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut ()) {
-        if matches!(expr.kind, hir::ExprKind::FunctionExpression(_)) {
-            return;
-        }
-        walk_expr(self, expr, ctx);
-    }
-
-    fn visit_path(&mut self, path: &'hir mut hir::Path, _ctx: &mut ()) {
-        if let hir::Slot::Upvar(slot_index, scope_index) = path.res.slot() {
-            if let Some(&capture_index) = self.capture_map.get(&(scope_index, slot_index)) {
-                // Replace scope_index with 1: the capture scope is always
-                // exactly one level above wherever this reference currently
-                // points. The additional levels within the closure body are
-                // unchanged because the scope_index already accounted for them.
-                // We adjust: new_scope = scope_index - (scope_index - 1) = 1?
-                // No: the capture scope replaces the EXTERNAL scopes. The
-                // internal nesting stays the same. At runtime the stack is
-                // [root, capture, fn_body, ...inner_scopes...] so the capture
-                // scope is at the same depth as where the fn body scope used
-                // to be + 1 extra.  Since the original scope_index already
-                // measured from the current position to the definition, and
-                // the definition now lives in the capture scope (which is 1
-                // above fn_body), we just keep the same scope_index. Only
-                // the slot changes to capture_index.
-                path.res.set_slot(hir::Slot::Upvar(capture_index, scope_index));
-            }
         }
     }
 }
@@ -150,14 +109,7 @@ impl FreeVariableAnalysis {
         // 4. Store captures on scope data.
         decl.body.scope.set_captures(captures);
 
-        // 5. Remap direct upvar references in the body (not nested FEs).
-        let mut remapper = ShallowUpvarRemapper {
-            capture_map: &capture_map,
-            depth: 0,
-        };
-        remapper.visit_block(&mut decl.body, &mut ());
-
-        // 6. Update nested closures' capture info for lifted variables.
+        // 5. Update nested closures' capture info for lifted variables.
         Self::apply_lifts(&mut decl.body, &lifts_per_closure, &capture_map);
     }
 
@@ -167,15 +119,14 @@ impl FreeVariableAnalysis {
     fn collect_lifts(
         body: &hir::Block,
         all_upvars: &mut BTreeSet<(hir::ScopeIndex, hir::SlotIndex)>,
-    ) -> Vec<(usize, Vec<(usize, (hir::ScopeIndex, hir::SlotIndex))>)> {
-        // Vec of (closure_index_in_stmts_or_expr, Vec<(capture_idx, our_key)>)
-        let mut result = Vec::new();
+    ) -> ClosureLiftInfo {
+        let mut result: ClosureLiftInfo = Vec::new();
 
         // Helper: inspect a single expression for nested closures.
         fn inspect_expr(
             expr: &hir::Expr,
             all_upvars: &mut BTreeSet<(hir::ScopeIndex, hir::SlotIndex)>,
-            result: &mut Vec<(usize, Vec<(usize, (hir::ScopeIndex, hir::SlotIndex))>)>,
+            result: &mut ClosureLiftInfo,
             idx: usize,
         ) {
             if let hir::ExprKind::FunctionExpression(nested_decl) = &expr.kind {
@@ -205,7 +156,7 @@ impl FreeVariableAnalysis {
     /// Apply the lift updates to nested closures' capture info.
     fn apply_lifts(
         body: &mut hir::Block,
-        lifts_per_closure: &[(usize, Vec<(usize, (hir::ScopeIndex, hir::SlotIndex))>)],
+        lifts_per_closure: &[(usize, Vec<LiftEntry>)],
         capture_map: &std::collections::HashMap<(hir::ScopeIndex, hir::SlotIndex), usize>,
     ) {
         if lifts_per_closure.is_empty() {
@@ -213,25 +164,25 @@ impl FreeVariableAnalysis {
         }
 
         // Build a set of indices that need updating for fast lookup.
-        let lift_map: std::collections::HashMap<usize, &Vec<(usize, (hir::ScopeIndex, hir::SlotIndex))>> =
-            lifts_per_closure.iter().map(|(idx, lifts)| (*idx, lifts)).collect();
+        let lift_map: std::collections::HashMap<usize, &[LiftEntry]> = lifts_per_closure
+            .iter()
+            .map(|(idx, lifts)| (*idx, lifts.as_slice()))
+            .collect();
 
-        let mut counter = 0usize;
         Self::visit_exprs_shallow_mut(body, |idx, expr| {
-            if let Some(lifts) = lift_map.get(&idx) {
-                if let hir::ExprKind::FunctionExpression(nested_decl) = &mut expr.kind {
-                    let mut caps = nested_decl.body.scope.captures().to_vec();
-                    for &(cap_idx, ref our_key) in lifts.iter() {
-                        let our_capture_idx = capture_map[our_key];
-                        caps[cap_idx] = CaptureInfo {
-                            slot_index: our_capture_idx,
-                            scope_index: 2,
-                        };
-                    }
-                    nested_decl.body.scope.set_captures(caps);
+            if let Some(lifts) = lift_map.get(&idx)
+                && let hir::ExprKind::FunctionExpression(nested_decl) = &mut expr.kind
+            {
+                let mut caps = nested_decl.body.scope.captures().to_vec();
+                for &(cap_idx, ref our_key) in *lifts {
+                    let our_capture_idx = capture_map[our_key];
+                    caps[cap_idx] = CaptureInfo {
+                        slot_index: our_capture_idx,
+                        scope_index: 2,
+                    };
                 }
+                nested_decl.body.scope.set_captures(caps);
             }
-            counter += 1;
         });
     }
 
@@ -387,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn single_upvar_is_captured_and_remapped() {
+    fn single_upvar_is_captured() {
         let mut decl = fn_expr_with_upvar(3, 2);
         FreeVariableAnalysis::process_function_decl(&mut decl);
 
@@ -397,10 +348,11 @@ mod tests {
         assert_eq!(captures[0].slot_index, 3);
         assert_eq!(captures[0].scope_index, 2);
 
-        // Check that the path inside the body was remapped
+        // The original upvar slot should be preserved (no remapping needed since
+        // execution still uses scope-swapping). Captures are only for GC tracing.
         let body_expr = decl.body.expr.as_ref().unwrap();
         if let hir::ExprKind::Path(path) = &body_expr.kind {
-            assert_eq!(path.res.slot(), hir::Slot::Upvar(0, 1));
+            assert_eq!(path.res.slot(), hir::Slot::Upvar(3, 2));
         } else {
             panic!("expected Path expression");
         }
