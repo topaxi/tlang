@@ -192,22 +192,29 @@ impl VMState {
         // capture so that mutations can be written back to the original scope
         // (two-way sync between closure and enclosing scope).
         let capture_info = decl.body.scope.captures().to_vec();
-        let captures: Vec<TlangValue> = capture_info
-            .iter()
-            .filter_map(|c| {
-                self.execution
-                    .scope_stack
-                    .read_capture(c.scope_index, c.slot_index)
-            })
-            .collect();
-        let capture_positions: Vec<Option<crate::scope::CapturePosition>> = capture_info
+        let (captures, capture_positions): (
+            Vec<TlangValue>,
+            Vec<Option<crate::scope::CapturePosition>>,
+        ) = capture_info
             .iter()
             .map(|c| {
-                self.execution
+                let value = self
+                    .execution
                     .scope_stack
-                    .capture_position(c.scope_index, c.slot_index)
+                    .read_capture(c.scope_index, c.slot_index)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "missing capture for scope_index={} slot_index={}",
+                            c.scope_index, c.slot_index
+                        )
+                    });
+                let position = self
+                    .execution
+                    .scope_stack
+                    .capture_position(c.scope_index, c.slot_index);
+                (value, position)
             })
-            .collect();
+            .unzip();
 
         self.new_object(TlangObjectKind::Closure(TlangClosure {
             id: decl.hir_id,

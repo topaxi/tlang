@@ -213,6 +213,11 @@ impl CaptureRemapper {
     /// Captures with `scope_index > block_depth + 1` come from beyond this
     /// closure. After remapping, they must reference this closure's capture
     /// scope instead of the original parent scopes.
+    ///
+    /// The `capture_origins` mechanism on `ScopeStack` ensures that even
+    /// though the nested closure's CaptureInfo points at the parent capture
+    /// array, `capture_position` resolves through to the ultimate original
+    /// binding for write-back.
     fn update_nested_captures(&self, nested: &mut hir::FunctionDeclaration) {
         let threshold = self.block_depth + 1;
         let new_scope = self.block_depth + 2;

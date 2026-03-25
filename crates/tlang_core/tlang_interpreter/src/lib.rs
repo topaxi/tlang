@@ -141,6 +141,11 @@ impl Interpreter {
     /// Upvar slots, `Upvar(cap_idx, block_depth + 1)` resolves to
     /// `capture_scope[cap_idx]`.
     ///
+    /// `capture_positions` are the original memory positions for each
+    /// captured variable.  They are stored on the capture scope so that
+    /// `capture_position` resolves through to the ultimate original binding,
+    /// preserving correct two-way sync for nested closures.
+    ///
     /// Returns `(body_result, modified_captures)` — the caller must write
     /// the modified captures back to the `TlangClosure` to persist mutations.
     #[inline(always)]
@@ -148,6 +153,7 @@ impl Interpreter {
         &self,
         state: &mut VMState,
         captures: &[TlangValue],
+        capture_positions: &[Option<scope::CapturePosition>],
         f: F,
     ) -> (R, Vec<TlangValue>)
     where
@@ -155,7 +161,12 @@ impl Interpreter {
     {
         let root_scope = vec![*state.execution.scope_stack.root_scope()];
         let old_scopes = std::mem::replace(&mut state.execution.scope_stack.scopes, root_scope);
-        let cap_start = state.execution.scope_stack.push_capture_scope(captures);
+        // Also save and clear capture_origins since we're replacing scopes.
+        let old_origins = std::mem::take(&mut state.execution.scope_stack.capture_origins);
+        let cap_start = state
+            .execution
+            .scope_stack
+            .push_capture_scope(captures, Some(capture_positions));
         let result = f(self, state);
         // Read back modified captures before restoring scopes so mutations
         // to captured variables persist across invocations.
@@ -164,6 +175,7 @@ impl Interpreter {
             .scope_stack
             .read_back_captures(cap_start, captures.len());
         state.execution.scope_stack.scopes = old_scopes;
+        state.execution.scope_stack.capture_origins = old_origins;
         (result, modified)
     }
 
@@ -1076,7 +1088,7 @@ impl Interpreter {
                     .collect();
 
                 let (result, modified_captures) =
-                    self.with_closure_scope(state, &captures, |this, state| {
+                    self.with_closure_scope(state, &captures, &capture_positions, |this, state| {
                         this.eval_fn_call(state, &closure_decl, callee, args)
                             .unwrap_value()
                     });

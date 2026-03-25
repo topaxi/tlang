@@ -19,6 +19,14 @@ pub struct ScopeStack {
     global_memory: Vec<TlangValue>,
     // Central continuous memory for local scopes only (non-global)
     memory: Vec<TlangValue>,
+    // Per-slot capture origin positions for capture scopes.  When a capture
+    // scope is pushed with `push_capture_scope`, this stores the original
+    // memory positions so that `capture_position` can resolve through the
+    // capture scope to the ultimate original binding.
+    //
+    // Key: index in `self.scopes` that is a capture scope.
+    // Value: Vec of per-slot CapturePosition (same length as the scope's size).
+    pub capture_origins: std::collections::HashMap<usize, Vec<Option<CapturePosition>>>,
 }
 
 impl ScopeStack {
@@ -32,6 +40,7 @@ impl ScopeStack {
             scopes,
             global_memory: Vec::with_capacity(100), // Separate global memory
             memory: Vec::with_capacity(1000), // Start with reasonable capacity for local scopes
+            capture_origins: std::collections::HashMap::new(),
         }
     }
 
@@ -120,9 +129,20 @@ impl ScopeStack {
     /// root scope and the function-body scope so that remapped
     /// `Slot::Upvar(cap_idx, block_depth + 1)` indices resolve correctly.
     ///
+    /// `origins` optionally stores the original memory positions for each
+    /// capture slot.  When a nested closure calls `capture_position` and
+    /// the target scope is this capture scope, the origin position is
+    /// returned instead of the local buffer position.  This ensures that
+    /// mutations in nested closures are written back to the ultimate
+    /// original binding, not to the temporary capture-scope buffer.
+    ///
     /// Returns the start position in the memory vector so the caller can
     /// read back modified values after the closure body executes.
-    pub fn push_capture_scope(&mut self, captures: &[TlangValue]) -> usize {
+    pub fn push_capture_scope(
+        &mut self,
+        captures: &[TlangValue],
+        origins: Option<&[Option<CapturePosition>]>,
+    ) -> usize {
         let start = self.memory.len();
         self.memory.extend_from_slice(captures);
         let new_scope = Scope::new(start, captures.len());
@@ -134,6 +154,14 @@ impl ScopeStack {
         );
 
         self.scopes.push(new_scope);
+
+        // Record origin positions if provided so `capture_position` can
+        // resolve through this capture scope.
+        if let Some(origins) = origins {
+            let scope_idx = self.scopes.len() - 1;
+            self.capture_origins.insert(scope_idx, origins.to_vec());
+        }
+
         start
     }
 
@@ -145,7 +173,14 @@ impl ScopeStack {
     }
 
     /// Return the position (local or global memory) for a captured variable.
-    /// Returns `None` only if scope_index is 0 (no capture).
+    ///
+    /// If the resolved scope is a capture scope (has entries in
+    /// `capture_origins`), this returns the *original* position stored there
+    /// instead of the capture-scope buffer position.  This ensures that
+    /// nested closures write mutations back to the ultimate original binding.
+    ///
+    /// Returns `None` only if scope_index is 0 (no capture) or the origin
+    /// position is `None`.
     pub fn capture_position(
         &self,
         scope_index: ScopeIndex,
@@ -155,6 +190,13 @@ impl ScopeStack {
             return None;
         }
         let abs_scope = self.scope_index(scope_index - 1);
+
+        // If this scope is a capture scope, resolve through to the original
+        // position so that write-back targets the ultimate binding.
+        if let Some(origins) = self.capture_origins.get(&abs_scope) {
+            return origins.get(slot_index).copied().flatten();
+        }
+
         if abs_scope == 0 {
             Some(CapturePosition::Global(slot_index))
         } else {
