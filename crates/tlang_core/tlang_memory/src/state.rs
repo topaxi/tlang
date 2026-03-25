@@ -176,6 +176,10 @@ impl VMState {
         )))
     }
 
+    /// # Panics
+    ///
+    /// Panics if a captured variable's scope slot cannot be read from the
+    /// current scope stack (indicates a bug in `FreeVariableAnalysis`).
     pub fn new_closure(&mut self, decl: &hir::FunctionDeclaration) -> TlangValue {
         self.program
             .closures
