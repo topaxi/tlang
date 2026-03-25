@@ -62,15 +62,22 @@ impl<'a> InnerCodegen<'a> {
             hir::ExprKind::List(exprs)
                 if !exprs.is_empty() && exprs.iter().all(|e| e.is_path()) =>
             {
-                let idents: Vec<String> = exprs
-                    .iter()
-                    .map(|e| {
-                        let ident = e.path().unwrap().first_ident();
-                        self.current_scope()
-                            .resolve_variable(ident.as_str())
-                            .unwrap_or_else(|| ident.to_string())
-                    })
-                    .collect();
+                let mut idents = Vec::with_capacity(exprs.len());
+                for e in exprs {
+                    let ident = e.path().unwrap().first_ident();
+                    let name = ident.as_str();
+                    let span = ident.span;
+                    match self.current_scope().resolve_variable(name) {
+                        Some(resolved) => idents.push(resolved),
+                        None => {
+                            self.errors
+                                .push(crate::error::CodegenError::unresolved_identifier(
+                                    name, span,
+                                ));
+                            idents.push(name.to_string());
+                        }
+                    }
+                }
                 (String::new(), Some(idents))
             }
             _ => {

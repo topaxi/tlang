@@ -95,11 +95,10 @@ impl<'a> InnerCodegen<'a> {
 
     fn generate_identifier(&mut self, name: &Ident) -> Expression<'a> {
         let name_string = name.as_str();
-        let identifier = self
-            .current_scope()
-            .resolve_variable(name_string)
-            .unwrap_or_else(|| name_string.to_string());
-        self.ident_expr(&js::safe_js_variable_name(&identifier))
+        match self.current_scope().resolve_variable(name_string) {
+            Some(identifier) => self.ident_expr(&js::safe_js_variable_name(&identifier)),
+            None => self.unresolved_identifier_expr(name_string, name.span),
+        }
     }
 
     fn generate_assignment(&mut self, lhs: &hir::Expr, rhs: &hir::Expr) -> Expression<'a> {

@@ -532,6 +532,19 @@ impl<'a> InnerCodegen<'a> {
         self.undefined_expr()
     }
 
+    /// Record an unresolved-identifier error and return a fallback `undefined`
+    /// expression so that code generation can continue and collect further
+    /// errors before reporting.
+    pub(crate) fn unresolved_identifier_expr(
+        &mut self,
+        name: &str,
+        span: TlangSpan,
+    ) -> Expression<'a> {
+        self.errors
+            .push(CodegenError::unresolved_identifier(name, span));
+        self.undefined_expr()
+    }
+
     pub fn generate_module(&mut self, module: &hir::Module) -> Program<'a> {
         let stmts = self.generate_stmts(&module.block.stmts);
         let body = self.ast.vec_from_iter(stmts);
