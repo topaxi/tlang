@@ -29,6 +29,7 @@ use crate::hir_opt::{HirOptContext, HirOptError};
 // ---------------------------------------------------------------------------
 
 struct ShallowUpvarCollector {
+    /// Deduplicated set of (scope_index, slot_index) as found in the HIR.
     upvars: BTreeSet<(hir::ScopeIndex, hir::SlotIndex)>,
 }
 
@@ -60,7 +61,7 @@ impl<'hir> Visitor<'hir> for ShallowUpvarCollector {
 
 // ---------------------------------------------------------------------------
 // ShallowUpvarRemapper: rewrites direct Slot::Upvar references (not in
-// nested FunctionExpressions) to Slot::Upvar(capture_index, 1).
+// nested FunctionExpressions) using the capture map.
 // ---------------------------------------------------------------------------
 
 struct ShallowUpvarRemapper<'a> {
@@ -80,7 +81,21 @@ impl<'hir, 'a> Visitor<'hir> for ShallowUpvarRemapper<'a> {
     fn visit_path(&mut self, path: &'hir mut hir::Path, _ctx: &mut ()) {
         if let hir::Slot::Upvar(slot_index, scope_index) = path.res.slot() {
             if let Some(&capture_index) = self.capture_map.get(&(scope_index, slot_index)) {
-                path.res.set_slot(hir::Slot::Upvar(capture_index, 1));
+                // Replace scope_index with 1: the capture scope is always
+                // exactly one level above wherever this reference currently
+                // points. The additional levels within the closure body are
+                // unchanged because the scope_index already accounted for them.
+                // We adjust: new_scope = scope_index - (scope_index - 1) = 1?
+                // No: the capture scope replaces the EXTERNAL scopes. The
+                // internal nesting stays the same. At runtime the stack is
+                // [root, capture, fn_body, ...inner_scopes...] so the capture
+                // scope is at the same depth as where the fn body scope used
+                // to be + 1 extra.  Since the original scope_index already
+                // measured from the current position to the definition, and
+                // the definition now lives in the capture scope (which is 1
+                // above fn_body), we just keep the same scope_index. Only
+                // the slot changes to capture_index.
+                path.res.set_slot(hir::Slot::Upvar(capture_index, scope_index));
             }
         }
     }
@@ -138,6 +153,7 @@ impl FreeVariableAnalysis {
         // 5. Remap direct upvar references in the body (not nested FEs).
         let mut remapper = ShallowUpvarRemapper {
             capture_map: &capture_map,
+            depth: 0,
         };
         remapper.visit_block(&mut decl.body, &mut ());
 

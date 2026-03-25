@@ -116,6 +116,29 @@ impl ScopeStack {
         self.scopes.push(new_scope);
     }
 
+    /// Read the current values from the capture scope (second-to-last scope).
+    /// Used to detect mutations made by closure bodies for write-back.
+    pub fn read_capture_scope(&self, count: usize) -> Vec<TlangValue> {
+        // The capture scope is the second scope (index 1) in the current
+        // scope stack [root, capture, ...fn scopes...]. Since the fn scope
+        // has been popped by the time we call this, the capture scope is
+        // now the top of the stack. But to be safe, we search from the end.
+        if self.scopes.len() < 2 {
+            // No capture scope to read — return empty.
+            return Vec::new();
+        }
+        let capture_scope = &self.scopes[1]; // [root(0), capture(1)]
+        let start = capture_scope.start();
+        (0..count)
+            .map(|i| {
+                self.memory
+                    .get(start + i)
+                    .copied()
+                    .unwrap_or(TlangValue::Nil)
+            })
+            .collect()
+    }
+
     /// # Panics
     pub fn current_scope(&self) -> &Scope {
         self.scopes.last().expect("No current scope available")

@@ -9,19 +9,18 @@ use super::TlangValue;
 #[derive(Debug)]
 pub struct TlangClosure {
     pub id: HirId,
-    // Captured values from parent scopes, one per entry in the closure's
-    // `CaptureInfo` list.  At invocation the runtime pushes a single
-    // "capture scope" containing these values so that the remapped
-    // `Slot::Upvar(capture_index, 1)` references resolve correctly.
+    /// Scope chain metadata, cloned at closure creation time.
+    /// Used at invocation to restore the correct scope structure
+    /// (scope-swapping) so nested closures and upvar resolution work.
+    pub scope_stack: Vec<crate::scope::Scope>,
+    /// Captured free-variable values, one per entry in the closure's
+    /// `CaptureInfo` list.  Used for GC tracing — only the actually
+    /// referenced bindings, not the entire scope memory.
     pub captures: Vec<TlangValue>,
     // Captured cells for mutable upvar bindings.
-    // Key: capture_index — position in `captures`
+    // Key: (scope_index, var_index) in the captured scope stack
     // Value: TlangObjectId of a Cell object
-    //
-    // When a closure captures an upvar, instead of copying the value, we create a
-    // Cell object and store references in both the closure and the original memory.
-    // This enables mutations to be visible in both places.
-    pub captured_cells: std::collections::HashMap<usize, TlangObjectId>,
+    pub captured_cells: std::collections::HashMap<(usize, usize), TlangObjectId>,
 }
 
 #[derive(Debug, PartialEq)]
