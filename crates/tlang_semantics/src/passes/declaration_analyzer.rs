@@ -29,16 +29,44 @@ impl DeclarationAnalyzer {
         node_id: NodeId,
         ctx: &mut SemanticAnalysisContext,
     ) -> Rc<RefCell<DefScope>> {
-        debug!("Entering new scope for node: {node_id}");
+        self.push_symbol_table_inner(node_id, ctx, false)
+    }
+
+    fn push_function_symbol_table(
+        &mut self,
+        node_id: NodeId,
+        ctx: &mut SemanticAnalysisContext,
+    ) -> Rc<RefCell<DefScope>> {
+        self.push_symbol_table_inner(node_id, ctx, true)
+    }
+
+    fn push_symbol_table_inner(
+        &mut self,
+        node_id: NodeId,
+        ctx: &mut SemanticAnalysisContext,
+        is_function_scope: bool,
+    ) -> Rc<RefCell<DefScope>> {
+        debug!("Entering new scope for node: {node_id} (function_scope={is_function_scope})");
 
         let parent = self.current_symbol_table().clone();
-        let new_symbol_table = Rc::new(RefCell::new(DefScope::new(parent)));
+        let new_symbol_table = if is_function_scope {
+            Rc::new(RefCell::new(DefScope::new_function_scope(parent)))
+        } else {
+            Rc::new(RefCell::new(DefScope::new(parent)))
+        };
         ctx.symbol_tables.insert(node_id, new_symbol_table.clone());
         self.symbol_table_stack.push(new_symbol_table.clone());
 
         new_symbol_table
     }
 
+    /// Pop the current scope from the symbol table stack.
+    ///
+    /// This is used for **both** function scopes (pushed via
+    /// `push_function_symbol_table`) and block scopes (pushed via
+    /// `push_symbol_table`).  The distinction between function and
+    /// non-function scopes is encoded in the `DefScope::is_function_scope`
+    /// flag, not in the push/pop path.
     fn pop_symbol_table(&mut self) -> Rc<RefCell<DefScope>> {
         debug!("Leaving scope");
 
@@ -81,7 +109,7 @@ impl DeclarationAnalyzer {
             );
 
             // Enter function scope for parameter/body analysis
-            self.enter_scope(method.id, ctx);
+            self.push_function_symbol_table(method.id, ctx);
 
             // Declare the function self-reference binding (needed for
             // multi-clause lowering which calls shift() to remove it).
@@ -106,7 +134,7 @@ impl DeclarationAnalyzer {
             if let Some(expr) = &method.body.expression {
                 self.visit_expr(expr, ctx);
             }
-            self.leave_scope(method.id, ctx);
+            self.pop_symbol_table();
         }
     }
 }
@@ -244,8 +272,10 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             declaration.span.end_lc.line,
         );
 
-        // Enter function scope
-        self.enter_scope(declaration.id, ctx);
+        // Enter function scope — marked as a function boundary so that
+        // `DefScope::get_slot` can distinguish intra-function block access
+        // from cross-function closure captures.
+        self.push_function_symbol_table(declaration.id, ctx);
 
         // The function name is also declared and bound within the function itself.
         // Similar to what JS does.
@@ -277,7 +307,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
         );
 
         // Leave function scope
-        self.leave_scope(declaration.id, ctx);
+        self.pop_symbol_table();
     }
 
     fn visit_expr(&mut self, expr: &'ast Expr, ctx: &mut Self::Context) {
@@ -289,7 +319,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             ExprKind::FunctionExpression(decl) => {
                 // Declare the function self-reference symbol first
                 let name_as_str = decl.name_or_invalid();
-                self.enter_scope(decl.id, ctx);
+                self.push_function_symbol_table(decl.id, ctx);
                 self.declare_symbol(
                     ctx,
                     decl.id,
@@ -311,7 +341,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                 }
 
                 self.visit_block(&decl.body.statements, &decl.body.expression, ctx);
-                self.leave_scope(decl.id, ctx);
+                self.pop_symbol_table();
             }
             _ => {
                 // For all other expressions, use the default walker which includes

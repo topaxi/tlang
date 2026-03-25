@@ -166,6 +166,13 @@ pub struct DefScope {
     #[cfg_attr(feature = "serde", serde(skip_serializing))]
     parent: Option<Rc<RefCell<DefScope>>>,
     symbols: Vec<Def>,
+    /// When `true`, this scope represents a function boundary (function
+    /// declaration, function expression, or impl-block method).  Walking
+    /// **out** of a function scope during symbol lookup means crossing a
+    /// function boundary, which distinguishes a true closure capture
+    /// (`Slot::Upvar`) from an intra-function parent-block reference
+    /// (`Slot::BlockVar`).
+    is_function_scope: bool,
 }
 
 // TODO: Should we keep track of the symbol id within the symbol table?
@@ -175,6 +182,25 @@ impl DefScope {
             parent: Some(parent),
             ..Default::default()
         }
+    }
+
+    /// Create a new scope that represents a function boundary (function
+    /// declaration, function expression, or impl-block method).
+    pub fn new_function_scope(parent: Rc<RefCell<DefScope>>) -> Self {
+        DefScope {
+            parent: Some(parent),
+            is_function_scope: true,
+            ..Default::default()
+        }
+    }
+
+    /// Mark (or un-mark) this scope as a function boundary.
+    pub fn set_is_function_scope(&mut self, value: bool) {
+        self.is_function_scope = value;
+    }
+
+    pub fn is_function_scope(&self) -> bool {
+        self.is_function_scope
     }
 
     pub fn parent(&self) -> Option<Rc<RefCell<DefScope>>> {
@@ -199,20 +225,39 @@ impl DefScope {
             .position(&predicate)
     }
 
-    pub fn get_slot(&self, predicate: impl Fn(&Def) -> bool) -> Option<(usize, usize)> {
+    /// Look up a symbol and return its slot position.
+    ///
+    /// Returns `Some((slot_index, scope_distance, crosses_function))` where:
+    /// - `slot_index` is the symbol's position among slot-eligible siblings in
+    ///   the scope where it was found.
+    /// - `scope_distance` is the number of parent-chain hops from the current
+    ///   scope to the scope that contains the symbol (0 = local).
+    /// - `crosses_function` is `true` when walking from the current scope to
+    ///   the defining scope requires leaving at least one function-boundary
+    ///   scope, making the access a true closure capture.
+    pub fn get_slot(&self, predicate: impl Fn(&Def) -> bool) -> Option<(usize, usize, bool)> {
         if let Some(index) = self.get_slot_index(&self.symbols, &predicate) {
-            return Some((index, 0));
+            return Some((index, 0, false));
         }
 
         let mut scope_index = 1;
         let mut table = self.parent();
+        // Track whether we have exited a function-boundary scope.
+        // Walking from a child scope to its parent crosses a function
+        // boundary when the *child* (i.e. the scope we are leaving) is
+        // marked `is_function_scope`.
+        let mut crossed_function = self.is_function_scope;
 
         while let Some(t) = table {
             let t = t.borrow();
 
             if let Some(index) = self.get_slot_index(&t.symbols, &predicate) {
-                return Some((index, scope_index));
+                return Some((index, scope_index, crossed_function));
             }
+
+            // If the scope we are about to leave is a function scope,
+            // any further lookup crosses a function boundary.
+            crossed_function = crossed_function || t.is_function_scope;
 
             scope_index += 1;
             table = t.parent();

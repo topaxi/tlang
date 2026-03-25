@@ -229,7 +229,8 @@ impl ScopeStack {
     fn resolve_value(&self, res: &hir::Res) -> Option<TlangValue> {
         match res.slot() {
             hir::Slot::Local(index) => self.get_local(index),
-            hir::Slot::Upvar(index, relative_scope_index) => {
+            hir::Slot::BlockVar(index, relative_scope_index)
+            | hir::Slot::Upvar(index, relative_scope_index) => {
                 self.get_upvar(relative_scope_index, index)
             }
             _ => None,
@@ -240,7 +241,8 @@ impl ScopeStack {
     pub fn update_value(&mut self, res: &hir::Res, value: TlangValue) {
         match res.slot() {
             hir::Slot::Local(index) => self.set_local(index, value),
-            hir::Slot::Upvar(index, relative_scope_index) => {
+            hir::Slot::BlockVar(index, relative_scope_index)
+            | hir::Slot::Upvar(index, relative_scope_index) => {
                 self.set_upvar(relative_scope_index, index, value);
             }
             _ => panic!("Cannot update value for {res:?}"),
