@@ -2,6 +2,7 @@ use tlang_hir::{self as hir, HirScope, ScopeIndex};
 
 use crate::resolver::Resolver;
 use crate::value::TlangValue;
+pub use crate::value::object::{CapturePositionVec, CaptureVec};
 
 /// Identifies where a captured variable lives in the memory model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,14 +20,15 @@ pub struct ScopeStack {
     global_memory: Vec<TlangValue>,
     // Central continuous memory for local scopes only (non-global)
     memory: Vec<TlangValue>,
-    // Per-slot capture origin positions for capture scopes.  When a capture
+    // Origin positions for the single active capture scope.  When a capture
     // scope is pushed with `push_capture_scope`, this stores the original
     // memory positions so that `capture_position` can resolve through the
     // capture scope to the ultimate original binding.
     //
-    // Key: index in `self.scopes` that is a capture scope.
-    // Value: Vec of per-slot CapturePosition (same length as the scope's size).
-    capture_origins: std::collections::HashMap<usize, Vec<Option<CapturePosition>>>,
+    // At most one capture scope is active at a time (the closure invocation
+    // model pushes `[root, capture_scope]`), so a flat `Option` replaces the
+    // previous `HashMap<usize, …>` to avoid hashing overhead per call.
+    capture_origin: Option<(usize, CapturePositionVec)>,
 }
 
 impl ScopeStack {
@@ -40,7 +42,7 @@ impl ScopeStack {
             scopes,
             global_memory: Vec::with_capacity(100), // Separate global memory
             memory: Vec::with_capacity(1000), // Start with reasonable capacity for local scopes
-            capture_origins: std::collections::HashMap::new(),
+            capture_origin: None,
         }
     }
 
@@ -159,7 +161,7 @@ impl ScopeStack {
         // resolve through this capture scope.
         if let Some(origins) = origins {
             let scope_idx = self.scopes.len() - 1;
-            self.capture_origins.insert(scope_idx, origins.to_vec());
+            self.capture_origin = Some((scope_idx, origins.into()));
         }
 
         start
@@ -168,32 +170,31 @@ impl ScopeStack {
     /// Read capture values back from the memory buffer after a closure body
     /// has executed.  Used to persist mutations to captured variables across
     /// invocations.
-    pub fn read_back_captures(&self, start: usize, count: usize) -> Vec<TlangValue> {
-        self.memory[start..start + count].to_vec()
+    pub fn read_back_captures(
+        &self,
+        start: usize,
+        count: usize,
+    ) -> crate::value::object::CaptureVec {
+        self.memory[start..start + count].into()
     }
 
-    /// Take all capture origin metadata, leaving the map empty.
+    /// Take capture origin metadata, leaving the field empty.
     ///
-    /// Used by `with_closure_scope` to save origins before replacing the
-    /// scope stack, so they can be restored afterwards.
-    pub fn take_capture_origins(
-        &mut self,
-    ) -> std::collections::HashMap<usize, Vec<Option<CapturePosition>>> {
-        std::mem::take(&mut self.capture_origins)
+    /// Used by `with_closure_scope` to save origin before replacing the
+    /// scope stack, so it can be restored afterwards.
+    pub fn take_capture_origin(&mut self) -> Option<(usize, CapturePositionVec)> {
+        self.capture_origin.take()
     }
 
     /// Restore previously saved capture origin metadata.
-    pub fn restore_capture_origins(
-        &mut self,
-        origins: std::collections::HashMap<usize, Vec<Option<CapturePosition>>>,
-    ) {
-        self.capture_origins = origins;
+    pub fn restore_capture_origin(&mut self, origin: Option<(usize, CapturePositionVec)>) {
+        self.capture_origin = origin;
     }
 
     /// Return the position (local or global memory) for a captured variable.
     ///
-    /// If the resolved scope is a capture scope (has entries in
-    /// `capture_origins`), this returns the *original* position stored there
+    /// If the resolved scope is a capture scope (has an entry in
+    /// `capture_origin`), this returns the *original* position stored there
     /// instead of the capture-scope buffer position.  This ensures that
     /// nested closures write mutations back to the ultimate original binding.
     ///
@@ -209,9 +210,11 @@ impl ScopeStack {
         }
         let abs_scope = self.scope_index(scope_index - 1);
 
-        // If this scope is a capture scope, resolve through to the original
+        // If this scope is the capture scope, resolve through to the original
         // position so that write-back targets the ultimate binding.
-        if let Some(origins) = self.capture_origins.get(&abs_scope) {
+        if let Some((origin_scope, ref origins)) = self.capture_origin
+            && abs_scope == origin_scope
+        {
             return origins.get(slot_index).copied().flatten();
         }
 

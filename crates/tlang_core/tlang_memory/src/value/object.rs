@@ -1,11 +1,19 @@
 use std::ops::{Index, IndexMut};
 
+use smallvec::SmallVec;
 use tlang_span::HirId;
 
 use crate::scope::CapturePosition;
 use crate::shape::{ShapeKey, Shaped};
 
 use super::TlangValue;
+
+/// Inline capacity for capture SmallVecs.  Most closures capture 1–4
+/// variables; keeping them inline avoids a heap allocation in the common case.
+pub const CAPTURE_INLINE_CAP: usize = 4;
+
+pub type CaptureVec = SmallVec<[TlangValue; CAPTURE_INLINE_CAP]>;
+pub type CapturePositionVec = SmallVec<[Option<CapturePosition>; CAPTURE_INLINE_CAP]>;
 
 #[derive(Debug)]
 pub struct TlangClosure {
@@ -20,13 +28,13 @@ pub struct TlangClosure {
     /// Mutations to captures during closure execution are written back here
     /// AND to the original memory positions (in `capture_positions`) so
     /// that the enclosing scope sees the changes.
-    pub captures: Vec<TlangValue>,
+    pub captures: CaptureVec,
     /// Positions in the memory model where each captured variable originally
     /// lives.  Used for two-way sync: at invocation, fresh values are read
     /// from these positions; after execution, modified values are written
     /// back.  Positions remain valid because `ScopeStack::pop()` never
     /// truncates memory.
-    pub capture_positions: Vec<Option<CapturePosition>>,
+    pub capture_positions: CapturePositionVec,
     // Captured cells for mutable upvar bindings.
     // Key: (scope_index, var_index) in the captured scope stack
     // Value: TlangObjectId of a Cell object
@@ -428,10 +436,11 @@ mod tests {
 
     #[test]
     fn test_closure_referenced_values() {
+        use smallvec::smallvec;
         use tlang_span::HirId;
 
         // Create a closure with some captured values
-        let captured = vec![
+        let captured: CaptureVec = smallvec![
             TlangValue::I64(42),
             TlangValue::Object(5.into()), // This is an object reference that GC needs to trace
             TlangValue::Bool(true),
@@ -439,23 +448,24 @@ mod tests {
         let closure = TlangClosure {
             id: HirId::new(1),
             captures: captured.clone(),
-            capture_positions: vec![None; captured.len()],
+            capture_positions: smallvec![None; captured.len()],
             captured_cells: std::collections::HashMap::new(),
         };
         let obj = TlangObjectKind::Closure(closure);
 
         let refs: Vec<_> = obj.referenced_values().collect();
         assert_eq!(refs.len(), 3);
-        assert_eq!(refs, captured);
+        assert_eq!(refs, captured.as_slice());
     }
 
     #[test]
     fn test_closure_referenced_values_includes_cells() {
+        use smallvec::smallvec;
         use std::collections::HashMap;
         use tlang_span::HirId;
 
         // Create a closure with captured values and captured cells
-        let captures = vec![TlangValue::I64(42)];
+        let captures: CaptureVec = smallvec![TlangValue::I64(42)];
         let mut captured_cells = HashMap::new();
         captured_cells.insert((0, 0), 100.into()); // Cell at scope 0, var 0 -> object ID 100
         captured_cells.insert((1, 2), 200.into()); // Cell at scope 1, var 2 -> object ID 200
@@ -463,7 +473,7 @@ mod tests {
         let closure = TlangClosure {
             id: HirId::new(1),
             captures: captures.clone(),
-            capture_positions: vec![None; captures.len()],
+            capture_positions: smallvec![None; captures.len()],
             captured_cells,
         };
         let obj = TlangObjectKind::Closure(closure);
@@ -478,13 +488,14 @@ mod tests {
 
     #[test]
     fn test_closure_empty_captures() {
+        use smallvec::smallvec;
         use tlang_span::HirId;
 
         // Closure with no captured values
         let closure = TlangClosure {
             id: HirId::new(1),
-            captures: vec![],
-            capture_positions: vec![],
+            captures: smallvec![],
+            capture_positions: smallvec![],
             captured_cells: std::collections::HashMap::new(),
         };
         let obj = TlangObjectKind::Closure(closure);

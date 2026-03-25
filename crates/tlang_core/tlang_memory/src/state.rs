@@ -197,8 +197,8 @@ impl VMState {
         // (two-way sync between closure and enclosing scope).
         let capture_info = decl.body.scope.captures().to_vec();
         let (captures, capture_positions): (
-            Vec<TlangValue>,
-            Vec<Option<crate::scope::CapturePosition>>,
+            crate::value::object::CaptureVec,
+            crate::value::object::CapturePositionVec,
         ) = capture_info
             .iter()
             .map(|c| {

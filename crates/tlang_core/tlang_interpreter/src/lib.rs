@@ -155,14 +155,14 @@ impl Interpreter {
         captures: &[TlangValue],
         capture_positions: &[Option<scope::CapturePosition>],
         f: F,
-    ) -> (R, Vec<TlangValue>)
+    ) -> (R, scope::CaptureVec)
     where
         F: FnOnce(&Interpreter, &mut VMState) -> R,
     {
         let root_scope = vec![*state.execution.scope_stack.root_scope()];
         let old_scopes = std::mem::replace(&mut state.execution.scope_stack.scopes, root_scope);
-        // Also save and clear capture_origins since we're replacing scopes.
-        let old_origins = state.execution.scope_stack.take_capture_origins();
+        // Also save and clear capture_origin since we're replacing scopes.
+        let old_origin = state.execution.scope_stack.take_capture_origin();
         let cap_start = state
             .execution
             .scope_stack
@@ -178,7 +178,7 @@ impl Interpreter {
         state
             .execution
             .scope_stack
-            .restore_capture_origins(old_origins);
+            .restore_capture_origin(old_origin);
         (result, modified)
     }
 
@@ -1072,7 +1072,7 @@ impl Interpreter {
 
                 // Fresh-read from original memory positions so the closure sees
                 // mutations made by the enclosing scope since it was created.
-                let captures: Vec<TlangValue> = stale_captures
+                let captures: scope::CaptureVec = stale_captures
                     .iter()
                     .zip(capture_positions.iter())
                     .map(|(&stale, pos)| match pos {
