@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use tlang_codegen_js::CodegenError;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_diagnostics::render_ice;
 use tlang_hir_opt::HirPass;
@@ -11,6 +12,22 @@ use crate::commands::compile::CompileTargetHirOptimizer;
 pub struct BuildOptions {
     pub project_dir: String,
     pub output_file: Option<String>,
+}
+
+/// Render codegen errors without source context (source text is not available
+/// in the multi-module build pipeline).  Outputs one line per error to stderr.
+fn render_codegen_errors(module_path: &ModulePath, errors: &[CodegenError]) -> String {
+    let mut out = String::new();
+    for e in errors {
+        out.push_str(&format!(
+            "error: {}\n  --> {}:{}:{}\n",
+            e.message,
+            module_path,
+            e.span.start_lc.line + 1,
+            e.span.start_lc.column + 1,
+        ));
+    }
+    out
 }
 
 pub fn handle_build(options: &BuildOptions) -> bool {
@@ -67,7 +84,10 @@ pub fn handle_build(options: &BuildOptions) -> bool {
         for name in &protocol_names {
             codegen.register_protocol(name);
         }
-        codegen.generate_code(&hir_module);
+        if let Err(errors) = codegen.generate_code(&hir_module) {
+            eprint!("{}", render_codegen_errors(path, &errors));
+            return false;
+        }
         let module_code = codegen.get_output().to_string();
 
         if !module_code.trim().is_empty() {
@@ -105,7 +125,10 @@ pub fn handle_build(options: &BuildOptions) -> bool {
         for name in &protocol_names {
             codegen.register_protocol(name);
         }
-        codegen.generate_code(&hir_module);
+        if let Err(errors) = codegen.generate_code(&hir_module) {
+            eprint!("{}", render_codegen_errors(&ModulePath::root(), &errors));
+            return false;
+        }
         let root_code = codegen.get_output().to_string();
 
         if !root_code.trim().is_empty() {

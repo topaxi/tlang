@@ -5,6 +5,7 @@ use tlang_ast::node::Visibility;
 use tlang_ast::token::Literal;
 use tlang_hir as hir;
 
+use crate::error::CodegenError;
 use crate::generator::{CodegenJS, InnerCodegen};
 
 impl<'a> InnerCodegen<'a> {
@@ -140,7 +141,13 @@ impl<'a> InnerCodegen<'a> {
             hir::PatKind::List(patterns) => {
                 self.generate_variable_declaration_list_pattern(patterns, value)
             }
-            _ => todo!("Variable declaration pattern matching is not implemented yet."),
+            _ => {
+                self.errors.push(CodegenError::unsupported(
+                    "variable declaration pattern matching",
+                    pattern.span,
+                ));
+                vec![]
+            }
         }
     }
 
@@ -200,10 +207,13 @@ impl<'a> InnerCodegen<'a> {
                 hir::PatKind::Wildcard => {
                     elements.push(None);
                 }
-                _ => todo!(
-                    "Variable declaration pattern matching for {:?} is not implemented yet.",
-                    pattern.kind
-                ),
+                _ => {
+                    self.errors.push(CodegenError::unsupported(
+                        "variable declaration pattern matching",
+                        pattern.span,
+                    ));
+                    elements.push(None);
+                }
             }
         }
 

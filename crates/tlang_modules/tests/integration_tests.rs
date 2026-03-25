@@ -52,7 +52,9 @@ fn compile_project_to_js(project_name: &str) -> String {
         for name in &protocol_names {
             codegen.register_protocol(name);
         }
-        codegen.generate_code(&hir_module);
+        codegen
+            .generate_code(&hir_module)
+            .expect("codegen should succeed");
         let code = codegen.get_output().to_string();
 
         if !code.trim().is_empty() {
@@ -87,7 +89,9 @@ fn compile_project_to_js(project_name: &str) -> String {
         for name in &protocol_names {
             codegen.register_protocol(name);
         }
-        codegen.generate_code(&hir_module);
+        codegen
+            .generate_code(&hir_module)
+            .expect("codegen should succeed");
         parts.push(codegen.get_output().to_string());
     }
 

@@ -8,6 +8,7 @@ use oxc_codegen::{Codegen, CodegenOptions, IndentChar};
 use oxc_sourcemap::{SourceMap, Token};
 use oxc_span::SPAN;
 
+use crate::error::CodegenError;
 use crate::scope::Scope;
 use oxc_estree::{ESTree, PrettyJSSerializer};
 use tlang_defs::DefKind;
@@ -84,8 +85,10 @@ impl CodegenJS {
     ///
     /// # Panics
     ///
-    /// Panics if the embedded stdlib `.tlang` sources fail to parse or pass
-    /// semantic analysis, which would indicate a bug in the stdlib source.
+    /// Panics if the embedded stdlib `.tlang` sources fail to parse, fail
+    /// semantic analysis, fail to lower to HIR, or fail to generate JavaScript
+    /// successfully — any of which would indicate a bug in the stdlib source or
+    /// the compiler.
     pub fn compile_stdlib_module() -> String {
         use tlang_ast_lowering::lower_to_hir;
         use tlang_hir_opt::hir_opt::HirOptContext;
@@ -123,7 +126,9 @@ impl CodegenJS {
         // Bundle mode: suppress `export` on public declarations so the compiled
         // tlang code is script-compatible (no ES-module syntax).
         generator.set_bundle_mode(true);
-        generator.generate_code(&module);
+        generator
+            .generate_code(&module)
+            .expect("stdlib codegen should succeed");
         let compiled_tlang = generator.get_output().to_string();
 
         let mut bundle = String::new();
@@ -219,8 +224,8 @@ impl CodegenJS {
         ]
     }
 
-    pub fn generate_code(&mut self, module: &hir::Module) {
-        self.run_codegen(module, None, None);
+    pub fn generate_code(&mut self, module: &hir::Module) -> Result<(), Vec<CodegenError>> {
+        self.run_codegen(module, None, None)
     }
 
     /// Enable bundle mode: suppresses `export` keywords on public declarations.
@@ -242,8 +247,8 @@ impl CodegenJS {
         module: &hir::Module,
         source_name: &str,
         source_text: &str,
-    ) {
-        self.run_codegen(module, Some(source_text), Some(source_name));
+    ) -> Result<(), Vec<CodegenError>> {
+        self.run_codegen(module, Some(source_text), Some(source_name))
     }
 
     fn run_codegen(
@@ -251,7 +256,7 @@ impl CodegenJS {
         module: &hir::Module,
         source_text: Option<&str>,
         source_name: Option<&str>,
-    ) {
+    ) -> Result<(), Vec<CodegenError>> {
         let allocator = Allocator::default();
         let ast = AstBuilder::new(&allocator);
         let mut inner = InnerCodegen::new(ast, self.protocol_names.clone());
@@ -260,6 +265,15 @@ impl CodegenJS {
             inner = inner.with_source_text(st.to_string());
         }
         let program = inner.generate_module(module);
+
+        if !inner.errors.is_empty() {
+            // Clear any stale output from a previous successful run so that
+            // callers cannot accidentally use old output after an error.
+            self.output.clear();
+            self.js_ast_json.clear();
+            self.source_map = None;
+            return Err(inner.errors);
+        }
 
         let mut serializer = PrettyJSSerializer::new(false);
         program.serialize(&mut serializer);
@@ -277,6 +291,7 @@ impl CodegenJS {
         let result = Codegen::new().with_options(options).build(&program);
         self.output = result.code;
         self.source_map = result.map;
+        Ok(())
     }
 
     pub fn get_output(&self) -> &str {
@@ -482,6 +497,10 @@ pub(crate) struct InnerCodegen<'a> {
     /// statement nodes, ensuring comment attachment keys are always distinct
     /// (even when multiple HIR nodes derive from the same source position).
     span_counter: u32,
+    /// Errors accumulated during code generation (e.g. unsupported features).
+    /// Checked at the end of [`generate_module`]; if non-empty the caller
+    /// should return an error instead of emitting output.
+    pub(crate) errors: Vec<CodegenError>,
 }
 
 impl<'a> InnerCodegen<'a> {
@@ -496,12 +515,21 @@ impl<'a> InnerCodegen<'a> {
             comment_source: String::new(),
             oxc_comments: Vec::new(),
             span_counter: 1,
+            errors: Vec::new(),
         }
     }
 
     pub fn with_source_text(mut self, source_text: String) -> Self {
         self.source_text = source_text;
         self
+    }
+
+    /// Record an unsupported-feature error and return a fallback `undefined`
+    /// expression so that code generation can continue and collect further
+    /// errors before reporting.
+    pub(crate) fn unsupported_expr(&mut self, feature: &str, span: TlangSpan) -> Expression<'a> {
+        self.errors.push(CodegenError::unsupported(feature, span));
+        self.undefined_expr()
     }
 
     pub fn generate_module(&mut self, module: &hir::Module) -> Program<'a> {

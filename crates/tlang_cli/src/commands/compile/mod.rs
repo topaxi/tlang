@@ -6,7 +6,10 @@ use std::{
     path::Path,
 };
 
-use output::{CompileTarget, ast::AstTarget, hir::HirTarget, hir_raw::HirRawTarget, js::JsTarget};
+use output::{
+    CompileTarget, ast::AstTarget, codegen_errors_to_diagnostics, hir::HirTarget,
+    hir_raw::HirRawTarget, js::JsTarget,
+};
 use tlang_ast_lowering::lower_to_hir;
 use tlang_codegen_js::{
     generator::{CodegenJS, shift_source_map_lines},
@@ -216,7 +219,9 @@ fn compile_source(
                     if options.source_map {
                         let source_name = path.to_string_lossy();
                         let mut generator = CodegenJS::default();
-                        generator.generate_code_with_source_map(&module, &source_name, source);
+                        generator
+                            .generate_code_with_source_map(&module, &source_name, source)
+                            .map_err(codegen_errors_to_diagnostics)?;
                         pending_source_map = generator.get_source_map_json();
                         Ok(generator.get_output().to_string())
                     } else {

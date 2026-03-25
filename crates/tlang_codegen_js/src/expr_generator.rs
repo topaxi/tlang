@@ -52,8 +52,8 @@ impl<'a> InnerCodegen<'a> {
                     "Block/Loop/Match/Break/Continue should not appear in expression position after ANF"
                 )
             }
-            hir::ExprKind::Let(..) => todo!("Let expression not implemented yet."),
-            hir::ExprKind::Range(_) => todo!("Range expression not implemented yet."),
+            hir::ExprKind::Let(..) => self.unsupported_expr("let expressions", expr.span),
+            hir::ExprKind::Range(_) => self.unsupported_expr("range expressions", expr.span),
         };
         *js_expr.span_mut() = Self::hir_span(expr.span);
         js_expr
