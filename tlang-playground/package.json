@@ -25,7 +25,7 @@
     "last 2 and_chr versions"
   ],
   "dependencies": {
-    "@catppuccin/palette": "^1.7.1",
+    "@catppuccin/palette": "^1.8.0",
     "@codemirror/lang-javascript": "^6.2.5",
     "@floating-ui/dom": "^1.7.6",
     "@lit/context": "^1.1.6",
