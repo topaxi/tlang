@@ -20,13 +20,26 @@ pub trait HirScope {
     fn set_upvars(&mut self, upvars: usize);
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct HirScopeData {
     // How many slots to allocate for local variables.
     locals: usize,
     // How many slots to allocate for variables from parent scopes.
     upvars: usize,
+    // Explicit capture list populated by FreeVariableAnalysis.
+    // Each entry maps to a free variable the closure needs from a parent scope.
+    captures: Vec<CaptureInfo>,
+}
+
+impl HirScopeData {
+    pub fn captures(&self) -> &[CaptureInfo] {
+        &self.captures
+    }
+
+    pub fn set_captures(&mut self, captures: Vec<CaptureInfo>) {
+        self.captures = captures;
+    }
 }
 
 impl HirScope for HirScopeData {
@@ -90,6 +103,22 @@ impl From<DefKind> for BindingKind {
 
 pub type SlotIndex = usize;
 pub type ScopeIndex = u16;
+
+/// Describes a single captured free variable for a closure.
+///
+/// When a closure references a variable from a parent scope, the
+/// `FreeVariableAnalysis` HIR pass records that reference here so the
+/// runtime can capture only the needed bindings instead of the entire
+/// scope stack.
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct CaptureInfo {
+    /// Slot index of the variable in the source scope.
+    pub slot_index: SlotIndex,
+    /// Relative scope distance from the closure to the source scope
+    /// (same semantics as the `ScopeIndex` in `Slot::Upvar`).
+    pub scope_index: ScopeIndex,
+}
 
 #[derive(Debug, Default, Eq, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]

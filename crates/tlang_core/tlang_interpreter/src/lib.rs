@@ -133,6 +133,61 @@ impl Interpreter {
         self.with_scope(state, root_scope, f)
     }
 
+    /// Invoke a closure by pushing `[root, capture_scope]` instead of
+    /// restoring the full saved scope chain.
+    ///
+    /// The capture scope contains the captured values in the order defined
+    /// by `CaptureInfo`.  After `FreeVariableAnalysis` has remapped the
+    /// Upvar slots, `Upvar(cap_idx, block_depth + 1)` resolves to
+    /// `capture_scope[cap_idx]`.
+    ///
+    /// `capture_positions` are the original memory positions for each
+    /// captured variable.  They are stored on the capture scope so that
+    /// `capture_position` resolves through to the ultimate original binding,
+    /// preserving correct two-way sync for nested closures.
+    ///
+    /// Returns `(body_result, modified_captures)` — the caller must write
+    /// the modified captures back to the `TlangClosure` to persist mutations.
+    #[inline(always)]
+    fn with_closure_scope<F, R>(
+        &self,
+        state: &mut VMState,
+        captures: &[TlangValue],
+        capture_positions: &[Option<scope::CapturePosition>],
+        f: F,
+    ) -> (R, scope::CaptureVec)
+    where
+        F: FnOnce(&Interpreter, &mut VMState) -> R,
+    {
+        let root_scope = vec![*state.execution.scope_stack.root_scope()];
+        let old_scopes = std::mem::replace(&mut state.execution.scope_stack.scopes, root_scope);
+        // Also save and clear capture_origin since we're replacing scopes.
+        let old_origin = state.execution.scope_stack.take_capture_origin();
+        let cap_start = state
+            .execution
+            .scope_stack
+            .push_capture_scope(captures, Some(capture_positions));
+        let result = f(self, state);
+        // Read back modified captures before restoring scopes so mutations
+        // to captured variables persist across invocations.
+        let modified = state
+            .execution
+            .scope_stack
+            .read_back_captures(cap_start, captures.len());
+        // Truncate the memory buffer back to where it was before the capture
+        // scope was pushed.  All capture-scope and closure-body memory is
+        // temporary; we've already read back the modified captures above.
+        // Without this truncation, every closure invocation permanently grows
+        // the memory buffer.
+        state.execution.scope_stack.truncate_memory(cap_start);
+        state.execution.scope_stack.scopes = old_scopes;
+        state
+            .execution
+            .scope_stack
+            .restore_capture_origin(old_origin);
+        (result, modified)
+    }
+
     #[inline(always)]
     fn with_scope<F, R>(&self, state: &mut VMState, scopes: Vec<scope::Scope>, f: F) -> R
     where
@@ -1018,19 +1073,55 @@ impl Interpreter {
         match state.get_object_by_id(id).unwrap() {
             TlangObjectKind::Closure(closure) => {
                 let closure_decl = state.get_closure_decl(closure.id).unwrap();
-                // Clone the captured scope stack so we can move it into `with_scope`
-                // without borrowing `closure` for the duration of the call.
-                //
-                // Note: We use with_scope (scope-swapping) rather than with_captured_scope
-                // because closures need to be able to mutate variables in parent scopes.
-                // The captured_memory field is used for GC tracing but not for execution,
-                // since using captured memory would prevent mutable capture semantics.
-                let scope_stack = closure.scope_stack.clone();
+                let stale_captures = closure.captures.clone();
+                let capture_positions = closure.capture_positions.clone();
 
-                self.with_scope(state, scope_stack, |this, state| {
-                    this.eval_fn_call(state, &closure_decl, callee, args)
-                        .unwrap_value()
-                })
+                // Fresh-read from original memory positions so the closure sees
+                // mutations made by the enclosing scope since it was created.
+                let captures: scope::CaptureVec = stale_captures
+                    .iter()
+                    .zip(capture_positions.iter())
+                    .map(|(&stale, pos)| match pos {
+                        Some(scope::CapturePosition::Local(p)) => state
+                            .execution
+                            .scope_stack
+                            .read_memory_at(*p)
+                            .unwrap_or(stale),
+                        Some(scope::CapturePosition::Global(p)) => state
+                            .execution
+                            .scope_stack
+                            .read_global_at(*p)
+                            .unwrap_or(stale),
+                        None => stale,
+                    })
+                    .collect();
+
+                let (result, modified_captures) =
+                    self.with_closure_scope(state, &captures, &capture_positions, |this, state| {
+                        this.eval_fn_call(state, &closure_decl, callee, args)
+                            .unwrap_value()
+                    });
+
+                // Write back to original memory positions so the enclosing
+                // scope sees mutations made by the closure (two-way sync).
+                for (pos, &value) in capture_positions.iter().zip(modified_captures.iter()) {
+                    match pos {
+                        Some(scope::CapturePosition::Local(p)) => {
+                            state.execution.scope_stack.write_memory_at(*p, value);
+                        }
+                        Some(scope::CapturePosition::Global(p)) => {
+                            state.execution.scope_stack.write_global_at(*p, value);
+                        }
+                        None => {}
+                    }
+                }
+
+                // Update closure's captures for the next invocation.
+                if let Some(TlangObjectKind::Closure(closure)) = state.get_object_by_id_mut(id) {
+                    closure.captures = modified_captures;
+                }
+
+                result
             }
             TlangObjectKind::Fn(hir_id) => {
                 let fn_decl = state

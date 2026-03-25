@@ -176,22 +176,59 @@ impl VMState {
         )))
     }
 
+    /// # Panics
+    ///
+    /// Panics if a captured variable's scope slot cannot be read from the
+    /// current scope stack (indicates a bug in `FreeVariableAnalysis`).
     pub fn new_closure(&mut self, decl: &hir::FunctionDeclaration) -> TlangValue {
         self.program
             .closures
             .entry(decl.hir_id)
             .or_insert_with(|| decl.clone().into());
 
-        // Capture all memory values from the current scope stack for GC tracing.
-        let global_memory_len = self.execution.scope_stack.global_memory_len();
-        let captured_memory = self.execution.scope_stack.capture_all_memory();
+        // Snapshot captured values and record their original memory positions.
+        //
+        // CaptureInfo entries record which creation-time scope slots the
+        // closure references.  read_capture translates from the normalized
+        // (scope_index, slot_index) to the current scope stack layout.
+        //
+        // capture_positions stores the absolute memory position for each
+        // capture so that mutations can be written back to the original scope
+        // (two-way sync between closure and enclosing scope).
+        let capture_info = decl.body.scope.captures().to_vec();
+        let (captures, capture_positions): (
+            crate::value::object::CaptureVec,
+            crate::value::object::CapturePositionVec,
+        ) = capture_info
+            .iter()
+            .map(|c| {
+                let value = self
+                    .execution
+                    .scope_stack
+                    .read_capture(c.scope_index, c.slot_index)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "new_closure: cannot read capture for closure {:?} \
+                             (scope_index={}, slot_index={}, scopes_len={})",
+                            decl.hir_id,
+                            c.scope_index,
+                            c.slot_index,
+                            self.execution.scope_stack.scopes.len()
+                        )
+                    });
+                let position = self
+                    .execution
+                    .scope_stack
+                    .capture_position(c.scope_index, c.slot_index);
+                (value, position)
+            })
+            .unzip();
 
         self.new_object(TlangObjectKind::Closure(TlangClosure {
             id: decl.hir_id,
-            scope_stack: self.execution.scope_stack.scopes.clone(),
+            captures,
+            capture_positions,
             captured_cells: std::collections::HashMap::new(),
-            captured_memory,
-            global_memory_len,
         }))
     }
 

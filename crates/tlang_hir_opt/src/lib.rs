@@ -1,6 +1,7 @@
 #![feature(box_patterns)]
 pub mod anf_transform;
 pub mod constant_folding;
+pub mod free_variable_analysis;
 pub mod hir_opt;
 pub mod slot_allocation;
 pub mod symbol_resolution;
@@ -8,6 +9,7 @@ pub mod tail_call_validation;
 
 pub use anf_transform::{AnfFilter, AnfTransform, FullAnfFilter};
 pub use constant_folding::{ConstantFolder, ConstantFolding, ConstantPropagator};
+pub use free_variable_analysis::FreeVariableAnalysis;
 pub use hir_opt::{HirOptError, HirOptimizer, HirPass};
 pub use slot_allocation::{ScopeDataUpdater, SlotAllocation, SlotAllocator};
 pub use symbol_resolution::SymbolResolution;

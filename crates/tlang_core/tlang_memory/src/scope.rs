@@ -2,6 +2,16 @@ use tlang_hir::{self as hir, HirScope, ScopeIndex};
 
 use crate::resolver::Resolver;
 use crate::value::TlangValue;
+pub use crate::value::object::{CapturePositionVec, CaptureVec};
+
+/// Identifies where a captured variable lives in the memory model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CapturePosition {
+    /// Value lives in the local `memory` buffer at this absolute index.
+    Local(usize),
+    /// Value lives in `global_memory` at this index.
+    Global(usize),
+}
 
 #[derive(Debug, Clone)]
 pub struct ScopeStack {
@@ -10,6 +20,15 @@ pub struct ScopeStack {
     global_memory: Vec<TlangValue>,
     // Central continuous memory for local scopes only (non-global)
     memory: Vec<TlangValue>,
+    // Origin positions for the single active capture scope.  When a capture
+    // scope is pushed with `push_capture_scope`, this stores the original
+    // memory positions so that `capture_position` can resolve through the
+    // capture scope to the ultimate original binding.
+    //
+    // At most one capture scope is active at a time (the closure invocation
+    // model pushes `[root, capture_scope]`), so a flat `Option` replaces the
+    // previous `HashMap<usize, …>` to avoid hashing overhead per call.
+    capture_origin: Option<(usize, CapturePositionVec)>,
 }
 
 impl ScopeStack {
@@ -23,6 +42,7 @@ impl ScopeStack {
             scopes,
             global_memory: Vec::with_capacity(100), // Separate global memory
             memory: Vec::with_capacity(1000), // Start with reasonable capacity for local scopes
+            capture_origin: None,
         }
     }
 
@@ -102,6 +122,142 @@ impl ScopeStack {
         }
 
         log::debug!("Popping scope");
+    }
+
+    /// Push a capture scope containing the given captured values.
+    ///
+    /// This creates a scope backed by `captures` at the end of the memory
+    /// vector.  At closure invocation the capture scope sits between the
+    /// root scope and the function-body scope so that remapped
+    /// `Slot::Upvar(cap_idx, block_depth + 1)` indices resolve correctly.
+    ///
+    /// `origins` optionally stores the original memory positions for each
+    /// capture slot.  When a nested closure calls `capture_position` and
+    /// the target scope is this capture scope, the origin position is
+    /// returned instead of the local buffer position.  This ensures that
+    /// mutations in nested closures are written back to the ultimate
+    /// original binding, not to the temporary capture-scope buffer.
+    ///
+    /// Returns the start position in the memory vector so the caller can
+    /// read back modified values after the closure body executes.
+    pub fn push_capture_scope(
+        &mut self,
+        captures: &[TlangValue],
+        origins: Option<&[Option<CapturePosition>]>,
+    ) -> usize {
+        let start = self.memory.len();
+        self.memory.extend_from_slice(captures);
+        let new_scope = Scope::new(start, captures.len());
+
+        log::debug!(
+            "Pushing capture scope with {} values at start={}",
+            captures.len(),
+            start
+        );
+
+        self.scopes.push(new_scope);
+
+        // Record origin positions if provided so `capture_position` can
+        // resolve through this capture scope.
+        if let Some(origins) = origins {
+            let scope_idx = self.scopes.len() - 1;
+            self.capture_origin = Some((scope_idx, origins.into()));
+        }
+
+        start
+    }
+
+    /// Read capture values back from the memory buffer after a closure body
+    /// has executed.  Used to persist mutations to captured variables across
+    /// invocations.
+    pub fn read_back_captures(
+        &self,
+        start: usize,
+        count: usize,
+    ) -> crate::value::object::CaptureVec {
+        self.memory[start..start + count].into()
+    }
+
+    /// Truncate the local memory buffer to the given length.
+    ///
+    /// Used by `with_closure_scope` to reclaim the temporary capture-scope
+    /// (and any nested-body) memory after modified captures have been read
+    /// back.  Without truncation every closure invocation would permanently
+    /// grow the memory buffer.
+    pub fn truncate_memory(&mut self, len: usize) {
+        self.memory.truncate(len);
+    }
+
+    /// Take capture origin metadata, leaving the field empty.
+    ///
+    /// Used by `with_closure_scope` to save origin before replacing the
+    /// scope stack, so it can be restored afterwards.
+    pub fn take_capture_origin(&mut self) -> Option<(usize, CapturePositionVec)> {
+        self.capture_origin.take()
+    }
+
+    /// Restore previously saved capture origin metadata.
+    pub fn restore_capture_origin(&mut self, origin: Option<(usize, CapturePositionVec)>) {
+        self.capture_origin = origin;
+    }
+
+    /// Return the position (local or global memory) for a captured variable.
+    ///
+    /// If the resolved scope is a capture scope (has an entry in
+    /// `capture_origin`), this returns the *original* position stored there
+    /// instead of the capture-scope buffer position.  This ensures that
+    /// nested closures write mutations back to the ultimate original binding.
+    ///
+    /// Returns `None` only if scope_index is 0 (no capture) or the origin
+    /// position is `None`.
+    pub fn capture_position(
+        &self,
+        scope_index: ScopeIndex,
+        slot_index: usize,
+    ) -> Option<CapturePosition> {
+        if scope_index == 0 {
+            return None;
+        }
+        let abs_scope = self.scope_index(scope_index - 1);
+
+        // If this scope is the capture scope, resolve through to the original
+        // position so that write-back targets the ultimate binding.
+        if let Some((origin_scope, ref origins)) = self.capture_origin
+            && abs_scope == origin_scope
+        {
+            return origins.get(slot_index).copied().flatten();
+        }
+
+        if abs_scope == 0 {
+            Some(CapturePosition::Global(slot_index))
+        } else {
+            let scope = &self.scopes[abs_scope];
+            Some(CapturePosition::Local(scope.start() + slot_index))
+        }
+    }
+
+    /// Read a value at an absolute position in the local memory buffer.
+    pub fn read_memory_at(&self, pos: usize) -> Option<TlangValue> {
+        self.memory.get(pos).copied()
+    }
+
+    /// Write a value at an absolute position in the local memory buffer.
+    pub fn write_memory_at(&mut self, pos: usize, value: TlangValue) {
+        if pos < self.memory.len() {
+            self.memory[pos] = value;
+        }
+    }
+
+    /// Read a value at an index in global memory.
+    pub fn read_global_at(&self, index: usize) -> Option<TlangValue> {
+        self.global_memory.get(index).copied()
+    }
+
+    /// Write a value at an index in global memory.
+    pub fn write_global_at(&mut self, index: usize, value: TlangValue) {
+        if index < self.global_memory.len() {
+            self.global_memory[index] = value;
+        }
     }
 
     /// # Panics
@@ -201,6 +357,21 @@ impl ScopeStack {
             let absolute_index = start + index;
             self.memory.get(absolute_index).copied()
         }
+    }
+
+    /// Read the value for a captured variable at closure creation time.
+    ///
+    /// `scope_index` is the *normalized* `CaptureInfo.scope_index` value from
+    /// `FreeVariableAnalysis` (where 1 = the immediately enclosing scope at the
+    /// point where the closure is being created, 2 = one scope further up, etc.).
+    ///
+    /// This translates to `get_upvar(scope_index - 1, slot_index)`:
+    ///   abs = scopes.len() - scope_index
+    pub fn read_capture(&self, scope_index: ScopeIndex, slot_index: usize) -> Option<TlangValue> {
+        if scope_index == 0 {
+            return None;
+        }
+        self.get_upvar(scope_index - 1, slot_index)
     }
 
     fn set_upvar(&mut self, relative_scope_index: u16, index: usize, value: TlangValue) {
@@ -308,65 +479,6 @@ impl ScopeStack {
 
             &self.memory[start..end]
         }
-    }
-
-    /// Capture all memory values from all scopes for closure creation.
-    /// Returns the global memory followed by all local scope memory.
-    ///
-    /// NOTE: This currently captures all memory, not just the variables actually
-    /// used by the closure. A future optimization could implement selective capture
-    /// based on actual variable usage analysis from the HIR.
-    ///
-    /// The captured memory is stored in the closure for future GC preparation.
-    /// Currently, closure execution still uses the original scope-swapping approach
-    /// with shared memory for correct mutable capture semantics.
-    pub fn capture_all_memory(&self) -> Vec<TlangValue> {
-        let mut captured = Vec::with_capacity(self.global_memory.len() + self.memory.len());
-        // Copy global memory first
-        captured.extend_from_slice(&self.global_memory);
-        // Then copy all local scope memory
-        captured.extend_from_slice(&self.memory);
-        captured
-    }
-
-    /// Get the current length of global memory.
-    /// Used to know where global memory ends and local memory begins in captured memory.
-    pub fn global_memory_len(&self) -> usize {
-        self.global_memory.len()
-    }
-
-    /// Replace all memory with captured values from a closure.
-    /// Returns the previous memory state (global_memory, memory) for restoration.
-    ///
-    /// The captured_memory is split at global_memory_len into:
-    /// - global_memory: captured_memory[..global_memory_len]
-    /// - memory: captured_memory[global_memory_len..]
-    ///
-    /// Note: This method is prepared for future GC work but is not currently used
-    /// because closure execution requires mutable capture semantics (scope-swapping).
-    #[allow(dead_code)]
-    pub fn replace_memory_with_captured(
-        &mut self,
-        captured_memory: &[TlangValue],
-        global_memory_len: usize,
-    ) -> (Vec<TlangValue>, Vec<TlangValue>) {
-        let (global_part, local_part) =
-            captured_memory.split_at(global_memory_len.min(captured_memory.len()));
-
-        let old_global = std::mem::replace(&mut self.global_memory, global_part.to_vec());
-        let old_local = std::mem::replace(&mut self.memory, local_part.to_vec());
-
-        (old_global, old_local)
-    }
-
-    /// Restore memory to previous state after closure execution.
-    ///
-    /// Note: This method is prepared for future GC work but is not currently used
-    /// because closure execution requires mutable capture semantics (scope-swapping).
-    #[allow(dead_code)]
-    pub fn restore_memory(&mut self, global_memory: Vec<TlangValue>, memory: Vec<TlangValue>) {
-        self.global_memory = global_memory;
-        self.memory = memory;
     }
 }
 
