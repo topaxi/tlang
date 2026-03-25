@@ -204,8 +204,12 @@ impl VMState {
                     .read_capture(c.scope_index, c.slot_index)
                     .unwrap_or_else(|| {
                         panic!(
-                            "missing capture for scope_index={} slot_index={}",
-                            c.scope_index, c.slot_index
+                            "new_closure: cannot read capture for closure {:?} \
+                             (scope_index={}, slot_index={}, scopes_len={})",
+                            decl.hir_id,
+                            c.scope_index,
+                            c.slot_index,
+                            self.execution.scope_stack.scopes.len()
                         )
                     });
                 let position = self

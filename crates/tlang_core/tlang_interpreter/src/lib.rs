@@ -162,7 +162,7 @@ impl Interpreter {
         let root_scope = vec![*state.execution.scope_stack.root_scope()];
         let old_scopes = std::mem::replace(&mut state.execution.scope_stack.scopes, root_scope);
         // Also save and clear capture_origins since we're replacing scopes.
-        let old_origins = std::mem::take(&mut state.execution.scope_stack.capture_origins);
+        let old_origins = state.execution.scope_stack.take_capture_origins();
         let cap_start = state
             .execution
             .scope_stack
@@ -175,7 +175,10 @@ impl Interpreter {
             .scope_stack
             .read_back_captures(cap_start, captures.len());
         state.execution.scope_stack.scopes = old_scopes;
-        state.execution.scope_stack.capture_origins = old_origins;
+        state
+            .execution
+            .scope_stack
+            .restore_capture_origins(old_origins);
         (result, modified)
     }
 

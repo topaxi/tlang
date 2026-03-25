@@ -26,7 +26,7 @@ pub struct ScopeStack {
     //
     // Key: index in `self.scopes` that is a capture scope.
     // Value: Vec of per-slot CapturePosition (same length as the scope's size).
-    pub capture_origins: std::collections::HashMap<usize, Vec<Option<CapturePosition>>>,
+    capture_origins: std::collections::HashMap<usize, Vec<Option<CapturePosition>>>,
 }
 
 impl ScopeStack {
@@ -170,6 +170,24 @@ impl ScopeStack {
     /// invocations.
     pub fn read_back_captures(&self, start: usize, count: usize) -> Vec<TlangValue> {
         self.memory[start..start + count].to_vec()
+    }
+
+    /// Take all capture origin metadata, leaving the map empty.
+    ///
+    /// Used by `with_closure_scope` to save origins before replacing the
+    /// scope stack, so they can be restored afterwards.
+    pub fn take_capture_origins(
+        &mut self,
+    ) -> std::collections::HashMap<usize, Vec<Option<CapturePosition>>> {
+        std::mem::take(&mut self.capture_origins)
+    }
+
+    /// Restore previously saved capture origin metadata.
+    pub fn restore_capture_origins(
+        &mut self,
+        origins: std::collections::HashMap<usize, Vec<Option<CapturePosition>>>,
+    ) {
+        self.capture_origins = origins;
     }
 
     /// Return the position (local or global memory) for a captured variable.
