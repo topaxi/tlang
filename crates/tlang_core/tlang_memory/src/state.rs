@@ -182,25 +182,27 @@ impl VMState {
             .entry(decl.hir_id)
             .or_insert_with(|| decl.clone().into());
 
-        // Snapshot values from the scopes that the closure captures for GC.
+        // Snapshot captured values for GC tracing.
         //
-        // The FreeVariableAnalysis pass populates CaptureInfo on the closure's
-        // HirScopeData, recording which (scope_index, slot_index) pairs the
-        // closure body references.  However, those indices are relative to the
-        // *runtime* scope stack inside the closure body (which includes
-        // match-arm and block scopes that don't exist at creation time), so
-        // they cannot be used to selectively read values from the creation-time
-        // scope stack.
+        // FreeVariableAnalysis has populated CaptureInfo on the closure's
+        // HirScopeData with normalized (scope_index, slot_index) pairs.
+        // Normalized scope_index=1 means the immediately enclosing scope at
+        // creation time, 2 = one scope further up, etc.
         //
-        // As a pragmatic intermediate step, we snapshot all live scope memory
-        // (global + local up to the current scope's end).  This is already an
-        // improvement over the old `capture_all_memory` because `memory_iter()`
-        // only iterates up to the live end of the last scope, excluding stale
-        // values from exited scopes.
+        // read_capture(scope_index, slot_index) translates from normalized
+        // CaptureInfo coordinates to the creation-time scope stack position.
         //
-        // A future optimisation can map CaptureInfo entries to absolute
-        // creation-time positions to enable truly selective capture.
-        let captures: Vec<TlangValue> = self.execution.scope_stack.memory_iter().collect();
+        // The resulting Vec contains only the values the closure actually
+        // references, keeping closures from retaining unrelated live memory.
+        let capture_info = decl.body.scope.captures().to_vec();
+        let captures: Vec<TlangValue> = capture_info
+            .iter()
+            .filter_map(|c| {
+                self.execution
+                    .scope_stack
+                    .read_capture(c.scope_index, c.slot_index)
+            })
+            .collect();
 
         self.new_object(TlangObjectKind::Closure(TlangClosure {
             id: decl.hir_id,

@@ -203,6 +203,21 @@ impl ScopeStack {
         }
     }
 
+    /// Read the value for a captured variable at closure creation time.
+    ///
+    /// `scope_index` is the *normalized* `CaptureInfo.scope_index` value from
+    /// `FreeVariableAnalysis` (where 1 = the immediately enclosing scope at the
+    /// point where the closure is being created, 2 = one scope further up, etc.).
+    ///
+    /// This translates to `get_upvar(scope_index - 1, slot_index)`:
+    ///   abs = scopes.len() - scope_index
+    pub fn read_capture(&self, scope_index: ScopeIndex, slot_index: usize) -> Option<TlangValue> {
+        if scope_index == 0 {
+            return None;
+        }
+        self.get_upvar(scope_index - 1, slot_index)
+    }
+
     fn set_upvar(&mut self, relative_scope_index: u16, index: usize, value: TlangValue) {
         let scope_index = self.scope_index(relative_scope_index);
 

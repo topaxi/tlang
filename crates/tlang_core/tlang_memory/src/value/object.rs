@@ -13,13 +13,12 @@ pub struct TlangClosure {
     /// Used at invocation to restore the correct scope structure
     /// (scope-swapping) so nested closures and upvar resolution work.
     pub scope_stack: Vec<crate::scope::Scope>,
-    /// Snapshot of live scope memory at closure creation time.
-    /// Used for GC tracing so the collector can reach all values the closure
-    /// might reference without having to walk the full scope stack.
+    /// Selective snapshot of captured values at closure creation time, for GC tracing.
     ///
-    /// NOTE: this is currently a full memory snapshot, not a selective list
-    /// of only the captured bindings. Selective capture (driven by
-    /// `HirScopeData::captures`) is the goal of a future optimisation phase.
+    /// Contains only the values referenced by `Slot::Upvar` inside the closure
+    /// body, as determined by `FreeVariableAnalysis`. The GC traces these to
+    /// prevent values referenced by the closure from being collected after the
+    /// creating scope exits.
     pub captures: Vec<TlangValue>,
     // Captured cells for mutable upvar bindings.
     // Key: (scope_index, var_index) in the captured scope stack
