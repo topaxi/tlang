@@ -3,6 +3,15 @@ use tlang_hir::{self as hir, HirScope, ScopeIndex};
 use crate::resolver::Resolver;
 use crate::value::TlangValue;
 
+/// Identifies where a captured variable lives in the memory model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CapturePosition {
+    /// Value lives in the local `memory` buffer at this absolute index.
+    Local(usize),
+    /// Value lives in `global_memory` at this index.
+    Global(usize),
+}
+
 #[derive(Debug, Clone)]
 pub struct ScopeStack {
     pub scopes: Vec<Scope>,
@@ -102,6 +111,80 @@ impl ScopeStack {
         }
 
         log::debug!("Popping scope");
+    }
+
+    /// Push a capture scope containing the given captured values.
+    ///
+    /// This creates a scope backed by `captures` at the end of the memory
+    /// vector.  At closure invocation the capture scope sits between the
+    /// root scope and the function-body scope so that remapped
+    /// `Slot::Upvar(cap_idx, block_depth + 1)` indices resolve correctly.
+    ///
+    /// Returns the start position in the memory vector so the caller can
+    /// read back modified values after the closure body executes.
+    pub fn push_capture_scope(&mut self, captures: &[TlangValue]) -> usize {
+        let start = self.memory.len();
+        self.memory.extend_from_slice(captures);
+        let new_scope = Scope::new(start, captures.len());
+
+        log::debug!(
+            "Pushing capture scope with {} values at start={}",
+            captures.len(),
+            start
+        );
+
+        self.scopes.push(new_scope);
+        start
+    }
+
+    /// Read capture values back from the memory buffer after a closure body
+    /// has executed.  Used to persist mutations to captured variables across
+    /// invocations.
+    pub fn read_back_captures(&self, start: usize, count: usize) -> Vec<TlangValue> {
+        self.memory[start..start + count].to_vec()
+    }
+
+    /// Return the position (local or global memory) for a captured variable.
+    /// Returns `None` only if scope_index is 0 (no capture).
+    pub fn capture_position(
+        &self,
+        scope_index: ScopeIndex,
+        slot_index: usize,
+    ) -> Option<CapturePosition> {
+        if scope_index == 0 {
+            return None;
+        }
+        let abs_scope = self.scope_index(scope_index - 1);
+        if abs_scope == 0 {
+            Some(CapturePosition::Global(slot_index))
+        } else {
+            let scope = &self.scopes[abs_scope];
+            Some(CapturePosition::Local(scope.start() + slot_index))
+        }
+    }
+
+    /// Read a value at an absolute position in the local memory buffer.
+    pub fn read_memory_at(&self, pos: usize) -> Option<TlangValue> {
+        self.memory.get(pos).copied()
+    }
+
+    /// Write a value at an absolute position in the local memory buffer.
+    pub fn write_memory_at(&mut self, pos: usize, value: TlangValue) {
+        if pos < self.memory.len() {
+            self.memory[pos] = value;
+        }
+    }
+
+    /// Read a value at an index in global memory.
+    pub fn read_global_at(&self, index: usize) -> Option<TlangValue> {
+        self.global_memory.get(index).copied()
+    }
+
+    /// Write a value at an index in global memory.
+    pub fn write_global_at(&mut self, index: usize, value: TlangValue) {
+        if index < self.global_memory.len() {
+            self.global_memory[index] = value;
+        }
     }
 
     /// # Panics

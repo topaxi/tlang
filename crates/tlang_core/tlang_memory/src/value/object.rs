@@ -2,6 +2,7 @@ use std::ops::{Index, IndexMut};
 
 use tlang_span::HirId;
 
+use crate::scope::CapturePosition;
 use crate::shape::{ShapeKey, Shaped};
 
 use super::TlangValue;
@@ -9,17 +10,23 @@ use super::TlangValue;
 #[derive(Debug)]
 pub struct TlangClosure {
     pub id: HirId,
-    /// Scope chain metadata, cloned at closure creation time.
-    /// Used at invocation to restore the correct scope structure
-    /// (scope-swapping) so nested closures and upvar resolution work.
-    pub scope_stack: Vec<crate::scope::Scope>,
-    /// Selective snapshot of captured values at closure creation time, for GC tracing.
+    /// Selective snapshot of captured values at closure creation time.
     ///
-    /// Contains only the values referenced by `Slot::Upvar` inside the closure
-    /// body, as determined by `FreeVariableAnalysis`. The GC traces these to
-    /// prevent values referenced by the closure from being collected after the
-    /// creating scope exits.
+    /// Contains the values referenced by `Slot::Upvar` inside the closure
+    /// body, as determined by `FreeVariableAnalysis`.  At invocation a
+    /// single capture scope is pushed containing these values so that
+    /// remapped `Upvar(cap_idx, block_depth + 1)` resolves correctly.
+    ///
+    /// Mutations to captures during closure execution are written back here
+    /// AND to the original memory positions (in `capture_positions`) so
+    /// that the enclosing scope sees the changes.
     pub captures: Vec<TlangValue>,
+    /// Positions in the memory model where each captured variable originally
+    /// lives.  Used for two-way sync: at invocation, fresh values are read
+    /// from these positions; after execution, modified values are written
+    /// back.  Positions remain valid because `ScopeStack::pop()` never
+    /// truncates memory.
+    pub capture_positions: Vec<Option<CapturePosition>>,
     // Captured cells for mutable upvar bindings.
     // Key: (scope_index, var_index) in the captured scope stack
     // Value: TlangObjectId of a Cell object
@@ -355,7 +362,7 @@ impl ExactSizeIterator for ReferencedValuesIter<'_> {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scope::Scope;
+
     use crate::shape::ShapeKey;
 
     #[test]
@@ -431,8 +438,8 @@ mod tests {
         ];
         let closure = TlangClosure {
             id: HirId::new(1),
-            scope_stack: vec![Scope::default()],
             captures: captured.clone(),
+            capture_positions: vec![None; captured.len()],
             captured_cells: std::collections::HashMap::new(),
         };
         let obj = TlangObjectKind::Closure(closure);
@@ -455,8 +462,8 @@ mod tests {
 
         let closure = TlangClosure {
             id: HirId::new(1),
-            scope_stack: vec![Scope::default()],
             captures: captures.clone(),
+            capture_positions: vec![None; captures.len()],
             captured_cells,
         };
         let obj = TlangObjectKind::Closure(closure);
@@ -476,8 +483,8 @@ mod tests {
         // Closure with no captured values
         let closure = TlangClosure {
             id: HirId::new(1),
-            scope_stack: vec![Scope::default()],
             captures: vec![],
+            capture_positions: vec![],
             captured_cells: std::collections::HashMap::new(),
         };
         let obj = TlangObjectKind::Closure(closure);

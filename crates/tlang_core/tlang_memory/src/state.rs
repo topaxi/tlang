@@ -182,18 +182,15 @@ impl VMState {
             .entry(decl.hir_id)
             .or_insert_with(|| decl.clone().into());
 
-        // Snapshot captured values for GC tracing.
+        // Snapshot captured values and record their original memory positions.
         //
-        // FreeVariableAnalysis has populated CaptureInfo on the closure's
-        // HirScopeData with normalized (scope_index, slot_index) pairs.
-        // Normalized scope_index=1 means the immediately enclosing scope at
-        // creation time, 2 = one scope further up, etc.
+        // CaptureInfo entries record which creation-time scope slots the
+        // closure references.  read_capture translates from the normalized
+        // (scope_index, slot_index) to the current scope stack layout.
         //
-        // read_capture(scope_index, slot_index) translates from normalized
-        // CaptureInfo coordinates to the creation-time scope stack position.
-        //
-        // The resulting Vec contains only the values the closure actually
-        // references, keeping closures from retaining unrelated live memory.
+        // capture_positions stores the absolute memory position for each
+        // capture so that mutations can be written back to the original scope
+        // (two-way sync between closure and enclosing scope).
         let capture_info = decl.body.scope.captures().to_vec();
         let captures: Vec<TlangValue> = capture_info
             .iter()
@@ -203,11 +200,19 @@ impl VMState {
                     .read_capture(c.scope_index, c.slot_index)
             })
             .collect();
+        let capture_positions: Vec<Option<crate::scope::CapturePosition>> = capture_info
+            .iter()
+            .map(|c| {
+                self.execution
+                    .scope_stack
+                    .capture_position(c.scope_index, c.slot_index)
+            })
+            .collect();
 
         self.new_object(TlangObjectKind::Closure(TlangClosure {
             id: decl.hir_id,
-            scope_stack: self.execution.scope_stack.scopes.clone(),
             captures,
+            capture_positions,
             captured_cells: std::collections::HashMap::new(),
         }))
     }

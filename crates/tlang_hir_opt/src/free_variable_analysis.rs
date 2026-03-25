@@ -1,4 +1,4 @@
-//! Free variable analysis for closures.
+//! Free variable analysis and capture remapping for closures.
 //!
 //! This pass runs after slot allocation. For each `FunctionExpression` (closure)
 //! and `FunctionDeclaration` (named nested function) in the HIR, it:
@@ -8,6 +8,11 @@
 //! 2. Lifts transitive captures: if a nested closure captures a variable from
 //!    a scope above the current closure, the current closure also captures it.
 //! 3. Stores the resulting `Vec<CaptureInfo>` on `HirScopeData::captures`.
+//! 4. Remaps `Slot::Upvar` references so they index into the flat capture
+//!    array. After remapping, `Upvar(cap_idx, block_depth + 1)` points to
+//!    a single capture scope pushed at invocation time.
+//! 5. Updates nested closures' `CaptureInfo` for transitive captures that
+//!    now go through the current closure's capture scope.
 //!
 //! ## Normalized `scope_index`
 //!
@@ -22,10 +27,16 @@
 //! normalized = raw_scope_index - block_depth_within_function
 //! ```
 //!
-//! This value is unique per captured variable and stable across reference sites,
-//! making it usable as a key for selective capture in a later phase.
+//! This value is unique per captured variable and stable across reference sites.
+//!
+//! ## Post-remapping `Slot::Upvar`
+//!
+//! After the remapping pass, `Slot::Upvar(cap_idx, raw_scope)` in a closure
+//! body means: read `captures[cap_idx]` from the capture scope, which is
+//! `raw_scope` scopes back from the current scope (where
+//! `raw_scope = block_depth + 1`).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 use tlang_hir::visit::{walk_block, walk_expr, walk_pat, walk_stmt};
 use tlang_hir::{self as hir, CaptureInfo, Visitor};
@@ -64,13 +75,26 @@ impl CaptureCollector {
 
     /// Lift transitive captures from a directly-nested function.
     ///
-    /// If the nested function has a capture with `scope_index > 1`, that
-    /// variable comes from a scope above *this* closure, so we also capture
-    /// it at `scope_index - 1` to ensure GC can trace the full chain.
+    /// If the nested function captures a variable from *beyond* the current
+    /// closure's function boundary (i.e., `scope_index > block_depth + 1`),
+    /// the current closure must also capture it.
+    ///
+    /// The nested closure's normalized scope_index includes the block depth
+    /// (`d`) between the nested fn body and the current closure's fn body.
+    /// The current closure's scope_index is:
+    ///
+    /// ```text
+    /// outer_scope = nested_scope - d - 1
+    /// ```
+    ///
+    /// where `d = self.block_depth` at the point where the nested closure
+    /// appears.
     fn lift_from(&mut self, nested: &hir::FunctionDeclaration) {
         for cap in nested.body.scope.captures() {
-            if cap.scope_index > 1 {
-                self.upvars.insert((cap.scope_index - 1, cap.slot_index));
+            if let Some(outer_scope_index) = cap.scope_index.checked_sub(self.block_depth + 1)
+                && outer_scope_index > 0
+            {
+                self.upvars.insert((outer_scope_index, cap.slot_index));
             }
         }
     }
@@ -136,6 +160,141 @@ impl<'hir> Visitor<'hir> for CaptureCollector {
 }
 
 // ---------------------------------------------------------------------------
+// CaptureRemapper
+// ---------------------------------------------------------------------------
+
+/// Rewrites `Slot::Upvar` references in a closure body so they point into
+/// a flat capture array instead of the original scope chain.
+///
+/// After running, every `Upvar(slot, scope_index)` in the body becomes
+/// `Upvar(capture_index, block_depth + 1)`, where `capture_index` is the
+/// position in the closure's `captures` Vec and `block_depth + 1` is the
+/// distance from the reference site to the single capture scope that will
+/// be pushed at invocation time.
+///
+/// Additionally, nested closures' `CaptureInfo` entries for transitive
+/// captures (variables from beyond this closure) are updated to reference
+/// the capture-scope layout.
+struct CaptureRemapper {
+    /// `(normalized_scope_index, slot_index) → capture_array_index`
+    capture_map: HashMap<(hir::ScopeIndex, hir::SlotIndex), usize>,
+    /// Block depth within the closure body (same tracking as CaptureCollector).
+    block_depth: u16,
+}
+
+impl CaptureRemapper {
+    fn new(captures: &[CaptureInfo]) -> Self {
+        let capture_map = captures
+            .iter()
+            .enumerate()
+            .map(|(i, cap)| ((cap.scope_index, cap.slot_index), i))
+            .collect();
+
+        Self {
+            capture_map,
+            block_depth: 0,
+        }
+    }
+
+    /// Remap a single `Slot::Upvar` to point into the flat capture array.
+    fn remap_upvar(
+        &self,
+        slot_index: hir::SlotIndex,
+        scope_index: hir::ScopeIndex,
+    ) -> Option<hir::Slot> {
+        let normalized = scope_index.saturating_sub(self.block_depth);
+        let cap_idx = self.capture_map.get(&(normalized, slot_index))?;
+        let new_scope = self.block_depth + 1;
+        Some(hir::Slot::Upvar(*cap_idx, new_scope))
+    }
+
+    /// Update a nested closure's `CaptureInfo` entries for transitive captures.
+    ///
+    /// Captures with `scope_index > block_depth + 1` come from beyond this
+    /// closure. After remapping, they must reference this closure's capture
+    /// scope instead of the original parent scopes.
+    fn update_nested_captures(&self, nested: &mut hir::FunctionDeclaration) {
+        let threshold = self.block_depth + 1;
+        let new_scope = self.block_depth + 2;
+
+        let mut updated: Vec<CaptureInfo> = Vec::new();
+
+        for cap in nested.body.scope.captures() {
+            if cap.scope_index > threshold {
+                // Transitive capture — find its position in our capture array.
+                let outer_normalized = cap.scope_index - threshold;
+                if let Some(&cap_idx) = self.capture_map.get(&(outer_normalized, cap.slot_index)) {
+                    updated.push(CaptureInfo {
+                        slot_index: cap_idx,
+                        scope_index: new_scope,
+                    });
+                } else {
+                    // Keep original (shouldn't happen with correct analysis).
+                    updated.push(*cap);
+                }
+            } else {
+                // Direct capture from this closure's body/blocks — unchanged.
+                updated.push(*cap);
+            }
+        }
+
+        nested.body.scope.set_captures(updated);
+    }
+}
+
+impl<'hir> Visitor<'hir> for CaptureRemapper {
+    type Context = ();
+
+    fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut ()) {
+        if let hir::StmtKind::FunctionDeclaration(nested) = &mut stmt.kind {
+            self.update_nested_captures(nested);
+            return;
+        }
+        walk_stmt(self, stmt, ctx);
+    }
+
+    fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut ()) {
+        match &mut expr.kind {
+            hir::ExprKind::FunctionExpression(nested) => {
+                self.update_nested_captures(nested);
+            }
+            hir::ExprKind::Match(discriminant, arms) => {
+                self.visit_expr(discriminant, ctx);
+                for arm in arms {
+                    let has_pat_scope = arm.hir_id != arm.block.hir_id;
+                    self.block_depth += 1;
+                    walk_pat(self, &mut arm.pat, ctx);
+                    if let Some(guard) = &mut arm.guard {
+                        self.visit_expr(guard, ctx);
+                    }
+                    if has_pat_scope {
+                        self.visit_block(&mut arm.block, ctx);
+                    } else {
+                        walk_block(self, &mut arm.block, ctx);
+                    }
+                    self.block_depth -= 1;
+                }
+            }
+            _ => walk_expr(self, expr, ctx),
+        }
+    }
+
+    fn visit_block(&mut self, block: &'hir mut hir::Block, ctx: &mut ()) {
+        self.block_depth += 1;
+        walk_block(self, block, ctx);
+        self.block_depth -= 1;
+    }
+
+    fn visit_path(&mut self, path: &'hir mut hir::Path, _ctx: &mut ()) {
+        if let hir::Slot::Upvar(slot_index, scope_index) = path.res.slot()
+            && let Some(new_slot) = self.remap_upvar(slot_index, scope_index)
+        {
+            path.res.set_slot(new_slot);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Top-level pass
 // ---------------------------------------------------------------------------
 
@@ -143,7 +302,14 @@ impl<'hir> Visitor<'hir> for CaptureCollector {
 pub struct FreeVariableAnalysis;
 
 impl FreeVariableAnalysis {
-    fn process_function_decl(decl: &mut hir::FunctionDeclaration) {
+    /// Collect captures for a function and optionally remap Upvar slots.
+    ///
+    /// `remap` should be `true` only for `FunctionExpression` (closures), which
+    /// are invoked with a capture scope at runtime. `FunctionDeclaration` (named
+    /// functions) are invoked via `with_root_scope` and must keep their original
+    /// Upvar slots — but we still compute CaptureInfo so parent closures can
+    /// lift transitive captures via `lift_from`.
+    fn process_function_decl(decl: &mut hir::FunctionDeclaration, remap: bool) {
         // Clear any stale captures from a previous run.
         decl.body.scope.set_captures(vec![]);
 
@@ -165,7 +331,14 @@ impl FreeVariableAnalysis {
             })
             .collect();
 
-        decl.body.scope.set_captures(captures);
+        decl.body.scope.set_captures(captures.clone());
+
+        if remap {
+            // Remap Upvar slots in the body to point into the flat capture array,
+            // and update nested closures' CaptureInfo for the new layout.
+            let mut remapper = CaptureRemapper::new(&captures);
+            walk_block(&mut remapper, &mut decl.body, &mut ());
+        }
     }
 }
 
@@ -177,7 +350,9 @@ impl<'hir> Visitor<'hir> for FreeVariableAnalysis {
             // Process the body first (inside-out) so nested closures/functions
             // have their captures resolved before this function is processed.
             self.visit_block(&mut decl.body, ctx);
-            Self::process_function_decl(decl);
+            // Named functions are Fn objects (with_root_scope), not closures —
+            // collect CaptureInfo for transitive lifting but do NOT remap.
+            Self::process_function_decl(decl, false);
             return;
         }
         walk_stmt(self, stmt, ctx);
@@ -189,7 +364,9 @@ impl<'hir> Visitor<'hir> for FreeVariableAnalysis {
         if matches!(expr.kind, hir::ExprKind::FunctionExpression(_)) {
             walk_expr(self, expr, ctx);
             if let hir::ExprKind::FunctionExpression(decl) = &mut expr.kind {
-                Self::process_function_decl(decl);
+                // FunctionExpression → Closure objects (with_closure_scope) —
+                // remap Upvars to index into the flat capture array.
+                Self::process_function_decl(decl, true);
             }
         } else {
             walk_expr(self, expr, ctx);
@@ -285,17 +462,17 @@ mod tests {
         // Reference is directly in the function body (block_depth = 0).
         // raw scope_index = 2, normalized = 2 - 0 = 2.
         let mut decl = fn_expr_with_upvar(3, 2);
-        FreeVariableAnalysis::process_function_decl(&mut decl);
+        FreeVariableAnalysis::process_function_decl(&mut decl, true);
 
         let captures = decl.body.scope.captures();
         assert_eq!(captures.len(), 1);
         assert_eq!(captures[0].slot_index, 3);
         assert_eq!(captures[0].scope_index, 2);
 
-        // The original Slot::Upvar in the HIR is unchanged (captures are GC-only).
+        // After remapping, Upvar(3, 2) → Upvar(cap_idx=0, block_depth+1=1).
         let body_expr = decl.body.expr.as_ref().unwrap();
         if let hir::ExprKind::Path(path) = &body_expr.kind {
-            assert_eq!(path.res.slot(), hir::Slot::Upvar(3, 2));
+            assert_eq!(path.res.slot(), hir::Slot::Upvar(0, 1));
         } else {
             panic!("expected Path expression");
         }
@@ -323,7 +500,7 @@ mod tests {
         };
 
         let mut decl = fn_decl_with_body_expr(block_expr);
-        FreeVariableAnalysis::process_function_decl(&mut decl);
+        FreeVariableAnalysis::process_function_decl(&mut decl, true);
 
         let captures = decl.body.scope.captures();
         assert_eq!(captures.len(), 1);
@@ -375,7 +552,7 @@ mod tests {
             span: Span::default(),
         };
 
-        FreeVariableAnalysis::process_function_decl(&mut decl);
+        FreeVariableAnalysis::process_function_decl(&mut decl, true);
 
         let captures = decl.body.scope.captures();
         assert_eq!(
@@ -429,7 +606,7 @@ mod tests {
             span: Span::default(),
         };
 
-        FreeVariableAnalysis::process_function_decl(&mut decl);
+        FreeVariableAnalysis::process_function_decl(&mut decl, true);
         assert!(
             decl.body.scope.captures().is_empty(),
             "stale captures should be cleared when there are no upvars"
@@ -476,7 +653,7 @@ mod tests {
             span: Span::default(),
         };
 
-        FreeVariableAnalysis::process_function_decl(&mut decl);
+        FreeVariableAnalysis::process_function_decl(&mut decl, true);
         assert!(decl.body.scope.captures().is_empty());
     }
 
