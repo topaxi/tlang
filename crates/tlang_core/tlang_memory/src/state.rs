@@ -182,11 +182,7 @@ impl VMState {
             .entry(decl.hir_id)
             .or_insert_with(|| decl.clone().into());
 
-        // Resolve only the explicitly-captured free variables.
-        // Each CaptureInfo carries the original (slot_index, scope_index)
-        // from the closure's perspective.  At creation time the closure's own
-        // scope has not been pushed yet, so the runtime scope distance is
-        // `scope_index - 1`.
+        // Resolve only the explicitly-captured free variables for GC tracing.
         let captures: Vec<TlangValue> = decl
             .body
             .scope
@@ -203,6 +199,7 @@ impl VMState {
 
         self.new_object(TlangObjectKind::Closure(TlangClosure {
             id: decl.hir_id,
+            scope_stack: self.execution.scope_stack.scopes.clone(),
             captures,
             captured_cells: std::collections::HashMap::new(),
         }))

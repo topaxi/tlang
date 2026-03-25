@@ -144,37 +144,6 @@ impl Interpreter {
         result
     }
 
-    /// Execute `f` with a capture scope pushed onto the current scope stack.
-    ///
-    /// The capture scope contains the closure's captured values and sits one
-    /// level above the function scope that `eval_fn_call` will push, so that
-    /// `Slot::Upvar(capture_index, 1)` resolves correctly.
-    ///
-    /// Returns `(result, updated_captures)`: the updated captures reflect any
-    /// mutations the closure body made to the captured bindings, so the caller
-    /// can write them back to the closure object for mutable-capture semantics.
-    #[inline(always)]
-    fn with_capture_scope<F, R>(
-        &self,
-        state: &mut VMState,
-        captures: &[TlangValue],
-        f: F,
-    ) -> (R, Vec<TlangValue>)
-    where
-        F: FnOnce(&Interpreter, &mut VMState) -> R,
-    {
-        // Keep only the root (global) scope, then push the capture scope.
-        let root_scope = vec![*state.execution.scope_stack.root_scope()];
-        let old_scopes = std::mem::replace(&mut state.execution.scope_stack.scopes, root_scope);
-        state.execution.scope_stack.push_capture_scope(captures);
-        let result = f(self, state);
-        // Read back possibly-mutated capture values before popping.
-        let updated = state.execution.scope_stack.read_capture_scope(captures.len());
-        state.execution.scope_stack.pop(); // pop capture scope
-        state.execution.scope_stack.scopes = old_scopes;
-        (result, updated)
-    }
-
     pub fn eval(&self, state: &mut VMState, input: &hir::Module) -> TlangValue {
         self.eval_block_inner(state, &input.block).unwrap_value()
     }
@@ -1049,24 +1018,12 @@ impl Interpreter {
         match state.get_object_by_id(id).unwrap() {
             TlangObjectKind::Closure(closure) => {
                 let closure_decl = state.get_closure_decl(closure.id).unwrap();
-                // Clone the captured values so we can move them without
-                // borrowing `closure` for the duration of the call.
-                let captures = closure.captures.clone();
+                let scope_stack = closure.scope_stack.clone();
 
-                let (result, updated_captures) =
-                    self.with_capture_scope(state, &captures, |this, state| {
-                        this.eval_fn_call(state, &closure_decl, callee, args)
-                            .unwrap_value()
-                    });
-
-                // Write back mutated captures for mutable-capture semantics.
-                if let Some(TlangObjectKind::Closure(closure)) =
-                    state.get_object_by_id_mut(id)
-                {
-                    closure.captures = updated_captures;
-                }
-
-                result
+                self.with_scope(state, scope_stack, |this, state| {
+                    this.eval_fn_call(state, &closure_decl, callee, args)
+                        .unwrap_value()
+                })
             }
             TlangObjectKind::Fn(hir_id) => {
                 let fn_decl = state
