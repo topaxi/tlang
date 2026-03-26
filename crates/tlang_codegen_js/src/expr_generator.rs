@@ -6,6 +6,7 @@ use tlang_ast::token::Literal;
 use tlang_hir as hir;
 
 use crate::binary_operator_generator::{map_binary_op, map_unary_op};
+use crate::builtins;
 use crate::generator::InnerCodegen;
 use crate::js;
 
@@ -71,45 +72,118 @@ impl<'a> InnerCodegen<'a> {
     }
 
     fn generate_path_expression(&mut self, path: &hir::Path) -> Expression<'a> {
-        // If we have a full identifier which resolves in the current scope, use it directly.
-        if let Some(identifier) = self.current_scope().resolve_variable(&path.to_string()) {
-            return self.ident_expr(&js::safe_js_variable_name(&identifier));
-        }
-
         let first_segment = path.segments.first().unwrap();
         let first_name = first_segment.ident.as_str();
 
-        let mut result = if self.is_protocol(first_name) {
-            self.ident_expr(&CodegenJS::protocol_js_name(first_name))
-        } else if let Some(identifier) = self.current_scope().resolve_variable(first_name) {
-            // First segment resolves individually (e.g. `Option` → `Option`).
-            self.ident_expr(&js::safe_js_variable_name(&identifier))
-        } else if !path.res.is_unresolved() {
-            // The semantic analyser resolved this reference (e.g. a cross-module
-            // import or a semantic-builtin hint) even though the codegen scope
-            // does not have a local entry yet.  Emit the JS-safe first segment
-            // name as-is so the bundled output remains correct.
-            self.ident_expr(&js::safe_js_variable_name(first_name))
-        } else {
-            // Truly unresolved: the semantic analyser never found this binding.
-            // This is a compiler bug — emit an error and a safe fallback.
-            self.generate_identifier(&first_segment.ident)
-        };
-
-        for segment in &path.segments[1..] {
-            let prop = js::safe_js_variable_name(segment.ident.as_str());
-            result = self.static_member_expr(result, &prop);
+        // 1. Single-segment: HirId-based resolution (user-defined bindings)
+        if path.segments.len() == 1
+            && let Some(hir_id) = path.res.hir_id()
+            && let Some(js_name) = self.name_map.resolve(hir_id)
+        {
+            return self.ident_expr(js_name);
         }
 
-        result
+        // 2. Multi-segment: resolve first segment, then member-chain the rest.
+        //    E.g. `Vector::new` → `Vector.$new`, `Option::Some` → `Option.Some`
+        if path.segments.len() > 1 {
+            let path_str = path.to_string();
+
+            // 2a. Full path builtin (e.g. "math::pi" → "Math.PI")
+            if let Some(js_name) = builtins::lookup(&path_str) {
+                return self.ident_expr(js_name);
+            }
+
+            // 2b. Protocol check
+            if self.is_protocol(first_name) {
+                let mut result = self.ident_expr(&CodegenJS::protocol_js_name(first_name));
+                for segment in &path.segments[1..] {
+                    let prop = js::safe_js_variable_name(segment.ident.as_str());
+                    result = self.static_member_expr(result, &prop);
+                }
+                return result;
+            }
+
+            // 2c. First-segment builtin with member chain (e.g. "math" → "Math")
+            if let Some(first_js) = builtins::lookup(first_name) {
+                let mut result = self.ident_expr(first_js);
+                for segment in &path.segments[1..] {
+                    let prop = js::safe_js_variable_name(segment.ident.as_str());
+                    result = self.static_member_expr(result, &prop);
+                }
+                return result;
+            }
+
+            // 2d. Resolve first segment via NameMap, then member-chain
+            let first_js = if path.res.hir_id().is_some() {
+                // The HIR resolution for a multi-segment path like `Vector::new`
+                // points at the function declaration.  But the JS call site needs
+                // the member-access form `Vector.$new`, not the flat `Vector__new`.
+                // So resolve the first segment individually.
+                self.name_map
+                    .resolve_by_name(first_name)
+                    .map(|s| s.to_string())
+                    .or_else(|| {
+                        // If first segment not in NameMap by name, it might be a
+                        // type/struct that was registered under its own HirId.
+                        // Fall back to safe JS name of the source name.
+                        Some(js::safe_js_variable_name(first_name))
+                    })
+            } else if !path.res.is_unresolved() {
+                Some(js::safe_js_variable_name(first_name))
+            } else {
+                self.name_map
+                    .resolve_by_name(first_name)
+                    .map(|s| s.to_string())
+                    .or_else(|| Some(js::safe_js_variable_name(first_name)))
+            };
+
+            if let Some(first_js) = first_js {
+                let mut result = self.ident_expr(&first_js);
+                for segment in &path.segments[1..] {
+                    let prop = js::safe_js_variable_name(segment.ident.as_str());
+                    result = self.static_member_expr(result, &prop);
+                }
+                return result;
+            }
+        }
+
+        // 3. Single-segment fallbacks
+
+        let path_str = path.to_string();
+
+        // 3a. Builtin lookup
+        if let Some(js_name) = builtins::lookup(&path_str) {
+            return self.ident_expr(js_name);
+        }
+
+        // 3b. Protocol check
+        if self.is_protocol(first_name) {
+            return self.ident_expr(&CodegenJS::protocol_js_name(first_name));
+        }
+
+        // 3c. Resolved by semantic analysis but not in NameMap
+        if !path.res.is_unresolved() {
+            return self.ident_expr(&js::safe_js_variable_name(first_name));
+        }
+
+        // 3d. Name-based fallback for paths where semantic analysis didn't
+        //     resolve the reference but the name was registered in the NameMap
+        //     (e.g. `self` in protocol default method bodies).
+        if let Some(js_name) = self.name_map.resolve_by_name(first_name) {
+            return self.ident_expr(js_name);
+        }
+
+        // 4. Truly unresolved — emit error + fallback
+        self.generate_identifier(&first_segment.ident)
     }
 
     fn generate_identifier(&mut self, name: &Ident) -> Expression<'a> {
         let name_string = name.as_str();
-        match self.current_scope().resolve_variable(name_string) {
-            Some(identifier) => self.ident_expr(&js::safe_js_variable_name(&identifier)),
-            None => self.unresolved_identifier_expr(name_string, name.span),
+        // Last-resort builtin check (should rarely be reached)
+        if let Some(js_name) = builtins::lookup(name_string) {
+            return self.ident_expr(js_name);
         }
+        self.unresolved_identifier_expr(name_string, name.span)
     }
 
     fn generate_assignment(&mut self, lhs: &hir::Expr, rhs: &hir::Expr) -> Expression<'a> {
@@ -121,12 +195,16 @@ impl<'a> InnerCodegen<'a> {
     fn generate_assignment_target(&mut self, expr: &hir::Expr) -> AssignmentTarget<'a> {
         match &expr.kind {
             hir::ExprKind::Path(path) => {
-                let name = if let Some(resolved) =
-                    self.current_scope().resolve_variable(&path.to_string())
-                {
-                    js::safe_js_variable_name(&resolved)
+                let first_name = path.first_ident().as_str();
+                let name = if let Some(hir_id) = path.res.hir_id() {
+                    self.name_map
+                        .resolve(hir_id)
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| js::safe_js_variable_name(first_name))
                 } else {
-                    js::safe_js_variable_name(path.first_ident().as_str())
+                    builtins::lookup(&path.to_string())
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| js::safe_js_variable_name(first_name))
                 };
 
                 if path.segments.len() == 1 {
@@ -346,7 +424,7 @@ impl<'a> InnerCodegen<'a> {
             placeholders.push("_".to_string());
         } else {
             for _ in 0..wildcard_count {
-                let tmp = self.current_scope().declare_unique_variable("_");
+                let tmp = self.name_map.alloc_unique("_");
                 placeholders.push(tmp);
             }
         }
@@ -417,18 +495,12 @@ impl<'a> InnerCodegen<'a> {
     }
 
     /// Generate block statements, propagating local variables to the parent scope.
+    /// With HirId-keyed NameMap, bindings are flat — no explicit propagation needed.
     pub fn generate_block_stmts_propagate_scope(
         &mut self,
         block: &hir::Block,
     ) -> Vec<Statement<'a>> {
-        self.push_scope();
-        let result = self.generate_block_stmts(block);
-        let locals = self.current_scope().local_variables().clone();
-        self.pop_scope();
-        for (name, js_name) in locals {
-            self.current_scope().declare_variable_alias(&name, &js_name);
-        }
-        result
+        self.generate_block_stmts(block)
     }
 
     /// Generate a loop expression as statements.

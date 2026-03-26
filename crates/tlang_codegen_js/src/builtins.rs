@@ -70,3 +70,11 @@ pub static JS_BUILTINS: &[JsBuiltin] = &[
         Some(DefKind::Function(2)),
     ),
 ];
+
+/// Look up a tlang name in the JS builtins registry.
+pub fn lookup(tlang_name: &str) -> Option<&'static str> {
+    JS_BUILTINS
+        .iter()
+        .find(|b| b.tlang_name == tlang_name)
+        .map(|b| b.js_name)
+}

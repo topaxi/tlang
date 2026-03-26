@@ -11,7 +11,7 @@ use oxc_span::SPAN;
 
 use crate::builtins::JS_BUILTINS;
 use crate::error::CodegenError;
-use crate::scope::Scope;
+use crate::name_map::NameMap;
 use oxc_estree::{ESTree, PrettyJSSerializer};
 use tlang_defs::DefKind;
 use tlang_hir as hir;
@@ -476,7 +476,7 @@ fn strip_module_declarations(source: &str) -> String {
 
 pub(crate) struct InnerCodegen<'a> {
     pub ast: AstBuilder<'a>,
-    pub scopes: Scope,
+    pub name_map: NameMap,
     pub function_context_stack: Vec<FunctionContext>,
     pub protocol_names: HashSet<String>,
     /// When true, suppress `export` keywords on public declarations.
@@ -502,17 +502,9 @@ pub(crate) struct InnerCodegen<'a> {
 
 impl<'a> InnerCodegen<'a> {
     pub fn new(ast: AstBuilder<'a>, protocol_names: HashSet<String>) -> Self {
-        // Keep builtins (the JS-glue map) in a dedicated *parent* scope so that
-        // `has_local_variable` on the root scope only returns true for names that
-        // were explicitly declared (or pre-registered) in the current compilation
-        // unit.  Without this separation, user-declared names that happen to
-        // collide with a builtin (e.g. `fn log()`) were silently given the
-        // builtin JS name (`console.log`) instead of a fresh local binding.
-        let builtins = Scope::default();
-        let root_scope = Scope::new(Some(Box::new(builtins)));
         Self {
             ast,
-            scopes: root_scope,
+            name_map: NameMap::new(),
             function_context_stack: Vec::new(),
             protocol_names,
             bundle_mode: false,
@@ -577,17 +569,11 @@ impl<'a> InnerCodegen<'a> {
     // -- Scope helpers -------------------------------------------------------
 
     pub fn push_scope(&mut self) {
-        self.scopes = Scope::new(Some(Box::new(self.scopes.clone())));
+        self.name_map.push_scope();
     }
 
     pub fn pop_scope(&mut self) {
-        if let Some(parent) = self.scopes.get_parent() {
-            self.scopes = parent.clone();
-        }
-    }
-
-    pub fn current_scope(&mut self) -> &mut Scope {
-        &mut self.scopes
+        self.name_map.pop_scope();
     }
 
     // -- Function context helpers --------------------------------------------
@@ -612,7 +598,7 @@ impl<'a> InnerCodegen<'a> {
                 .iter()
                 .map(|param| {
                     if param.name.is_wildcard() {
-                        self.scopes.declare_tmp_variable()
+                        self.name_map.alloc_tmp()
                     } else {
                         param.name.to_string()
                     }

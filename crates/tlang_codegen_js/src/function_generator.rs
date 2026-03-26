@@ -12,13 +12,13 @@ impl<'a> InnerCodegen<'a> {
         declaration: &hir::FunctionDeclaration,
     ) -> Vec<Statement<'a>> {
         let js_name = fn_identifier_to_string(&declaration.name);
-        // Use the name that was pre-registered by `pre_register_declarations` if
-        // it exists in the LOCAL scope only — not in parent scopes, to avoid
-        // accidentally picking up builtin mappings (e.g. `log` → `console.log`).
+        // Use the name pre-registered by `pre_register_declarations` if
+        // available; otherwise register a fresh local binding.
         let name_as_str = self
-            .current_scope()
-            .resolve_local_variable(&js_name)
-            .unwrap_or_else(|| self.current_scope().declare_local_variable(&js_name));
+            .name_map
+            .resolve(declaration.hir_id)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| self.name_map.register_local(declaration.hir_id, &js_name));
         let is_tail_recursive =
             is_function_body_tail_recursive_block(&name_as_str, &declaration.body);
         self.push_function_context(
@@ -85,12 +85,13 @@ impl<'a> InnerCodegen<'a> {
     ) -> Vec<Statement<'a>> {
         let is_method = matches!(declaration.name.kind, hir::ExprKind::FieldAccess(_, _));
         let js_name = fn_identifier_to_string(&declaration.name);
-        // Use the name that was pre-registered by `pre_register_declarations` if
-        // it exists in the LOCAL scope only — not in parent scopes.
+        // Use the name pre-registered by `pre_register_declarations` if
+        // available; otherwise register a fresh local binding.
         let name_as_str = self
-            .current_scope()
-            .resolve_local_variable(&js_name)
-            .unwrap_or_else(|| self.current_scope().declare_local_variable(&js_name));
+            .name_map
+            .resolve(declaration.hir_id)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| self.name_map.register_local(declaration.hir_id, &js_name));
 
         // Build the dispatcher body: if/else chain on arguments.length
         let mut if_chain: Option<Statement<'a>> = None;
@@ -263,25 +264,21 @@ impl<'a> InnerCodegen<'a> {
 
         if let Some(param) = iter.next() {
             if is_method {
-                // Self param: declare alias to `this`
-                let var_name = self
-                    .current_scope()
-                    .declare_local_variable(param.name.as_str());
-                self.current_scope()
-                    .declare_variable_alias(&var_name, "this");
+                // Self param: map directly to `this`.
+                self.name_map.register_exact(param.hir_id, "this");
                 // Skip adding to params list — `this` is implicit in JS methods
                 if let Some(param) = iter.next()
                     && !param.name.is_wildcard()
                 {
                     let var_name = self
-                        .current_scope()
-                        .declare_local_variable(param.name.as_str());
+                        .name_map
+                        .register_local(param.hir_id, param.name.as_str());
                     result.push(self.formal_param(&var_name));
                 }
             } else if !param.name.is_wildcard() {
                 let var_name = self
-                    .current_scope()
-                    .declare_local_variable(param.name.as_str());
+                    .name_map
+                    .register_local(param.hir_id, param.name.as_str());
                 result.push(self.formal_param(&var_name));
             }
         }
@@ -289,8 +286,8 @@ impl<'a> InnerCodegen<'a> {
         for param in iter {
             if !param.name.is_wildcard() {
                 let var_name = self
-                    .current_scope()
-                    .declare_local_variable(param.name.as_str());
+                    .name_map
+                    .register_local(param.hir_id, param.name.as_str());
                 result.push(self.formal_param(&var_name));
             }
         }
@@ -468,10 +465,7 @@ impl<'a> InnerCodegen<'a> {
             let params = ctx.parameter_bindings.clone();
 
             // Assign args to tmp vars first
-            let tmp_vars: Vec<String> = params
-                .iter()
-                .map(|_| self.current_scope().declare_tmp_variable())
-                .collect();
+            let tmp_vars: Vec<String> = params.iter().map(|_| self.name_map.alloc_tmp()).collect();
 
             let mut stmts = Vec::new();
 
@@ -595,17 +589,6 @@ pub(crate) fn fn_identifier_to_string(expr: &hir::Expr) -> String {
     match &expr.kind {
         hir::ExprKind::Path(path) => js::safe_js_variable_name(&path.join("__")),
         hir::ExprKind::FieldAccess(_base, field) => js::safe_js_variable_name(&field.to_string()),
-        _ => unreachable!(),
-    }
-}
-
-/// Returns the raw (pre-`safe_js_variable_name`) name for a function
-/// identifier expression.  Used during pre-registration to register aliases
-/// for arity-qualified names (e.g. `factorial/2` → `factorial$$2`).
-pub(crate) fn fn_identifier_raw_to_string(expr: &hir::Expr) -> String {
-    match &expr.kind {
-        hir::ExprKind::Path(path) => path.join("__"),
-        hir::ExprKind::FieldAccess(_base, field) => field.to_string(),
         _ => unreachable!(),
     }
 }

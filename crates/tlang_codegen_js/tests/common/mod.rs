@@ -3,6 +3,7 @@ use tlang_codegen_js::js_anf_transform::JsAnfTransform;
 use tlang_codegen_js::js_hir_opt::JsHirOptimizer;
 use tlang_defs::DefKind;
 use tlang_hir_opt::HirPass;
+use tlang_hir_opt::symbol_resolution::SymbolResolution;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 
@@ -73,8 +74,16 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
                     .optimize_hir(&mut module, &mut ctx)
                     .expect("HIR optimization failed");
             } else {
-                let mut anf = JsAnfTransform::default();
+                // Even without full optimization, SymbolResolution must run to
+                // populate path.res with HirId references — codegen relies on
+                // HirId-keyed name resolution.
                 let mut ctx = meta.into();
+                let mut sym_res = SymbolResolution::default();
+                sym_res.init_context(&mut ctx);
+                sym_res
+                    .optimize_hir(&mut module, &mut ctx)
+                    .expect("symbol resolution failed");
+                let mut anf = JsAnfTransform::default();
                 anf.optimize_hir(&mut module, &mut ctx)
                     .expect("internal compiler error: ANF transform failed to converge");
             }

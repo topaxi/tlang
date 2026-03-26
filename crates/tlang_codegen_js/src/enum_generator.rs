@@ -10,15 +10,15 @@ use crate::generator::InnerCodegen;
 
 impl<'a> InnerCodegen<'a> {
     pub fn generate_enum_declaration(&mut self, decl: &hir::EnumDeclaration) -> Statement<'a> {
-        let raw_name = decl.name.as_str();
-        // Use the pre-registered local scope name if available; otherwise declare
-        // a fresh local binding.  Using resolve_local_variable (not the full
-        // resolve_variable) prevents accidentally picking up builtin mappings from
-        // parent scopes.
+        // Use the pre-registered name if available; otherwise register locally.
         let name = self
-            .current_scope()
-            .resolve_local_variable(raw_name)
-            .unwrap_or_else(|| self.current_scope().declare_local_variable(raw_name));
+            .name_map
+            .resolve(decl.hir_id)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                self.name_map
+                    .register_local(decl.hir_id, decl.name.as_str())
+            });
 
         let mut elements = Vec::new();
 
@@ -307,8 +307,8 @@ impl<'a> InnerCodegen<'a> {
 
     fn infer_parameter_name_from_type(&mut self, ty: &hir::Ty) -> String {
         match &ty.kind {
-            hir::TyKind::Path(path) => self.current_scope().declare_variable(&path.join("_")),
-            _ => self.current_scope().declare_variable("arg"),
+            hir::TyKind::Path(path) => self.name_map.alloc_name(&path.join("_")),
+            _ => self.name_map.alloc_name("arg"),
         }
     }
 }
