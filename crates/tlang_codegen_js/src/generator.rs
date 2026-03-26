@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::LazyLock;
 
 use oxc_allocator::{Allocator, Vec as OxcVec};
 use oxc_ast::AstBuilder;
@@ -8,6 +9,7 @@ use oxc_codegen::{Codegen, CodegenOptions, IndentChar};
 use oxc_sourcemap::{SourceMap, Token};
 use oxc_span::SPAN;
 
+use crate::builtins::JS_BUILTINS;
 use crate::error::CodegenError;
 use crate::scope::Scope;
 use oxc_estree::{ESTree, PrettyJSSerializer};
@@ -181,17 +183,14 @@ impl CodegenJS {
     }
 
     pub fn get_standard_library_symbols() -> &'static [(&'static str, DefKind)] {
-        &[
+        /// Symbols that exist in the semantic layer only — no JS name mapping.
+        static SEMANTIC_ONLY_SYMBOLS: &[(&str, DefKind)] = &[
             ("Option", DefKind::Enum),
             ("Result", DefKind::Enum),
             ("Option::Some", DefKind::EnumVariant(1)),
             ("Option::None", DefKind::EnumVariant(0)),
             ("Result::Ok", DefKind::EnumVariant(1)),
             ("Result::Err", DefKind::EnumVariant(1)),
-            ("Some", DefKind::EnumVariant(1)),
-            ("None", DefKind::EnumVariant(0)),
-            ("Ok", DefKind::EnumVariant(1)),
-            ("Err", DefKind::EnumVariant(1)),
             ("Functor", DefKind::Protocol),
             ("Functor::map", DefKind::ProtocolMethod(2)),
             ("Match", DefKind::Protocol),
@@ -204,24 +203,22 @@ impl CodegenJS {
             ("Display", DefKind::Protocol),
             ("Display::to_string", DefKind::ProtocolMethod(1)),
             ("len", DefKind::Function(1)),
-            ("log", DefKind::Function(u16::MAX)),
-            ("math", DefKind::Module),
-            ("math::pi", DefKind::Variable),
-            ("math::max", DefKind::Function(u16::MAX)),
-            ("math::min", DefKind::Function(u16::MAX)),
-            ("math::floor", DefKind::Function(1)),
-            ("math::random", DefKind::Function(0)),
-            ("random_int", DefKind::Function(1)),
-            ("math::sqrt", DefKind::Function(1)),
             ("compose", DefKind::Function(2)),
             ("re", DefKind::Function(2)),
             ("map", DefKind::Function(2)),
             ("panic", DefKind::Function(1)),
             ("string", DefKind::Module),
-            ("string::from_char_code", DefKind::Function(1)),
-            ("string::char_code_at", DefKind::Function(2)),
-            ("string::StringBuf", DefKind::Struct),
-        ]
+        ];
+
+        static SYMBOLS: LazyLock<Vec<(&'static str, DefKind)>> = LazyLock::new(|| {
+            JS_BUILTINS
+                .iter()
+                .filter_map(|b| b.def_kind.map(|dk| (b.tlang_name, dk)))
+                .chain(SEMANTIC_ONLY_SYMBOLS.iter().copied())
+                .collect()
+        });
+
+        &SYMBOLS
     }
 
     pub fn generate_code(&mut self, module: &hir::Module) -> Result<(), Vec<CodegenError>> {

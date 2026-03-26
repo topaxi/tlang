@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::builtins::JS_BUILTINS;
 use crate::js;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -138,31 +139,10 @@ impl Default for Scope {
     fn default() -> Self {
         Self {
             parent: None,
-            variables: HashMap::from_iter(vec![
-                ("Some".to_string(), "Option.Some".to_string()),
-                ("None".to_string(), "Option.None".to_string()),
-                ("Ok".to_string(), "Result.Ok".to_string()),
-                ("Err".to_string(), "Result.Err".to_string()),
-                ("log".to_string(), "console.log".to_string()),
-                ("log::log".to_string(), "console.log".to_string()),
-                ("log::group".to_string(), "console.group".to_string()),
-                ("log::groupEnd".to_string(), "console.groupEnd".to_string()),
-                ("math".to_string(), "Math".to_string()),
-                ("math::pi".to_string(), "Math.PI".to_string()),
-                ("math::min".to_string(), "Math.min".to_string()),
-                ("math::max".to_string(), "Math.max".to_string()),
-                ("math::floor".to_string(), "Math.floor".to_string()),
-                ("math::random".to_string(), "Math.random".to_string()),
-                (
-                    "string::StringBuf".to_string(),
-                    "string.StringBuf".to_string(),
-                ),
-                (
-                    "string::from_char_code".to_string(),
-                    "String.fromCharCode".to_string(),
-                ),
-                ("random_int".to_string(), "random_int".to_string()),
-            ]),
+            variables: JS_BUILTINS
+                .iter()
+                .map(|b| (b.tlang_name.to_string(), b.js_name.to_string()))
+                .collect(),
         }
     }
 }
