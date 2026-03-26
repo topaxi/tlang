@@ -131,10 +131,13 @@ impl<'a> InnerCodegen<'a> {
             } else if !path.res.is_unresolved() {
                 Some(js::safe_js_variable_name(first_name))
             } else {
+                // path.res.is_unresolved() — try name-based fallback.
+                // If that also fails, return None so the single-segment error
+                // path (step 4) records a CodegenError instead of silently
+                // emitting a raw JS name.
                 self.name_map
                     .resolve_by_name(first_name)
                     .map(|s| s.to_string())
-                    .or_else(|| Some(js::safe_js_variable_name(first_name)))
             };
 
             if let Some(first_js) = first_js {
@@ -195,12 +198,22 @@ impl<'a> InnerCodegen<'a> {
     fn generate_assignment_target(&mut self, expr: &hir::Expr) -> AssignmentTarget<'a> {
         match &expr.kind {
             hir::ExprKind::Path(path) => {
-                let first_name = path.first_ident().as_str();
+                let first_ident = path.first_ident();
+                let first_name = first_ident.as_str();
                 let name = if let Some(hir_id) = path.res.hir_id() {
-                    self.name_map
-                        .resolve(hir_id)
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| js::safe_js_variable_name(first_name))
+                    if let Some(resolved) = self.name_map.resolve(hir_id) {
+                        resolved.to_string()
+                    } else {
+                        // HirId is present but the identifier was never registered
+                        // in the NameMap — record an error and fall back to a safe
+                        // placeholder so codegen can continue collecting errors.
+                        self.errors
+                            .push(crate::error::CodegenError::unresolved_identifier(
+                                first_name,
+                                first_ident.span,
+                            ));
+                        js::safe_js_variable_name(first_name)
+                    }
                 } else {
                     builtins::lookup(&path.to_string())
                         .map(|s| s.to_string())

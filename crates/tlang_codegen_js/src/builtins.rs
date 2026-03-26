@@ -29,8 +29,8 @@ impl JsBuiltin {
 /// Authoritative registry mapping tlang stdlib names to their JavaScript
 /// equivalents.  This is the single source of truth for:
 ///
-/// - `Scope::default()` — populates the codegen scope so identifiers resolve
-///   to their JS counterparts.
+/// - `builtins::lookup()` — backs the codegen name resolution so identifiers
+///   resolve to their JS counterparts during code generation.
 /// - `CodegenJS::get_standard_library_symbols()` — provides `DefKind` metadata
 ///   to the semantic analyser for all entries where `def_kind` is `Some`.
 ///

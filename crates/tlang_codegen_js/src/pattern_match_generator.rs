@@ -206,17 +206,29 @@ impl<'a> InnerCodegen<'a> {
 
         let mut seen_names: HashMap<String, String> = HashMap::new();
         for (hir_id, name) in &all_idents {
-            // Check if this name matches the match subject or fixed list idents
-            // — these already have a JS binding so we alias instead of declaring.
-            let is_subject_alias = match fixed_list_idents {
-                Some(idents) => idents.contains(name),
-                None => name == match_value_name,
+            // Check if this pattern identifier aliases the match subject (or one
+            // of the fixed-list elements).  We compare by *JS binding name* so
+            // that renamed identifiers (e.g. `x` declared as `x$0` due to
+            // shadowing) are detected correctly.  `resolve_by_name` looks up the
+            // last registered JS name for a given source name.
+            //
+            // We own the JS name here so that the immutable borrow of `name_map`
+            // is released before the mutable `register_exact` call below.
+            let subject_js_name: Option<String> =
+                self.name_map.resolve_by_name(name).map(|s| s.to_string());
+            let is_subject_alias = match (&subject_js_name, fixed_list_idents) {
+                (Some(js), Some(idents)) => idents.iter().any(|s| s == js),
+                (Some(js), None) => js == match_value_name,
+                _ => false,
             };
 
             if is_subject_alias {
-                // Alias this pattern HirId to the existing JS name for the
-                // match subject / fixed list ident (already declared).
-                self.name_map.register_exact(*hir_id, name);
+                // Alias this pattern HirId to the actual JS binding of the match
+                // subject / fixed-list element (not the raw source name, which may
+                // differ after dedup-suffixing).
+                // `subject_js_name` is guaranteed `Some` when `is_subject_alias`.
+                let js_binding = subject_js_name.unwrap();
+                self.name_map.register_exact(*hir_id, &js_binding);
             } else if let Some(js_name) = seen_names.get(name) {
                 // Same source name in a different arm — share the JS binding.
                 self.name_map.register_exact(*hir_id, js_name);
@@ -377,13 +389,27 @@ impl<'a> InnerCodegen<'a> {
         let parent_expr = self.access_path_to_expr(access);
         let tag_access = self.static_member_expr(parent_expr, "tag");
         let resolved = if let Some(hir_id) = path.res.hir_id() {
-            self.name_map
-                .resolve(hir_id)
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| path.join("."))
+            if let Some(s) = self.name_map.resolve(hir_id) {
+                s.to_string()
+            } else if let Some(s) = builtins::lookup(&path.to_string()) {
+                // Semantically resolved but not in NameMap — this is a known
+                // builtin looked up by its registered name.
+                s.to_string()
+            } else {
+                // Semantically resolved (has HirId) but not in NameMap and not
+                // an explicitly registered builtin.  For qualified enum variant
+                // paths like `Option::None`, `path.join(".")` produces the
+                // structurally-correct JS form (`Option.None`).
+                path.join(".")
+            }
         } else {
             builtins::lookup(&path.to_string())
+                .or_else(|| builtins::lookup(path.last_ident().as_str()))
                 .map(|s| s.to_string())
+                // Semantic analysis already validates enum variant paths, so
+                // any path that reaches here is structurally valid.  The
+                // `path.join(".")` structural translation is correct for all
+                // user-defined and builtin enum variants.
                 .unwrap_or_else(|| path.join("."))
         };
 
