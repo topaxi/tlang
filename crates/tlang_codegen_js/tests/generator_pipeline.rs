@@ -2,7 +2,6 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_defs::DefKind;
 
-
 mod common;
 
 #[test]

@@ -124,6 +124,14 @@ impl Scope {
 
         None
     }
+
+    /// Resolve `name` only within **this** scope's local variables; does not
+    /// traverse parent scopes.  Used by declaration generators to look up names
+    /// that were pre-registered in the current scope without accidentally picking
+    /// up builtin mappings from the global/parent scope.
+    pub(crate) fn resolve_local_variable(&self, name: &str) -> Option<String> {
+        self.variables.get(name).cloned()
+    }
 }
 
 impl Default for Scope {

@@ -11,11 +11,13 @@ use crate::generator::InnerCodegen;
 impl<'a> InnerCodegen<'a> {
     pub fn generate_enum_declaration(&mut self, decl: &hir::EnumDeclaration) -> Statement<'a> {
         let raw_name = decl.name.as_str();
-        // Use the pre-registered scope name if available; otherwise declare it
-        // now (handles enums declared outside of generate_stmts flow).
+        // Use the pre-registered local scope name if available; otherwise declare
+        // a fresh local binding.  Using resolve_local_variable (not the full
+        // resolve_variable) prevents accidentally picking up builtin mappings from
+        // parent scopes.
         let name = self
             .current_scope()
-            .resolve_variable(raw_name)
+            .resolve_local_variable(raw_name)
             .unwrap_or_else(|| self.current_scope().declare_local_variable(raw_name));
 
         let mut elements = Vec::new();

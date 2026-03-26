@@ -226,10 +226,12 @@ impl<'a> InnerCodegen<'a> {
             .map(|(key, value)| {
                 let shorthand = key.path() == value.path();
                 // Dict keys are always property names, not variable references.
-                // For path keys (simple identifiers like `a` in `{ a: 1 }`),
-                // emit the raw name directly without scope lookup.
+                // For single-segment path keys (simple identifiers like `a` in
+                // `{ a: 1 }`), emit the raw name directly without scope lookup.
+                // Multi-segment paths (e.g. `Foo::bar`) are evaluated as computed
+                // keys to preserve their semantics.
                 let key_expr = match &key.kind {
-                    hir::ExprKind::Path(path) => {
+                    hir::ExprKind::Path(path) if path.segments.len() == 1 => {
                         self.ident_expr(&js::safe_js_variable_name(path.first_ident().as_str()))
                     }
                     _ => self.generate_expr(key),

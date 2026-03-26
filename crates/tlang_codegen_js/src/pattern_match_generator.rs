@@ -63,6 +63,7 @@ impl<'a> InnerCodegen<'a> {
                 if !exprs.is_empty() && exprs.iter().all(|e| e.is_path()) =>
             {
                 let mut idents = Vec::with_capacity(exprs.len());
+                let mut all_resolved = true;
                 for e in exprs {
                     let ident = e.path().unwrap().first_ident();
                     let name = ident.as_str();
@@ -70,29 +71,26 @@ impl<'a> InnerCodegen<'a> {
                     match self.current_scope().resolve_variable(name) {
                         Some(resolved) => idents.push(resolved),
                         None => {
+                            // Record the error but bail out of the fixed-list
+                            // optimisation — proceeding with an unresolved name
+                            // would emit invalid JS that references an undeclared
+                            // variable.  Fall through to the tmp-variable path.
                             self.errors
                                 .push(crate::error::CodegenError::unresolved_identifier(
                                     name, span,
                                 ));
-                            idents.push(name.to_string());
+                            all_resolved = false;
+                            break;
                         }
                     }
                 }
-                (String::new(), Some(idents))
+                if all_resolved {
+                    (String::new(), Some(idents))
+                } else {
+                    self.bind_match_subject_as_tmp(expr, &mut declarators)
+                }
             }
-            _ => {
-                let tmp = self.current_scope().declare_tmp_variable();
-                let val = self.generate_expr(expr);
-                declarators.push(self.ast.variable_declarator(
-                    SPAN,
-                    VariableDeclarationKind::Let,
-                    self.binding_pattern_ident(&tmp),
-                    NONE,
-                    Some(val),
-                    false,
-                ));
-                (tmp, None)
-            }
+            _ => self.bind_match_subject_as_tmp(expr, &mut declarators),
         };
 
         // 2 & 3. Declare let guard variable and all pattern identifiers
@@ -124,6 +122,29 @@ impl<'a> InnerCodegen<'a> {
         }
 
         result
+    }
+
+    /// Bind the match subject `expr` to a fresh tmp variable and append a
+    /// `let $tmp = <expr>` declarator.  Returns `(tmp_name, None)`.
+    ///
+    /// This is the fall-back path used when the match subject cannot be
+    /// represented as a fixed list of in-scope identifiers.
+    fn bind_match_subject_as_tmp(
+        &mut self,
+        expr: &hir::Expr,
+        declarators: &mut Vec<VariableDeclarator<'a>>,
+    ) -> (String, Option<Vec<String>>) {
+        let tmp = self.current_scope().declare_tmp_variable();
+        let val = self.generate_expr(expr);
+        declarators.push(self.ast.variable_declarator(
+            SPAN,
+            VariableDeclarationKind::Let,
+            self.binding_pattern_ident(&tmp),
+            NONE,
+            Some(val),
+            false,
+        ));
+        (tmp, None)
     }
 
     fn declare_match_variables(

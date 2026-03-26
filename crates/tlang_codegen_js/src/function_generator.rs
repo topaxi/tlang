@@ -13,11 +13,11 @@ impl<'a> InnerCodegen<'a> {
     ) -> Vec<Statement<'a>> {
         let js_name = fn_identifier_to_string(&declaration.name);
         // Use the name that was pre-registered by `pre_register_declarations` if
-        // available; otherwise fall back to declaring it now (e.g. nested functions
-        // inside blocks that were not visited by the pre-registration pass).
+        // it exists in the LOCAL scope only — not in parent scopes, to avoid
+        // accidentally picking up builtin mappings (e.g. `log` → `console.log`).
         let name_as_str = self
             .current_scope()
-            .resolve_variable(&js_name)
+            .resolve_local_variable(&js_name)
             .unwrap_or_else(|| self.current_scope().declare_local_variable(&js_name));
         let is_tail_recursive =
             is_function_body_tail_recursive_block(&name_as_str, &declaration.body);
@@ -85,9 +85,11 @@ impl<'a> InnerCodegen<'a> {
     ) -> Vec<Statement<'a>> {
         let is_method = matches!(declaration.name.kind, hir::ExprKind::FieldAccess(_, _));
         let js_name = fn_identifier_to_string(&declaration.name);
+        // Use the name that was pre-registered by `pre_register_declarations` if
+        // it exists in the LOCAL scope only — not in parent scopes.
         let name_as_str = self
             .current_scope()
-            .resolve_variable(&js_name)
+            .resolve_local_variable(&js_name)
             .unwrap_or_else(|| self.current_scope().declare_local_variable(&js_name));
 
         // Build the dispatcher body: if/else chain on arguments.length

@@ -369,3 +369,23 @@ fn test_function_name_with_reserved_keyword() {
     "};
     assert_eq!(output, expected_output);
 }
+
+// ── Builtin-name shadowing ─────────────────────────────────────────────────
+
+#[test]
+fn test_function_named_like_builtin_generates_valid_declaration() {
+    // A user-defined function whose tlang name collides with a JS-glue builtin
+    // (e.g. `log` → `console.log`) must generate a valid JS function declaration
+    // name, not the mapped JS name.
+    let output = compile!("fn log(x) { x }");
+    // The JS output must NOT contain `function console.log` (invalid JS).
+    assert!(
+        !output.contains("function console.log"),
+        "should not generate 'function console.log'"
+    );
+    // It must contain a valid function declaration for `log`.
+    assert!(
+        output.contains("function log"),
+        "should generate a function named `log` or `log$0`"
+    );
+}

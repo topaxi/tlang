@@ -505,9 +505,17 @@ pub(crate) struct InnerCodegen<'a> {
 
 impl<'a> InnerCodegen<'a> {
     pub fn new(ast: AstBuilder<'a>, protocol_names: HashSet<String>) -> Self {
+        // Keep builtins (the JS-glue map) in a dedicated *parent* scope so that
+        // `has_local_variable` on the root scope only returns true for names that
+        // were explicitly declared (or pre-registered) in the current compilation
+        // unit.  Without this separation, user-declared names that happen to
+        // collide with a builtin (e.g. `fn log()`) were silently given the
+        // builtin JS name (`console.log`) instead of a fresh local binding.
+        let builtins = Scope::default();
+        let root_scope = Scope::new(Some(Box::new(builtins)));
         Self {
             ast,
-            scopes: Scope::default(),
+            scopes: root_scope,
             function_context_stack: Vec::new(),
             protocol_names,
             bundle_mode: false,
