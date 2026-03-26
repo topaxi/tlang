@@ -2,7 +2,6 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::node::Ident;
 use tlang_codegen_js::generator::{CodegenJS, shift_source_map_lines};
-use tlang_defs::DefKind;
 use tlang_hir as hir;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
@@ -346,8 +345,14 @@ fn test_list_literal() {
 
 #[test]
 fn test_partial_application() {
-    let output = compile!("let add1 = add(_, 1);", vec![("add", DefKind::Function(2))]);
+    let output = compile!(indoc! {"
+        fn add(x, y) { x + y }
+        let add1 = add(_, 1);
+    "});
     let expected_output = indoc! {"
+        function add(x, y) {
+            return x + y;
+        }
         let add1 = (_) => add(_, 1);
     "};
     assert_eq!(output, expected_output);
@@ -355,11 +360,14 @@ fn test_partial_application() {
 
 #[test]
 fn test_partial_application_with_multiple_arguments() {
-    let output = compile!(
-        "let add1 = add(_, 1, _);",
-        vec![("add", DefKind::Function(3))]
-    );
+    let output = compile!(indoc! {"
+        fn add(x, y, z) { x + y + z }
+        let add1 = add(_, 1, _);
+    "});
     let expected_output = indoc! {"
+        function add(x, y, z) {
+            return x + y + z;
+        }
         let add1 = (_0, _1) => add(_0, 1, _1);
     "};
     assert_eq!(output, expected_output);

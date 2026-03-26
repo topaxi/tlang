@@ -2,8 +2,6 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_defs::DefKind;
 
-use crate::common::CodegenOptions;
-
 mod common;
 
 #[test]
@@ -77,24 +75,22 @@ fn test_pipeline_operator_to_function_call_with_wildcards() {
 
 #[test]
 fn test_pipeline_operator_long_chaining() {
-    let mut options = CodegenOptions::default();
-    options
-        .builtin_symbols
-        .push(("filter", DefKind::Function(2)));
-    options
-        .builtin_symbols
-        .push(("foldl", DefKind::Function(3)));
-    let output = compile!(
-        indoc! {"
-            [1,2,3]
-            |> map(fn (x) { x ** 2 })
-            |> filter(fn (x) { x % 2 == 0 })
-            |> foldl(fn (acc, x) { acc + x }, 0)
-            |> log();
-        "},
-        options
-    );
+    let output = compile!(indoc! {"
+        fn filter(xs, pred) { [] }
+        fn foldl(xs, f, acc) { acc }
+        [1,2,3]
+        |> map(fn (x) { x ** 2 })
+        |> filter(fn (x) { x % 2 == 0 })
+        |> foldl(fn (acc, x) { acc + x }, 0)
+        |> log();
+    "});
     let expected_output = indoc! {"
+        function filter(xs, pred) {
+            return [];
+        }
+        function foldl(xs, f, acc) {
+            return acc;
+        }
         console.log(foldl(filter(map([
             1,
             2,

@@ -20,6 +20,18 @@ impl CodegenError {
             span,
         }
     }
+
+    /// Construct an error for an identifier that could not be resolved in the
+    /// current scope.  This indicates a compiler bug: the identifier was not
+    /// registered before it was referenced.
+    pub fn unresolved_identifier(name: &str, span: Span) -> Self {
+        Self {
+            message: format!(
+                "unresolved identifier `{name}`: not found in the codegen scope (compiler bug)"
+            ),
+            span,
+        }
+    }
 }
 
 impl fmt::Display for CodegenError {

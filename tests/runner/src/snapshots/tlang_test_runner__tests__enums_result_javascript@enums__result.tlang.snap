@@ -16,7 +16,7 @@ true
 
 Error: Called unwrap on Err
     at panic ([stdin]:2:9)
-    at Result.unwrap$0 [as unwrap] ([stdin]:136:16)
+    at Result.unwrap ([stdin]:136:16)
     at [stdin]:377:17
     at runScriptInThisContext (node:internal/vm:218:10)
     at node:internal/process/execution:456:12

@@ -1,10 +1,12 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use oxc_ast::NONE;
 use oxc_ast::ast::*;
 use oxc_span::SPAN;
 use tlang_hir as hir;
+use tlang_hir::HirId;
 
+use crate::builtins;
 use crate::generator::InnerCodegen;
 use tlang_ast::node::Ident;
 
@@ -53,39 +55,54 @@ impl<'a> InnerCodegen<'a> {
         // 1. Determine match value binding and fixed list context
         let (match_value_name, fixed_list_idents) = match &expr.kind {
             hir::ExprKind::Path(path) => {
-                let name = self
-                    .current_scope()
-                    .resolve_variable(path.first_ident().as_str())
-                    .expect("Match expression identifier not found");
+                let name = if let Some(hir_id) = path.res.hir_id() {
+                    self.name_map
+                        .resolve(hir_id)
+                        .expect("Match expression identifier not found")
+                        .to_string()
+                } else {
+                    builtins::lookup(path.first_ident().as_str())
+                        .expect("Match expression identifier not found")
+                        .to_string()
+                };
                 (name, None)
             }
             hir::ExprKind::List(exprs)
                 if !exprs.is_empty() && exprs.iter().all(|e| e.is_path()) =>
             {
-                let idents: Vec<String> = exprs
-                    .iter()
-                    .map(|e| {
-                        let ident = e.path().unwrap().first_ident();
-                        self.current_scope()
-                            .resolve_variable(ident.as_str())
-                            .unwrap_or_else(|| ident.to_string())
-                    })
-                    .collect();
-                (String::new(), Some(idents))
+                let mut idents = Vec::with_capacity(exprs.len());
+                let mut all_resolved = true;
+                for e in exprs {
+                    let path = e.path().unwrap();
+                    let ident = path.first_ident();
+                    let name = ident.as_str();
+                    let span = ident.span;
+
+                    let resolved = if let Some(hir_id) = path.res.hir_id() {
+                        self.name_map.resolve(hir_id).map(|s| s.to_string())
+                    } else {
+                        builtins::lookup(name).map(|s| s.to_string())
+                    };
+
+                    match resolved {
+                        Some(r) => idents.push(r),
+                        None => {
+                            self.errors
+                                .push(crate::error::CodegenError::unresolved_identifier(
+                                    name, span,
+                                ));
+                            all_resolved = false;
+                            break;
+                        }
+                    }
+                }
+                if all_resolved {
+                    (String::new(), Some(idents))
+                } else {
+                    self.bind_match_subject_as_tmp(expr, &mut declarators)
+                }
             }
-            _ => {
-                let tmp = self.current_scope().declare_tmp_variable();
-                let val = self.generate_expr(expr);
-                declarators.push(self.ast.variable_declarator(
-                    SPAN,
-                    VariableDeclarationKind::Let,
-                    self.binding_pattern_ident(&tmp),
-                    NONE,
-                    Some(val),
-                    false,
-                ));
-                (tmp, None)
-            }
+            _ => self.bind_match_subject_as_tmp(expr, &mut declarators),
         };
 
         // 2 & 3. Declare let guard variable and all pattern identifiers
@@ -119,6 +136,29 @@ impl<'a> InnerCodegen<'a> {
         result
     }
 
+    /// Bind the match subject `expr` to a fresh tmp variable and append a
+    /// `let $tmp = <expr>` declarator.  Returns `(tmp_name, None)`.
+    ///
+    /// This is the fall-back path used when the match subject cannot be
+    /// represented as a fixed list of in-scope identifiers.
+    fn bind_match_subject_as_tmp(
+        &mut self,
+        expr: &hir::Expr,
+        declarators: &mut Vec<VariableDeclarator<'a>>,
+    ) -> (String, Option<Vec<String>>) {
+        let tmp = self.name_map.alloc_tmp();
+        let val = self.generate_expr(expr);
+        declarators.push(self.ast.variable_declarator(
+            SPAN,
+            VariableDeclarationKind::Let,
+            self.binding_pattern_ident(&tmp),
+            NONE,
+            Some(val),
+            false,
+        ));
+        (tmp, None)
+    }
+
     fn declare_match_variables(
         &mut self,
         arms: &[hir::MatchArm],
@@ -127,7 +167,7 @@ impl<'a> InnerCodegen<'a> {
         declarators: &mut Vec<VariableDeclarator<'a>>,
     ) -> String {
         let let_guard_var = if arms.iter().any(|arm| arm.has_let_guard()) {
-            let var = self.current_scope().declare_tmp_variable();
+            let var = self.name_map.alloc_tmp();
             declarators.push(self.ast.variable_declarator(
                 SPAN,
                 VariableDeclarationKind::Let,
@@ -141,8 +181,17 @@ impl<'a> InnerCodegen<'a> {
             String::new()
         };
 
-        let mut seen = HashSet::new();
-        let filtered: Vec<String> = arms
+        // Collect all pattern identifiers across arms.  Multiple arms may
+        // introduce the same source name (e.g. `Some(a)` and `Ok(a)`) — they
+        // should share one `let` declaration.  We deduplicate by name, mapping
+        // all HirIds with the same name to the same JS binding.
+        //
+        // Identifiers whose name matches the match subject (or one of the
+        // fixed list idents) don't need a separate `let` declaration in JS —
+        // they reuse the existing binding.  But we still need to register their
+        // HirId in the NameMap so that HirId-based resolution works in
+        // `generate_pat_condition`.
+        let all_idents: Vec<(HirId, String)> = arms
             .iter()
             .flat_map(|arm| {
                 let mut idents = get_pat_identifiers(&arm.pat);
@@ -153,23 +202,48 @@ impl<'a> InnerCodegen<'a> {
                 }
                 idents
             })
-            .filter(|ident| match fixed_list_idents {
-                Some(idents) => !idents.contains(ident),
-                None => ident != match_value_name,
-            })
-            .filter(|ident| seen.insert(ident.clone()))
             .collect();
 
-        for ident in &filtered {
-            let binding = self.current_scope().declare_variable(ident);
-            declarators.push(self.ast.variable_declarator(
-                SPAN,
-                VariableDeclarationKind::Let,
-                self.binding_pattern_ident(&binding),
-                NONE,
-                None,
-                false,
-            ));
+        let mut seen_names: HashMap<String, String> = HashMap::new();
+        for (hir_id, name) in &all_idents {
+            // Check if this pattern identifier aliases the match subject (or one
+            // of the fixed-list elements).  We compare by *JS binding name* so
+            // that renamed identifiers (e.g. `x` declared as `x$0` due to
+            // shadowing) are detected correctly.  `resolve_by_name` looks up the
+            // last registered JS name for a given source name.
+            //
+            // We own the JS name here so that the immutable borrow of `name_map`
+            // is released before the mutable `register_exact` call below.
+            let subject_js_name: Option<String> =
+                self.name_map.resolve_by_name(name).map(|s| s.to_string());
+            let is_subject_alias = match (&subject_js_name, fixed_list_idents) {
+                (Some(js), Some(idents)) => idents.iter().any(|s| s == js),
+                (Some(js), None) => js == match_value_name,
+                _ => false,
+            };
+
+            if is_subject_alias {
+                // Alias this pattern HirId to the actual JS binding of the match
+                // subject / fixed-list element (not the raw source name, which may
+                // differ after dedup-suffixing).
+                // `subject_js_name` is guaranteed `Some` when `is_subject_alias`.
+                let js_binding = subject_js_name.unwrap();
+                self.name_map.register_exact(*hir_id, &js_binding);
+            } else if let Some(js_name) = seen_names.get(name) {
+                // Same source name in a different arm — share the JS binding.
+                self.name_map.register_exact(*hir_id, js_name);
+            } else {
+                let js_name = self.name_map.register(*hir_id, name);
+                seen_names.insert(name.clone(), js_name.clone());
+                declarators.push(self.ast.variable_declarator(
+                    SPAN,
+                    VariableDeclarationKind::Let,
+                    self.binding_pattern_ident(&js_name),
+                    NONE,
+                    None,
+                    false,
+                ));
+            }
         }
 
         let_guard_var
@@ -251,15 +325,15 @@ impl<'a> InnerCodegen<'a> {
         fixed_list_idents: &Option<Vec<String>>,
     ) -> Option<Expression<'a>> {
         match &pat.kind {
-            hir::PatKind::Identifier(_, ident_pattern) => {
+            hir::PatKind::Identifier(hir_id, _ident_pattern) => {
                 let binding_name = self
-                    .current_scope()
-                    .resolve_variable(ident_pattern.as_str())
-                    .unwrap();
+                    .name_map
+                    .resolve(*hir_id)
+                    .expect("Pattern identifier not registered in NameMap");
 
                 let parent_expr = self.access_path_to_expr(access);
                 let assign =
-                    self.assign_expr(self.assignment_target_ident(&binding_name), parent_expr);
+                    self.assign_expr(self.assignment_target_ident(binding_name), parent_expr);
                 // (binding = parent, true)
                 Some(self.ast.expression_sequence(
                     SPAN,
@@ -314,10 +388,30 @@ impl<'a> InnerCodegen<'a> {
     ) -> Option<Expression<'a>> {
         let parent_expr = self.access_path_to_expr(access);
         let tag_access = self.static_member_expr(parent_expr, "tag");
-        let resolved = self
-            .current_scope()
-            .resolve_variable(&path.to_string())
-            .unwrap_or_else(|| path.join("."));
+        let resolved = if let Some(hir_id) = path.res.hir_id() {
+            if let Some(s) = self.name_map.resolve(hir_id) {
+                s.to_string()
+            } else if let Some(s) = builtins::lookup(&path.to_string()) {
+                // Semantically resolved but not in NameMap — this is a known
+                // builtin looked up by its registered name.
+                s.to_string()
+            } else {
+                // Semantically resolved (has HirId) but not in NameMap and not
+                // an explicitly registered builtin.  For qualified enum variant
+                // paths like `Option::None`, `path.join(".")` produces the
+                // structurally-correct JS form (`Option.None`).
+                path.join(".")
+            }
+        } else {
+            builtins::lookup(&path.to_string())
+                .or_else(|| builtins::lookup(path.last_ident().as_str()))
+                .map(|s| s.to_string())
+                // Semantic analysis already validates enum variant paths, so
+                // any path that reaches here is structurally valid.  The
+                // `path.join(".")` structural translation is correct for all
+                // user-defined and builtin enum variants.
+                .unwrap_or_else(|| path.join("."))
+        };
 
         let mut cond = self.ast.expression_binary(
             SPAN,
@@ -440,9 +534,9 @@ impl<'a> InnerCodegen<'a> {
     }
 }
 
-fn get_pat_identifiers(pattern: &hir::Pat) -> Vec<String> {
+fn get_pat_identifiers(pattern: &hir::Pat) -> Vec<(HirId, String)> {
     match &pattern.kind {
-        hir::PatKind::Identifier(_, ident) => vec![ident.to_string()],
+        hir::PatKind::Identifier(hir_id, ident) => vec![(*hir_id, ident.to_string())],
         hir::PatKind::Enum(_, patterns) => patterns
             .iter()
             .flat_map(|(_, p)| get_pat_identifiers(p))

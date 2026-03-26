@@ -4,12 +4,18 @@ use oxc_span::SPAN;
 use tlang_ast::node::Visibility;
 use tlang_ast::token::Literal;
 use tlang_hir as hir;
+use tlang_hir::HirId;
 
 use crate::error::CodegenError;
 use crate::generator::{CodegenJS, InnerCodegen};
 
 impl<'a> InnerCodegen<'a> {
     pub fn generate_stmts(&mut self, stmts: &[hir::Stmt]) -> Vec<Statement<'a>> {
+        // Pre-register all declaration names before generating bodies so that
+        // forward references (e.g. a function calling a sibling multi-clause
+        // variant) resolve correctly.
+        self.pre_register_declarations(stmts);
+
         let mut result = Vec::new();
         for stmt in stmts {
             let comments = &stmt.leading_comments;
@@ -22,6 +28,57 @@ impl<'a> InnerCodegen<'a> {
             result.extend(generated);
         }
         result
+    }
+
+    /// Scan `stmts` and register the JS name of every function, struct, and
+    /// enum declaration into the `NameMap` **before** any body is generated.
+    /// This ensures that forward references (e.g. a function body that calls a
+    /// sibling arity-variant declared later in the same block) can be resolved.
+    fn pre_register_declarations(&mut self, stmts: &[hir::Stmt]) {
+        use crate::function_generator::fn_identifier_to_string;
+
+        for stmt in stmts {
+            match &stmt.kind {
+                hir::StmtKind::FunctionDeclaration(decl) if !self.name_map.has(decl.hir_id) => {
+                    let js_name = fn_identifier_to_string(&decl.name);
+                    let is_method = matches!(decl.name.kind, hir::ExprKind::FieldAccess(_, _));
+                    if is_method {
+                        // Method names are assigned to prototypes (e.g.
+                        // Result.prototype.unwrap) so they don't share
+                        // namespace with other types' methods — skip dedup.
+                        self.name_map.register_exact(decl.hir_id, &js_name);
+                    } else {
+                        self.name_map.register_local(decl.hir_id, &js_name);
+                    }
+                }
+                hir::StmtKind::DynFunctionDeclaration(decl) if !self.name_map.has(decl.hir_id) => {
+                    let js_name = fn_identifier_to_string(&decl.name);
+                    let is_method = matches!(decl.name.kind, hir::ExprKind::FieldAccess(_, _));
+                    if is_method {
+                        self.name_map.register_exact(decl.hir_id, &js_name);
+                    } else {
+                        self.name_map.register_local(decl.hir_id, &js_name);
+                    }
+                }
+                hir::StmtKind::StructDeclaration(decl) if !self.name_map.has(decl.hir_id) => {
+                    self.name_map
+                        .register_local(decl.hir_id, decl.name.as_str());
+                }
+                hir::StmtKind::EnumDeclaration(decl) if !self.name_map.has(decl.hir_id) => {
+                    let enum_js = self
+                        .name_map
+                        .register_local(decl.hir_id, decl.name.as_str());
+                    // Register each variant's HirId with its full JS access
+                    // path (e.g. "Option.Some") so that pattern-match tag
+                    // comparisons can resolve variant HirIds directly.
+                    for variant in &decl.variants {
+                        let variant_js = format!("{enum_js}.{}", variant.name.as_str());
+                        self.name_map.register_exact(variant.hir_id, &variant_js);
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
     pub fn generate_stmt(&mut self, statement: &hir::Stmt) -> Vec<Statement<'a>> {
@@ -135,8 +192,8 @@ impl<'a> InnerCodegen<'a> {
         value: &hir::Expr,
     ) -> Vec<Statement<'a>> {
         match &pattern.kind {
-            hir::PatKind::Identifier(_, ident) => {
-                self.generate_variable_declaration_identifier(ident.as_str(), value)
+            hir::PatKind::Identifier(hir_id, ident) => {
+                self.generate_variable_declaration_identifier(*hir_id, ident.as_str(), value)
             }
             hir::PatKind::List(patterns) => {
                 self.generate_variable_declaration_list_pattern(patterns, value)
@@ -153,25 +210,21 @@ impl<'a> InnerCodegen<'a> {
 
     fn generate_variable_declaration_identifier(
         &mut self,
+        hir_id: HirId,
         name: &str,
         value: &hir::Expr,
     ) -> Vec<Statement<'a>> {
-        let shadowed_name = self.current_scope().resolve_variable(name);
-        let var_name = self.current_scope().declare_variable(name);
-
-        if let Some(ref shadowed_name) = shadowed_name {
-            self.current_scope()
-                .declare_variable_alias(name, shadowed_name);
-        }
-
-        // `let foo;` for None-initialised ANF temporaries
+        // Generate init expression FIRST — references in the initialiser
+        // resolve to the OLD binding via their own HirIds, so no temporary
+        // alias / shadow dance is needed.
         let init = if matches!(&value.kind, hir::ExprKind::Literal(l) if **l == Literal::None) {
             None
         } else {
             Some(self.generate_expr(value))
         };
 
-        self.current_scope().declare_variable_alias(name, &var_name);
+        // Now register the new binding (may shadow an outer name).
+        let var_name = self.name_map.register(hir_id, name);
 
         vec![self.let_decl(&var_name, init)]
     }
@@ -183,24 +236,16 @@ impl<'a> InnerCodegen<'a> {
     ) -> Vec<Statement<'a>> {
         let mut elements = Vec::new();
         let mut rest = None;
-        let mut bindings = Vec::new();
 
         for pattern in patterns {
             match &pattern.kind {
-                hir::PatKind::Identifier(_, ident) => {
-                    let shadowed_name = self.current_scope().resolve_variable(ident.as_str());
-                    let var_name = self.current_scope().declare_variable(ident.as_str());
-                    if let Some(ref shadowed_name) = shadowed_name {
-                        self.current_scope()
-                            .declare_variable_alias(ident.as_str(), shadowed_name);
-                    }
-                    bindings.push((ident.to_string(), var_name.clone()));
+                hir::PatKind::Identifier(hir_id, ident) => {
+                    let var_name = self.name_map.register(*hir_id, ident.as_str());
                     elements.push(Some(self.binding_pattern_ident(&var_name)));
                 }
                 hir::PatKind::Rest(inner) => {
-                    if let hir::PatKind::Identifier(_, ident) = &inner.kind {
-                        let var_name = self.current_scope().declare_variable(ident.as_str());
-                        bindings.push((ident.to_string(), var_name.clone()));
+                    if let hir::PatKind::Identifier(hir_id, ident) = &inner.kind {
+                        let var_name = self.name_map.register(*hir_id, ident.as_str());
                         rest = Some(self.binding_pattern_ident(&var_name));
                     }
                 }
@@ -218,11 +263,6 @@ impl<'a> InnerCodegen<'a> {
         }
 
         let init = self.generate_expr(value);
-
-        for (ident_name, var_name) in &bindings {
-            self.current_scope()
-                .declare_variable_alias(ident_name, var_name);
-        }
 
         vec![self.let_array_destructuring(self.ast.vec_from_iter(elements), rest, init)]
     }

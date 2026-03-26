@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::LazyLock;
 
 use oxc_allocator::{Allocator, Vec as OxcVec};
 use oxc_ast::AstBuilder;
@@ -8,8 +9,9 @@ use oxc_codegen::{Codegen, CodegenOptions, IndentChar};
 use oxc_sourcemap::{SourceMap, Token};
 use oxc_span::SPAN;
 
+use crate::builtins::JS_BUILTINS;
 use crate::error::CodegenError;
-use crate::scope::Scope;
+use crate::name_map::NameMap;
 use oxc_estree::{ESTree, PrettyJSSerializer};
 use tlang_defs::DefKind;
 use tlang_hir as hir;
@@ -181,17 +183,14 @@ impl CodegenJS {
     }
 
     pub fn get_standard_library_symbols() -> &'static [(&'static str, DefKind)] {
-        &[
+        /// Symbols that exist in the semantic layer only — no JS name mapping.
+        static SEMANTIC_ONLY_SYMBOLS: &[(&str, DefKind)] = &[
             ("Option", DefKind::Enum),
             ("Result", DefKind::Enum),
             ("Option::Some", DefKind::EnumVariant(1)),
             ("Option::None", DefKind::EnumVariant(0)),
             ("Result::Ok", DefKind::EnumVariant(1)),
             ("Result::Err", DefKind::EnumVariant(1)),
-            ("Some", DefKind::EnumVariant(1)),
-            ("None", DefKind::EnumVariant(0)),
-            ("Ok", DefKind::EnumVariant(1)),
-            ("Err", DefKind::EnumVariant(1)),
             ("Functor", DefKind::Protocol),
             ("Functor::map", DefKind::ProtocolMethod(2)),
             ("Match", DefKind::Protocol),
@@ -204,24 +203,22 @@ impl CodegenJS {
             ("Display", DefKind::Protocol),
             ("Display::to_string", DefKind::ProtocolMethod(1)),
             ("len", DefKind::Function(1)),
-            ("log", DefKind::Function(u16::MAX)),
-            ("math", DefKind::Module),
-            ("math::pi", DefKind::Variable),
-            ("math::max", DefKind::Function(u16::MAX)),
-            ("math::min", DefKind::Function(u16::MAX)),
-            ("math::floor", DefKind::Function(1)),
-            ("math::random", DefKind::Function(0)),
-            ("random_int", DefKind::Function(1)),
-            ("math::sqrt", DefKind::Function(1)),
             ("compose", DefKind::Function(2)),
             ("re", DefKind::Function(2)),
             ("map", DefKind::Function(2)),
             ("panic", DefKind::Function(1)),
             ("string", DefKind::Module),
-            ("string::from_char_code", DefKind::Function(1)),
-            ("string::char_code_at", DefKind::Function(2)),
-            ("string::StringBuf", DefKind::Struct),
-        ]
+        ];
+
+        static SYMBOLS: LazyLock<Vec<(&'static str, DefKind)>> = LazyLock::new(|| {
+            JS_BUILTINS
+                .iter()
+                .filter_map(|b| b.def_kind.map(|dk| (b.tlang_name, dk)))
+                .chain(SEMANTIC_ONLY_SYMBOLS.iter().copied())
+                .collect()
+        });
+
+        &SYMBOLS
     }
 
     pub fn generate_code(&mut self, module: &hir::Module) -> Result<(), Vec<CodegenError>> {
@@ -479,7 +476,7 @@ fn strip_module_declarations(source: &str) -> String {
 
 pub(crate) struct InnerCodegen<'a> {
     pub ast: AstBuilder<'a>,
-    pub scopes: Scope,
+    pub name_map: NameMap,
     pub function_context_stack: Vec<FunctionContext>,
     pub protocol_names: HashSet<String>,
     /// When true, suppress `export` keywords on public declarations.
@@ -507,7 +504,7 @@ impl<'a> InnerCodegen<'a> {
     pub fn new(ast: AstBuilder<'a>, protocol_names: HashSet<String>) -> Self {
         Self {
             ast,
-            scopes: Scope::default(),
+            name_map: NameMap::new(),
             function_context_stack: Vec::new(),
             protocol_names,
             bundle_mode: false,
@@ -529,6 +526,19 @@ impl<'a> InnerCodegen<'a> {
     /// errors before reporting.
     pub(crate) fn unsupported_expr(&mut self, feature: &str, span: TlangSpan) -> Expression<'a> {
         self.errors.push(CodegenError::unsupported(feature, span));
+        self.undefined_expr()
+    }
+
+    /// Record an unresolved-identifier error and return a fallback `undefined`
+    /// expression so that code generation can continue and collect further
+    /// errors before reporting.
+    pub(crate) fn unresolved_identifier_expr(
+        &mut self,
+        name: &str,
+        span: TlangSpan,
+    ) -> Expression<'a> {
+        self.errors
+            .push(CodegenError::unresolved_identifier(name, span));
         self.undefined_expr()
     }
 
@@ -559,17 +569,11 @@ impl<'a> InnerCodegen<'a> {
     // -- Scope helpers -------------------------------------------------------
 
     pub fn push_scope(&mut self) {
-        self.scopes = Scope::new(Some(Box::new(self.scopes.clone())));
+        self.name_map.push_scope();
     }
 
     pub fn pop_scope(&mut self) {
-        if let Some(parent) = self.scopes.get_parent() {
-            self.scopes = parent.clone();
-        }
-    }
-
-    pub fn current_scope(&mut self) -> &mut Scope {
-        &mut self.scopes
+        self.name_map.pop_scope();
     }
 
     // -- Function context helpers --------------------------------------------
@@ -594,7 +598,7 @@ impl<'a> InnerCodegen<'a> {
                 .iter()
                 .map(|param| {
                     if param.name.is_wildcard() {
-                        self.scopes.declare_tmp_variable()
+                        self.name_map.alloc_tmp()
                     } else {
                         param.name.to_string()
                     }

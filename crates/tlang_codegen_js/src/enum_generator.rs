@@ -10,6 +10,16 @@ use crate::generator::InnerCodegen;
 
 impl<'a> InnerCodegen<'a> {
     pub fn generate_enum_declaration(&mut self, decl: &hir::EnumDeclaration) -> Statement<'a> {
+        // Use the pre-registered name if available; otherwise register locally.
+        let name = self
+            .name_map
+            .resolve(decl.hir_id)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                self.name_map
+                    .register_local(decl.hir_id, decl.name.as_str())
+            });
+
         let mut elements = Vec::new();
 
         // tag = this
@@ -95,7 +105,7 @@ impl<'a> InnerCodegen<'a> {
             SPAN,
             ClassType::ClassDeclaration,
             self.ast.vec(),
-            Some(self.binding_ident(decl.name.as_str())),
+            Some(self.binding_ident(&name)),
             NONE,
             None,
             NONE,
@@ -297,8 +307,8 @@ impl<'a> InnerCodegen<'a> {
 
     fn infer_parameter_name_from_type(&mut self, ty: &hir::Ty) -> String {
         match &ty.kind {
-            hir::TyKind::Path(path) => self.current_scope().declare_variable(&path.join("_")),
-            _ => self.current_scope().declare_variable("arg"),
+            hir::TyKind::Path(path) => self.name_map.alloc_name(&path.join("_")),
+            _ => self.name_map.alloc_name("arg"),
         }
     }
 }
