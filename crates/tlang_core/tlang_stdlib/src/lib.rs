@@ -12,6 +12,7 @@ pub mod protocols;
 pub mod regex;
 pub mod result;
 pub mod string;
+pub mod temporal;
 
 /// Called once at startup to anchor this crate in the final binary.
 ///

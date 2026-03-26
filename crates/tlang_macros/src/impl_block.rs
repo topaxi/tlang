@@ -3,6 +3,78 @@ use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::{Ident, Token, braced, parenthesized};
 
+/// A possibly-dotted name, e.g. `Foo` or `Temporal.Duration`.
+///
+/// Parsed from `Ident ( '.' Ident )*` token sequences.  A single `Ident` is
+/// represented as a one-segment `DottedName` so existing (non-dotted) call
+/// sites remain source-compatible.
+#[derive(Clone)]
+pub(crate) struct DottedName {
+    pub segments: Vec<Ident>,
+}
+
+impl DottedName {
+    /// Dotted string used for inventory registration (e.g. `"Temporal.Duration"`).
+    pub fn to_dotted_string(&self) -> String {
+        self.segments
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+            .join(".")
+    }
+
+    /// Underscore-joined, lowercased string safe for Rust identifiers
+    /// (e.g. `"temporal_duration"`).
+    #[allow(dead_code)]
+    pub fn to_ident_prefix(&self) -> String {
+        self.segments
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+            .join("_")
+            .to_lowercase()
+    }
+
+    pub fn span(&self) -> proc_macro2::Span {
+        self.segments
+            .first()
+            .expect("DottedName has at least one segment")
+            .span()
+    }
+}
+
+impl Parse for DottedName {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let first: Ident = input.parse()?;
+        let mut segments = vec![first];
+        while input.peek(Token![.]) {
+            input.parse::<Token![.]>()?;
+            segments.push(input.parse()?);
+        }
+        Ok(DottedName { segments })
+    }
+}
+
+impl PartialEq for DottedName {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_dotted_string() == other.to_dotted_string()
+    }
+}
+
+impl std::fmt::Display for DottedName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_dotted_string())
+    }
+}
+
+impl From<Ident> for DottedName {
+    fn from(ident: Ident) -> Self {
+        DottedName {
+            segments: vec![ident],
+        }
+    }
+}
+
 pub(crate) struct ImplMethod {
     pub name: Ident,
     pub params: Vec<Ident>, // first param is `this`
@@ -15,7 +87,7 @@ pub(crate) struct ImplMethod {
 pub(crate) struct ImplBlock {
     pub protocol: Option<Ident>,
     #[allow(dead_code)]
-    pub type_name: Ident,
+    pub type_name: DottedName,
     pub methods: Vec<ImplMethod>,
 }
 
@@ -23,7 +95,7 @@ pub(crate) struct ImplBlock {
 /// the type definition body. `kind` is used in error messages ("enum" or "struct").
 pub(crate) fn parse_impl_blocks(
     input: ParseStream,
-    type_name: &Ident,
+    type_name: &DottedName,
     kind: &str,
 ) -> syn::Result<Vec<ImplBlock>> {
     let mut blocks = Vec::new();
@@ -31,14 +103,23 @@ pub(crate) fn parse_impl_blocks(
     while input.peek(Token![impl]) {
         input.parse::<Token![impl]>()?;
 
-        let first_ident: Ident = input.parse()?;
+        // The first thing after `impl` can be a (possibly-dotted) type name
+        // or a protocol name followed by `for`.
+        let first_name: DottedName = input.parse()?;
 
         let (protocol, impl_type_name) = if input.peek(Token![for]) {
+            // `impl Protocol for Type.Name { ... }`
+            if first_name.segments.len() != 1 {
+                return Err(syn::Error::new(
+                    first_name.span(),
+                    "protocol name must be a single identifier",
+                ));
+            }
             input.parse::<Token![for]>()?;
-            let impl_type: Ident = input.parse()?;
-            (Some(first_ident), impl_type)
+            let impl_type: DottedName = input.parse()?;
+            (Some(first_name.segments[0].clone()), impl_type)
         } else {
-            (None, first_ident)
+            (None, first_name)
         };
 
         if impl_type_name != *type_name {
@@ -121,7 +202,8 @@ pub(crate) fn generate_impl_methods(
             // Extra params = everything after `this`.
             let extra_params: Vec<&Ident> = method.params.iter().skip(1).collect();
 
-            let type_prefix = type_name_str.to_lowercase();
+            // Replace dots with underscores so the wrapper is a valid Rust ident.
+            let type_prefix = type_name_str.replace('.', "_").to_lowercase();
 
             let wrapper_name = if let Some(protocol) = &impl_block.protocol {
                 let protocol_str = protocol.to_string().to_lowercase();

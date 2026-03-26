@@ -3,7 +3,7 @@ use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::{Ident, Token, braced, parenthesized};
 
-use crate::impl_block::{ImplBlock, generate_impl_methods, parse_impl_blocks};
+use crate::impl_block::{DottedName, ImplBlock, generate_impl_methods, parse_impl_blocks};
 
 /// Represents a variant field list like `(value)` or `(head, tail)`.
 struct VariantFields(Vec<Ident>);
@@ -53,7 +53,7 @@ impl Parse for DefineEnumInput {
             }
         }
 
-        let impl_blocks = parse_impl_blocks(input, &name, "enum")?;
+        let impl_blocks = parse_impl_blocks(input, &DottedName::from(name.clone()), "enum")?;
 
         Ok(DefineEnumInput {
             name,
