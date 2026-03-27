@@ -1,0 +1,52 @@
+// Triple-quoted string tests
+// Demonstrates support for """...""" and '''...''' multiline strings
+
+fn test_basic_triple_double_quoted() {
+    let msg = """Hello, World!""";
+    msg |> log();
+}
+
+fn test_basic_triple_single_quoted() {
+    let msg = '''Hello, World!''';
+    msg |> log();
+}
+
+fn test_multiline_triple_quoted() {
+    let msg = """
+Hello
+World
+""";
+    msg |> log();
+}
+
+fn test_triple_quoted_with_embedded_quote() {
+    let msg = """She said "hi" today""";
+    msg |> log();
+}
+
+fn test_triple_quoted_escape_sequences() {
+    let msg = """tab:\there""";
+    msg |> log();
+}
+
+fn test_tagged_triple_quoted() {
+    let name = "World";
+    let result = f"""Hello, {name}!""";
+    result |> log();
+}
+
+fn test_tagged_triple_quoted_multiline() {
+    let x = 42;
+    let result = f"""
+Value: {x}
+""";
+    result |> log();
+}
+
+test_basic_triple_double_quoted();
+test_basic_triple_single_quoted();
+test_multiline_triple_quoted();
+test_triple_quoted_with_embedded_quote();
+test_triple_quoted_escape_sequences();
+test_tagged_triple_quoted();
+test_tagged_triple_quoted_multiline();

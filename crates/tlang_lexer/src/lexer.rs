@@ -141,6 +141,195 @@ impl<'src> Lexer<'src> {
         &self.source[start..self.position]
     }
 
+    /// Check if the upcoming source text starts with a third consecutive `quote` character.
+    /// `self.position` is at `current_char`; `next_char` is the char at `position + 1`.
+    /// For ASCII quote characters (`"` and `'`), `position + 2` is the third char.
+    fn is_triple_quote(&self, quote: char) -> bool {
+        self.next_char == quote
+            && self
+                .source
+                .get(self.position + 2..)
+                .is_some_and(|s| s.starts_with(quote))
+    }
+
+    /// Read the content of a triple-quoted string literal (`"""..."""` or `'''...'''`).
+    /// The three opening quotes have already been consumed.
+    /// Returns a `Literal::String` for `"""` or `Literal::Char` for `'''`.
+    fn read_triple_quoted_string(&mut self, quote: char) -> Result<Literal, String> {
+        let mut result = String::new();
+
+        loop {
+            // Check for closing triple quote
+            if self.current_char == quote && self.is_triple_quote(quote) {
+                self.advance();
+                self.advance();
+                self.advance();
+                let id = intern(&result);
+                return Ok(if quote == '"' {
+                    Literal::String(id)
+                } else {
+                    Literal::Char(id)
+                });
+            }
+
+            if self.current_char == '\0' {
+                return Err("Unterminated triple-quoted string literal".to_string());
+            }
+
+            if self.current_char == '\\' {
+                self.advance(); // consume the backslash
+                match self.current_char {
+                    '"' => result.push('"'),
+                    '\'' => result.push('\''),
+                    '\\' => result.push('\\'),
+                    'n' => result.push('\n'),
+                    't' => result.push('\t'),
+                    'r' => result.push('\r'),
+                    '0' => result.push('\0'),
+                    'u' => {
+                        self.advance(); // consume 'u'
+                        if self.current_char == '{' {
+                            self.advance(); // consume '{'
+                            if let Ok(unicode_char) = self.read_unicode_escape() {
+                                result.push(unicode_char);
+                            } else {
+                                result.push('\\');
+                                result.push('u');
+                                result.push('{');
+                                while self.current_char != '}' && self.current_char != '\0' {
+                                    result.push(self.current_char);
+                                    self.advance();
+                                }
+                                if self.current_char == '}' {
+                                    result.push('}');
+                                    self.advance();
+                                }
+                                continue;
+                            }
+                        } else {
+                            result.push('\\');
+                            result.push('u');
+                            continue;
+                        }
+                    }
+                    ch => {
+                        result.push('\\');
+                        result.push(ch);
+                    }
+                }
+                self.advance();
+            } else {
+                result.push(self.current_char);
+                self.advance();
+            }
+        }
+    }
+
+    /// Read the content of a triple-quoted tagged string (`tag"""..."""` or `tag'''...'''`).
+    /// The three opening quotes have already been consumed.
+    /// Interpolation and escape handling is identical to [`read_tagged_string_parts`], but
+    /// termination requires three consecutive matching quote characters.
+    pub fn read_tagged_triple_string_parts(
+        &mut self,
+        quote: char,
+    ) -> Result<Vec<TaggedStringPart>, String> {
+        let mut parts = Vec::new();
+        let mut current_literal = String::new();
+
+        loop {
+            // Check for closing triple quote
+            if self.current_char == quote && self.is_triple_quote(quote) {
+                self.advance();
+                self.advance();
+                self.advance();
+                parts.push(TaggedStringPart::Literal(current_literal.into_boxed_str()));
+                return Ok(parts);
+            }
+
+            if self.current_char == '\0' {
+                return Err("Unterminated triple-quoted tagged string literal".to_string());
+            }
+
+            if self.current_char == '\\' {
+                self.advance(); // consume backslash
+                match self.current_char {
+                    '{' | '}' => {
+                        current_literal.push(self.current_char);
+                        self.advance();
+                    }
+                    '"' => {
+                        current_literal.push('"');
+                        self.advance();
+                    }
+                    '\'' => {
+                        current_literal.push('\'');
+                        self.advance();
+                    }
+                    '\\' => {
+                        current_literal.push('\\');
+                        self.advance();
+                    }
+                    'n' => {
+                        current_literal.push('\n');
+                        self.advance();
+                    }
+                    't' => {
+                        current_literal.push('\t');
+                        self.advance();
+                    }
+                    'r' => {
+                        current_literal.push('\r');
+                        self.advance();
+                    }
+                    '0' => {
+                        current_literal.push('\0');
+                        self.advance();
+                    }
+                    ch => {
+                        // Unknown escape → keep as-is
+                        current_literal.push('\\');
+                        current_literal.push(ch);
+                        self.advance();
+                    }
+                }
+            } else if self.current_char == '{' {
+                if self.next_char == '{' {
+                    // `{{` → literal `{`
+                    current_literal.push('{');
+                    self.advance();
+                    self.advance();
+                } else if self.next_char.is_ascii_alphabetic() || self.next_char == '_' {
+                    // Start of interpolation
+                    parts.push(TaggedStringPart::Literal(
+                        std::mem::take(&mut current_literal).into_boxed_str(),
+                    ));
+                    self.advance(); // consume `{`
+                    let interp_line = self.current_line;
+                    let interp_column = self.current_column;
+                    let interp_byte_offset = self.byte_position();
+                    let raw = self.read_interpolation_body(quote)?;
+                    parts.push(TaggedStringPart::Interpolation {
+                        source: raw.into_boxed_str(),
+                        line: interp_line,
+                        column: interp_column,
+                        byte_offset: interp_byte_offset,
+                    });
+                } else {
+                    current_literal.push('{');
+                    self.advance();
+                }
+            } else if self.current_char == '}' && self.next_char == '}' {
+                // `}}` → literal `}`
+                current_literal.push('}');
+                self.advance();
+                self.advance();
+            } else {
+                current_literal.push(self.current_char);
+                self.advance();
+            }
+        }
+    }
+
     fn read_string_literal(&mut self, quote: char) -> Result<Literal, String> {
         let mut result = String::new();
 
@@ -663,12 +852,23 @@ impl<'src> Lexer<'src> {
             '0'..='9' => self.read_number_literal(start_pos, start_lc),
             '"' | '\'' => {
                 let quote = ch;
-                self.advance();
-                match self.read_string_literal(quote) {
-                    Ok(literal) => self.token(TokenKind::Literal(literal), start_pos, start_lc),
-                    Err(_error) => {
-                        // Only for unterminated strings, return an Unknown token
-                        self.token(TokenKind::Unknown, start_pos, start_lc)
+                if self.is_triple_quote(quote) {
+                    // Triple-quoted string: consume the three opening quotes
+                    self.advance();
+                    self.advance();
+                    self.advance();
+                    match self.read_triple_quoted_string(quote) {
+                        Ok(literal) => self.token(TokenKind::Literal(literal), start_pos, start_lc),
+                        Err(_) => self.token(TokenKind::Unknown, start_pos, start_lc),
+                    }
+                } else {
+                    self.advance();
+                    match self.read_string_literal(quote) {
+                        Ok(literal) => self.token(TokenKind::Literal(literal), start_pos, start_lc),
+                        Err(_error) => {
+                            // Only for unterminated strings, return an Unknown token
+                            self.token(TokenKind::Unknown, start_pos, start_lc)
+                        }
                     }
                 }
             }
@@ -694,6 +894,28 @@ impl<'src> Lexer<'src> {
                         // (no whitespace), which makes it a tagged string literal.
                         if matches!(self.current_char, '"' | '\'') {
                             let quote = self.current_char;
+                            if self.is_triple_quote(quote) {
+                                // Triple-quoted tagged string. Advance past the first quote so
+                                // the token span covers only "tag<quote>" — identical to the
+                                // single-quoted case — enabling the parser to strip one trailing
+                                // quote character when extracting the tag name.
+                                self.advance(); // consume first opening quote
+                                let tag_token = self.token(
+                                    TokenKind::TaggedStringStart(quote),
+                                    start_pos,
+                                    start_lc,
+                                );
+                                self.advance(); // consume second opening quote
+                                self.advance(); // consume third opening quote
+                                let parts = match self.read_tagged_triple_string_parts(quote) {
+                                    Ok(p) => p,
+                                    Err(_) => {
+                                        return self.token(TokenKind::Unknown, start_pos, start_lc);
+                                    }
+                                };
+                                self.pending_tagged_parts = Some(parts);
+                                return tag_token;
+                            }
                             self.advance(); // consume the opening quote
                             // Create the token BEFORE reading content so the span
                             // covers only "tag<quote>" (not the string content).
