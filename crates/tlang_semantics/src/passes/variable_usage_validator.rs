@@ -11,7 +11,7 @@ use tlang_ast::{
     },
     visit::{Visitor, walk_expr, walk_pat, walk_stmt},
 };
-use tlang_defs::{Def, DefScope};
+use tlang_defs::{Def, DefKind, DefScope};
 use tlang_span::{NodeId, Span};
 
 /// Pass for validating variable usage, handling both unused variables
@@ -59,6 +59,9 @@ impl VariableUsageValidator {
             // TODO: We currently do not track member methods, as we do not have any type
             //       information yet.
             .filter(|symbol| !symbol.name.contains('.'))
+            // StructMethod aliases (e.g. `Expense::is_food`) shadow the dot-method
+            // and are only used when referenced explicitly; don't report them as unused.
+            .filter(|symbol| !matches!(symbol.kind, DefKind::StructMethod(_)))
             .collect::<Vec<_>>();
 
         for unused_symbol in &unused_symbols {

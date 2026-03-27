@@ -10,14 +10,14 @@ false
 true
 10
 
-[stdin]:2
+[stdin]:3
   throw new Error(msg);
   ^
 
 Error: Called unwrap on Err
-    at panic ([stdin]:2:9)
-    at Result.unwrap ([stdin]:136:16)
-    at [stdin]:589:17
+    at panic ([stdin]:3:9)
+    at Result.unwrap ([stdin]:157:16)
+    at [stdin]:626:17
     at runScriptInThisContext (node:internal/vm:218:10)
     at node:internal/process/execution:456:12
     at [stdin]-wrapper:6:24

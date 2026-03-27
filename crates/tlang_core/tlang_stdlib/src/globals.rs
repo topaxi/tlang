@@ -29,6 +29,36 @@ pub fn compose(state: &mut VMState, f: TlangValue, g: TlangValue) -> TlangValue 
     })
 }
 
+/// Tagged string interpolation: `f"text {expr} more"` → `f(["text ", " more"], [expr])`
+///
+/// Each interpolated value is converted to a string via `Display::to_string`.
+#[native_fn]
+pub fn f(state: &mut VMState, parts: TlangValue, values: TlangValue) -> TlangValue {
+    let parts_list: Vec<TlangValue> = state
+        .get_struct(parts)
+        .map(|s| s.values().to_vec())
+        .unwrap_or_else(|| state.panic("f(): first argument must be a list".to_string()));
+    let values_list: Vec<TlangValue> = state
+        .get_struct(values)
+        .map(|s| s.values().to_vec())
+        .unwrap_or_else(|| state.panic("f(): second argument must be a list".to_string()));
+
+    let mut result = String::new();
+    for (i, &part) in parts_list.iter().enumerate() {
+        let s = state
+            .get_object(part)
+            .and_then(|o| o.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| state.panic("f(): parts element must be a string".to_string()));
+        result.push_str(&s);
+        if i < values_list.len() {
+            result.push_str(&state.stringify(values_list[i]));
+        }
+    }
+
+    state.new_string(result)
+}
+
 #[cfg(test)]
 mod tests {
     use tlang_memory::{TlangValue, VMState};

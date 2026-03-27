@@ -1,0 +1,41 @@
+// Tests that dot-methods can be referenced as first-class values via the
+// qualified `Type::method` alias syntax.
+
+enum Shape {
+    Circle(radius),
+    Rectangle(width, height),
+}
+
+fn Shape.area(Shape::Circle(r)) { math::pi * r ** 2 }
+fn Shape.area(Shape::Rectangle(w, h)) { w * h }
+
+fn Shape.is_circle(Shape::Circle(_)) { true }
+fn Shape.is_circle(_) { false }
+
+fn Shape.is_rectangle(Shape::Rectangle(_, _)) { true }
+fn Shape.is_rectangle(_) { false }
+
+fn filter([], _) { [] }
+fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
+fn filter([_, ...xs], f) { rec filter(xs, f) }
+
+fn map([], _) { [] }
+fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+
+let shapes = [
+    Shape::Circle(5.0),
+    Shape::Rectangle(3.0, 4.0),
+    Shape::Circle(1.0),
+    Shape::Rectangle(2.0, 6.0),
+];
+
+// Use Type::method as first-class value in filter
+let circles = shapes |> filter(Shape::is_circle);
+circles |> len() |> log();
+
+let rectangles = shapes |> filter(Shape::is_rectangle);
+rectangles |> len() |> log();
+
+// Use Type::method as first-class value in map
+let areas = shapes |> map(Shape::area);
+areas |> log();

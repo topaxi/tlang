@@ -76,6 +76,8 @@ pub enum BindingKind {
     Enum,
     Variant,
     Fn,
+    /// A `::` alias that refers to a dot-method on a struct/enum prototype.
+    StructMethod,
     Param,
     Field,
     Closure,
@@ -94,6 +96,7 @@ impl From<DefKind> for BindingKind {
             DefKind::Enum => BindingKind::Enum,
             DefKind::EnumVariant(_) => BindingKind::Variant,
             DefKind::Function(_) | DefKind::FunctionSelfRef(_) => BindingKind::Fn,
+            DefKind::StructMethod(_) => BindingKind::StructMethod,
             DefKind::Parameter => BindingKind::Param,
             DefKind::Module => todo!(),
             DefKind::Protocol | DefKind::ProtocolMethod(_) => BindingKind::Enum,
@@ -287,6 +290,7 @@ impl Res {
                 | BindingKind::Upvar
                 | BindingKind::Temp
                 | BindingKind::Fn
+                | BindingKind::StructMethod
                 | BindingKind::Param
                 | BindingKind::Closure
                 | BindingKind::Field
