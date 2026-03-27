@@ -85,20 +85,26 @@ export const tagStringTagTokenizer = new ExternalTokenizer((input) => {
 
 // Tokenizes the opening and closing quotes of tagged strings.
 // Uses stack.canShift to determine whether to emit open or close variant.
+// Input is only advanced after confirming a token can be shifted, to avoid
+// consuming the quote without producing a token.
 export const taggedStringQuoteTokenizer = new ExternalTokenizer(
   (input, stack) => {
     if (input.next === 34 /* " */) {
-      input.advance();
-      if (stack.canShift(TaggedStringOpenDouble))
+      if (stack.canShift(TaggedStringOpenDouble)) {
+        input.advance();
         input.acceptToken(TaggedStringOpenDouble);
-      else if (stack.canShift(TaggedStringDoubleClose))
+      } else if (stack.canShift(TaggedStringDoubleClose)) {
+        input.advance();
         input.acceptToken(TaggedStringDoubleClose);
+      }
     } else if (input.next === 39 /* ' */) {
-      input.advance();
-      if (stack.canShift(TaggedStringOpenSingle))
+      if (stack.canShift(TaggedStringOpenSingle)) {
+        input.advance();
         input.acceptToken(TaggedStringOpenSingle);
-      else if (stack.canShift(TaggedStringSingleClose))
+      } else if (stack.canShift(TaggedStringSingleClose)) {
+        input.advance();
         input.acceptToken(TaggedStringSingleClose);
+      }
     }
   },
   { contextual: true },
