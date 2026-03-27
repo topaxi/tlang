@@ -24,6 +24,8 @@ if (typeof Temporal !== 'undefined') {
   }
 
   // Wrap a JS getter as a zero-arg method so `obj.snake()` works in tlang.
+  // The interpreter exposes these as methods (e.g. `date.day_of_week()`)
+  // while JS Temporal defines them as getter properties (`date.dayOfWeek`).
   function wrapGetterAsMethod(proto, snake, camel) {
     const desc = Object.getOwnPropertyDescriptor(proto, camel);
     if (desc && desc.get && !proto[snake]) {
