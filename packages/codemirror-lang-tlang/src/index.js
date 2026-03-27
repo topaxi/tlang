@@ -146,6 +146,7 @@ import { LanguageSupport } from '@codemirror/language';
  *   sqlLanguage?: import('@codemirror/language').Language,
  *   jsonLanguage?: import('@codemirror/language').Language,
  *   jsLanguage?: import('@codemirror/language').Language,
+ *   markdownLanguage?: import('@codemirror/language').Language,
  * }} languages
  */
 function makeTaggedStringWrap(languages) {
@@ -159,6 +160,9 @@ function makeTaggedStringWrap(languages) {
   if (languages.jsonLanguage)
     tagParsers['json'] = languages.jsonLanguage.parser;
   if (languages.jsLanguage) tagParsers['js'] = languages.jsLanguage.parser;
+  if (languages.markdownLanguage)
+    tagParsers['md'] = tagParsers['markdown'] =
+      languages.markdownLanguage.parser;
 
   if (Object.keys(tagParsers).length === 0) return undefined;
 
@@ -201,6 +205,7 @@ function makeTaggedStringWrap(languages) {
  *   sqlLanguage?: import('@codemirror/language').Language,
  *   jsonLanguage?: import('@codemirror/language').Language,
  *   jsLanguage?: import('@codemirror/language').Language,
+ *   markdownLanguage?: import('@codemirror/language').Language,
  * }} [options]
  */
 export function tlangLanguageSupport(options = {}) {

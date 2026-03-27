@@ -4,8 +4,12 @@ import { EditorState, Prec } from '@codemirror/state';
 import { Diagnostic, linter, lintGutter } from '@codemirror/lint';
 import { catppuccin } from 'codemirror-theme-catppuccin';
 import { tlangLanguageSupport } from 'codemirror-lang-tlang';
-import { javascript } from '@codemirror/lang-javascript';
-import { json } from '@codemirror/lang-json';
+import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
+import { json, jsonLanguage } from '@codemirror/lang-json';
+import { htmlLanguage } from '@codemirror/lang-html';
+import { cssLanguage } from '@codemirror/lang-css';
+import { StandardSQL } from '@codemirror/lang-sql';
+import { markdownLanguage } from '@codemirror/lang-markdown';
 import { LitElement, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { hostListener } from '../decorators/host-listener';
@@ -72,7 +76,16 @@ export class TCodeMirror extends LitElement {
 
     switch (this.language) {
       case 'tlang':
-        extensions.push(tlangLanguageSupport());
+        extensions.push(
+          tlangLanguageSupport({
+            htmlLanguage,
+            cssLanguage,
+            sqlLanguage: StandardSQL.language,
+            jsonLanguage,
+            jsLanguage: javascriptLanguage,
+            markdownLanguage,
+          }),
+        );
         break;
 
       case 'javascript':

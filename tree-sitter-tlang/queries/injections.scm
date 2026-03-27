@@ -45,3 +45,11 @@
  (#eq? @_tag "js")
  (#set! injection.language "javascript")
  (#set! injection.combined))
+
+; Markdown injection for md"..." and markdown"..." tagged strings
+((tagged_string
+  tag: (tagged_string_tag) @_tag
+  (tagged_string_content) @injection.content)
+ (#any-of? @_tag "md" "markdown")
+ (#set! injection.language "markdown")
+ (#set! injection.combined))

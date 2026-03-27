@@ -7,4 +7,5 @@ export function tlangLanguageSupport(options?: {
   sqlLanguage?: Language;
   jsonLanguage?: Language;
   jsLanguage?: Language;
+  markdownLanguage?: Language;
 }): LanguageSupport;
