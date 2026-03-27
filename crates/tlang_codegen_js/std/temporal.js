@@ -23,6 +23,14 @@ if (typeof Temporal !== 'undefined') {
     }
   }
 
+  // Wrap a JS getter as a zero-arg method so `obj.snake()` works in tlang.
+  function wrapGetterAsMethod(proto, snake, camel) {
+    const desc = Object.getOwnPropertyDescriptor(proto, camel);
+    if (desc && desc.get && !proto[snake]) {
+      proto[snake] = function() { return this[camel]; };
+    }
+  }
+
   function aliasStatic(cls, snake, camel) {
     if (cls[camel] && !cls[snake]) {
       cls[snake] = cls[camel];
@@ -72,8 +80,10 @@ if (typeof Temporal !== 'undefined') {
   if (Temporal.PlainDate) {
     const P = Temporal.PlainDate.prototype;
     aliasGetter(P, 'month_code', 'monthCode');
-    aliasGetter(P, 'day_of_week', 'dayOfWeek');
-    aliasGetter(P, 'day_of_year', 'dayOfYear');
+    aliasGetter(P, 'calendar_id', 'calendarId');
+    // day_of_week and day_of_year are methods in the interpreter
+    wrapGetterAsMethod(P, 'day_of_week', 'dayOfWeek');
+    wrapGetterAsMethod(P, 'day_of_year', 'dayOfYear');
     aliasGetter(P, 'week_of_year', 'weekOfYear');
     aliasGetter(P, 'year_of_week', 'yearOfWeek');
     aliasGetter(P, 'days_in_week', 'daysInWeek');
@@ -81,7 +91,6 @@ if (typeof Temporal !== 'undefined') {
     aliasGetter(P, 'days_in_year', 'daysInYear');
     aliasGetter(P, 'months_in_year', 'monthsInYear');
     aliasGetter(P, 'in_leap_year', 'inLeapYear');
-    aliasGetter(P, 'calendar_id', 'calendarId');
 
     aliasMethod(P, 'with_calendar', 'withCalendar');
     aliasMethod(P, 'to_plain_date_time', 'toPlainDateTime');

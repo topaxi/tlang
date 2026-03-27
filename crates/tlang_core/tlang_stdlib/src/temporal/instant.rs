@@ -48,7 +48,7 @@ pub fn instant_from(vm: &mut VMState, arg: TlangValue) -> TlangValue {
 }
 
 /// `Temporal.Instant.fromEpochMilliseconds(ms)` — create from epoch milliseconds.
-#[native_fn(name = "Temporal::Instant::fromEpochMilliseconds")]
+#[native_fn(name = "Temporal::Instant::from_epoch_milliseconds")]
 pub fn instant_from_epoch_ms(vm: &mut VMState, ms_val: TlangValue) -> TlangValue {
     let ms = ms_val.as_f64() as i64;
     let inst = TemporalInstant::from_epoch_milliseconds(ms)

@@ -185,6 +185,7 @@ mod tests {
 
                 #[allow(clippy::zombie_processes)]
                 let javascript_output = Command::new("node")
+                    .arg("--harmony-temporal")
                     .stdin(tlang_js_compiler_output.stdout.unwrap())
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())

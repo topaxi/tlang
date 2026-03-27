@@ -1,0 +1,27 @@
+---
+source: tests/runner/src/main.rs
+assertion_line: 379
+description: "Backend: javascript"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/temporal/temporal_plain_time.tlang
+---
+14
+30
+45
+0
+14:30:45
+9
+15
+30
+123
+11
+30
+8
+30
+8
+30
+8
+30
+14:24:00
+true
+false

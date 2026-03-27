@@ -20,7 +20,7 @@ pub fn now_instant(vm: &mut VMState) -> TlangValue {
 }
 
 /// `Temporal.Now.zonedDateTimeISO(tz?)` — current time as a ZonedDateTime.
-#[native_fn(name = "Temporal::Now::zonedDateTimeISO")]
+#[native_fn(name = "Temporal::Now::zoned_date_time_iso")]
 pub fn now_zoned_date_time_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangValue {
     let ns = super::system_epoch_nanoseconds();
     let tz = if tz_val.is_nil() {
@@ -36,7 +36,7 @@ pub fn now_zoned_date_time_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangVal
 }
 
 /// `Temporal.Now.plainDateTimeISO(tz?)` — current time as a PlainDateTime.
-#[native_fn(name = "Temporal::Now::plainDateTimeISO")]
+#[native_fn(name = "Temporal::Now::plain_date_time_iso")]
 pub fn now_plain_date_time_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangValue {
     let ns = super::system_epoch_nanoseconds();
     let tz = if tz_val.is_nil() {
@@ -65,7 +65,7 @@ pub fn now_plain_date_time_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangVal
 }
 
 /// `Temporal.Now.plainDateISO(tz?)` — current date as a PlainDate.
-#[native_fn(name = "Temporal::Now::plainDateISO")]
+#[native_fn(name = "Temporal::Now::plain_date_iso")]
 pub fn now_plain_date_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangValue {
     let ns = super::system_epoch_nanoseconds();
     let tz = if tz_val.is_nil() {
@@ -83,7 +83,7 @@ pub fn now_plain_date_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangValue {
 }
 
 /// `Temporal.Now.plainTimeISO(tz?)` — current time as a PlainTime.
-#[native_fn(name = "Temporal::Now::plainTimeISO")]
+#[native_fn(name = "Temporal::Now::plain_time_iso")]
 pub fn now_plain_time_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangValue {
     let ns = super::system_epoch_nanoseconds();
     let tz = if tz_val.is_nil() {
@@ -108,7 +108,7 @@ pub fn now_plain_time_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangValue {
 }
 
 /// `Temporal.Now.timeZoneId()` — returns `"UTC"` (default system timezone).
-#[native_fn(name = "Temporal::Now::timeZoneId")]
+#[native_fn(name = "Temporal::Now::time_zone_id")]
 pub fn now_time_zone_id(vm: &mut VMState) -> TlangValue {
     vm.new_string("UTC".to_string())
 }

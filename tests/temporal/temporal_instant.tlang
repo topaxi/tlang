@@ -1,0 +1,47 @@
+// Temporal.Instant — construction, properties, arithmetic
+
+// Construction from ISO string
+let inst = Temporal::Instant::from("2025-03-15T14:30:00Z");
+log(inst.epoch_milliseconds);
+log(inst.to_string());
+
+// Construction from epoch milliseconds (Unix epoch = 0)
+let epoch = Temporal::Instant::from_epoch_milliseconds(0);
+log(epoch.epoch_milliseconds);  // 0
+log(epoch.to_string());
+
+// Known timestamp: 2000-01-01T00:00:00Z = 946684800000 ms
+let y2k = Temporal::Instant::from_epoch_milliseconds(946684800000);
+log(y2k.epoch_milliseconds);
+log(y2k.to_string());
+
+// Add duration (only time components work for Instant)
+let dur = Temporal::Duration::from("PT1H");
+let later = inst.add(dur);
+log(later.to_string());
+
+// Subtract duration
+let earlier = inst.subtract(dur);
+log(earlier.to_string());
+
+// Difference: until
+let i1 = Temporal::Instant::from("2025-01-01T00:00:00Z");
+let i2 = Temporal::Instant::from("2025-01-01T02:30:00Z");
+let diff = i1.until(i2);
+log(diff.seconds);  // 9000 (= 2h30m in seconds)
+
+// since (reverse direction)
+let diff2 = i2.since(i1);
+log(diff2.seconds);  // 9000
+
+// Equality
+let same1 = Temporal::Instant::from("2025-06-15T00:00:00Z");
+let same2 = Temporal::Instant::from("2025-06-15T00:00:00Z");
+let diff_inst = Temporal::Instant::from("2025-06-15T00:00:01Z");
+log(same1.equals(same2));       // true
+log(same1.equals(diff_inst));   // false
+
+// Round to nearest hour
+let precise = Temporal::Instant::from("2025-06-15T14:45:30Z");
+let rounded = precise.round("hour");
+log(rounded.to_string());

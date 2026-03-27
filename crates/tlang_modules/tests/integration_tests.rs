@@ -101,6 +101,7 @@ fn compile_project_to_js(project_name: &str) -> String {
 fn run_js(code: &str) -> String {
     use std::process::Command;
     let output = Command::new("node")
+        .arg("--harmony-temporal")
         .arg("--input-type=module")
         .arg("-e")
         .arg(code)

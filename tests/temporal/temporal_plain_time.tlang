@@ -1,0 +1,52 @@
+// Temporal.PlainTime — construction, properties, arithmetic, rounding
+
+// Construction from ISO string
+let time = Temporal::PlainTime::from("14:30:45");
+log(time.hour);        // 14
+log(time.minute);      // 30
+log(time.second);      // 45
+log(time.millisecond); // 0
+log(time.to_string());
+
+// Construction with sub-second precision
+let precise = Temporal::PlainTime::from("09:15:30.123");
+log(precise.hour);        // 9
+log(precise.minute);      // 15
+log(precise.second);      // 30
+log(precise.millisecond); // 123
+
+// Add duration
+let t = Temporal::PlainTime::from("10:00:00");
+let dur = Temporal::Duration::from("PT1H30M");
+let later = t.add(dur);
+log(later.hour);    // 11
+log(later.minute);  // 30
+
+// Subtract duration
+let earlier = t.subtract(dur);
+log(earlier.hour);    // 8
+log(earlier.minute);  // 30
+
+// Difference: until
+let t1 = Temporal::PlainTime::from("09:00:00");
+let t2 = Temporal::PlainTime::from("17:30:00");
+let diff = t1.until(t2);
+log(diff.hours);    // 8
+log(diff.minutes);  // 30
+
+// Difference: since
+let diff2 = t2.since(t1);
+log(diff2.hours);   // 8
+log(diff2.minutes); // 30
+
+// Rounding
+let rounded = Temporal::PlainTime::from("14:23:45.678");
+let r = rounded.round("minute");
+log(r.to_string());
+
+// Equality
+let same1 = Temporal::PlainTime::from("12:00:00");
+let same2 = Temporal::PlainTime::from("12:00:00");
+let diff_time = Temporal::PlainTime::from("12:00:01");
+log(same1.equals(same2));      // true
+log(same1.equals(diff_time));  // false

@@ -1,0 +1,21 @@
+---
+source: tests/runner/src/main.rs
+assertion_line: 379
+description: "Backend: javascript"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/temporal/temporal_plain_year_month.tlang
+---
+2025
+3
+2025-03
+2025
+6
+2025-06
+2024
+12
+2024-12
+2026
+2
+5
+true
+false

@@ -1,0 +1,14 @@
+---
+source: tests/runner/src/main.rs
+assertion_line: 379
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/temporal/temporal_plain_month_day.tlang
+---
+M12
+25
+12-25
+M02
+14
+true
+false
