@@ -550,3 +550,91 @@ fn test_variable_usage_validator_undeclared_variable() {
     assert!(diagnostics[0].message().contains("similar_name"));
     assert!(diagnostics[0].is_error());
 }
+
+#[test]
+fn test_tagged_string_chain_bug() {
+    let source = "let a = \"x\";\nlet b = f\"{a}\";\nlet c = f\"{b}\";\nf\"{c}\" |> log();";
+    
+    let mut parser = Parser::from_source(source);
+    let (mut ast, _) = parser.parse().unwrap();
+    
+    let mut analyzer = create_analyzer(&[
+        ("f", DefKind::Function(2)),
+        ("log", DefKind::Function(1)),
+    ]);
+    
+    let result = analyzer.analyze(&mut ast);
+    
+    let root_table = analyzer.root_symbol_table();
+    for sym in root_table.borrow().get_all_local_symbols() {
+        eprintln!("Symbol: name={}, declared={}, scope_start={}", 
+                 sym.name, sym.declared, sym.scope_start);
+    }
+    
+    assert!(result.is_ok(), "Expected success, got {:?}", result);
+}
+
+#[test]
+fn test_tagged_string_chain_bug_debug() {
+    use tlang_ast::node::{StmtKind, ExprKind};
+
+    let source = "let a = \"x\";\nlet b = f\"{a}\";\nlet c = f\"{b}\";\nf\"{c}\" |> log();";
+    
+    let mut parser = Parser::from_source(source);
+    let (mut ast, _) = parser.parse().unwrap();
+    
+    eprintln!("Module id: {:?}", ast.id);
+    
+    // Inspect spans
+    for (i, stmt) in ast.statements.iter().enumerate() {
+        eprintln!("stmt[{}]: span={:?} kind={}", i, stmt.span, 
+            match &stmt.kind {
+                StmtKind::Let(d) => format!("Let({})", match &d.pattern.kind {
+                    tlang_ast::node::PatKind::Identifier(n) => n.as_str().to_string(),
+                    _ => "?".to_string(),
+                }),
+                StmtKind::Expr(_) => "Expr".to_string(),
+                _ => "Other".to_string(),
+            }
+        );
+        if let StmtKind::Let(d) = &stmt.kind {
+            if let ExprKind::TaggedString { tag, exprs, .. } = &d.expression.kind {
+                eprintln!("  TaggedString: tag.span={:?}", tag.span);
+                for e in exprs {
+                    eprintln!("  expr span={:?}", e.span);
+                }
+            }
+        }
+        if let StmtKind::Expr(e) = &stmt.kind {
+            // Check the pipeline LHS
+            if let ExprKind::BinaryOp(binop) = &e.kind {
+                if let ExprKind::TaggedString { tag, exprs, .. } = &binop.lhs.kind {
+                    eprintln!("  TaggedString LHS: tag.span={:?}", tag.span);
+                    for e in exprs {
+                        eprintln!("  expr span={:?}", e.span);
+                    }
+                }
+            }
+        }
+    }
+    
+    let mut analyzer = create_analyzer(&[
+        ("f", DefKind::Function(2)),
+        ("log", DefKind::Function(1)),
+    ]);
+    
+    let result = analyzer.analyze(&mut ast);
+    
+    // Print module symbol table
+    let module_table = analyzer.get_symbol_table(ast.id).unwrap();
+    eprintln!("\nModule symbol table:");
+    for sym in module_table.borrow().get_all_local_symbols() {
+        eprintln!("  name={}, declared={}, scope_start={}, defined_at={:?}", 
+                 sym.name, sym.declared, sym.scope_start, sym.defined_at);
+    }
+    
+    match result {
+        Ok(_) => eprintln!("Success!"),
+        Err(diags) => eprintln!("Errors: {:?}", diags),
+    }
+}
