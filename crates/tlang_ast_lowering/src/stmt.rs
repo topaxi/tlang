@@ -40,9 +40,9 @@ impl LoweringContext {
             }
             ast::node::StmtKind::FunctionDeclaration(box decl) => {
                 let decl = if has_non_identifier_patterns(decl) {
-                    let decls = [decl.clone()];
-                    let all_param_names = get_param_names(&decls);
-                    self.lower_fn_decl_matching(&decls, &all_param_names, &node.leading_comments)
+                    let decls = std::slice::from_ref(decl);
+                    let all_param_names = get_param_names(decls);
+                    self.lower_fn_decl_matching(decls, &all_param_names, &node.leading_comments)
                 } else {
                     self.lower_fn_decl(decl)
                 };
