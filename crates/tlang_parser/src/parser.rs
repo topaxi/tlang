@@ -1222,9 +1222,12 @@ impl<'src> Parser<'src> {
         // but the tag is just the identifier before the opening quote.
         let full = self.lexer.span_text(token.span);
         let tag = &full[..full.len() - quote.len_utf8()];
-        self.advance();
-        // Parts were eagerly read by the lexer and buffered.
+        // Take the eagerly-buffered parts BEFORE advancing. `advance()` pre-loads
+        // the next token via a lexer lookahead; if that token is another tagged
+        // string, `pending_tagged_parts` would be overwritten before we get a
+        // chance to read the parts that belong to this tagged string.
         let parts = self.lexer.take_tagged_string_parts().unwrap_or_default();
+        self.advance();
         self.expand_tagged_string(tag, parts, span)
     }
 

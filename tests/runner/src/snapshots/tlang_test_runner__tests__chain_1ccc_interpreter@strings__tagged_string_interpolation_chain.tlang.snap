@@ -1,0 +1,7 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/strings/tagged_string_interpolation_chain.tlang
+---
+x
