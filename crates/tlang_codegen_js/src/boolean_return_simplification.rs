@@ -150,12 +150,61 @@ impl BooleanReturnSimplification {
 impl BooleanReturnSimplification {
     /// Detect and apply the boolean-return simplification on a function body.
     fn try_optimize_fn_body(&mut self, body: &mut hir::Block) {
-        for stmt in &mut body.stmts {
-            if try_simplify_stmt(stmt) {
-                self.changed = true;
-            }
+        if simplify_block_recursive(body) {
+            self.changed = true;
         }
     }
+}
+
+/// Recursively simplify all statements within a block. Returns `true` if any
+/// statement (in this block or nested blocks) was changed.
+fn simplify_block_recursive(block: &mut hir::Block) -> bool {
+    let mut changed = false;
+    for stmt in &mut block.stmts {
+        if simplify_stmt_recursive(stmt) {
+            changed = true;
+        }
+    }
+    changed
+}
+
+/// Simplify a statement and recursively traverse into any nested blocks.
+/// Returns `true` if this statement or any nested statement was changed.
+fn simplify_stmt_recursive(stmt: &mut hir::Stmt) -> bool {
+    if try_simplify_stmt(stmt) {
+        return true;
+    }
+
+    // If the statement was not directly simplified, traverse into nested blocks.
+    let mut changed = false;
+    if let hir::StmtKind::Expr(expr) = &mut stmt.kind {
+        match &mut expr.kind {
+            hir::ExprKind::IfElse(_, then_block, else_branches) => {
+                if simplify_block_recursive(then_block) {
+                    changed = true;
+                }
+                for clause in else_branches {
+                    if simplify_block_recursive(&mut clause.consequence) {
+                        changed = true;
+                    }
+                }
+            }
+            hir::ExprKind::Match(_, arms) => {
+                for arm in arms {
+                    if simplify_block_recursive(&mut arm.block) {
+                        changed = true;
+                    }
+                }
+            }
+            hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
+                if simplify_block_recursive(block) {
+                    changed = true;
+                }
+            }
+            _ => {}
+        }
+    }
+    changed
 }
 
 /// Try to simplify a single statement. Returns `true` if the statement was

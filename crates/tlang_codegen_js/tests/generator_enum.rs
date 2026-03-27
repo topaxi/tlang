@@ -259,3 +259,32 @@ fn test_enum_is_variant_negated_boolean_return_simplification() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_enum_is_variant_with_positional_fields() {
+    let output = compile!(indoc! {"
+        enum Shape { Circle(r), Rectangle(w, h) }
+        fn Shape.is_circle(Shape::Circle(_)) { true }
+        fn Shape.is_circle(_) { false }
+    "});
+    let expected_output = indoc! {"
+        class Shape {
+            tag = this;
+            [0];
+            [1];
+            static Circle = (r) => Object.assign(new this(), {
+                tag: this.Circle,
+                0: r
+            });
+            static Rectangle = (w, h) => Object.assign(new this(), {
+                tag: this.Rectangle,
+                0: w,
+                1: h
+            });
+        }
+        Shape.prototype.is_circle = function is_circle() {
+            return this.tag === Shape.Circle;
+        };
+    "};
+    assert_eq!(output, expected_output);
+}

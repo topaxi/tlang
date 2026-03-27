@@ -64,6 +64,11 @@ fn simplify_in_stmt<'a>(stmt: &mut Statement<'a>, ast: &AstBuilder<'a>) {
                 simplify_in_expr(arg, ast);
             }
         }
+        Statement::FunctionDeclaration(func) => {
+            if let Some(ref mut body) = func.body {
+                simplify_in_stmts(&mut body.statements, ast);
+            }
+        }
         _ => {}
     }
 }

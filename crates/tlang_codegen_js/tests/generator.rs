@@ -359,6 +359,23 @@ fn test_boolean_return_simplification_negated() {
 }
 
 #[test]
+fn test_boolean_return_simplification_after_other_statements() {
+    let output = compile!(indoc! {"
+        fn is_positive(n) {
+            let x = n + 1;
+            if x > 0 { return true; } else { return false; }
+        }
+    "});
+    let expected_output = indoc! {"
+        function is_positive(n) {
+            let x = n + 1;
+            return x > 0;
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
 fn test_list_literal() {
     let output = compile!("fn main() { [1, 2, 3] }");
     let expected_output = indoc! {"
