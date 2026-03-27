@@ -1926,17 +1926,41 @@ impl Interpreter {
                         })
                 })
             }
-            hir::PatKind::Enum(path, kvs) => {
-                todo!(
-                    "eval_pat: Enum({:?}, {:?}) for value {}\nCurrent scope: {}",
-                    path,
-                    kvs,
-                    state.stringify(value),
-                    state.debug_stringify_scope_stack()
-                )
+            hir::PatKind::Enum(path, kvs) if state.get_struct(value).is_some() => {
+                self.eval_pat_struct(state, path, kvs, value)
             }
+            hir::PatKind::Enum(_path, _kvs) => false,
             hir::PatKind::Rest(_) => unreachable!("Rest patterns can only appear in list patterns"),
         }
+    }
+
+    fn eval_pat_struct(
+        &self,
+        state: &mut VMState,
+        path: &hir::Path,
+        kvs: &[(Ident, hir::Pat)],
+        value: TlangValue,
+    ) -> bool {
+        let Some(expected_hir_id) = path.res.hir_id() else {
+            return false;
+        };
+
+        let value_shape_key = state.get_struct(value).unwrap().shape();
+
+        if value_shape_key != ShapeKey::HirId(expected_hir_id) {
+            return false;
+        }
+
+        kvs.iter().all(|(k, pat)| {
+            state
+                .get_shape_by_key(value_shape_key)
+                .and_then(|shape| shape.get_struct_shape())
+                .and_then(|struct_shape| struct_shape.get_field_index(&k.to_string()))
+                .is_some_and(|field_index| {
+                    let tlang_struct = state.get_struct(value).unwrap();
+                    self.eval_pat(state, pat, tlang_struct[field_index])
+                })
+        })
     }
 
     // TODO: Instead of having rest patterns within list patterns, we should have a pattern

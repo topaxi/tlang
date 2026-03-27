@@ -50,6 +50,61 @@ fn test_struct_nested() {
     assert_eq!(value, TlangValue::U64(5000));
 }
 
+// ── Struct destructuring in match ─────────────────────────────────────────────
+
+#[test]
+fn test_struct_destructure_match_single_field() {
+    let s = common::eval_to_string(
+        r#"struct SafeHtml { value: string }
+         let sh = SafeHtml { value: "hello" };
+         match sh {
+             SafeHtml { value } => value,
+         }"#,
+    );
+    assert_eq!(s, "hello");
+}
+
+#[test]
+fn test_struct_destructure_match_multiple_fields() {
+    let value = common::eval(
+        "struct Point { x: isize, y: isize }
+         let p = Point { x: 3, y: 4 };
+         match p {
+             Point { x, y } => x + y,
+         }",
+    );
+    assert_eq!(value, TlangValue::U64(7));
+}
+
+#[test]
+fn test_struct_destructure_match_with_wildcard_fallback() {
+    let value = common::eval(
+        "struct Cat { name: string }
+         struct Dog { name: string }
+         let d = Dog { name: \"Rex\" };
+         match d {
+             Cat { name } => 1,
+             Dog { name } => 2,
+             _ => 0,
+         }",
+    );
+    assert_eq!(value, TlangValue::U64(2));
+}
+
+#[test]
+fn test_struct_destructure_match_no_match_falls_to_wildcard() {
+    let value = common::eval(
+        "struct Cat { name: string }
+         struct Dog { name: string }
+         let d = Dog { name: \"Rex\" };
+         match d {
+             Cat { name } => 1,
+             _ => 0,
+         }",
+    );
+    assert_eq!(value, TlangValue::U64(0));
+}
+
 // ── Struct in pattern matching ────────────────────────────────────────────────
 
 #[test]

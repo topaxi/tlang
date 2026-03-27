@@ -1,0 +1,40 @@
+struct SafeHtml { value: string }
+
+fn render(v) {
+    match v {
+        SafeHtml { value } => value,
+        _ => "unknown",
+    }
+}
+
+let sh = SafeHtml { value: "hello" };
+render(sh) |> log();
+render(42) |> log();
+
+struct Point { x: isize, y: isize }
+
+fn classify(p) {
+    match p {
+        Point { x: 0, y: 0 } => "origin",
+        Point { x, y } => "point",
+    }
+}
+
+let p = Point { x: 3, y: 4 };
+classify(p) |> log();
+
+struct Cat { name: string }
+struct Dog { name: string }
+
+fn describe(animal) {
+    match animal {
+        Cat { name } => "cat: " + name,
+        Dog { name } => "dog: " + name,
+        _ => "unknown animal",
+    }
+}
+
+let c = Cat { name: "Whiskers" };
+let d = Dog { name: "Rex" };
+describe(c) |> log();
+describe(d) |> log();
