@@ -142,23 +142,30 @@ impl<'a> InnerCodegen<'a> {
 
             if let Some(first_js) = first_js {
                 let mut result = self.ident_expr(&first_js);
-                // StructMethod aliases (e.g. `Expense::is_food`) reference
-                // dot-methods that live on the prototype, so insert `.prototype`
-                // and wrap with `$uncurryThis` to convert the `this`-based
-                // method into a plain function taking the instance as arg 1.
                 let is_struct_method = path.res.binding_kind() == hir::BindingKind::StructMethod;
                 if is_struct_method {
+                    // StructMethod aliases (e.g. `Expense::is_food` or
+                    // `Temporal::PlainDate::foo`) reference dot-methods on the
+                    // prototype. Build the full type expression from all
+                    // segments except the last, insert `.prototype`, then the
+                    // final method name, and wrap with `$uncurryThis`.
+                    let segments = &path.segments;
+                    for segment in &segments[1..segments.len() - 1] {
+                        let prop = js::safe_js_variable_name(segment.ident.as_str());
+                        result = self.static_member_expr(result, &prop);
+                    }
                     result = self.static_member_expr(result, "prototype");
-                }
-                for segment in &path.segments[1..] {
-                    let prop = js::safe_js_variable_name(segment.ident.as_str());
-                    result = self.static_member_expr(result, &prop);
-                }
-                if is_struct_method {
+                    let method = js::safe_js_variable_name(segments.last().unwrap().ident.as_str());
+                    result = self.static_member_expr(result, &method);
                     result = self.call_expr(
                         self.ident_expr("$uncurryThis"),
                         vec![Argument::from(result)],
                     );
+                } else {
+                    for segment in &path.segments[1..] {
+                        let prop = js::safe_js_variable_name(segment.ident.as_str());
+                        result = self.static_member_expr(result, &prop);
+                    }
                 }
                 return result;
             }

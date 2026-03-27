@@ -1,0 +1,9 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/structs/method_refs.tlang
+---
+2
+2
+[78.53981633974483, 12, 3.141592653589793, 12]
