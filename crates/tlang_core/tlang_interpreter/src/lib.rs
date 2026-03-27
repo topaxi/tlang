@@ -1941,30 +1941,19 @@ impl Interpreter {
         kvs: &[(Ident, hir::Pat)],
         value: TlangValue,
     ) -> bool {
-        let shape_opt = self.get_shape_of(state, value);
-        let shape = match shape_opt {
-            Some(s) => s,
-            None => {
-                let s = state.stringify(value);
-                state.panic(format!("Struct shape not found for value {:?}", s))
-            }
-        };
-        let struct_shape = match shape.get_struct_shape() {
-            Some(s) => s,
-            None => {
-                let s = state.stringify(value);
-                state.panic(format!("Value has a shape, but not a struct shape {:?}", s))
-            }
+        let Some(expected_hir_id) = path.res.hir_id() else {
+            return false;
         };
 
-        let path_name = path.to_string();
+        let value_shape_key = state.get_struct(value).unwrap().shape();
 
-        if struct_shape.name != path_name {
+        if value_shape_key != ShapeKey::HirId(expected_hir_id) {
             return false;
         }
 
         kvs.iter().all(|(k, pat)| {
-            self.get_shape_of(state, value)
+            state
+                .get_shape_by_key(value_shape_key)
                 .and_then(|shape| shape.get_struct_shape())
                 .and_then(|struct_shape| struct_shape.get_field_index(&k.to_string()))
                 .is_some_and(|field_index| {
