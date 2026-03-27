@@ -1,4 +1,4 @@
-import { $assert } from './globals.js';
+import { $assert } from './globals.pre.js';
 import { string } from './string.tlang.js';
 
 export const $StringBuf = class StringBuf {
