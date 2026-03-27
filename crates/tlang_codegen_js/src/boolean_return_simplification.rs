@@ -197,9 +197,7 @@ fn simplify_stmt_recursive(stmt: &mut hir::Stmt) -> bool {
                 }
             }
             hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
-                if simplify_block_recursive(block) {
-                    changed = true;
-                }
+                changed |= simplify_block_recursive(block);
             }
             _ => {}
         }
