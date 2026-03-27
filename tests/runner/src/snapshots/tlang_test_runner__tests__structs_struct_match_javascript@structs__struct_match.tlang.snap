@@ -5,6 +5,7 @@ expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/structs/struct_match.tlang
 ---
 unknown
+unknown
 undefined
 unknown animal
 unknown animal

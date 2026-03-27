@@ -5,6 +5,7 @@ expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/structs/struct_match.tlang
 ---
 hello
+unknown
 point
 cat: Whiskers
 dog: Rex

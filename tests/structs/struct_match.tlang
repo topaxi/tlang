@@ -9,6 +9,7 @@ fn render(v) {
 
 let sh = SafeHtml { value: "hello" };
 render(sh) |> log();
+render(42) |> log();
 
 struct Point { x: isize, y: isize }
 
