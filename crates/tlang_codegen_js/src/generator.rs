@@ -308,10 +308,7 @@ impl CodegenJS {
         // Post-process: simplify `if (c) { return true } else { return false }`
         // into `return c` (or `return !c` when swapped).
         let post_ast = AstBuilder::new(&allocator);
-        crate::js_boolean_return_simplification::simplify_boolean_returns(
-            &mut program,
-            &post_ast,
-        );
+        crate::js_boolean_return_simplification::simplify_boolean_returns(&mut program, &post_ast);
 
         let mut serializer = PrettyJSSerializer::new(false);
         program.serialize(&mut serializer);

@@ -185,11 +185,7 @@ fn try_simplify_stmt(stmt: &mut hir::Stmt) -> bool {
         unreachable!();
     };
 
-    let return_expr = if negate {
-        negate_expr(*cond)
-    } else {
-        *cond
-    };
+    let return_expr = if negate { negate_expr(*cond) } else { *cond };
 
     stmt.kind = hir::StmtKind::Return(Some(Box::new(return_expr)));
     true
@@ -233,12 +229,11 @@ fn block_returns_bool(block: &hir::Block) -> Option<bool> {
         return None;
     }
 
-    if let hir::StmtKind::Return(Some(expr)) = &block.stmts[0].kind {
-        if let hir::ExprKind::Literal(lit) = &expr.kind {
-            if let Literal::Boolean(b) = **lit {
-                return Some(b);
-            }
-        }
+    if let hir::StmtKind::Return(Some(expr)) = &block.stmts[0].kind
+        && let hir::ExprKind::Literal(lit) = &expr.kind
+        && let Literal::Boolean(b) = **lit
+    {
+        return Some(b);
     }
 
     None

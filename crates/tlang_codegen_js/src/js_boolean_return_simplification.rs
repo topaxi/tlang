@@ -26,7 +26,7 @@ use oxc_span::SPAN;
 /// This operates as a safety net after codegen, catching boolean-return
 /// patterns regardless of HIR origin (IfElse nodes, Match nodes, etc.).
 pub fn simplify_boolean_returns<'a>(program: &mut Program<'a>, ast: &AstBuilder<'a>) {
-    for stmt in program.body.iter_mut() {
+    for stmt in &mut program.body {
         simplify_in_stmt(stmt, ast);
     }
 }
@@ -53,7 +53,7 @@ fn simplify_in_stmt<'a>(stmt: &mut Statement<'a>, ast: &AstBuilder<'a>) {
             simplify_in_expr(&mut expr_stmt.expression, ast);
         }
         Statement::VariableDeclaration(var_decl) => {
-            for declarator in var_decl.declarations.iter_mut() {
+            for declarator in &mut var_decl.declarations {
                 if let Some(ref mut init) = declarator.init {
                     simplify_in_expr(init, ast);
                 }
@@ -89,13 +89,13 @@ fn simplify_in_expr<'a>(expr: &mut Expression<'a>, ast: &AstBuilder<'a>) {
             simplify_in_expr(&mut assign.right, ast);
         }
         Expression::SequenceExpression(seq) => {
-            for sub_expr in seq.expressions.iter_mut() {
+            for sub_expr in &mut seq.expressions {
                 simplify_in_expr(sub_expr, ast);
             }
         }
         Expression::CallExpression(call) => {
             simplify_in_expr(&mut call.callee, ast);
-            for arg in call.arguments.iter_mut() {
+            for arg in &mut call.arguments {
                 if let Argument::SpreadElement(spread) = arg {
                     simplify_in_expr(&mut spread.argument, ast);
                 } else {
