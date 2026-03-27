@@ -8,17 +8,12 @@
 //   • Temporal API for date-based queries
 //   • For-loop accumulators for aggregation
 
-// ── Expense Type ───────────────────────────────────────────────────
-// Each variant carries an amount and a date.
-
 enum Expense {
     Food(amount, date),
     Transport(amount, date),
     Entertainment(amount, date),
     Utilities(amount, date),
 }
-
-// ── Accessor Methods (pattern-matched over every variant) ──────────
 
 fn Expense.amount(Expense::Food(a, _)) { a }
 fn Expense.amount(Expense::Transport(a, _)) { a }
@@ -35,18 +30,27 @@ fn Expense.category_name(Expense::Transport(_, _)) { "Transport" }
 fn Expense.category_name(Expense::Entertainment(_, _)) { "Entertainment" }
 fn Expense.category_name(Expense::Utilities(_, _)) { "Utilities" }
 
-// Category predicates
-fn is_food(Expense::Food(_, _)) { true }
-fn is_food(_) { false }
+impl Display for Expense {
+    fn to_string(e) {
+        let category = e.category_name();
+        let amount = e.amount();
+        let date = e.date().to_string();
 
-fn is_transport(Expense::Transport(_, _)) { true }
-fn is_transport(_) { false }
+        "{category}: {amount} on {date}"
+    }
+}
 
-fn is_entertainment(Expense::Entertainment(_, _)) { true }
-fn is_entertainment(_) { false }
+fn Expense.is_food(Expense::Food(_, _)) { true }
+fn Expense.is_food(_) { false }
 
-fn is_utilities(Expense::Utilities(_, _)) { true }
-fn is_utilities(_) { false }
+fn Expense.is_transport(Expense::Transport(_, _)) { true }
+fn Expense.is_transport(_) { false }
+
+fn Expense.is_entertainment(Expense::Entertainment(_, _)) { true }
+fn Expense.is_entertainment(_) { false }
+
+fn Expense.is_utilities(Expense::Utilities(_, _)) { true }
+fn Expense.is_utilities(_) { false }
 
 // ── Utility Functions ──────────────────────────────────────────────
 
@@ -56,9 +60,6 @@ fn filter([_, ...xs], f) { rec filter(xs, f) }
 
 fn foldl([], acc, _) { acc }
 fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
-
-fn length([]) { 0 }
-fn length([_, ...rest]) { 1 + length(rest) }
 
 fn sum_amounts(expenses) {
     expenses |> foldl(0, fn(acc, e) { acc + e.amount() })
@@ -73,7 +74,7 @@ let expenses = [
     Expense::Utilities(85.20, Temporal::PlainDate::from("2025-03-07")),
     Expense::Food(62.30, Temporal::PlainDate::from("2025-03-10")),
     Expense::Transport(15.00, Temporal::PlainDate::from("2025-03-12")),
-    Expense::Entertainment(79.99, Temporal::PlainDate::from("2025-03-15")),
+    Expense::Entertainment(80.99, Temporal::PlainDate::from("2025-03-15")),
     Expense::Food(12.40, Temporal::PlainDate::from("2025-03-18")),
     Expense::Utilities(55.00, Temporal::PlainDate::from("2025-03-20")),
     Expense::Food(35.00, Temporal::PlainDate::from("2025-03-25")),
@@ -89,7 +90,7 @@ log("Total spending:");
 total |> log();
 
 log("Number of transactions:");
-expenses |> length() |> log();
+expenses |> len() |> log();
 
 // ── Category Breakdown (pipeline + filter + fold) ──────────────────
 
@@ -97,16 +98,16 @@ log("");
 log("--- Spending by Category ---");
 
 log("Food:");
-expenses |> filter(is_food) |> sum_amounts() |> log();
+expenses |> filter(Expense::is_food) |> sum_amounts() |> log();
 
 log("Transport:");
-expenses |> filter(is_transport) |> sum_amounts() |> log();
+expenses |> filter(Expense::is_transport) |> sum_amounts() |> log();
 
 log("Entertainment:");
-expenses |> filter(is_entertainment) |> sum_amounts() |> log();
+expenses |> filter(Expense::is_entertainment) |> sum_amounts() |> log();
 
 log("Utilities:");
-expenses |> filter(is_utilities) |> sum_amounts() |> log();
+expenses |> filter(Expense::is_utilities) |> sum_amounts() |> log();
 
 // ── Transaction Counts (for-loop accumulator) ──────────────────────
 
@@ -114,10 +115,10 @@ log("");
 log("--- Transaction Counts ---");
 
 let counts = for e in expenses; with acc = [0, 0, 0, 0] {
-    if is_food(e)          { [acc[0] + 1, acc[1], acc[2], acc[3]] }
-    else if is_transport(e)     { [acc[0], acc[1] + 1, acc[2], acc[3]] }
-    else if is_entertainment(e) { [acc[0], acc[1], acc[2] + 1, acc[3]] }
-    else                        { [acc[0], acc[1], acc[2], acc[3] + 1] }
+    if e.is_food()               { [acc[0] + 1, acc[1], acc[2], acc[3]] }
+    else if e.is_transport()     { [acc[0], acc[1] + 1, acc[2], acc[3]] }
+    else if e.is_entertainment() { [acc[0], acc[1], acc[2] + 1, acc[3]] }
+    else                         { [acc[0], acc[1], acc[2], acc[3] + 1] }
 };
 
 log("Food:");
