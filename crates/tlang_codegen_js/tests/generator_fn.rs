@@ -389,3 +389,17 @@ fn test_function_named_like_builtin_generates_valid_declaration() {
         "should generate a function named `log` or `log$0`"
     );
 }
+
+#[test]
+fn test_multi_clause_boolean_return_simplification() {
+    let output = compile!(indoc! {"
+        fn is_zero(0) { true }
+        fn is_zero(_) { false }
+    "});
+    let expected_output = indoc! {"
+        function is_zero(arg0) {
+            return arg0 === 0;
+        }
+    "};
+    assert_eq!(output, expected_output);
+}

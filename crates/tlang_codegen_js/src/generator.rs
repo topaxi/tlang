@@ -294,7 +294,7 @@ impl CodegenJS {
         if let Some(st) = source_text {
             inner = inner.with_source_text(st.to_string());
         }
-        let program = inner.generate_module(module);
+        let mut program = inner.generate_module(module);
 
         if !inner.errors.is_empty() {
             // Clear any stale output from a previous successful run so that
@@ -304,6 +304,11 @@ impl CodegenJS {
             self.source_map = None;
             return Err(inner.errors);
         }
+
+        // Post-process: simplify `if (c) { return true } else { return false }`
+        // into `return c` (or `return !c` when swapped).
+        let post_ast = AstBuilder::new(&allocator);
+        crate::js_boolean_return_simplification::simplify_boolean_returns(&mut program, &post_ast);
 
         let mut serializer = PrettyJSSerializer::new(false);
         program.serialize(&mut serializer);

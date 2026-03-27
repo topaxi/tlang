@@ -2,6 +2,7 @@ use tlang_hir as hir;
 use tlang_hir_opt::hir_opt::{HirOptContext, HirOptError, HirOptGroup};
 use tlang_hir_opt::{self as hir_opt, HirPass};
 
+use crate::boolean_return_simplification::BooleanReturnSimplification;
 use crate::js_anf_return_opt::JsAnfReturnOpt;
 use crate::js_anf_transform::JsAnfTransform;
 
@@ -13,6 +14,7 @@ impl Default for JsHirOptimizer {
             Box::new(hir_opt::tail_call_validation::TailPositionAnalysis),
             Box::new(JsAnfTransform::default()),
             Box::new(JsAnfReturnOpt::default()),
+            Box::new(BooleanReturnSimplification::default()),
             Box::new(hir_opt::symbol_resolution::SymbolResolution::default()),
             Box::new(hir_opt::constant_folding::ConstantFolding::default()),
         ])
