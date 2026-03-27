@@ -31,12 +31,10 @@ fn Expense.category_name(Expense::Entertainment(_, _)) { "Entertainment" }
 fn Expense.category_name(Expense::Utilities(_, _)) { "Utilities" }
 
 impl Display for Expense {
-    fn to_string(e) {
-        let category = e.category_name();
-        let amount = e.amount();
-        let date = e.date().to_string();
+    apply to_string;
 
-        "{category}: {amount} on {date}"
+    fn to_string(e) {
+        f"{e.category_name()}: {e.amount()} on {e.date()}"
     }
 }
 
@@ -159,9 +157,4 @@ let largest = expenses |> foldl(first, fn(best, e) {
     if e.amount() > best.amount() { e } else { best }
 });
 
-log("Amount:");
-largest.amount() |> log();
-log("Category:");
-largest.category_name() |> log();
-log("Date:");
-largest.date().to_string() |> log();
+largest.to_string() |> log();

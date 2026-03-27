@@ -272,6 +272,23 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             declaration.span.end_lc.line,
         );
 
+        // For dot-method declarations (e.g. `fn Expense.is_food(...)`) also
+        // register the `::` qualified form (`Expense::is_food`) so that
+        // callers can reference the method as a first-class function value.
+        if let ExprKind::FieldExpression(ref field_expr) = declaration.name.kind
+            && let Some(base_path) = field_expr.base.path()
+        {
+            let qualified = format!("{}::{}", base_path, field_expr.field);
+            self.declare_symbol(
+                ctx,
+                declaration.id,
+                &qualified,
+                DefKind::StructMethod(declaration.parameters.len() as u16),
+                declaration.name.span,
+                declaration.span.end_lc.line,
+            );
+        }
+
         // Enter function scope — marked as a function boundary so that
         // `DefScope::get_slot` can distinguish intra-function block access
         // from cross-function closure captures.

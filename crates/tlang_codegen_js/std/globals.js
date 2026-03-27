@@ -67,3 +67,23 @@ export class $AssertError extends Error {}
 export function $assert(cond, msg) {
   if (!cond) throw new $AssertError(typeof msg === 'function' ? msg() : msg);
 }
+
+export const $uncurryThis = (() => {
+  const cache = new WeakMap();
+  const uncurry = Function.prototype.bind.bind(Function.prototype.call);
+
+  /**
+   * @template This
+   * @template {(this: This, ...args: any[]) => any} T
+   * @param {T} fn - The function to uncurry.
+   * @return {(self: This, ...args: Parameters<T>) => ReturnType<T>} The uncurried function.
+   */
+  return (fn) => {
+    let uncurried = cache.get(fn);
+    if (uncurried == null) {
+      uncurried = uncurry(fn);
+      cache.set(fn, uncurried);
+    }
+    return uncurried;
+  };
+})();

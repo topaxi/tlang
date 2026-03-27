@@ -28,6 +28,9 @@ pub enum DefKind {
     Struct,
     Protocol,
     ProtocolMethod(u16),
+    /// A `::` alias for a dot-method on a struct/enum (e.g. `Expense::is_food`
+    /// pointing at the definition `fn Expense.is_food`).
+    StructMethod(u16),
 }
 
 impl DefKind {
@@ -35,7 +38,8 @@ impl DefKind {
         match self {
             DefKind::Function(arity)
             | DefKind::FunctionSelfRef(arity)
-            | DefKind::ProtocolMethod(arity) => Some(arity),
+            | DefKind::ProtocolMethod(arity)
+            | DefKind::StructMethod(arity) => Some(arity),
             _ => None,
         }
     }
@@ -46,7 +50,10 @@ impl Display for DefKind {
         match self {
             DefKind::Module => write!(f, "module"),
             DefKind::Variable => write!(f, "variable"),
-            DefKind::Function(_) | DefKind::FunctionSelfRef(_) | DefKind::ProtocolMethod(_) => {
+            DefKind::Function(_)
+            | DefKind::FunctionSelfRef(_)
+            | DefKind::ProtocolMethod(_)
+            | DefKind::StructMethod(_) => {
                 write!(f, "function")
             }
             DefKind::Parameter => write!(f, "parameter"),
@@ -144,13 +151,16 @@ impl Def {
     }
 
     pub fn is_fn(&self, arity: usize) -> bool {
-        matches!(self.kind, DefKind::Function(a) | DefKind::FunctionSelfRef(a) | DefKind::ProtocolMethod(a) if a as usize == arity || a == u16::MAX)
+        matches!(self.kind, DefKind::Function(a) | DefKind::FunctionSelfRef(a) | DefKind::ProtocolMethod(a) | DefKind::StructMethod(a) if a as usize == arity || a == u16::MAX)
     }
 
     pub fn is_any_fn(&self) -> bool {
         matches!(
             self.kind,
-            DefKind::Function(_) | DefKind::FunctionSelfRef(_) | DefKind::ProtocolMethod(_)
+            DefKind::Function(_)
+                | DefKind::FunctionSelfRef(_)
+                | DefKind::ProtocolMethod(_)
+                | DefKind::StructMethod(_)
         )
     }
 
@@ -313,7 +323,8 @@ impl DefScope {
             .filter(|s| {
                 if let DefKind::Function(a)
                 | DefKind::FunctionSelfRef(a)
-                | DefKind::ProtocolMethod(a) = s.kind
+                | DefKind::ProtocolMethod(a)
+                | DefKind::StructMethod(a) = s.kind
                 {
                     a == u16::MAX || // Builtin n-ary function
                     a as usize == arity

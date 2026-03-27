@@ -206,6 +206,7 @@ impl CodegenJS {
             ("len", DefKind::Function(1)),
             ("compose", DefKind::Function(2)),
             ("re", DefKind::Function(2)),
+            ("f", DefKind::Function(2)),
             ("map", DefKind::Function(2)),
             ("panic", DefKind::Function(1)),
             ("string", DefKind::Module),
