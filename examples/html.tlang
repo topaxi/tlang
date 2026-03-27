@@ -70,10 +70,20 @@ header |> log();
 
 log("=== List rendering ===");
 
-struct Post { title: string, author: string, excerpt: string }
+struct Post {
+    title: string,
+    author: string,
+    excerpt: string,
+}
 
 fn Post.render(self) {
-    html"<article><h2>{text(self.title)}</h2><p class=\"byline\">by {text(self.author)}</p><p>{text(self.excerpt)}</p></article>"
+    html"
+        <article>
+            <h2>{text(self.title)}</h2>
+            <p class=\"byline\">by {text(self.author)}</p>
+            <p>{text(self.excerpt)}</p>
+        </article>
+    "
 }
 
 let posts = [
