@@ -123,7 +123,9 @@ fn try_simplify_if_bool_return<'a>(
         return None;
     }
 
-    // Take the condition expression from the if statement.
+    // Take the condition expression from the if statement. The dummy `false`
+    // literal is needed because OXC arena-allocated nodes cannot be moved out
+    // directly; the entire IfStatement will be discarded by the caller.
     let condition = std::mem::replace(
         &mut if_stmt.test,
         ast.expression_boolean_literal(SPAN, false),

@@ -176,7 +176,9 @@ fn try_simplify_stmt(stmt: &mut hir::Stmt) -> bool {
         return false;
     };
 
-    // Now mutate: extract the condition from the IfElse and build a Return.
+    // Now mutate: take ownership of the entire IfElse expression via
+    // mem::replace so we can extract the condition. The old StmtKind (and its
+    // then/else blocks) is dropped after we extract `cond`.
     let old_kind = std::mem::replace(&mut stmt.kind, hir::StmtKind::Return(None));
     let hir::StmtKind::Expr(expr) = old_kind else {
         unreachable!();
