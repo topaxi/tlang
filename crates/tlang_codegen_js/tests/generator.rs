@@ -329,6 +329,36 @@ fn test_if_else_ternary_precedence() {
 }
 
 #[test]
+fn test_boolean_return_simplification() {
+    let output = compile!(indoc! {"
+        fn is_positive(n) {
+            if n > 0 { return true; } else { return false; }
+        }
+    "});
+    let expected_output = indoc! {"
+        function is_positive(n) {
+            return n > 0;
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_boolean_return_simplification_negated() {
+    let output = compile!(indoc! {"
+        fn is_not_positive(n) {
+            if n > 0 { return false; } else { return true; }
+        }
+    "});
+    let expected_output = indoc! {"
+        function is_not_positive(n) {
+            return !(n > 0);
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
 fn test_list_literal() {
     let output = compile!("fn main() { [1, 2, 3] }");
     let expected_output = indoc! {"

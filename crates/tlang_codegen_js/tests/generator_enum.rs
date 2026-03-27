@@ -217,3 +217,45 @@ fn test_maximum_depth_tree_positional() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_enum_is_variant_boolean_return_simplification() {
+    let output = compile!(indoc! {"
+        enum Color { Red, Blue, Green }
+        fn Color.is_red(Color::Red) { true }
+        fn Color.is_red(_) { false }
+    "});
+    let expected_output = indoc! {"
+        class Color {
+            tag = this;
+            static Red = new this();
+            static Blue = new this();
+            static Green = new this();
+        }
+        Color.prototype.is_red = function is_red() {
+            return this.tag === Color.Red;
+        };
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_enum_is_variant_negated_boolean_return_simplification() {
+    let output = compile!(indoc! {"
+        enum Color { Red, Blue, Green }
+        fn Color.is_not_red(Color::Red) { false }
+        fn Color.is_not_red(_) { true }
+    "});
+    let expected_output = indoc! {"
+        class Color {
+            tag = this;
+            static Red = new this();
+            static Blue = new this();
+            static Green = new this();
+        }
+        Color.prototype.is_not_red = function is_not_red() {
+            return !(this.tag === Color.Red);
+        };
+    "};
+    assert_eq!(output, expected_output);
+}
