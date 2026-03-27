@@ -9,10 +9,10 @@
 //   • For-loop accumulators for aggregation
 
 enum Expense {
-    Food(amount, date),
-    Transport(amount, date),
-    Entertainment(amount, date),
-    Utilities(amount, date),
+    Food(f32, Temporal::PlainDate),
+    Transport(f32, Temporal::PlainDate),
+    Entertainment(f32, Temporal::PlainDate),
+    Utilities(f32, Temporal::PlainDate),
 }
 
 fn Expense.amount(Expense::Food(a, _)) { a }
