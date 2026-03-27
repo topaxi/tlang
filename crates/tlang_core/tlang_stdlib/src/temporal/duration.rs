@@ -23,17 +23,35 @@ pub(crate) fn to_temporal(vm: &VMState, this: TlangValue) -> TemporalDuration {
     let s = vm
         .get_struct(this)
         .expect("expected Temporal.Duration struct");
+
+    // Extract integer fields directly to avoid f64 precision loss.
+    fn get_i64(val: &TlangValue) -> i64 {
+        match val {
+            TlangValue::I64(v) | TlangValue::I8(v) | TlangValue::I16(v) | TlangValue::I32(v) => *v,
+            TlangValue::U64(v) | TlangValue::U8(v) | TlangValue::U16(v) | TlangValue::U32(v) => {
+                *v as i64
+            }
+            other => {
+                let f = other.as_f64();
+                if !f.is_finite() || f.fract() != 0.0 {
+                    panic!("Temporal.Duration: field must be a finite integer");
+                }
+                f as i64
+            }
+        }
+    }
+
     TemporalDuration::new(
-        s[F_YEARS].as_f64() as i64,
-        s[F_MONTHS].as_f64() as i64,
-        s[F_WEEKS].as_f64() as i64,
-        s[F_DAYS].as_f64() as i64,
-        s[F_HOURS].as_f64() as i64,
-        s[F_MINUTES].as_f64() as i64,
-        s[F_SECONDS].as_f64() as i64,
-        s[F_MILLISECONDS].as_f64() as i64,
-        s[F_MICROSECONDS].as_f64() as i128,
-        s[F_NANOSECONDS].as_f64() as i128,
+        get_i64(&s[F_YEARS]),
+        get_i64(&s[F_MONTHS]),
+        get_i64(&s[F_WEEKS]),
+        get_i64(&s[F_DAYS]),
+        get_i64(&s[F_HOURS]),
+        get_i64(&s[F_MINUTES]),
+        get_i64(&s[F_SECONDS]),
+        get_i64(&s[F_MILLISECONDS]),
+        get_i64(&s[F_MICROSECONDS]) as i128,
+        get_i64(&s[F_NANOSECONDS]) as i128,
     )
     .expect("invalid duration fields")
 }
@@ -61,8 +79,12 @@ pub(crate) fn from_temporal(vm: &mut VMState, dur: &TemporalDuration) -> TlangVa
             TlangValue::I64(dur.minutes()),
             TlangValue::I64(dur.seconds()),
             TlangValue::I64(dur.milliseconds()),
-            TlangValue::I64(dur.microseconds() as i64),
-            TlangValue::I64(dur.nanoseconds() as i64),
+            TlangValue::I64(i64::try_from(dur.microseconds()).unwrap_or_else(|_| {
+                vm.panic("Temporal.Duration: microseconds out of i64 range".to_string())
+            })),
+            TlangValue::I64(i64::try_from(dur.nanoseconds()).unwrap_or_else(|_| {
+                vm.panic("Temporal.Duration: nanoseconds out of i64 range".to_string())
+            })),
             TlangValue::I64(sign_val),
             TlangValue::Bool(dur.is_zero()),
         ],
@@ -81,10 +103,17 @@ pub fn duration_from(vm: &mut VMState, arg: TlangValue) -> TlangValue {
     // If arg is a struct (record), extract fields as a partial duration.
     if let Some(fields) = vm.get_struct(arg) {
         let f = |idx: usize| -> Option<i64> {
-            fields
-                .get(idx)
-                .filter(|v| !v.is_nil())
-                .map(|v| v.as_f64() as i64)
+            fields.get(idx).filter(|v| !v.is_nil()).map(|v| match v {
+                TlangValue::I64(i)
+                | TlangValue::I8(i)
+                | TlangValue::I16(i)
+                | TlangValue::I32(i) => i,
+                TlangValue::U64(u)
+                | TlangValue::U8(u)
+                | TlangValue::U16(u)
+                | TlangValue::U32(u) => u as i64,
+                other => other.as_f64() as i64,
+            })
         };
         let dur = TemporalDuration::from_partial_duration(PartialDuration {
             years: f(0),

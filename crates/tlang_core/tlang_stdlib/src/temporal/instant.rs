@@ -14,8 +14,13 @@ pub(crate) fn to_temporal(vm: &VMState, this: TlangValue) -> TemporalInstant {
     let s = vm
         .get_struct(this)
         .expect("expected Temporal.Instant struct");
-    // epoch_nanoseconds stored as I64 (fits current dates until ~2262).
-    let ns = s[F_EPOCH_NANOSECONDS].as_f64() as i128;
+    // Read epoch_nanoseconds as integer directly to avoid f64 precision loss.
+    let ns: i128 = match s[F_EPOCH_NANOSECONDS] {
+        TlangValue::I64(v) | TlangValue::I8(v) | TlangValue::I16(v) | TlangValue::I32(v) => {
+            v as i128
+        }
+        _ => panic!("Temporal.Instant: epoch_nanoseconds field must be an integer"),
+    };
     TemporalInstant::try_new(ns).expect("invalid epoch nanoseconds")
 }
 
@@ -26,10 +31,16 @@ pub(crate) fn from_temporal(vm: &mut VMState, inst: &TemporalInstant) -> TlangVa
         .builtin_shapes
         .lookup("Temporal.Instant")
         .expect("Temporal.Instant shape not registered");
+    let epoch_ns_i64 = i64::try_from(inst.as_i128()).unwrap_or_else(|_| {
+        vm.panic(
+            "Temporal.Instant: epochNanoseconds value is outside the supported i64 range"
+                .to_string(),
+        )
+    });
     vm.new_object(TlangObjectKind::Struct(TlangStruct::new(
         shape,
         vec![
-            TlangValue::I64(inst.as_i128() as i64),
+            TlangValue::I64(epoch_ns_i64),
             TlangValue::I64(inst.epoch_milliseconds()),
         ],
     )))

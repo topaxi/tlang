@@ -80,17 +80,17 @@ pub static JS_BUILTINS: &[JsBuiltin] = &[
     JsBuiltin::new(
         "Temporal::Now::plain_date_time_iso",
         "Temporal.Now.plain_date_time_iso",
-        Some(DefKind::Function(0)),
+        Some(DefKind::Function(u16::MAX)),
     ),
     JsBuiltin::new(
         "Temporal::Now::plain_date_iso",
         "Temporal.Now.plain_date_iso",
-        Some(DefKind::Function(0)),
+        Some(DefKind::Function(u16::MAX)),
     ),
     JsBuiltin::new(
         "Temporal::Now::plain_time_iso",
         "Temporal.Now.plain_time_iso",
-        Some(DefKind::Function(0)),
+        Some(DefKind::Function(u16::MAX)),
     ),
     JsBuiltin::new(
         "Temporal::Now::zoned_date_time_iso",

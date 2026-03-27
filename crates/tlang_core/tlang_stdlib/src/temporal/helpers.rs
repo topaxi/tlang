@@ -10,10 +10,21 @@ pub(crate) fn get_string_field(vm: &VMState, this: TlangValue, index: usize) -> 
         .to_string()
 }
 
-/// Extract an i64 field from a struct at the given index via `as_f64()`.
+/// Extract an i64 field from a struct at the given index.
+///
+/// Reads integer-valued `TlangValue` variants directly to avoid precision loss
+/// from converting large integers (e.g. epoch nanoseconds) through `f64`.
+/// Falls back to `as_f64()` only for non-integer values.
+#[allow(dead_code)]
 pub(crate) fn get_i64_field(vm: &VMState, this: TlangValue, index: usize) -> i64 {
     let s = vm.get_struct(this).expect("expected struct");
-    s[index].as_f64() as i64
+    match s[index] {
+        TlangValue::I64(i) | TlangValue::I8(i) | TlangValue::I16(i) | TlangValue::I32(i) => i,
+        TlangValue::U64(u) | TlangValue::U8(u) | TlangValue::U16(u) | TlangValue::U32(u) => {
+            u as i64
+        }
+        other => other.as_f64() as i64,
+    }
 }
 
 /// Parse a string argument from a TlangValue.

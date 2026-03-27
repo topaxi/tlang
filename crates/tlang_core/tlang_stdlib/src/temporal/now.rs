@@ -21,8 +21,9 @@ pub fn now_instant(vm: &mut VMState) -> TlangValue {
 
 /// `Temporal.Now.zonedDateTimeISO(tz?)` — current time as a ZonedDateTime.
 #[native_fn(name = "Temporal::Now::zoned_date_time_iso")]
-pub fn now_zoned_date_time_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangValue {
+pub fn now_zoned_date_time_iso(vm: &mut VMState, args: &[TlangValue]) -> TlangValue {
     let ns = super::system_epoch_nanoseconds();
+    let tz_val = args.first().copied().unwrap_or(TlangValue::Nil);
     let tz = if tz_val.is_nil() {
         TimeZone::utc()
     } else {
@@ -37,8 +38,9 @@ pub fn now_zoned_date_time_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangVal
 
 /// `Temporal.Now.plainDateTimeISO(tz?)` — current time as a PlainDateTime.
 #[native_fn(name = "Temporal::Now::plain_date_time_iso")]
-pub fn now_plain_date_time_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangValue {
+pub fn now_plain_date_time_iso(vm: &mut VMState, args: &[TlangValue]) -> TlangValue {
     let ns = super::system_epoch_nanoseconds();
+    let tz_val = args.first().copied().unwrap_or(TlangValue::Nil);
     let tz = if tz_val.is_nil() {
         TimeZone::utc()
     } else {
@@ -66,8 +68,9 @@ pub fn now_plain_date_time_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangVal
 
 /// `Temporal.Now.plainDateISO(tz?)` — current date as a PlainDate.
 #[native_fn(name = "Temporal::Now::plain_date_iso")]
-pub fn now_plain_date_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangValue {
+pub fn now_plain_date_iso(vm: &mut VMState, args: &[TlangValue]) -> TlangValue {
     let ns = super::system_epoch_nanoseconds();
+    let tz_val = args.first().copied().unwrap_or(TlangValue::Nil);
     let tz = if tz_val.is_nil() {
         TimeZone::utc()
     } else {
@@ -84,8 +87,9 @@ pub fn now_plain_date_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangValue {
 
 /// `Temporal.Now.plainTimeISO(tz?)` — current time as a PlainTime.
 #[native_fn(name = "Temporal::Now::plain_time_iso")]
-pub fn now_plain_time_iso(vm: &mut VMState, tz_val: TlangValue) -> TlangValue {
+pub fn now_plain_time_iso(vm: &mut VMState, args: &[TlangValue]) -> TlangValue {
     let ns = super::system_epoch_nanoseconds();
+    let tz_val = args.first().copied().unwrap_or(TlangValue::Nil);
     let tz = if tz_val.is_nil() {
         TimeZone::utc()
     } else {
