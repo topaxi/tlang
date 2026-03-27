@@ -1926,17 +1926,52 @@ impl Interpreter {
                         })
                 })
             }
-            hir::PatKind::Enum(path, kvs) => {
-                todo!(
-                    "eval_pat: Enum({:?}, {:?}) for value {}\nCurrent scope: {}",
-                    path,
-                    kvs,
-                    state.stringify(value),
-                    state.debug_stringify_scope_stack()
-                )
+            hir::PatKind::Enum(path, kvs) if state.get_struct(value).is_some() => {
+                self.eval_pat_struct(state, path, kvs, value)
             }
+            hir::PatKind::Enum(_path, _kvs) => false,
             hir::PatKind::Rest(_) => unreachable!("Rest patterns can only appear in list patterns"),
         }
+    }
+
+    fn eval_pat_struct(
+        &self,
+        state: &mut VMState,
+        path: &hir::Path,
+        kvs: &[(Ident, hir::Pat)],
+        value: TlangValue,
+    ) -> bool {
+        let shape_opt = self.get_shape_of(state, value);
+        let shape = match shape_opt {
+            Some(s) => s,
+            None => {
+                let s = state.stringify(value);
+                state.panic(format!("Struct shape not found for value {:?}", s))
+            }
+        };
+        let struct_shape = match shape.get_struct_shape() {
+            Some(s) => s,
+            None => {
+                let s = state.stringify(value);
+                state.panic(format!("Value has a shape, but not a struct shape {:?}", s))
+            }
+        };
+
+        let path_name = path.to_string();
+
+        if struct_shape.name != path_name {
+            return false;
+        }
+
+        kvs.iter().all(|(k, pat)| {
+            self.get_shape_of(state, value)
+                .and_then(|shape| shape.get_struct_shape())
+                .and_then(|struct_shape| struct_shape.get_field_index(&k.to_string()))
+                .is_some_and(|field_index| {
+                    let tlang_struct = state.get_struct(value).unwrap();
+                    self.eval_pat(state, pat, tlang_struct[field_index])
+                })
+        })
     }
 
     // TODO: Instead of having rest patterns within list patterns, we should have a pattern
