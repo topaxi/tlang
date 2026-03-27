@@ -3,10 +3,10 @@
 // Demonstrates the html"..." tagged string for building HTML strings.
 //
 // Design:
-//   - html"..." interpolates values as-is (caller controls safety)
+//   - html"..." interpolates values via Display::to_string (caller controls safety)
 //   - text(v)  escapes raw user input before embedding
 //   - Nested html"..." results are plain strings and compose without re-escaping
-//   - Lists of html strings are joined automatically
+//   - Lists are pre-joined with join() before embedding in a template
 //
 // Tagged string expansion:
 //   html"<p>{expr}</p>"  →  html(["<p>", "</p>"], [expr])
@@ -28,18 +28,13 @@ fn text(v) { escape_html(Display::to_string(v)) }
 // ── html tag function ─────────────────────────────────────────────────────────
 
 // Joins a list of html strings into a single string.
-fn join_html([]) { "" }
-fn join_html([x, ...xs]) { x + join_html(xs) }
-
-// Renders an interpolated value: lists are joined, everything else is embedded as-is.
-fn render_value([]) { "" }
-fn render_value([x, ...xs]) { render_value(x) + render_value(xs) }
-fn render_value(v) { v }
+fn join([]) { "" }
+fn join([x, ...xs]) { x + join(xs) }
 
 // Interleaves template parts with rendered values.
 fn html_zip([last], [], acc) { acc + last }
 fn html_zip([part, ...parts], [value, ...values], acc) {
-    rec html_zip(parts, values, acc + part + render_value(value))
+    rec html_zip(parts, values, acc + part + Display::to_string(value))
 }
 
 fn html(parts, values) {
@@ -87,7 +82,7 @@ let posts = [
     Post { title: "Pattern matching", author: "Carol", excerpt: "Destructure everything."     },
 ];
 
-let post_items = posts |> map(fn(post) { html"<li>{render_post(post)}</li>" });
+let post_items = join(map(posts, fn(post) { html"<li>{post.render()}</li>" }));
 let post_list  = html"<ul class=\"posts\">{post_items}</ul>";
 
 post_list |> log();
