@@ -40,7 +40,11 @@ let parserWithMetadata = parser.configure({
       WildcardExpression: t.special(t.variableName),
       Number: t.number,
       String: t.string,
-      TaggedString: t.regexp,
+      TagStringTag: t.special(t.regexp),
+      'TaggedStringOpenDouble TaggedStringOpenSingle TaggedStringDoubleClose TaggedStringSingleClose':
+        t.regexp,
+      'TaggedStringContentDouble TaggedStringContentSingle': t.regexp,
+      'InterpolationStart InterpolationEnd': t.special(t.brace),
       LineComment: t.lineComment,
       BlockComment: t.blockComment,
       ArithOp: t.arithmeticOperator,
@@ -135,111 +139,6 @@ export const tlangCompletion = tlangLanguage.data.of({
 import { LanguageSupport } from '@codemirror/language';
 
 /**
- * Given a tagged string's text, extract the tag name and the content region.
- * Returns { tag, contentFrom, contentTo } where the offsets are relative
- * to the node start.
- *
- * @param {string} text
- * @returns {{ tag: string, contentFrom: number, contentTo: number } | null}
- */
-function parseTaggedStringBounds(text) {
-  const quotePos = text.search(/["']/);
-  if (quotePos < 0) return null;
-  const tag = text.slice(0, quotePos);
-  const quote = text[quotePos];
-  const contentFrom = quotePos + 1;
-  const contentTo = text.endsWith(quote) ? text.length - 1 : text.length;
-  return { tag, contentFrom, contentTo };
-}
-
-/**
- * Compute overlay ranges for injection, skipping interpolation regions.
- * Interpolations are `{expr}` where `{` is followed by an identifier-start char.
- * `{{` and `\{` are escapes and don't start interpolation.
- *
- * @param {number} nodeFrom  absolute offset of the node in the document
- * @param {string} content   the string content (between quotes)
- * @param {number} contentFrom  relative offset of content start within the node
- * @returns {Array<{from: number, to: number}>}
- */
-function computeOverlayRanges(nodeFrom, content, contentFrom) {
-  /** @type {Array<{from: number, to: number}>} */
-  const ranges = [];
-  let i = 0;
-  let rangeStart = 0;
-
-  while (i < content.length) {
-    const ch = content[i];
-
-    if (ch === '\\') {
-      // Skip escape sequence
-      i += 2;
-      continue;
-    }
-
-    if (ch === '{') {
-      if (i + 1 < content.length && content[i + 1] === '{') {
-        // {{ escape — skip both
-        i += 2;
-        continue;
-      }
-
-      if (i + 1 < content.length && /[a-zA-Z_]/.test(content[i + 1])) {
-        // Interpolation start — emit content range up to here
-        if (i > rangeStart) {
-          ranges.push({
-            from: nodeFrom + contentFrom + rangeStart,
-            to: nodeFrom + contentFrom + i,
-          });
-        }
-
-        // Skip to matching closing brace, tracking depth and string literals
-        // so that braces inside strings (e.g. `html"{ foo("}")  }") don't
-        // confuse the depth counter.
-        let depth = 1;
-        i++; // skip opening {
-        while (i < content.length && depth > 0) {
-          const ic = content[i];
-          if (ic === '"' || ic === "'") {
-            // Skip over a string literal inside the interpolation
-            const strQuote = ic;
-            i++;
-            while (i < content.length && content[i] !== strQuote) {
-              if (content[i] === '\\' && i + 1 < content.length) i++; // skip escaped char
-              i++;
-            }
-            if (i < content.length) i++; // skip closing quote
-          } else if (ic === '{') {
-            depth++;
-            i++;
-          } else if (ic === '}') {
-            depth--;
-            if (depth > 0) i++;
-          } else {
-            i++;
-          }
-        }
-        if (i < content.length) i++; // skip closing }
-        rangeStart = i;
-        continue;
-      }
-    }
-
-    i++;
-  }
-
-  // Emit remaining content
-  if (rangeStart < content.length) {
-    ranges.push({
-      from: nodeFrom + contentFrom + rangeStart,
-      to: nodeFrom + contentFrom + content.length,
-    });
-  }
-
-  return ranges;
-}
-
-/**
  * @param {{
  *   reLanguage?: import('@codemirror/language').Language,
  *   htmlLanguage?: import('@codemirror/language').Language,
@@ -265,20 +164,30 @@ function makeTaggedStringWrap(languages) {
 
   return parseMixed((node, input) => {
     if (node.type.name !== 'TaggedString') return null;
-    const text = input.read(node.from, node.to);
-    const bounds = parseTaggedStringBounds(text);
-    if (!bounds) return null;
 
-    const parser = tagParsers[bounds.tag];
+    // Walk the TaggedString's children to find the tag name and content ranges.
+    let tag = null;
+    /** @type {Array<{from: number, to: number}>} */
+    const overlay = [];
+
+    const cursor = node.node.cursor();
+    if (!cursor.firstChild()) return null;
+    do {
+      const name = cursor.type.name;
+      if (name === 'TagStringTag') {
+        tag = input.read(cursor.from, cursor.to);
+      } else if (
+        name === 'TaggedStringContentDouble' ||
+        name === 'TaggedStringContentSingle'
+      ) {
+        overlay.push({ from: cursor.from, to: cursor.to });
+      }
+    } while (cursor.nextSibling());
+
+    if (!tag || overlay.length === 0) return null;
+
+    const parser = tagParsers[tag];
     if (!parser) return null;
-
-    const content = text.slice(bounds.contentFrom, bounds.contentTo);
-    const overlay = computeOverlayRanges(
-      node.from,
-      content,
-      bounds.contentFrom,
-    );
-    if (overlay.length === 0) return null;
 
     return { parser, overlay };
   });

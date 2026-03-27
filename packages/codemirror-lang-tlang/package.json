@@ -9,12 +9,13 @@
   "scripts": {
     "prepare": "lezer-generator src/tlang.grammar -o src/parser.js",
     "build": "npm run prepare",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run"
   },
   "author": "Damian Senn <damian.senn@topaxi.codes>",
   "license": "ISC",
   "devDependencies": {
-    "@lezer/generator": "^1.8.0"
+    "@lezer/generator": "^1.8.0",
+    "vitest": "^4.1.2"
   },
   "dependencies": {
     "@lezer/lr": "^1.4.8"

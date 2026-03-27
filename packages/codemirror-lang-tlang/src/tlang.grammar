@@ -353,6 +353,45 @@ semi { ";" | insertSemi }
   @else blockCommentContent
 }
 
+//!taggedStringTokens
+
+@external tokens tagStringTagTokenizer from "./tokens.js" { TagStringTag }
+
+@external tokens taggedStringQuoteTokenizer from "./tokens.js" {
+  TaggedStringOpenDouble,
+  TaggedStringDoubleClose,
+  TaggedStringOpenSingle,
+  TaggedStringSingleClose
+}
+
+@external tokens taggedStringContentTokenizer from "./tokens.js" {
+  TaggedStringContentDouble,
+  TaggedStringContentSingle
+}
+
+@external tokens taggedStringInterpolationTokenizer from "./tokens.js" {
+  InterpolationStart[closedBy=InterpolationEnd],
+  InterpolationEnd[openedBy=InterpolationStart]
+}
+
+//!taggedString
+
+TaggedStringInterpolation[isolate] {
+  InterpolationStart expression InterpolationEnd
+}
+
+@skip {} {
+  TaggedString[isolate] {
+    TagStringTag
+    (TaggedStringOpenDouble
+       (TaggedStringContentDouble | TaggedStringInterpolation)*
+       TaggedStringDoubleClose |
+     TaggedStringOpenSingle
+       (TaggedStringContentSingle | TaggedStringInterpolation)*
+       TaggedStringSingleClose)
+  }
+}
+
 //!tokens
 
 @tokens {
@@ -397,12 +436,6 @@ semi { ";" | insertSemi }
     '"' (![\\\n"] | "\\" _)* '"'? |
     "'" (![\\\n'] | "\\" _)* "'"?
   }
-
-  TaggedString {
-    identifier ('"' (![\\\n"] | "\\" _)* '"'? | "'" (![\\\n'] | "\\" _)* "'"?)
-  }
-
-  @precedence { TaggedString, identifier }
 
 //!operatorTokens
 

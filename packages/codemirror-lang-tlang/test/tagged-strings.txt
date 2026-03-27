@@ -1,0 +1,71 @@
+# Static double-quoted tagged string
+
+re"\d+"
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenDouble,TaggedStringContentDouble,TaggedStringDoubleClose)))
+
+# Double-quoted tagged string with interpolation
+
+html"<div>{name}</div>"
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenDouble,TaggedStringContentDouble,TaggedStringInterpolation(InterpolationStart,VariableName,InterpolationEnd),TaggedStringContentDouble,TaggedStringDoubleClose)))
+
+# Regex quantifier is not treated as interpolation
+
+re"\d{2,5}"
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenDouble,TaggedStringContentDouble,TaggedStringDoubleClose)))
+
+# Escaped braces are not interpolation
+
+re"\d{{1,3}}"
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenDouble,TaggedStringContentDouble,TaggedStringDoubleClose)))
+
+# Binary expression inside interpolation
+
+html"{x + 1}"
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenDouble,TaggedStringInterpolation(InterpolationStart,BinaryExpression(VariableName,ArithOp,Number),InterpolationEnd),TaggedStringDoubleClose)))
+
+# Multiple interpolations
+
+sql"SELECT {cols} FROM {table}"
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenDouble,TaggedStringContentDouble,TaggedStringInterpolation(InterpolationStart,VariableName,InterpolationEnd),TaggedStringContentDouble,TaggedStringInterpolation(InterpolationStart,VariableName,InterpolationEnd),TaggedStringDoubleClose)))
+
+# Static single-quoted tagged string
+
+re'\w+'
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenSingle,TaggedStringContentSingle,TaggedStringSingleClose)))
+
+# Single-quoted tagged string with interpolation
+
+html'{name}'
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenSingle,TaggedStringInterpolation(InterpolationStart,VariableName,InterpolationEnd),TaggedStringSingleClose)))
+
+# Member expression inside interpolation
+
+html"{getUser().name}"
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenDouble,TaggedStringInterpolation(InterpolationStart,MemberExpression(CallExpression(VariableName,ArgList),PropertyName),InterpolationEnd),TaggedStringDoubleClose)))
