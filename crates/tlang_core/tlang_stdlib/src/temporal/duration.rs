@@ -20,38 +20,19 @@ const _F_BLANK: usize = 11;
 
 /// Reconstruct a `temporal_rs::Duration` from struct field values.
 pub(crate) fn to_temporal(vm: &VMState, this: TlangValue) -> TemporalDuration {
-    let s = vm
-        .get_struct(this)
-        .expect("expected Temporal.Duration struct");
-
-    // Extract integer fields directly to avoid f64 precision loss.
-    fn get_i64(val: &TlangValue) -> i64 {
-        match val {
-            TlangValue::I64(v) | TlangValue::I8(v) | TlangValue::I16(v) | TlangValue::I32(v) => *v,
-            TlangValue::U64(v) | TlangValue::U8(v) | TlangValue::U16(v) | TlangValue::U32(v) => {
-                *v as i64
-            }
-            other => {
-                let f = other.as_f64();
-                if !f.is_finite() || f.fract() != 0.0 {
-                    panic!("Temporal.Duration: field must be a finite integer");
-                }
-                f as i64
-            }
-        }
-    }
+    let f = |idx| super::get_i64_field(vm, this, idx);
 
     TemporalDuration::new(
-        get_i64(&s[F_YEARS]),
-        get_i64(&s[F_MONTHS]),
-        get_i64(&s[F_WEEKS]),
-        get_i64(&s[F_DAYS]),
-        get_i64(&s[F_HOURS]),
-        get_i64(&s[F_MINUTES]),
-        get_i64(&s[F_SECONDS]),
-        get_i64(&s[F_MILLISECONDS]),
-        get_i64(&s[F_MICROSECONDS]) as i128,
-        get_i64(&s[F_NANOSECONDS]) as i128,
+        f(F_YEARS),
+        f(F_MONTHS),
+        f(F_WEEKS),
+        f(F_DAYS),
+        f(F_HOURS),
+        f(F_MINUTES),
+        f(F_SECONDS),
+        f(F_MILLISECONDS),
+        f(F_MICROSECONDS) as i128,
+        f(F_NANOSECONDS) as i128,
     )
     .expect("invalid duration fields")
 }

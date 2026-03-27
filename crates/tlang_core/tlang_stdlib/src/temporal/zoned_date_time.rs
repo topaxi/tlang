@@ -21,16 +21,7 @@ const _F_CALENDAR: usize = 2;
 
 /// Reconstruct a `temporal_rs::ZonedDateTime` from struct fields.
 fn to_temporal(vm: &VMState, this: TlangValue) -> TemporalZonedDateTime {
-    let s = vm
-        .get_struct(this)
-        .expect("expected Temporal.ZonedDateTime struct");
-    // Read epoch_nanoseconds as integer directly to avoid f64 precision loss.
-    let ns: i128 = match s[F_EPOCH_NANOSECONDS] {
-        TlangValue::I64(v) | TlangValue::I8(v) | TlangValue::I16(v) | TlangValue::I32(v) => {
-            v as i128
-        }
-        _ => panic!("Temporal.ZonedDateTime: epoch_nanoseconds field must be an integer"),
-    };
+    let ns = super::get_i64_field(vm, this, F_EPOCH_NANOSECONDS) as i128;
     let tz_str = super::get_string_field(vm, this, F_TIMEZONE);
     let tz = TimeZone::try_from_str(&tz_str).expect("invalid timezone");
     TemporalZonedDateTime::try_new_iso(ns, tz).expect("invalid ZonedDateTime fields")

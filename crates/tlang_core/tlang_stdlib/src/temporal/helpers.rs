@@ -15,7 +15,6 @@ pub(crate) fn get_string_field(vm: &VMState, this: TlangValue, index: usize) -> 
 /// Reads integer-valued `TlangValue` variants directly to avoid precision loss
 /// from converting large integers (e.g. epoch nanoseconds) through `f64`.
 /// Falls back to `as_f64()` only for non-integer values.
-#[allow(dead_code)]
 pub(crate) fn get_i64_field(vm: &VMState, this: TlangValue, index: usize) -> i64 {
     let s = vm.get_struct(this).expect("expected struct");
     match s[index] {

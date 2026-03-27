@@ -8,7 +8,7 @@ const F_DAY: usize = 1;
 const _F_CALENDAR: usize = 2;
 
 /// Reconstruct a `temporal_rs::PlainMonthDay` from struct fields.
-fn to_temporal(vm: &mut VMState, this: TlangValue) -> TemporalPlainMonthDay {
+fn to_temporal(vm: &VMState, this: TlangValue) -> TemporalPlainMonthDay {
     let s = vm
         .get_struct(this)
         .expect("expected Temporal.PlainMonthDay struct");
@@ -16,22 +16,20 @@ fn to_temporal(vm: &mut VMState, this: TlangValue) -> TemporalPlainMonthDay {
     let month_code = vm
         .get_object(s[F_MONTH_CODE])
         .and_then(|o| o.as_str())
-        .unwrap_or_else(|| {
-            vm.panic("Temporal.PlainMonthDay: missing or invalid `month_code` field".to_string())
-        });
+        .expect("Temporal.PlainMonthDay: missing or invalid `month_code` field");
     let day = s[F_DAY].as_f64() as u8;
     // Parse month number from month_code (e.g. "M01" → 1, "M12" → 12).
     let month: u8 = month_code
         .strip_prefix('M')
         .and_then(|n| n.parse().ok())
         .unwrap_or_else(|| {
-            vm.panic(format!(
-                "Temporal.PlainMonthDay: invalid month_code `{month_code}`; expected like \"M01\"..\"M12\"",
-            ))
+            panic!(
+                "Temporal.PlainMonthDay: invalid month_code `{month_code}`; expected like \"M01\"..\"M12\""
+            )
         });
     let iso_str = format!("--{month:02}-{day:02}");
     TemporalPlainMonthDay::from_utf8(iso_str.as_bytes())
-        .unwrap_or_else(|e| vm.panic(format!("Temporal.PlainMonthDay: invalid fields: {e}")))
+        .unwrap_or_else(|e| panic!("Temporal.PlainMonthDay: invalid fields: {e}"))
 }
 
 /// Create a new `Temporal.PlainMonthDay` TlangValue.

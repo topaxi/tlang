@@ -11,16 +11,7 @@ const _F_EPOCH_MILLISECONDS: usize = 1;
 
 /// Reconstruct a `temporal_rs::Instant` from struct fields.
 pub(crate) fn to_temporal(vm: &VMState, this: TlangValue) -> TemporalInstant {
-    let s = vm
-        .get_struct(this)
-        .expect("expected Temporal.Instant struct");
-    // Read epoch_nanoseconds as integer directly to avoid f64 precision loss.
-    let ns: i128 = match s[F_EPOCH_NANOSECONDS] {
-        TlangValue::I64(v) | TlangValue::I8(v) | TlangValue::I16(v) | TlangValue::I32(v) => {
-            v as i128
-        }
-        _ => panic!("Temporal.Instant: epoch_nanoseconds field must be an integer"),
-    };
+    let ns = super::get_i64_field(vm, this, F_EPOCH_NANOSECONDS) as i128;
     TemporalInstant::try_new(ns).expect("invalid epoch nanoseconds")
 }
 
