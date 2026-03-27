@@ -39,7 +39,13 @@ impl LoweringContext {
                 }]
             }
             ast::node::StmtKind::FunctionDeclaration(box decl) => {
-                let decl = self.lower_fn_decl(decl);
+                let decl = if has_non_identifier_patterns(decl) {
+                    let decls = [decl.clone()];
+                    let all_param_names = get_param_names(&decls);
+                    self.lower_fn_decl_matching(&decls, &all_param_names, &node.leading_comments)
+                } else {
+                    self.lower_fn_decl(decl)
+                };
 
                 vec![hir::Stmt {
                     hir_id: self.lower_node_id(node.id),
@@ -346,7 +352,7 @@ impl LoweringContext {
         let methods = method_groups
             .into_iter()
             .map(|(_name, decls)| {
-                if decls.len() == 1 {
+                if decls.len() == 1 && !has_non_identifier_patterns(decls[0]) {
                     self.lower_fn_decl(decls[0])
                 } else {
                     let owned: Vec<_> = decls.iter().map(|d| (*d).clone()).collect();
@@ -545,7 +551,7 @@ impl LoweringContext {
         all_param_names: &[Option<Ident>],
         leading_comments: &[ast::token::CommentToken],
     ) -> hir::FunctionDeclaration {
-        if decls.len() == 1 {
+        if decls.len() == 1 && !has_non_identifier_patterns(&decls[0]) {
             return self.lower_fn_decl(&decls[0]);
         }
 
@@ -644,6 +650,17 @@ impl LoweringContext {
 
 fn get_enum_name(path: &ast::node::Path) -> String {
     path.segments[path.segments.len() - 2].to_string()
+}
+
+fn has_non_identifier_patterns(decl: &FunctionDeclaration) -> bool {
+    decl.parameters.iter().any(|param| {
+        !matches!(
+            param.pattern.kind,
+            ast::node::PatKind::Identifier(_)
+                | ast::node::PatKind::_Self
+                | ast::node::PatKind::Wildcard
+        )
+    })
 }
 
 fn get_param_names(decls: &[FunctionDeclaration]) -> Vec<Option<Ident>> {
