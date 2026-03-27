@@ -1,0 +1,19 @@
+---
+source: tests/runner/src/main.rs
+assertion_line: 379
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/temporal/temporal_plain_date.tlang
+---
+2025
+3
+15
+2025-03-15
+6
+74
+2025-03-25
+2025-03-05
+59
+59
+true
+false

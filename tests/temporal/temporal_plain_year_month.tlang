@@ -1,0 +1,39 @@
+// Temporal.PlainYearMonth — construction, properties, arithmetic
+
+// Construction from ISO string
+let ym = Temporal::PlainYearMonth::from("2025-03");
+log(ym.year);      // 2025
+log(ym.month);     // 3
+log(ym.to_string());
+
+// Add duration (months)
+let dur = Temporal::Duration::from("P3M");
+let later = ym.add(dur);
+log(later.year);   // 2025
+log(later.month);  // 6
+log(later.to_string());
+
+// Subtract duration
+let earlier = ym.subtract(dur);
+log(earlier.year);  // 2024
+log(earlier.month); // 12
+log(earlier.to_string());
+
+// Year rollover with add
+let dec = Temporal::PlainYearMonth::from("2025-11");
+let plus3 = dec.add(Temporal::Duration::from("P3M"));
+log(plus3.year);   // 2026
+log(plus3.month);  // 2
+
+// Difference: until
+let ym1 = Temporal::PlainYearMonth::from("2025-01");
+let ym2 = Temporal::PlainYearMonth::from("2025-06");
+let diff = ym1.until(ym2);
+log(diff.months);  // 5
+
+// Equality
+let same1 = Temporal::PlainYearMonth::from("2025-06");
+let same2 = Temporal::PlainYearMonth::from("2025-06");
+let diff_ym = Temporal::PlainYearMonth::from("2025-07");
+log(same1.equals(same2));     // true
+log(same1.equals(diff_ym));   // false

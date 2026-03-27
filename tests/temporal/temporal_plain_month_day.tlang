@@ -1,0 +1,19 @@
+// Temporal.PlainMonthDay — construction, properties, comparison
+
+// Construction from ISO string
+let md = Temporal::PlainMonthDay::from("--12-25");
+log(md.month_code);  // M12
+log(md.day);          // 25
+log(md.to_string());
+
+// Another month-day
+let valentine = Temporal::PlainMonthDay::from("--02-14");
+log(valentine.month_code);  // M02
+log(valentine.day);          // 14
+
+// Equality
+let same1 = Temporal::PlainMonthDay::from("--03-15");
+let same2 = Temporal::PlainMonthDay::from("--03-15");
+let diff_md = Temporal::PlainMonthDay::from("--03-16");
+log(same1.equals(same2));     // true
+log(same1.equals(diff_md));   // false

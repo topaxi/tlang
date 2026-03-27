@@ -13,6 +13,8 @@ tlang_memory = { path = "../tlang_memory" }
 inventory = { workspace = true }
 log = { workspace = true }
 regex = { workspace = true }
+temporal_rs = { version = "0.2.0", default-features = false, features = ["compiled_data"] }
+timezone_provider = { version = "0.2.0", default-features = false, features = ["tzif"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 rand = { version = "0.9" }

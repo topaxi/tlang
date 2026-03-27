@@ -1,0 +1,166 @@
+// Expense Tracker — a practical personal-finance example
+//
+// Demonstrates real-world usage of:
+//   • Enums with data for type-safe categories
+//   • Pattern matching in function signatures
+//   • Pipeline operator for data transformation
+//   • Higher-order functions (map, filter, fold)
+//   • Temporal API for date-based queries
+//   • For-loop accumulators for aggregation
+
+// ── Expense Type ───────────────────────────────────────────────────
+// Each variant carries an amount and a date.
+
+enum Expense {
+    Food(amount, date),
+    Transport(amount, date),
+    Entertainment(amount, date),
+    Utilities(amount, date),
+}
+
+// ── Accessor Methods (pattern-matched over every variant) ──────────
+
+fn Expense.amount(Expense::Food(a, _)) { a }
+fn Expense.amount(Expense::Transport(a, _)) { a }
+fn Expense.amount(Expense::Entertainment(a, _)) { a }
+fn Expense.amount(Expense::Utilities(a, _)) { a }
+
+fn Expense.date(Expense::Food(_, d)) { d }
+fn Expense.date(Expense::Transport(_, d)) { d }
+fn Expense.date(Expense::Entertainment(_, d)) { d }
+fn Expense.date(Expense::Utilities(_, d)) { d }
+
+fn Expense.category_name(Expense::Food(_, _)) { "Food" }
+fn Expense.category_name(Expense::Transport(_, _)) { "Transport" }
+fn Expense.category_name(Expense::Entertainment(_, _)) { "Entertainment" }
+fn Expense.category_name(Expense::Utilities(_, _)) { "Utilities" }
+
+// Category predicates
+fn is_food(Expense::Food(_, _)) { true }
+fn is_food(_) { false }
+
+fn is_transport(Expense::Transport(_, _)) { true }
+fn is_transport(_) { false }
+
+fn is_entertainment(Expense::Entertainment(_, _)) { true }
+fn is_entertainment(_) { false }
+
+fn is_utilities(Expense::Utilities(_, _)) { true }
+fn is_utilities(_) { false }
+
+// ── Utility Functions ──────────────────────────────────────────────
+
+fn filter([], _) { [] }
+fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
+fn filter([_, ...xs], f) { rec filter(xs, f) }
+
+fn foldl([], acc, _) { acc }
+fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+
+fn length([]) { 0 }
+fn length([_, ...rest]) { 1 + length(rest) }
+
+fn sum_amounts(expenses) {
+    expenses |> foldl(0, fn(acc, e) { acc + e.amount() })
+}
+
+// ── Expense Data ───────────────────────────────────────────────────
+
+let expenses = [
+    Expense::Food(45.50, Temporal::PlainDate::from("2025-03-01")),
+    Expense::Transport(30.00, Temporal::PlainDate::from("2025-03-03")),
+    Expense::Entertainment(24.00, Temporal::PlainDate::from("2025-03-05")),
+    Expense::Utilities(85.20, Temporal::PlainDate::from("2025-03-07")),
+    Expense::Food(62.30, Temporal::PlainDate::from("2025-03-10")),
+    Expense::Transport(15.00, Temporal::PlainDate::from("2025-03-12")),
+    Expense::Entertainment(79.99, Temporal::PlainDate::from("2025-03-15")),
+    Expense::Food(12.40, Temporal::PlainDate::from("2025-03-18")),
+    Expense::Utilities(55.00, Temporal::PlainDate::from("2025-03-20")),
+    Expense::Food(35.00, Temporal::PlainDate::from("2025-03-25")),
+];
+
+// ── Summary ────────────────────────────────────────────────────────
+
+log("=== Monthly Expense Report (March 2025) ===");
+log("");
+
+let total = expenses |> sum_amounts();
+log("Total spending:");
+total |> log();
+
+log("Number of transactions:");
+expenses |> length() |> log();
+
+// ── Category Breakdown (pipeline + filter + fold) ──────────────────
+
+log("");
+log("--- Spending by Category ---");
+
+log("Food:");
+expenses |> filter(is_food) |> sum_amounts() |> log();
+
+log("Transport:");
+expenses |> filter(is_transport) |> sum_amounts() |> log();
+
+log("Entertainment:");
+expenses |> filter(is_entertainment) |> sum_amounts() |> log();
+
+log("Utilities:");
+expenses |> filter(is_utilities) |> sum_amounts() |> log();
+
+// ── Transaction Counts (for-loop accumulator) ──────────────────────
+
+log("");
+log("--- Transaction Counts ---");
+
+let counts = for e in expenses; with acc = [0, 0, 0, 0] {
+    if is_food(e)          { [acc[0] + 1, acc[1], acc[2], acc[3]] }
+    else if is_transport(e)     { [acc[0], acc[1] + 1, acc[2], acc[3]] }
+    else if is_entertainment(e) { [acc[0], acc[1], acc[2] + 1, acc[3]] }
+    else                        { [acc[0], acc[1], acc[2], acc[3] + 1] }
+};
+
+log("Food:");
+counts[0] |> log();
+log("Transport:");
+counts[1] |> log();
+log("Entertainment:");
+counts[2] |> log();
+log("Utilities:");
+counts[3] |> log();
+
+// ── Date Range Query (Temporal API) ────────────────────────────────
+
+log("");
+log("--- First vs Second Half of Month ---");
+
+let mid_month = Temporal::PlainDate::from("2025-03-16");
+
+let first_half = expenses |> filter(fn(e) {
+    let diff = mid_month.since(e.date());
+    diff.days > 0
+});
+
+let first_half_total = first_half |> sum_amounts();
+log("First half (Mar 1-15):");
+first_half_total |> log();
+
+log("Second half (Mar 16-31):");
+total - first_half_total |> log();
+
+// ── Largest Expense ────────────────────────────────────────────────
+
+log("");
+log("--- Largest Expense ---");
+
+let first = expenses[0];
+let largest = expenses |> foldl(first, fn(best, e) {
+    if e.amount() > best.amount() { e } else { best }
+});
+
+log("Amount:");
+largest.amount() |> log();
+log("Category:");
+largest.category_name() |> log();
+log("Date:");
+largest.date().to_string() |> log();

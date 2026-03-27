@@ -1,0 +1,30 @@
+---
+source: tests/runner/src/main.rs
+assertion_line: 379
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/temporal/temporal_duration.tlang
+---
+2
+30
+PT2H30M
+1
+2
+3
+4
+5
+6
+0
+true
+1
+false
+1
+30
+PT1H30M
+30
+PT30M
+-1
+-1
+1
+1
+90

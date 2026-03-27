@@ -1,0 +1,40 @@
+// Temporal.PlainDate — construction, properties, arithmetic, comparison
+
+// Construction from ISO string
+let date = Temporal::PlainDate::from("2025-03-15");
+log(date.year);   // 2025
+log(date.month);  // 3
+log(date.day);    // 15
+log(date.to_string());
+
+// Day-of-week: 2025-03-15 is a Saturday = 6 in ISO 8601
+log(date.day_of_week());
+
+// Day-of-year
+log(date.day_of_year());
+
+// Add duration
+let dur = Temporal::Duration::from("P10D");
+let later = date.add(dur);
+log(later.to_string());
+
+// Subtract duration
+let earlier = date.subtract(dur);
+log(earlier.to_string());
+
+// Difference between dates
+let d1 = Temporal::PlainDate::from("2025-01-01");
+let d2 = Temporal::PlainDate::from("2025-03-01");
+let diff = d1.until(d2);
+log(diff.days);
+
+// since (reverse direction)
+let diff2 = d2.since(d1);
+log(diff2.days);
+
+// Equality
+let same1 = Temporal::PlainDate::from("2025-06-15");
+let same2 = Temporal::PlainDate::from("2025-06-15");
+let diff_date = Temporal::PlainDate::from("2025-06-16");
+log(same1.equals(same2));     // true
+log(same1.equals(diff_date)); // false

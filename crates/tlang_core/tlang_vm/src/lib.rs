@@ -36,6 +36,17 @@ impl VM {
             ("Result", DefKind::Enum),
             ("Regex", DefKind::Struct),
             ("math::pi", DefKind::Variable),
+            // Temporal namespace
+            ("Temporal", DefKind::Module),
+            ("Temporal::Now", DefKind::Module),
+            ("Temporal::Instant", DefKind::Struct),
+            ("Temporal::Duration", DefKind::Struct),
+            ("Temporal::PlainDate", DefKind::Struct),
+            ("Temporal::PlainTime", DefKind::Struct),
+            ("Temporal::PlainDateTime", DefKind::Struct),
+            ("Temporal::ZonedDateTime", DefKind::Struct),
+            ("Temporal::PlainYearMonth", DefKind::Struct),
+            ("Temporal::PlainMonthDay", DefKind::Struct),
         ]
     }
 

@@ -3,10 +3,10 @@ use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::{Ident, Token, braced};
 
-use crate::impl_block::{ImplBlock, generate_impl_methods, parse_impl_blocks};
+use crate::impl_block::{DottedName, ImplBlock, generate_impl_methods, parse_impl_blocks};
 
 struct DefineStructInput {
-    name: Ident,
+    name: DottedName,
     fields: Vec<Ident>,
     impl_blocks: Vec<ImplBlock>,
 }
@@ -14,7 +14,7 @@ struct DefineStructInput {
 impl Parse for DefineStructInput {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         input.parse::<Token![struct]>()?;
-        let name: Ident = input.parse()?;
+        let name: DottedName = input.parse()?;
 
         let fields_content;
         braced!(fields_content in input);
@@ -35,8 +35,7 @@ impl Parse for DefineStructInput {
 pub(crate) fn generate_define_struct(input: TokenStream) -> TokenStream {
     let def = syn::parse_macro_input!(input as DefineStructInput);
 
-    let struct_name = &def.name;
-    let struct_name_str = struct_name.to_string();
+    let struct_name_str = def.name.to_dotted_string();
 
     let field_strs: Vec<String> = def.fields.iter().map(|f| f.to_string()).collect();
 

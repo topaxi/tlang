@@ -179,6 +179,7 @@ impl CodegenJS {
             ("string.js", include_str!("../std/string.js")),
             ("regex.js", include_str!("../std/regex.js")),
             ("string_buf.js", include_str!("../std/string_buf.js")),
+            ("temporal.js", include_str!("../std/temporal.js")),
         ]
     }
 

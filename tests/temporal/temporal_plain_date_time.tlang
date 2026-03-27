@@ -1,0 +1,48 @@
+// Temporal.PlainDateTime — construction, properties, arithmetic
+
+// Construction from ISO string
+let dt = Temporal::PlainDateTime::from("2025-03-15T14:30:00");
+log(dt.year);     // 2025
+log(dt.month);    // 3
+log(dt.day);      // 15
+log(dt.hour);     // 14
+log(dt.minute);   // 30
+log(dt.second);   // 0
+log(dt.to_string());
+
+// Add duration
+let dur = Temporal::Duration::from("P1DT2H");
+let later = dt.add(dur);
+log(later.day);   // 16
+log(later.hour);  // 16
+log(later.to_string());
+
+// Subtract duration
+let earlier = dt.subtract(dur);
+log(earlier.day);  // 14
+log(earlier.hour); // 12
+log(earlier.to_string());
+
+// Difference between datetimes
+let dt1 = Temporal::PlainDateTime::from("2025-01-01T00:00:00");
+let dt2 = Temporal::PlainDateTime::from("2025-01-02T12:00:00");
+let diff = dt1.until(dt2);
+log(diff.days);   // 1
+log(diff.hours);  // 12
+
+// since
+let diff2 = dt2.since(dt1);
+log(diff2.days);  // 1
+log(diff2.hours); // 12
+
+// Round to nearest hour
+let precise = Temporal::PlainDateTime::from("2025-06-15T14:45:30");
+let rounded = precise.round("hour");
+log(rounded.to_string());
+
+// Equality
+let same1 = Temporal::PlainDateTime::from("2025-06-15T10:00:00");
+let same2 = Temporal::PlainDateTime::from("2025-06-15T10:00:00");
+let diff_dt = Temporal::PlainDateTime::from("2025-06-15T10:00:01");
+log(same1.equals(same2));    // true
+log(same1.equals(diff_dt));  // false

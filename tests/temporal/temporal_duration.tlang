@@ -1,0 +1,52 @@
+// Temporal.Duration — construction, properties, arithmetic, serialization
+
+// Construction from ISO 8601 string
+let d1 = Temporal::Duration::from("PT2H30M");
+log(d1.hours);     // 2
+log(d1.minutes);   // 30
+log(d1.to_string());
+
+// Construction from longer ISO duration
+let d2 = Temporal::Duration::from("P1Y2M3DT4H5M6S");
+log(d2.years);        // 1
+log(d2.months);       // 2
+log(d2.days);         // 3
+log(d2.hours);        // 4
+log(d2.minutes);      // 5
+log(d2.seconds);      // 6
+
+// Properties: sign and blank
+let zero = Temporal::Duration::from("PT0S");
+log(zero.sign);   // 0
+log(zero.blank);  // true
+
+let pos = Temporal::Duration::from("PT1H");
+log(pos.sign);   // 1
+log(pos.blank);  // false
+
+// Arithmetic: add
+let a = Temporal::Duration::from("PT1H");
+let b = Temporal::Duration::from("PT30M");
+let sum = a.add(b);
+log(sum.hours);    // 1
+log(sum.minutes);  // 30
+log(sum.to_string());
+
+// Arithmetic: subtract
+let diff = a.subtract(b);
+log(diff.minutes);  // 30
+log(diff.to_string());
+
+// Negation
+let neg = a.negated();
+log(neg.hours);  // -1
+log(neg.sign);   // -1
+
+// Absolute value
+let abs_val = neg.abs();
+log(abs_val.hours);  // 1
+log(abs_val.sign);   // 1
+
+// Total
+let t = Temporal::Duration::from("PT1H30M");
+log(t.total("minute"));  // 90
