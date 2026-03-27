@@ -98,6 +98,13 @@ impl LoweringContext {
                 }))
             }
             ast::node::ExprKind::Wildcard => hir::ExprKind::Wildcard,
+            ast::node::ExprKind::TaggedString { tag, parts, exprs } => {
+                hir::ExprKind::TaggedString {
+                    tag: Box::new(self.lower_expr(tag)),
+                    parts: parts.clone(),
+                    exprs: self.lower_exprs(exprs),
+                }
+            }
             ast::node::ExprKind::None => {
                 unreachable!("ExprKind::None should not be encountered, validate AST first")
             }

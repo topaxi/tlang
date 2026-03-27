@@ -87,3 +87,28 @@ export const $uncurryThis = (() => {
     return uncurried;
   };
 })();
+
+export const $tag = (() => {
+  const cache = new WeakMap();
+
+  /**
+   * Wraps a tlang tag function `(parts: string[], values: unknown[]) => T`
+   * into a JavaScript-compatible tagged template function
+   * `(strings: TemplateStringsArray, ...values: unknown[]) => T`.
+   *
+   * This lets tlang tag functions be called with native JS template literal
+   * syntax, preserving the same `(parts, values)` calling convention.
+   *
+   * @template T
+   * @param {(parts: string[], values: unknown[]) => T} fn
+   * @return {(strings: TemplateStringsArray, ...values: unknown[]) => T}
+   */
+  return (fn) => {
+    let tagged = cache.get(fn);
+    if (tagged == null) {
+      tagged = (strings, ...values) => fn([...strings], values);
+      cache.set(fn, tagged);
+    }
+    return tagged;
+  };
+})();

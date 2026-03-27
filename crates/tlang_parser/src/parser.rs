@@ -8,7 +8,6 @@ use tlang_ast::node::{
     StructDeclaration, StructField, Ty, TyKind, UnaryOp, UseDeclaration, UseItem, Visibility,
 };
 use tlang_ast::token::{CommentKind, CommentToken, Literal, TaggedStringPart, Token, TokenKind};
-use tlang_intern::intern;
 use tlang_lexer::Lexer;
 use tlang_span::{NodeId, NodeIdAllocator, Span};
 
@@ -1237,19 +1236,13 @@ impl<'src> Parser<'src> {
         parts: Vec<TaggedStringPart>,
         span: Span,
     ) -> Expr {
-        let mut string_parts: Vec<Expr> = Vec::new();
+        let mut string_parts: Vec<Box<str>> = Vec::new();
         let mut value_exprs: Vec<Expr> = Vec::new();
 
         for part in parts {
             match part {
                 TaggedStringPart::Literal(text) => {
-                    // Use Span::default() to mark these as synthetic (compiler-generated)
-                    // so the escape sequence validator skips them — tagged string content
-                    // may contain domain-specific escapes like \d in regex patterns.
-                    string_parts.push(node::expr!(
-                        self.unique_id(),
-                        Literal(Box::new(Literal::String(intern(&text))))
-                    ));
+                    string_parts.push(text);
                 }
                 TaggedStringPart::Interpolation {
                     source: raw_source,
@@ -1265,17 +1258,15 @@ impl<'src> Parser<'src> {
         }
 
         let callee_path = Path::from_ident(Ident::new(tag, span));
-        let callee = node::expr!(self.unique_id(), Path(Box::new(callee_path))).with_span(span);
-        let parts_list = node::expr!(self.unique_id(), List(string_parts)).with_span(span);
-        self.constant_pool_node_ids.push(parts_list.id);
-        let values_list = node::expr!(self.unique_id(), List(value_exprs)).with_span(span);
+        let tag_expr = node::expr!(self.unique_id(), Path(Box::new(callee_path))).with_span(span);
 
-        node::expr!(
+        Expr::new(
             self.unique_id(),
-            Call(Box::new(CallExpression {
-                callee,
-                arguments: vec![parts_list, values_list],
-            }))
+            ExprKind::TaggedString {
+                tag: Box::new(tag_expr),
+                parts: string_parts,
+                exprs: value_exprs,
+            },
         )
         .with_span(span)
     }

@@ -55,6 +55,9 @@ impl<'a> InnerCodegen<'a> {
             }
             hir::ExprKind::Let(..) => self.unsupported_expr("let expressions", expr.span),
             hir::ExprKind::Range(_) => self.unsupported_expr("range expressions", expr.span),
+            hir::ExprKind::TaggedString { tag, parts, exprs } => {
+                self.generate_tagged_string(tag, parts, exprs)
+            }
         };
         *js_expr.span_mut() = Self::hir_span(expr.span);
         js_expr
@@ -445,6 +448,37 @@ impl<'a> InnerCodegen<'a> {
             })
             .collect();
         self.call_expr(callee, args)
+    }
+
+    fn generate_tagged_string(
+        &mut self,
+        tag: &hir::Expr,
+        parts: &[Box<str>],
+        exprs: &[hir::Expr],
+    ) -> Expression<'a> {
+        let tag_expr = self.generate_expr(tag);
+        let dollar_tag = self.ident_expr("$tag");
+        let wrapped_tag = self.call_expr(dollar_tag, vec![Argument::from(tag_expr)]);
+
+        let mut quasis = self.ast.vec_with_capacity(parts.len());
+        let mut expressions = self.ast.vec_with_capacity(exprs.len());
+
+        for (i, part) in parts.iter().enumerate() {
+            let is_tail = i == parts.len() - 1;
+            let value = TemplateElementValue {
+                raw: self.ast.atom(part.as_ref()),
+                cooked: Some(self.ast.atom(part.as_ref())),
+            };
+            quasis.push(self.ast.template_element(SPAN, value, is_tail, true));
+        }
+
+        for expr in exprs {
+            expressions.push(self.generate_expr(expr));
+        }
+
+        let quasi = self.ast.template_literal(SPAN, quasis, expressions);
+        self.ast
+            .expression_tagged_template(SPAN, wrapped_tag, NONE, quasi)
     }
 
     fn generate_partial_application(

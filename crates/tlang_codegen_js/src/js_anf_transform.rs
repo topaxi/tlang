@@ -22,6 +22,9 @@ fn is_js_expressible(expr: &hir::Expr) -> bool {
             .iter()
             .all(|(k, v)| is_js_expressible(k) && is_js_expressible(v)),
         hir::ExprKind::FunctionExpression(..) | hir::ExprKind::Range(..) => true,
+        hir::ExprKind::TaggedString { tag, exprs, .. } => {
+            is_js_expressible(tag) && exprs.iter().all(is_js_expressible)
+        }
         hir::ExprKind::IfElse(cond, then_block, else_branches) => {
             can_render_as_ternary(cond, then_block, else_branches)
         }

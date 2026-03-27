@@ -139,6 +139,12 @@ fn check_expr(expr: &hir::Expr, is_tail: bool, diagnostics: &mut Vec<Diagnostic>
         | hir::ExprKind::Continue
         | hir::ExprKind::Break(None)
         | hir::ExprKind::Range(_) => {}
+        hir::ExprKind::TaggedString { tag, exprs, .. } => {
+            check_expr(tag, false, diagnostics);
+            for e in exprs {
+                check_expr(e, false, diagnostics);
+            }
+        }
     }
 }
 

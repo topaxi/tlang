@@ -8,10 +8,10 @@ Module(
     Stmt(
       id: 3,
       kind: Expr(Expr(
-        id: 12,
-        kind: Call(CallExpression(
-          callee: Expr(
-            id: 9,
+        id: 8,
+        kind: TaggedString(
+          tag: Expr(
+            id: 7,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -59,90 +59,21 @@ Module(
               ),
             ),
           ),
-          arguments: [
+          parts: [
+            "",
+            "",
+          ],
+          exprs: [
             Expr(
-              id: 10,
-              kind: List([
-                Expr(
+              id: 6,
+              kind: BinaryOp(BinaryOpExpression(
+                op: Add,
+                lhs: Expr(
                   id: 4,
-                  kind: Literal(String("")),
-                  leading_comments: [],
-                  trailing_comments: [],
-                  span: Span(
-                    start: 0,
-                    end: 0,
-                    start_lc: LineColumn(
-                      line: 0,
-                      column: 0,
-                    ),
-                    end_lc: LineColumn(
-                      line: 0,
-                      column: 0,
-                    ),
-                  ),
-                ),
-                Expr(
-                  id: 8,
-                  kind: Literal(String("")),
-                  leading_comments: [],
-                  trailing_comments: [],
-                  span: Span(
-                    start: 0,
-                    end: 0,
-                    start_lc: LineColumn(
-                      line: 0,
-                      column: 0,
-                    ),
-                    end_lc: LineColumn(
-                      line: 0,
-                      column: 0,
-                    ),
-                  ),
-                ),
-              ]),
-              leading_comments: [],
-              trailing_comments: [],
-              span: Span(
-                start: 0,
-                end: 4,
-                start_lc: LineColumn(
-                  line: 0,
-                  column: 0,
-                ),
-                end_lc: LineColumn(
-                  line: 0,
-                  column: 4,
-                ),
-              ),
-            ),
-            Expr(
-              id: 11,
-              kind: List([
-                Expr(
-                  id: 7,
-                  kind: BinaryOp(BinaryOpExpression(
-                    op: Add,
-                    lhs: Expr(
-                      id: 5,
-                      kind: Path(Path(
-                        segments: [
-                          Ident(
-                            name: "x",
-                            span: Span(
-                              start: 5,
-                              end: 6,
-                              start_lc: LineColumn(
-                                line: 0,
-                                column: 5,
-                              ),
-                              end_lc: LineColumn(
-                                line: 0,
-                                column: 6,
-                              ),
-                            ),
-                          ),
-                        ],
-                        res: Unresolved,
+                  kind: Path(Path(
+                    segments: [
+                      Ident(
+                        name: "x",
                         span: Span(
                           start: 5,
                           end: 6,
@@ -155,38 +86,19 @@ Module(
                             column: 6,
                           ),
                         ),
-                      )),
-                      leading_comments: [],
-                      trailing_comments: [],
-                      span: Span(
-                        start: 5,
-                        end: 6,
-                        start_lc: LineColumn(
-                          line: 0,
-                          column: 5,
-                        ),
-                        end_lc: LineColumn(
-                          line: 0,
-                          column: 6,
-                        ),
                       ),
-                    ),
-                    rhs: Expr(
-                      id: 6,
-                      kind: Literal(UnsignedInteger(1)),
-                      leading_comments: [],
-                      trailing_comments: [],
-                      span: Span(
-                        start: 9,
-                        end: 10,
-                        start_lc: LineColumn(
-                          line: 0,
-                          column: 9,
-                        ),
-                        end_lc: LineColumn(
-                          line: 0,
-                          column: 10,
-                        ),
+                    ],
+                    res: Unresolved,
+                    span: Span(
+                      start: 5,
+                      end: 6,
+                      start_lc: LineColumn(
+                        line: 0,
+                        column: 5,
+                      ),
+                      end_lc: LineColumn(
+                        line: 0,
+                        column: 6,
                       ),
                     ),
                   )),
@@ -194,10 +106,28 @@ Module(
                   trailing_comments: [],
                   span: Span(
                     start: 5,
-                    end: 10,
+                    end: 6,
                     start_lc: LineColumn(
                       line: 0,
                       column: 5,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 6,
+                    ),
+                  ),
+                ),
+                rhs: Expr(
+                  id: 5,
+                  kind: Literal(UnsignedInteger(1)),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: 9,
+                    end: 10,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 9,
                     ),
                     end_lc: LineColumn(
                       line: 0,
@@ -205,24 +135,24 @@ Module(
                     ),
                   ),
                 ),
-              ]),
+              )),
               leading_comments: [],
               trailing_comments: [],
               span: Span(
-                start: 0,
-                end: 4,
+                start: 5,
+                end: 10,
                 start_lc: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 5,
                 ),
                 end_lc: LineColumn(
                   line: 0,
-                  column: 4,
+                  column: 10,
                 ),
               ),
             ),
           ],
-        )),
+        ),
         leading_comments: [],
         trailing_comments: [],
         span: Span(

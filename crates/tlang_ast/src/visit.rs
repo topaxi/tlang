@@ -519,6 +519,12 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(
         node::ExprKind::Wildcard => {}
         node::ExprKind::Continue => {}
         node::ExprKind::Cast(..) => todo!(),
+        node::ExprKind::TaggedString { tag, exprs, .. } => {
+            visitor.visit_expr(tag, ctx);
+            for expr in exprs {
+                visitor.visit_expr(expr, ctx);
+            }
+        }
     }
 }
 

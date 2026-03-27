@@ -230,6 +230,11 @@ pub fn fold_expr<F: Folder>(folder: &mut F, expr: hir::Expr) -> hir::Expr {
             end: folder.fold_expr(range.end),
             inclusive: range.inclusive,
         })),
+        hir::ExprKind::TaggedString { tag, parts, exprs } => hir::ExprKind::TaggedString {
+            tag: Box::new(folder.fold_expr(*tag)),
+            parts,
+            exprs: exprs.into_iter().map(|e| folder.fold_expr(e)).collect(),
+        },
     };
 
     hir::Expr {

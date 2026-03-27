@@ -400,6 +400,19 @@ impl HirPretty {
             hir::ExprKind::Path(path) => self.print_path(path),
             hir::ExprKind::Range(range_expr) => self.print_range_expr(range_expr),
             hir::ExprKind::Wildcard => self.push_char('_'),
+            hir::ExprKind::TaggedString { tag, parts, exprs } => {
+                self.print_expr(tag);
+                self.push_char('`');
+                for (i, part) in parts.iter().enumerate() {
+                    self.push_str(part);
+                    if i < exprs.len() {
+                        self.push_str("${");
+                        self.print_expr(&exprs[i]);
+                        self.push_char('}');
+                    }
+                }
+                self.push_char('`');
+            }
         }
     }
 

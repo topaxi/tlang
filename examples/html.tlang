@@ -1,0 +1,104 @@
+// HTML templating with tagged string literals
+//
+// Demonstrates the html"..." tagged string for building HTML strings.
+//
+// Design:
+//   - html"..." interpolates values as-is (caller controls safety)
+//   - text(v)  escapes raw user input before embedding
+//   - Nested html"..." results are plain strings and compose without re-escaping
+//   - Lists of html strings are joined automatically
+//
+// Tagged string expansion:
+//   html"<p>{expr}</p>"  →  html(["<p>", "</p>"], [expr])
+
+// ── HTML escaping ─────────────────────────────────────────────────────────────
+
+fn escape_html(s) {
+    s
+    |> re"&".replace_all("&amp;")
+    |> re"<".replace_all("&lt;")
+    |> re">".replace_all("&gt;")
+    |> re"\"".replace_all("&quot;")
+    |> re"'".replace_all("&#39;")
+}
+
+// Converts a value to an escaped HTML string. Use for raw user input.
+fn text(v) { escape_html(Display::to_string(v)) }
+
+// ── html tag function ─────────────────────────────────────────────────────────
+
+// Joins a list of html strings into a single string.
+fn join_html([]) { "" }
+fn join_html([x, ...xs]) { x + join_html(xs) }
+
+// Renders an interpolated value: lists are joined, everything else is embedded as-is.
+fn render_value([]) { "" }
+fn render_value([x, ...xs]) { render_value(x) + render_value(xs) }
+fn render_value(v) { v }
+
+// Interleaves template parts with rendered values.
+fn html_zip([last], [], acc) { acc + last }
+fn html_zip([part, ...parts], [value, ...values], acc) {
+    rec html_zip(parts, values, acc + part + render_value(value))
+}
+
+fn html(parts, values) {
+    html_zip(parts, values, "")
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+
+// Escaping user input: wrap raw values in text() before embedding.
+log("=== HTML escaping ===");
+
+let user_input = "<script>alert('xss')</script>";
+let escaped = html"<p>User said: {text(user_input)}</p>";
+escaped |> log();
+// <p>User said: &lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;</p>
+
+// ── Nested templates ──────────────────────────────────────────────────────────
+
+log("=== Nested templates ===");
+
+// Inner templates are already HTML strings — they compose without re-escaping.
+let site_name = "My Site";
+let lang_name = "tlang";
+
+let lang_link = html"<a href=\"https://github.com/topaxi/tlang\">{lang_name}</a>";
+let intro     = html"<p>Welcome to {lang_link} — a toy functional language.</p>";
+let heading   = html"<h1>{text(site_name)}</h1>";
+let header    = html"<header>{heading}{intro}</header>";
+
+header |> log();
+
+// ── List of templates ─────────────────────────────────────────────────────────
+
+log("=== List rendering ===");
+
+struct Post { title: string, author: string, excerpt: string }
+
+fn Post.render(self) {
+    html"<article><h2>{text(self.title)}</h2><p class=\"byline\">by {text(self.author)}</p><p>{text(self.excerpt)}</p></article>"
+}
+
+let posts = [
+    Post { title: "Hello tlang!",     author: "Alice", excerpt: "An intro to tlang."          },
+    Post { title: "Tagged templates", author: "Bob",   excerpt: "Safe HTML via html\"...\"."  },
+    Post { title: "Pattern matching", author: "Carol", excerpt: "Destructure everything."     },
+];
+
+let post_items = posts |> map(fn(post) { html"<li>{render_post(post)}</li>" });
+let post_list  = html"<ul class=\"posts\">{post_items}</ul>";
+
+post_list |> log();
+
+// ── Number interpolation ──────────────────────────────────────────────────────
+
+log("=== Number interpolation ===");
+
+let count = 3;
+let limit = 10;
+let status = html"<p>{text(count)} of {text(limit)} items loaded.</p>";
+
+status |> log();
+// <p>3 of 10 items loaded.</p>

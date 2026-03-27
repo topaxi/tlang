@@ -316,6 +316,11 @@ pub enum ExprKind {
     Match(Box<MatchExpression>),
     RecursiveCall(Box<CallExpression>),
     Range(Box<RangeExpression>),
+    TaggedString {
+        tag: Box<Expr>,
+        parts: Vec<Box<str>>,
+        exprs: Vec<Expr>,
+    },
     Wildcard,
 }
 

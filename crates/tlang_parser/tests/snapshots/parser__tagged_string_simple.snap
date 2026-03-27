@@ -8,10 +8,10 @@ Module(
     Stmt(
       id: 3,
       kind: Expr(Expr(
-        id: 8,
-        kind: Call(CallExpression(
-          callee: Expr(
-            id: 5,
+        id: 5,
+        kind: TaggedString(
+          tag: Expr(
+            id: 4,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -59,64 +59,11 @@ Module(
               ),
             ),
           ),
-          arguments: [
-            Expr(
-              id: 6,
-              kind: List([
-                Expr(
-                  id: 4,
-                  kind: Literal(String("\\d+")),
-                  leading_comments: [],
-                  trailing_comments: [],
-                  span: Span(
-                    start: 0,
-                    end: 0,
-                    start_lc: LineColumn(
-                      line: 0,
-                      column: 0,
-                    ),
-                    end_lc: LineColumn(
-                      line: 0,
-                      column: 0,
-                    ),
-                  ),
-                ),
-              ]),
-              leading_comments: [],
-              trailing_comments: [],
-              span: Span(
-                start: 0,
-                end: 3,
-                start_lc: LineColumn(
-                  line: 0,
-                  column: 0,
-                ),
-                end_lc: LineColumn(
-                  line: 0,
-                  column: 3,
-                ),
-              ),
-            ),
-            Expr(
-              id: 7,
-              kind: List([]),
-              leading_comments: [],
-              trailing_comments: [],
-              span: Span(
-                start: 0,
-                end: 3,
-                start_lc: LineColumn(
-                  line: 0,
-                  column: 0,
-                ),
-                end_lc: LineColumn(
-                  line: 0,
-                  column: 3,
-                ),
-              ),
-            ),
+          parts: [
+            "\\d+",
           ],
-        )),
+          exprs: [],
+        ),
         leading_comments: [],
         trailing_comments: [],
         span: Span(

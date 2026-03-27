@@ -779,6 +779,11 @@ pub enum ExprKind {
     Literal(Box<Literal>),
     Match(Box<Expr>, Vec<MatchArm>),
     Range(Box<RangeExpression>),
+    TaggedString {
+        tag: Box<Expr>,
+        parts: Vec<Box<str>>,
+        exprs: Vec<Expr>,
+    },
     Wildcard, // TODO: This might be better to just be an identifier
 }
 

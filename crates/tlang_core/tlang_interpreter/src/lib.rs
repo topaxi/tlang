@@ -354,6 +354,20 @@ impl Interpreter {
             }
             hir::ExprKind::Match(expr, arms) => self.eval_match(state, expr, arms),
             hir::ExprKind::Range(..) => todo!("eval_expr: Range"),
+            hir::ExprKind::TaggedString { tag, parts, exprs } => {
+                let tag_fn = eval_value!(state, self.eval_expr(state, tag));
+                let parts_values: Vec<TlangValue> = parts
+                    .iter()
+                    .map(|p| state.new_string(p.to_string()))
+                    .collect();
+                let parts_list = state.new_list(parts_values);
+                let mut value_list = Vec::with_capacity(exprs.len());
+                for expr in exprs {
+                    value_list.push(eval_value!(state, self.eval_expr(state, expr)));
+                }
+                let values_list = state.new_list(value_list);
+                EvalResult::Value(self.eval_call_object(state, tag_fn, &[parts_list, values_list]))
+            }
             hir::ExprKind::Let(..) => state.panic(
                 "Let expressions are only valid in match guards and if expressions".to_string(),
             ),
