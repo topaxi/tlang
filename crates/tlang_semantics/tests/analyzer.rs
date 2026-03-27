@@ -550,3 +550,27 @@ fn test_variable_usage_validator_undeclared_variable() {
     assert!(diagnostics[0].message().contains("similar_name"));
     assert!(diagnostics[0].is_error());
 }
+
+#[test]
+fn test_tagged_string_interpolation_chain() {
+    // Regression test: a chain of tagged-string let bindings where the last
+    // variable is referenced inside another tagged-string expression (not the
+    // RHS of a let) must resolve correctly.  Previously the parser's one-token
+    // lookahead caused `pending_tagged_parts` to be overwritten by the NEXT
+    // tagged-string token before the current one's parts were consumed, leading
+    // to a spurious "undeclared variable" error.
+    let diagnostics = analyze_diag!(
+        indoc! {r#"
+            let a = "x";
+            let b = f"{a}";
+            let c = f"{b}";
+            f"{c}" |> log();
+        "#},
+        [("f", DefKind::Function(2)), ("log", DefKind::Function(1))]
+    );
+
+    assert!(
+        diagnostics.is_empty(),
+        "Expected no diagnostics, got {diagnostics:#?}"
+    );
+}

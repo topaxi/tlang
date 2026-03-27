@@ -1,0 +1,13 @@
+// Regression test: a chain of tagged-string let bindings must allow the
+// last-declared variable to be referenced inside a subsequent tagged-string
+// expression that is *not* itself the RHS of a let binding.
+//
+// Before the fix, the parser's one-token lookahead caused
+// `pending_tagged_parts` to be overwritten by the *next* tagged-string token
+// before the current one's parts were consumed, producing a spurious
+// "undeclared variable" error.
+
+let a = "x";
+let b = f"{a}";
+let c = f"{b}";
+f"{c}" |> log();
