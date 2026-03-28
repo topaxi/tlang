@@ -99,6 +99,7 @@ define_struct! {
             let re = build_regex(vm, this);
             if let Some(m) = re.find(&haystack) {
                 let matched = vm.new_string(m.as_str().to_string());
+                vm.push_temp_root(matched);
                 vm.new_enum(vm.heap.builtin_shapes.option, crate::option::OPTION_SOME, vec![matched])
             } else {
                 vm.new_enum(vm.heap.builtin_shapes.option, crate::option::OPTION_NONE, vec![])

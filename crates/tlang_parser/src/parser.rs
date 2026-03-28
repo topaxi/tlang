@@ -1263,8 +1263,15 @@ impl<'src> Parser<'src> {
         let callee_path = Path::from_ident(Ident::new(tag, span));
         let tag_expr = node::expr!(self.unique_id(), Path(Box::new(callee_path))).with_span(span);
 
+        let node_id = self.unique_id();
+
+        // Tagged strings with no interpolation are pure — cache them as constants.
+        if value_exprs.is_empty() {
+            self.constant_pool_node_ids.push(node_id);
+        }
+
         Expr::new(
-            self.unique_id(),
+            node_id,
             ExprKind::TaggedString {
                 tag: Box::new(tag_expr),
                 parts: string_parts,

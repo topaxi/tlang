@@ -281,20 +281,29 @@ impl VMState {
     }
 
     pub fn new_regex(&mut self, source: String, flags: String) -> TlangValue {
+        let mark = self.temp_roots_mark();
         let source_val = self.new_string(source);
+        self.push_temp_root(source_val);
         let flags_val = self.new_string(flags);
-        self.new_object(TlangObjectKind::Struct(TlangStruct::new(
+        self.push_temp_root(flags_val);
+        let result = self.new_object(TlangObjectKind::Struct(TlangStruct::new(
             self.heap.builtin_shapes.regex,
             vec![source_val, flags_val],
-        )))
+        )));
+        self.temp_roots_restore(mark);
+        result
     }
 
     pub fn new_string_buf(&mut self, initial: String) -> TlangValue {
+        let mark = self.temp_roots_mark();
         let inner = self.new_string(initial);
-        self.new_object(TlangObjectKind::Struct(TlangStruct::new(
+        self.push_temp_root(inner);
+        let result = self.new_object(TlangObjectKind::Struct(TlangStruct::new(
             self.heap.builtin_shapes.string_buf,
             vec![inner],
-        )))
+        )));
+        self.temp_roots_restore(mark);
+        result
     }
 
     /// Returns the current string contents of a StringBuf value, or `None` if

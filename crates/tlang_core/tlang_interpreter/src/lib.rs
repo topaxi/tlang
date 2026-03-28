@@ -358,9 +358,14 @@ impl Interpreter {
                 let tag_fn = eval_value!(state, self.eval_expr(state, tag));
                 let parts_values: Vec<TlangValue> = parts
                     .iter()
-                    .map(|p| state.new_string(p.to_string()))
+                    .map(|p| {
+                        let s = state.new_string(p.to_string());
+                        state.push_temp_root(s);
+                        s
+                    })
                     .collect();
                 let parts_list = state.new_list(parts_values);
+                state.push_temp_root(parts_list);
                 let mut value_list = Vec::with_capacity(exprs.len());
                 for expr in exprs {
                     value_list.push(eval_value!(state, self.eval_expr(state, expr)));
@@ -3192,6 +3197,57 @@ mod tests {
             stats.objects_deallocated > 0,
             "expected intermediate slices from map to be collected"
         );
+    }
+
+    #[test]
+    fn test_stress_gc_regex_literal() {
+        let mut t = interpreter("");
+        t.state_mut().set_stress_gc(true);
+        let result = t.eval(r#"re"hello".test("hello world")"#);
+        assert_eq!(result, TlangValue::Bool(true));
+    }
+
+    #[test]
+    fn test_stress_gc_regex_exec() {
+        let mut t = interpreter("");
+        t.state_mut().set_stress_gc(true);
+        let result = t.eval(r#"re"\d+".exec("abc 42 def")"#);
+        assert_eq!(t.state_mut().stringify(result), r#"Option::Some(0: 42)"#);
+    }
+
+    #[test]
+    fn test_stress_gc_regex_replace() {
+        let mut t = interpreter("");
+        t.state_mut().set_stress_gc(true);
+        let result = t.eval(r#"re"world".replace_all("hello world", "tlang")"#);
+        assert_eq!(t.state_mut().stringify(result), "hello tlang");
+    }
+
+    #[test]
+    fn test_stress_gc_regex_in_loop() {
+        let mut t = interpreter(indoc! {"
+            fn count_matches(items) {
+                let count = 0;
+                for item in items {
+                    if re\"a\".test(item) {
+                        count = count + 1;
+                    }
+                }
+                count
+            }
+        "});
+        t.state_mut().set_stress_gc(true);
+        let result =
+            t.eval(r#"count_matches(["apple", "banana", "cherry", "avocado", "blueberry"])"#);
+        assert_eq!(result, TlangValue::U64(3));
+    }
+
+    #[test]
+    fn test_stress_gc_tagged_string_with_interpolation() {
+        let mut t = interpreter(r#"let x = "world";"#);
+        t.state_mut().set_stress_gc(true);
+        let result = t.eval(r#"re"he{x}".test("helloworld")"#);
+        assert_eq!(result, TlangValue::Bool(false));
     }
 
     #[test]
