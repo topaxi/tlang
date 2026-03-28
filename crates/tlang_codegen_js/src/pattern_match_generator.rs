@@ -386,8 +386,8 @@ impl<'a> InnerCodegen<'a> {
         access: &AccessPath,
         fixed_list_idents: &Option<Vec<String>>,
     ) -> Option<Expression<'a>> {
-        let parent_expr = self.access_path_to_expr(access);
-        let tag_access = self.static_member_expr(parent_expr, "tag");
+        let is_struct = path.res.is_struct_def();
+
         let resolved = if let Some(hir_id) = path.res.hir_id() {
             if let Some(s) = self.name_map.resolve(hir_id) {
                 s.to_string()
@@ -413,12 +413,27 @@ impl<'a> InnerCodegen<'a> {
                 .unwrap_or_else(|| path.join("."))
         };
 
-        let mut cond = self.ast.expression_binary(
-            SPAN,
-            tag_access,
-            BinaryOperator::StrictEquality,
-            self.ident_expr(&resolved),
-        );
+        let mut cond = if is_struct {
+            // Struct patterns use `instanceof` checks since JS structs are
+            // constructor functions without a `.tag` property.
+            let parent_expr = self.access_path_to_expr(access);
+            self.ast.expression_binary(
+                SPAN,
+                parent_expr,
+                BinaryOperator::Instanceof,
+                self.ident_expr(&resolved),
+            )
+        } else {
+            // Enum variant patterns check the `.tag` property.
+            let parent_expr = self.access_path_to_expr(access);
+            let tag_access = self.static_member_expr(parent_expr, "tag");
+            self.ast.expression_binary(
+                SPAN,
+                tag_access,
+                BinaryOperator::StrictEquality,
+                self.ident_expr(&resolved),
+            )
+        };
 
         for (ident, pattern) in patterns.iter().filter(|(_, pat)| !pat.is_wildcard()) {
             let sub_access = if ident.as_str().chars().all(char::is_numeric) {

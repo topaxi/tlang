@@ -4,8 +4,8 @@ description: "Backend: javascript"
 expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/structs/struct_fn_param.tlang
 ---
-undefined
-undefined
-undefined
-unknown
+hello
+3
+7
+html: hello
 unknown
