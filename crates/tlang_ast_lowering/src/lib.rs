@@ -526,12 +526,15 @@ impl LoweringContext {
                 }
                 ast::node::TyKind::Unknown => hir::TyKind::Unknown,
             };
+            let res = self.node_id_to_hir_id.get(&node.id).copied();
             hir::Ty {
+                res,
                 kind,
                 span: node.span,
             }
         } else {
             hir::Ty {
+                res: None,
                 kind: hir::TyKind::Unknown,
                 span: tlang_span::Span::default(),
             }

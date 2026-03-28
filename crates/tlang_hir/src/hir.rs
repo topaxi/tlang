@@ -797,6 +797,10 @@ pub struct ElseClause {
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Ty {
+    /// Points to the declaration's `HirId`, preserving resolution identity
+    /// across lowering. Named types resolved via `node_id_to_hir_id` will have
+    /// `Some`; primitive and unknown types remain `None`.
+    pub res: Option<HirId>,
     pub kind: TyKind,
     pub span: Span,
 }
