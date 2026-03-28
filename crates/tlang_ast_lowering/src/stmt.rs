@@ -651,6 +651,11 @@ fn get_enum_name(path: &ast::node::Path) -> String {
     path.segments[n.saturating_sub(2)].to_string()
 }
 
+/// Returns `true` if the function declaration has any parameter with a
+/// non-trivial pattern (e.g. enum variant, struct destructuring, literal,
+/// list, or tuple patterns). Such patterns require match-dispatch lowering
+/// rather than the simple `lower_fn_decl` fast path which only handles
+/// identifiers, `self`, and wildcards.
 fn has_complex_param_patterns(decl: &FunctionDeclaration) -> bool {
     decl.parameters.iter().any(|param| {
         !matches!(
