@@ -1,0 +1,12 @@
+enum SafeHtml { Html(string) }
+
+protocol Display {
+  fn to_string(self)
+}
+
+impl Display for SafeHtml {
+  fn to_string(SafeHtml::Html(v)) { v }
+}
+
+let sh = SafeHtml::Html("hello");
+Display::to_string(sh) |> log();

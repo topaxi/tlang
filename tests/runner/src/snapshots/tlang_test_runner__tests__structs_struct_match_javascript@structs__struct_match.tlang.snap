@@ -4,11 +4,11 @@ description: "Backend: javascript"
 expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/structs/struct_match.tlang
 ---
+hello
 unknown
-unknown
-undefined
-unknown animal
-unknown animal
+point
+cat: Whiskers
+dog: Rex
 
 warning: Unused variable `x`, if this is intentional, prefix the name with an underscore: `_x`
   ┌─ [WORKSPACE_ROOT]/tests/structs/struct_match.tlang:1:1

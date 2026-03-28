@@ -1,0 +1,23 @@
+struct SafeHtml { value: string }
+
+// Single-dispatch with struct destructuring in function parameter
+fn get_value(SafeHtml { value }) { value }
+
+let sh = SafeHtml { value: "hello" };
+get_value(sh) |> log();
+
+struct Point { x: isize, y: isize }
+
+fn get_x(Point { x, y: _ }) { x }
+fn get_sum(Point { x, y }) { x + y }
+
+let p = Point { x: 3, y: 4 };
+get_x(p) |> log();
+get_sum(p) |> log();
+
+// Multi-dispatch: struct pattern clause + wildcard fallback
+fn describe(SafeHtml { value }) { "html: " + value }
+fn describe(_) { "unknown" }
+
+describe(sh) |> log();
+describe(42) |> log();
