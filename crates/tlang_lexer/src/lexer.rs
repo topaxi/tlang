@@ -196,7 +196,10 @@ impl<'src> Lexer<'src> {
                                 result.push('\\');
                                 result.push('u');
                                 result.push('{');
-                                while self.current_char != '}' && self.current_char != '\0' {
+                                while self.current_char != '}'
+                                    && self.current_char != '\0'
+                                    && !(self.current_char == quote && self.is_triple_quote(quote))
+                                {
                                     result.push(self.current_char);
                                     self.advance();
                                 }
@@ -229,7 +232,7 @@ impl<'src> Lexer<'src> {
     /// The three opening quotes have already been consumed.
     /// Interpolation and escape handling is identical to [`read_tagged_string_parts`], but
     /// termination requires three consecutive matching quote characters.
-    pub fn read_tagged_triple_string_parts(
+    fn read_tagged_triple_string_parts(
         &mut self,
         quote: char,
     ) -> Result<Vec<TaggedStringPart>, String> {
