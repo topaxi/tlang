@@ -389,27 +389,21 @@ impl<'a> InnerCodegen<'a> {
         let is_struct = path.res.is_struct_def();
 
         let resolved = if let Some(hir_id) = path.res.hir_id() {
-            if let Some(s) = self.name_map.resolve(hir_id) {
-                s.to_string()
-            } else if let Some(s) = builtins::lookup(&path.to_string()) {
-                // Semantically resolved but not in NameMap — this is a known
-                // builtin looked up by its registered name.
-                s.to_string()
-            } else {
-                // Semantically resolved (has HirId) but not in NameMap and not
-                // an explicitly registered builtin.  For qualified enum variant
-                // paths like `Option::None`, `path.join(".")` produces the
-                // structurally-correct JS form (`Option.None`).
-                path.join(".")
-            }
-        } else {
-            builtins::lookup(&path.to_string())
-                .or_else(|| builtins::lookup(path.last_ident().as_str()))
+            // User-defined enum variant or struct: always pre-registered in
+            // the NameMap by `pre_register_declarations`, so the lookup
+            // should always succeed.  The `path.join(".")` structural
+            // fallback handles any edge cases during incremental compilation.
+            self.name_map
+                .resolve(hir_id)
                 .map(|s| s.to_string())
-                // Semantic analysis already validates enum variant paths, so
-                // any path that reaches here is structurally valid.  The
-                // `path.join(".")` structural translation is correct for all
-                // user-defined and builtin enum variants.
+                .unwrap_or_else(|| path.join("."))
+        } else {
+            // Builtin path (no HirId assigned by semantic analysis).
+            // Unqualified names like `Some` and `None` are looked up directly;
+            // qualified paths like `Option::None` are handled by `path.join(".")`
+            // which already produces the structurally-correct JS form `Option.None`.
+            builtins::lookup(&path.to_string())
+                .map(|s| s.to_string())
                 .unwrap_or_else(|| path.join("."))
         };
 
