@@ -39,6 +39,10 @@ impl LoweringContext {
                 }]
             }
             ast::node::StmtKind::FunctionDeclaration(box decl) => {
+                if has_complex_param_patterns(decl) || decl.guard.is_some() {
+                    return self.lower_fn_decls(node, std::slice::from_ref(decl));
+                }
+
                 let decl = self.lower_fn_decl(decl);
 
                 vec![hir::Stmt {
@@ -346,7 +350,7 @@ impl LoweringContext {
         let methods = method_groups
             .into_iter()
             .map(|(_name, decls)| {
-                if decls.len() == 1 {
+                if decls.len() == 1 && !has_complex_param_patterns(decls[0]) {
                     self.lower_fn_decl(decls[0])
                 } else {
                     let owned: Vec<_> = decls.iter().map(|d| (*d).clone()).collect();
@@ -545,7 +549,7 @@ impl LoweringContext {
         all_param_names: &[Option<Ident>],
         leading_comments: &[ast::token::CommentToken],
     ) -> hir::FunctionDeclaration {
-        if decls.len() == 1 {
+        if decls.len() == 1 && decls[0].guard.is_none() && !has_complex_param_patterns(&decls[0]) {
             return self.lower_fn_decl(&decls[0]);
         }
 
@@ -643,7 +647,19 @@ impl LoweringContext {
 }
 
 fn get_enum_name(path: &ast::node::Path) -> String {
-    path.segments[path.segments.len() - 2].to_string()
+    let n = path.segments.len();
+    path.segments[n.saturating_sub(2)].to_string()
+}
+
+fn has_complex_param_patterns(decl: &FunctionDeclaration) -> bool {
+    decl.parameters.iter().any(|param| {
+        !matches!(
+            param.pattern.kind,
+            ast::node::PatKind::Identifier(_)
+                | ast::node::PatKind::_Self
+                | ast::node::PatKind::Wildcard
+        )
+    })
 }
 
 fn get_param_names(decls: &[FunctionDeclaration]) -> Vec<Option<Ident>> {
