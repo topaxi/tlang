@@ -2039,7 +2039,14 @@ impl Interpreter {
 
                 true
             }
-            TlangObjectKind::String(_) => {
+            TlangObjectKind::String(s) => {
+                let str_len = s.len();
+
+                // Empty list pattern is a special case, it only matches empty strings.
+                if patterns.is_empty() && str_len >= 1 {
+                    return false;
+                }
+
                 for (i, pat) in patterns.iter().enumerate() {
                     let str_value = state
                         .get_object(value)
