@@ -2,7 +2,7 @@
 //
 // Demonstrates real-world usage of:
 //   • Enums with data for type-safe categories
-//   • Pattern matching in function signatures
+//   • Pattern matching in function signatures and match expressions
 //   • Pipeline operator for data transformation
 //   • Higher-order functions (map, filter, fold)
 //   • Temporal API for date-based queries
@@ -25,17 +25,13 @@ fn Expense.date(Expense::Transport(_, d)) { d }
 fn Expense.date(Expense::Entertainment(_, d)) { d }
 fn Expense.date(Expense::Utilities(_, d)) { d }
 
-fn Expense.category_name(Expense::Food(_, _)) { "Food" }
-fn Expense.category_name(Expense::Transport(_, _)) { "Transport" }
-fn Expense.category_name(Expense::Entertainment(_, _)) { "Entertainment" }
-fn Expense.category_name(Expense::Utilities(_, _)) { "Utilities" }
-
 impl Display for Expense {
     apply to_string;
 
-    fn to_string(e) {
-        f"{e.category_name()}: {e.amount()} on {e.date()}"
-    }
+    fn to_string(Expense::Food(a, d)) { f"Food: {a} on {d}" }
+    fn to_string(Expense::Transport(a, d)) { f"Transport: {a} on {d}" }
+    fn to_string(Expense::Entertainment(a, d)) { f"Entertainment: {a} on {d}" }
+    fn to_string(Expense::Utilities(a, d)) { f"Utilities: {a} on {d}" }
 }
 
 fn Expense.is_food(Expense::Food(_, _)) { true }

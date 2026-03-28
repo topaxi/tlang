@@ -1,17 +1,34 @@
-// HTML templating with tagged string literals
+// HTML templating with type-safe escaping
 //
-// Demonstrates the html"..." tagged string for building HTML strings.
+// Demonstrates real-world usage of:
+//   • SafeHtml enum for type-safe HTML (prevents double-escaping)
+//   • html"..." tagged strings with automatic escaping
+//   • Multi-dispatch rendering: SafeHtml passes through, raw values auto-escape
+//   • Struct destructuring in function parameters
+//   • Triple-quoted strings for multiline templates
+//   • Pattern matching with match expressions
+//   • Pipeline operator for composing components
 //
 // Design:
-//   - html"..." interpolates values via Display::to_string (caller controls safety)
-//   - text(v)  escapes raw user input before embedding
-//   - Nested html"..." results are plain strings and compose without re-escaping
-//   - Lists are pre-joined with join() before embedding in a template
+//   - SafeHtml::Html(string) wraps trusted HTML content
+//   - html"..." auto-escapes interpolated values and returns SafeHtml
+//   - Nested SafeHtml values embed without re-escaping
+//   - text(v)  manually escapes input and wraps in SafeHtml
 //
 // Tagged string expansion:
 //   html"<p>{expr}</p>"  →  html(["<p>", "</p>"], [expr])
 
-// ── HTML escaping ─────────────────────────────────────────────────────────────
+// ── SafeHtml type ───────────────────────────────────────────────────────────
+
+enum SafeHtml { Html(string) }
+
+impl Display for SafeHtml {
+    apply to_string;
+
+    fn to_string(SafeHtml::Html(v)) { v }
+}
+
+// ── HTML escaping ───────────────────────────────────────────────────────────
 
 fn escape_html(s) {
     s
@@ -22,53 +39,89 @@ fn escape_html(s) {
     |> re"'".replace_all("&#39;")
 }
 
-// Converts a value to an escaped HTML string. Use for raw user input.
-fn text(v) { escape_html(Display::to_string(v)) }
+// Wraps raw input in SafeHtml after escaping.
+fn text(v) { SafeHtml::Html(escape_html(Display::to_string(v))) }
 
-// ── html tag function ─────────────────────────────────────────────────────────
+// ── Render dispatch ─────────────────────────────────────────────────────────
+//
+// SafeHtml values are trusted — they embed without re-escaping.
+// All other values are auto-escaped through Display.
 
-// Joins a list of html strings into a single string.
-fn join([]) { "" }
-fn join([x, ...xs]) { x + join(xs) }
+fn render(SafeHtml::Html(v)) { v }
+fn render(v) { escape_html(Display::to_string(v)) }
 
-// Interleaves template parts with rendered values.
+// ── html tag function ───────────────────────────────────────────────────────
+
 fn html_zip([last], [], acc) { acc + last }
 fn html_zip([part, ...parts], [value, ...values], acc) {
-    rec html_zip(parts, values, acc + part + Display::to_string(value))
+    rec html_zip(parts, values, acc + part + render(value))
 }
 
 fn html(parts, values) {
-    html_zip(parts, values, "")
+    SafeHtml::Html(html_zip(parts, values, ""))
 }
 
-// ── Demo ──────────────────────────────────────────────────────────────────────
+// ── Utility functions ───────────────────────────────────────────────────────
 
-// Escaping user input: wrap raw values in text() before embedding.
-log("=== HTML escaping ===");
+fn map([], _) { [] }
+fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
 
+fn join_html([]) { SafeHtml::Html("") }
+fn join_html([x, ...xs]) { SafeHtml::Html(render(x) + render(join_html(xs))) }
+
+// Strips the leading and trailing whitespace that triple-quoted strings
+// produce when formatted with surrounding line breaks.
+fn trim(SafeHtml::Html(v)) { SafeHtml::Html(trim(v)) }
+fn trim(s) {
+    s
+    |> re"^\s+".replace_first("")
+    |> re"\s+$".replace_first("")
+}
+
+fn dedent(SafeHtml::Html(v)) { SafeHtml::Html(dedent(v)) }
+fn dedent(s) {
+    let trimmed = s
+        |> re"^\n".replace_first("")
+        |> re"\n[ \t]*$".replace_first("");
+    match re"^([ \t]+)".exec(trimmed) {
+        Option::Some(indent) =>
+            trimmed |> re"^{indent}".flags("m").replace_all(""),
+        Option::None => trimmed,
+    }
+}
+
+// ── Demo: Auto-escaping ─────────────────────────────────────────────────────
+
+log("=== Auto-escaping ===");
+
+// Raw values are auto-escaped in templates — no manual text() needed.
 let user_input = "<script>alert('xss')</script>";
-let escaped = html"<p>User said: {text(user_input)}</p>";
-escaped |> log();
-// <p>User said: &lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;</p>
+html"<p>User said: {user_input}</p>" |> Display::to_string() |> log();
 
-// ── Nested templates ──────────────────────────────────────────────────────────
+let company = "O'Reilly & Sons";
+html"<span>{company}</span>" |> Display::to_string() |> log();
 
-log("=== Nested templates ===");
+// Numbers are safe and pass through escaping unchanged.
+let count = 3;
+let limit = 10;
+html"<p>{count} of {limit} items loaded.</p>" |> Display::to_string() |> log();
 
-// Inner templates are already HTML strings — they compose without re-escaping.
-let site_name = "My Site";
-let lang_name = "tlang";
+// ── Demo: SafeHtml composition ──────────────────────────────────────────────
 
-let lang_link = html"<a href=\"https://github.com/topaxi/tlang\">{lang_name}</a>";
-let intro     = html"<p>Welcome to {lang_link} — a toy functional language.</p>";
-let heading   = html"<h1>{text(site_name)}</h1>";
-let header    = html"<header>{heading}{intro}</header>";
+log("=== SafeHtml composition ===");
 
-header |> log();
+// html"..." returns SafeHtml — embedding it preserves HTML without re-escaping.
+let link = html"""<a href="https://github.com/topaxi/tlang">tlang</a>""";
+let intro = html"<p>Built with {link} — a functional language.</p>";
+intro.to_string() |> log();
 
-// ── List of templates ─────────────────────────────────────────────────────────
+// text() wraps escaped input in SafeHtml — useful outside of templates.
+let safe_name = text("Alice <admin>");
+html"<span>Author: {safe_name}</span>" |> Display::to_string() |> log();
 
-log("=== List rendering ===");
+// ── Demo: Struct rendering with destructuring ───────────────────────────────
+
+log("=== Blog posts ===");
 
 struct Post {
     title: string,
@@ -76,14 +129,16 @@ struct Post {
     excerpt: string,
 }
 
-fn Post.render(self) {
-    html"
+fn Post.render(Post { title, author, excerpt }) {
+    html"""
         <article>
-            <h2>{text(self.title)}</h2>
-            <p class=\"byline\">by {text(self.author)}</p>
-            <p>{text(self.excerpt)}</p>
+            <h2>{title}</h2>
+            <p class="byline">by {author}</p>
+            <p>{excerpt}</p>
         </article>
-    "
+    """
+    |> dedent()
+    |> trim()
 }
 
 let posts = [
@@ -92,18 +147,72 @@ let posts = [
     Post { title: "Pattern matching", author: "Carol", excerpt: "Destructure everything."     },
 ];
 
-let post_items = join(map(posts, fn(post) { html"<li>{post.render()}</li>" }));
-let post_list  = html"<ul class=\"posts\">{post_items}</ul>";
+let post_list = posts
+    |> map(fn(p) { html"<li>{p.render()}</li>" })
+    |> join_html();
 
-post_list |> log();
+html"""<ul class="posts">{post_list}</ul>"""
+|> Display::to_string()
+|> log();
 
-// ── Number interpolation ──────────────────────────────────────────────────────
+// ── Demo: Enum rendering with match ─────────────────────────────────────────
 
-log("=== Number interpolation ===");
+log("=== Alert component ===");
 
-let count = 3;
-let limit = 10;
-let status = html"<p>{text(count)} of {text(limit)} items loaded.</p>";
+enum Alert {
+    Success(string),
+    Warning(string),
+    Error(string),
+}
 
-status |> log();
-// <p>3 of 10 items loaded.</p>
+fn Alert.render(Alert::Success(msg)) { html"""<div class="alert success">{msg}</div>""" }
+fn Alert.render(Alert::Warning(msg)) { html"""<div class="alert warning">{msg}</div>""" }
+fn Alert.render(Alert::Error(msg))   { html"""<div class="alert error">{msg}</div>""" }
+
+Alert::Success("Changes saved!").render().to_string() |> log();
+Alert::Warning("Session expires soon.").render().to_string() |> log();
+Alert::Error("Invalid <input> detected.").render().to_string() |> log();
+
+// ── Demo: Full page layout ──────────────────────────────────────────────────
+
+log("=== Full page ===");
+
+struct Page {
+    title: string,
+    alerts: list,
+    posts: list,
+}
+
+fn Page.render(Page { title, alerts, posts }) {
+    let alert_section = alerts |> map(fn(a) { a.render() }) |> join_html();
+    let post_items = posts
+        |> map(fn(p) { html"<li>{p.render()}</li>" })
+        |> join_html();
+
+    html"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head><title>{title}</title></head>
+        <body>
+            <header><h1>{title}</h1></header>
+            <main>
+                {alert_section}
+                <ul class="posts">{post_items}</ul>
+            </main>
+        </body>
+        </html>
+    """
+    |> dedent()
+    |> trim()
+}
+
+let page = Page {
+    title: "My Blog",
+    alerts: [
+        Alert::Success("Welcome back!"),
+        Alert::Warning("2 unread messages."),
+    ],
+    posts: posts,
+};
+
+page.render().to_string() |> log();
