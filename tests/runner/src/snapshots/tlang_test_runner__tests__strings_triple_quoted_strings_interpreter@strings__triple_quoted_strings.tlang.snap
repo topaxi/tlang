@@ -1,0 +1,17 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/strings/triple_quoted_strings.tlang
+---
+Hello, World!
+Hello, World!
+
+Hello
+World
+
+She said "hi" today
+tab:	here
+Hello, World!
+
+Value: 42

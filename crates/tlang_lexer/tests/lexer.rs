@@ -573,3 +573,134 @@ fn test_tagged_string_interpolation_position_tracking() {
         _ => panic!("Expected Interpolation part"),
     }
 }
+
+// ── Triple-quoted string tests ─────────────────────────────────────────────────
+
+#[test]
+fn test_triple_double_quoted_string_empty() {
+    let mut lexer = Lexer::new(r#""""""""#);
+    assert_tokens!(lexer, [TokenKind::Literal(Literal::String(intern("")))]);
+}
+
+#[test]
+fn test_triple_single_quoted_string_empty() {
+    let mut lexer = Lexer::new("''''''");
+    assert_tokens!(lexer, [TokenKind::Literal(Literal::Char(intern("")))]);
+}
+
+#[test]
+fn test_triple_double_quoted_string_simple() {
+    let mut lexer = Lexer::new("\"\"\"hello\"\"\"");
+    assert_tokens!(
+        lexer,
+        [TokenKind::Literal(Literal::String(intern("hello")))]
+    );
+}
+
+#[test]
+fn test_triple_single_quoted_string_simple() {
+    let mut lexer = Lexer::new("'''hello'''");
+    assert_tokens!(lexer, [TokenKind::Literal(Literal::Char(intern("hello")))]);
+}
+
+#[test]
+fn test_triple_quoted_string_with_newlines() {
+    let mut lexer = Lexer::new("\"\"\"Hello\nWorld\"\"\"");
+    assert_tokens!(
+        lexer,
+        [TokenKind::Literal(Literal::String(intern("Hello\nWorld")))]
+    );
+}
+
+#[test]
+fn test_triple_quoted_string_contains_double_quote() {
+    // A single embedded double-quote inside triple-double-quoted string is allowed
+    let source = r#""""say "hi" now""""#;
+    let mut lexer = Lexer::new(source);
+    assert_tokens!(
+        lexer,
+        [TokenKind::Literal(Literal::String(intern(
+            "say \"hi\" now"
+        )))]
+    );
+}
+
+#[test]
+fn test_triple_quoted_string_contains_two_quotes() {
+    let mut lexer = Lexer::new("\"\"\"a\"\"b\"\"\"");
+    assert_tokens!(
+        lexer,
+        [TokenKind::Literal(Literal::String(intern("a\"\"b")))]
+    );
+}
+
+#[test]
+fn test_triple_quoted_string_escape_sequences() {
+    let mut lexer = Lexer::new("\"\"\"tab:\\there\"\"\"");
+    assert_tokens!(
+        lexer,
+        [TokenKind::Literal(Literal::String(intern("tab:\there")))]
+    );
+}
+
+#[test]
+fn test_triple_quoted_string_multiline() {
+    let source = "\"\"\"\nline1\nline2\n\"\"\"";
+    let mut lexer = Lexer::new(source);
+    assert_tokens!(
+        lexer,
+        [TokenKind::Literal(Literal::String(intern(
+            "\nline1\nline2\n"
+        )))]
+    );
+}
+
+#[test]
+fn test_triple_quoted_tagged_string_simple() {
+    let (tag, parts) = lex_tagged_string("sql\"\"\"SELECT * FROM users\"\"\"");
+    assert_eq!(tag, "sql");
+    assert_eq!(
+        parts,
+        vec![TaggedStringPart::Literal("SELECT * FROM users".into())]
+    );
+}
+
+#[test]
+fn test_triple_quoted_tagged_string_with_newline() {
+    let source = "sql\"\"\"\n  SELECT *\n  FROM users\n\"\"\"";
+    let (tag, parts) = lex_tagged_string(source);
+    assert_eq!(tag, "sql");
+    assert_eq!(
+        parts,
+        vec![TaggedStringPart::Literal(
+            "\n  SELECT *\n  FROM users\n".into()
+        )]
+    );
+}
+
+#[test]
+fn test_triple_quoted_tagged_string_with_interpolation() {
+    let (tag, parts) = lex_tagged_string("html\"\"\"\n<div>{name}</div>\n\"\"\"");
+    assert_eq!(tag, "html");
+    assert_eq!(parts.len(), 3);
+    assert_eq!(parts[0], TaggedStringPart::Literal("\n<div>".into()));
+    match &parts[1] {
+        TaggedStringPart::Interpolation { source, .. } => {
+            assert_eq!(source.as_ref(), "name");
+        }
+        _ => panic!("Expected Interpolation part"),
+    }
+    assert_eq!(parts[2], TaggedStringPart::Literal("</div>\n".into()));
+}
+
+#[test]
+fn test_triple_quoted_tagged_string_contains_single_quote() {
+    // An embedded double-quote inside a triple-double-quoted tagged string is allowed
+    let source = r#"html"""say "hi" now""""#;
+    let (tag, parts) = lex_tagged_string(source);
+    assert_eq!(tag, "html");
+    assert_eq!(
+        parts,
+        vec![TaggedStringPart::Literal("say \"hi\" now".into())]
+    );
+}
