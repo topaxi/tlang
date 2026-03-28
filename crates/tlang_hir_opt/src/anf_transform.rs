@@ -79,8 +79,8 @@ pub(crate) struct AnfFolder<'a, F: AnfFilter> {
     /// Statements to inject before the current position in a block.
     pub(crate) pending: Vec<hir::Stmt>,
     pub(crate) changed: &'a mut bool,
-    /// Name of the function currently being folded (for self-referencing TailCall detection).
-    pub(crate) current_function_name: Option<String>,
+    /// HirId of the function currently being folded (for self-referencing TailCall detection).
+    pub(crate) current_function_hir_id: Option<tlang_span::HirId>,
     pub(crate) filter: &'a F,
 }
 
@@ -101,10 +101,11 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
     /// current function). Only self-referencing TailCalls are converted to
     /// loops by the codegen; mutual TailCalls are regular calls.
     pub(crate) fn is_self_referencing_tail_call(&self, call: &hir::CallExpression) -> bool {
-        if let Some(ref fn_name) = self.current_function_name
+        if let Some(fn_hir_id) = self.current_function_hir_id
             && let hir::ExprKind::Path(ref path) = call.callee.kind
+            && let Some(callee_hir_id) = path.res.hir_id()
         {
-            return path.last_ident().as_str() == fn_name;
+            return callee_hir_id == fn_hir_id;
         }
         false
     }
@@ -729,13 +730,11 @@ fn fold_function_decl<F: AnfFilter>(
     folder: &mut AnfFolder<F>,
     decl: hir::FunctionDeclaration,
 ) -> hir::FunctionDeclaration {
-    let prev_fn_name = folder.current_function_name.take();
-    // Extract function name for self-referencing TailCall detection.
-    if let hir::ExprKind::Path(ref path) = decl.name.kind {
-        folder.current_function_name = Some(path.last_ident().to_string());
-    }
+    let prev_fn_hir_id = folder.current_function_hir_id.take();
+    // Store the function's HirId for self-referencing TailCall detection.
+    folder.current_function_hir_id = Some(decl.hir_id);
     let body = folder.fold_block(decl.body);
-    folder.current_function_name = prev_fn_name;
+    folder.current_function_hir_id = prev_fn_hir_id;
     hir::FunctionDeclaration {
         hir_id: decl.hir_id,
         visibility: decl.visibility,
@@ -763,7 +762,7 @@ impl<F: AnfFilter + Default> HirPass for AnfTransform<F> {
             counter: &mut self.counter,
             pending: Vec::new(),
             changed: &mut self.changed,
-            current_function_name: None,
+            current_function_hir_id: None,
             filter: &self.filter,
         };
 
