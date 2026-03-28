@@ -246,3 +246,29 @@ pub fn lookup(tlang_name: &str) -> Option<&'static str> {
         .find(|b| b.tlang_name == tlang_name)
         .map(|b| b.js_name)
 }
+
+/// Builtin tlang type → JavaScript constructor remappings for `impl` blocks.
+///
+/// Only types whose JavaScript constructor name *differs* from the tlang type
+/// name need to be listed here.  All other builtin types keep their name as the
+/// `$impl` constructor key.
+///
+/// This is the authoritative registry consumed by `generate_impl_block` when
+/// the target type has no resolved `HirId` (i.e. it is a builtin/unresolved
+/// type rather than a user-defined one).
+pub static BUILTIN_TYPE_JS_CONSTRUCTORS: &[(&str, &str)] = &[
+    // tlang `List` → JavaScript's native `Array` constructor.
+    ("List", "Array"),
+];
+
+/// Returns the JavaScript constructor name to use as the `$impl` key for a
+/// builtin tlang type.
+///
+/// Returns `None` when the tlang name should be used as-is (no remapping
+/// exists for the given type).
+pub fn builtin_type_js_constructor(tlang_name: &str) -> Option<&'static str> {
+    BUILTIN_TYPE_JS_CONSTRUCTORS
+        .iter()
+        .find(|(name, _)| *name == tlang_name)
+        .map(|(_, js)| *js)
+}

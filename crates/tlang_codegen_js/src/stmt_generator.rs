@@ -6,6 +6,7 @@ use tlang_ast::token::Literal;
 use tlang_hir as hir;
 use tlang_hir::HirId;
 
+use crate::builtins;
 use crate::error::CodegenError;
 use crate::generator::{CodegenJS, InnerCodegen};
 
@@ -348,13 +349,19 @@ impl<'a> InnerCodegen<'a> {
         let protocol_name = impl_block.protocol_name.to_string();
         let target_type = impl_block.target_type.to_string();
         let js_protocol_name = CodegenJS::protocol_js_name(&protocol_name);
-        // Only remap "List" → "Array" for builtin/unresolved types. A
-        // user-defined enum named List has a HIR ID and its JS class keeps the
-        // name "List".
-        let js_type_constructor = if impl_block.target_type.res.hir_id().is_none() {
-            js_constructor_for_type(&target_type)
+        // Use the resolved HirId to distinguish user-defined types (which have a
+        // HirId) from builtin/unresolved types (which do not). For builtin
+        // types consult the centralized registry to obtain the correct JS
+        // constructor name — e.g. tlang `List` maps to JavaScript's `Array`.
+        let js_type_constructor = if let Some(hir_id) = impl_block.target_type.res.hir_id() {
+            self.name_map
+                .resolve(hir_id)
+                .map(String::from)
+                .unwrap_or_else(|| target_type.clone())
         } else {
-            target_type.clone()
+            builtins::builtin_type_js_constructor(&target_type)
+                .map(String::from)
+                .unwrap_or_else(|| target_type.clone())
         };
 
         let mut stmts = Vec::new();
@@ -402,12 +409,14 @@ impl<'a> InnerCodegen<'a> {
 
         for apply_ident in &impl_block.apply_methods {
             let method_name = apply_ident.as_str();
+            // Builtin types have no HirId — applying protocol methods to them
+            // is not allowed to preserve backwards compatibility.
             assert!(
-                !is_builtin_type(&target_type),
+                impl_block.target_type.res.hir_id().is_some(),
                 "Cannot use 'apply' for built-in type '{target_type}': \
                  applying methods to built-in types is not allowed to preserve backwards compatibility"
             );
-            let proto = js_prototype_for_type(&target_type);
+            let proto = format!("{js_type_constructor}.prototype");
 
             // $installMethod(TargetType.prototype, "methodName", $Protocol.methodName);
             let install_call = self.call_expr(
@@ -425,26 +434,4 @@ impl<'a> InnerCodegen<'a> {
 
         stmts
     }
-}
-
-fn is_builtin_type(type_name: &str) -> bool {
-    matches!(
-        type_name,
-        "List" | "Option" | "Result" | "ListIterator" | "string::StringBuf"
-    )
-}
-
-/// Maps a tlang type name to the JS constructor identifier used as the `$impl`
-/// key. Arrays have no custom class so "List" maps to the built-in `Array`
-/// constructor. All other user/stdlib types keep their name since their tlang
-/// class is compiled with the same identifier.
-fn js_constructor_for_type(type_name: &str) -> String {
-    match type_name {
-        "List" => "Array".to_string(),
-        other => other.to_string(),
-    }
-}
-
-fn js_prototype_for_type(type_name: &str) -> String {
-    format!("{type_name}.prototype")
 }
