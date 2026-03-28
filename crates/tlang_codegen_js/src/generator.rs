@@ -223,6 +223,12 @@ impl CodegenJS {
             ("Option::None", DefKind::EnumVariant(0)),
             ("Result::Ok", DefKind::EnumVariant(1)),
             ("Result::Err", DefKind::EnumVariant(1)),
+            // `List` and `ListIterator` are builtin struct-backed types used as
+            // impl-block target types in the stdlib and user code. Registering
+            // them here suppresses spurious "no symbol found" warnings from the
+            // IdentifierResolver when compiling `impl Protocol for List`.
+            ("List", DefKind::Struct),
+            ("ListIterator", DefKind::Struct),
             ("Functor", DefKind::Protocol),
             ("Functor::map", DefKind::ProtocolMethod(2)),
             ("Match", DefKind::Protocol),
