@@ -607,17 +607,21 @@ impl LoweringContext {
             // now.
             this.current_symbol_table.borrow_mut().shift();
 
-            // Mapping argument pattern and signature guard into a match arm
+            // Mapping argument pattern and signature guard into a match arm.
+            // Propagate any type annotations inferred by FnParamTypeInference
+            // onto the lowered pattern's `ty` field so that the information
+            // survives into the HIR.
             let pat = if decl.parameters.len() > 1 {
                 let params = decl
                     .parameters
                     .iter()
-                    // We lose type information of each declaration here, as we
-                    // lower a whole FunctionParameter into a pattern. They
-                    // should probably match for each declaration and we might want
-                    // to verify this now or earlier in the pipeline.
-                    // Ignored for now as types are basically a NOOP everywhere.
-                    .map(|param| this.lower_pat_with_idents(&param.pattern, idents))
+                    .map(|param| {
+                        let mut pat = this.lower_pat_with_idents(&param.pattern, idents);
+                        if let Some(ty) = param.type_annotation.as_ref() {
+                            pat.ty = this.lower_ty(Some(ty));
+                        }
+                        pat
+                    })
                     .collect();
 
                 hir::Pat {
@@ -626,7 +630,12 @@ impl LoweringContext {
                     span: decl.span,
                 }
             } else {
-                this.lower_pat(&decl.parameters[0].pattern)
+                let param = &decl.parameters[0];
+                let mut pat = this.lower_pat(&param.pattern);
+                if let Some(ty) = param.type_annotation.as_ref() {
+                    pat.ty = this.lower_ty(Some(ty));
+                }
+                pat
             };
 
             let guard = decl.guard.as_ref().map(|expr| this.lower_expr(expr));
