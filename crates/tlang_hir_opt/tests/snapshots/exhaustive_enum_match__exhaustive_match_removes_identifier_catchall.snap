@@ -1,0 +1,18 @@
+---
+source: crates/tlang_hir_opt/tests/exhaustive_enum_match.rs
+expression: pretty
+---
+enum AB {
+    A
+    B
+}
+fn label(arg0: AB) -> unknown {
+    match arg0 {
+        AB::A => {
+            "a"
+        },
+        AB::B => {
+            "b"
+        },
+    }
+}

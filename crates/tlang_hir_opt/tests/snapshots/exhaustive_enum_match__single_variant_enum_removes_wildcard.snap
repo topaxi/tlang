@@ -1,0 +1,16 @@
+---
+source: crates/tlang_hir_opt/tests/exhaustive_enum_match.rs
+expression: pretty
+---
+enum Wrapper {
+    Value {
+        0: i64,
+    }
+}
+fn unwrap(wrapper: Wrapper) -> unknown {
+    match wrapper {
+        Wrapper::Value { 0: v } => {
+            v
+        },
+    }
+}
