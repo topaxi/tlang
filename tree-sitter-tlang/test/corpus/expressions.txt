@@ -255,6 +255,111 @@ re"\d{2,5}"
       (tagged_string_end))))
 
 ================================================================================
+Triple-quoted string
+================================================================================
+
+"""Hello, World!"""
+
+---
+
+(source_file
+  (expression_statement
+    (string)))
+
+================================================================================
+Triple-quoted string in variable declaration
+================================================================================
+
+let msg = """Hello, World!""";
+
+---
+
+(source_file
+  (variable_declaration
+    pattern: (pattern_assign
+      pattern: (binding)
+      default: (string))))
+
+================================================================================
+Triple-quoted single-quoted string
+================================================================================
+
+'''Hello, World!'''
+
+---
+
+(source_file
+  (expression_statement
+    (string)))
+
+================================================================================
+Triple-quoted multiline string
+================================================================================
+
+let s = """
+line 1
+line 2
+"""
+
+---
+
+(source_file
+  (variable_declaration
+    pattern: (pattern_assign
+      pattern: (binding)
+      default: (string))))
+
+================================================================================
+Triple-quoted string with embedded quotes
+================================================================================
+
+"""She said "hi" today"""
+
+---
+
+(source_file
+  (expression_statement
+    (string)))
+
+================================================================================
+Tagged triple-quoted string
+================================================================================
+
+f"""Hello, {name}!"""
+
+---
+
+(source_file
+  (expression_statement
+    (tagged_string
+      tag: (tagged_string_tag)
+      (tagged_string_start)
+      (tagged_string_content)
+      (interpolation (identifier))
+      (tagged_string_content)
+      (tagged_string_end))))
+
+================================================================================
+Tagged triple-quoted multiline string
+================================================================================
+
+html"""
+<div>{content}</div>
+"""
+
+---
+
+(source_file
+  (expression_statement
+    (tagged_string
+      tag: (tagged_string_tag)
+      (tagged_string_start)
+      (tagged_string_content)
+      (interpolation (identifier))
+      (tagged_string_content)
+      (tagged_string_end))))
+
+================================================================================
 Pipeline operator
 ================================================================================
 

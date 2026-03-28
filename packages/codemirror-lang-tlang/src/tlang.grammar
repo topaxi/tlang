@@ -179,7 +179,7 @@ ApplyStatement {
 
 pattern {
   WildcardPattern { kw<"_"> } |
-  LiteralPattern { "-"? Number | String | TaggedString | BooleanLiteral } |
+  LiteralPattern { "-"? Number | String | TripleString | TaggedString | BooleanLiteral } |
   EnumPattern |
   StructPattern |
   ArrayPattern |
@@ -227,6 +227,7 @@ Block {
 expression[@isGroup=Expression] {
   Number |
   String |
+  TripleString |
   TaggedString |
   VariableName |
   PathExpression { (Namespace "::")+ PathName } |
@@ -272,7 +273,7 @@ ContinueExpression { kw<"continue"> }
 
 //!property
 
-propName { PropertyName | "[" expression "]" | Number | String }
+propName { PropertyName | "[" expression "]" | Number | String | TripleString }
 
 Property {
   propName ~destructure (":" expression)? |
@@ -355,18 +356,26 @@ semi { ";" | insertSemi }
 
 //!taggedStringTokens
 
+@external tokens tripleStringTokenizer from "./tokens.js" { TripleString }
+
 @external tokens tagStringTagTokenizer from "./tokens.js" { TagStringTag }
 
 @external tokens taggedStringQuoteTokenizer from "./tokens.js" {
   TaggedStringOpenDouble,
   TaggedStringDoubleClose,
   TaggedStringOpenSingle,
-  TaggedStringSingleClose
+  TaggedStringSingleClose,
+  TaggedStringOpenTripleDouble,
+  TaggedStringTripleDoubleClose,
+  TaggedStringOpenTripleSingle,
+  TaggedStringTripleSingleClose
 }
 
 @external tokens taggedStringContentTokenizer from "./tokens.js" {
   TaggedStringContentDouble,
-  TaggedStringContentSingle
+  TaggedStringContentSingle,
+  TaggedStringContentTripleDouble,
+  TaggedStringContentTripleSingle
 }
 
 @external tokens taggedStringInterpolationTokenizer from "./tokens.js" {
@@ -388,7 +397,13 @@ TaggedStringInterpolation[isolate] {
        TaggedStringDoubleClose |
      TaggedStringOpenSingle
        (TaggedStringContentSingle | TaggedStringInterpolation)*
-       TaggedStringSingleClose)
+       TaggedStringSingleClose |
+     TaggedStringOpenTripleDouble
+       (TaggedStringContentTripleDouble | TaggedStringInterpolation)*
+       TaggedStringTripleDoubleClose |
+     TaggedStringOpenTripleSingle
+       (TaggedStringContentTripleSingle | TaggedStringInterpolation)*
+       TaggedStringTripleSingleClose)
   }
 }
 

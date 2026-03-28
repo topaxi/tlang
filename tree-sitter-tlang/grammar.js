@@ -39,6 +39,7 @@ module.exports = grammar({
     $.tagged_string_start,
     $.tagged_string_content,
     $.tagged_string_end,
+    $._triple_string,
   ],
 
   supertypes: ($) => [$._statement, $._expression, $._pattern, $._literal],
@@ -248,7 +249,7 @@ module.exports = grammar({
     wildcard_pattern: (_) => '_',
 
     literal_pattern: ($) =>
-      seq(optional('-'), choice($.number, $.string, $.boolean_literal)),
+      seq(optional('-'), choice($.number, $.string, alias($._triple_string, $.string), $.boolean_literal)),
 
     // Requires at least one "::" to distinguish from plain identifier.
     // Type names (uppercase) must be used for enum paths.
@@ -358,7 +359,8 @@ module.exports = grammar({
         $.continue_expression,
       ),
 
-    _literal: ($) => choice($.number, $.string, $.tagged_string, $.boolean_literal),
+    _literal: ($) =>
+      choice($.number, $.string, alias($._triple_string, $.string), $.tagged_string, $.boolean_literal),
 
     tagged_string: ($) =>
       prec.dynamic(

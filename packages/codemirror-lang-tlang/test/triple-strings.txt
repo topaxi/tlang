@@ -1,0 +1,42 @@
+# Plain triple-quoted double string
+
+"""hello world"""
+
+==>
+
+Script(ExpressionStatement(TripleString))
+
+# Plain triple-quoted single string
+
+'''hello world'''
+
+==>
+
+Script(ExpressionStatement(TripleString))
+
+# Triple-quoted multiline string
+
+"""
+hello
+world
+"""
+
+==>
+
+Script(ExpressionStatement(TripleString))
+
+# Triple-quoted string with embedded quotes
+
+"""She said "hello" and 'goodbye'"""
+
+==>
+
+Script(ExpressionStatement(TripleString))
+
+# Triple-quoted string in variable declaration
+
+let msg = """hello world"""
+
+==>
+
+Script(VariableDeclaration(let,VariableDefinition,Equals,TripleString))

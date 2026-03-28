@@ -11,10 +11,17 @@ import {
   TaggedStringDoubleClose,
   TaggedStringOpenSingle,
   TaggedStringSingleClose,
+  TaggedStringOpenTripleDouble,
+  TaggedStringTripleDoubleClose,
+  TaggedStringOpenTripleSingle,
+  TaggedStringTripleSingleClose,
   TaggedStringContentDouble,
   TaggedStringContentSingle,
+  TaggedStringContentTripleDouble,
+  TaggedStringContentTripleSingle,
   InterpolationStart,
   InterpolationEnd,
+  TripleString,
 } from './parser.terms.js';
 
 export const trackNewline = new ContextTracker({
@@ -90,6 +97,21 @@ export const tagStringTagTokenizer = new ExternalTokenizer((input) => {
 export const taggedStringQuoteTokenizer = new ExternalTokenizer(
   (input, stack) => {
     if (input.next === 34 /* " */) {
+      // Check for triple-quote first (""")
+      if (input.peek(1) === 34 && input.peek(2) === 34) {
+        if (stack.canShift(TaggedStringOpenTripleDouble)) {
+          input.advance();
+          input.advance();
+          input.advance();
+          input.acceptToken(TaggedStringOpenTripleDouble);
+        } else if (stack.canShift(TaggedStringTripleDoubleClose)) {
+          input.advance();
+          input.advance();
+          input.advance();
+          input.acceptToken(TaggedStringTripleDoubleClose);
+        }
+        return;
+      }
       if (stack.canShift(TaggedStringOpenDouble)) {
         input.advance();
         input.acceptToken(TaggedStringOpenDouble);
@@ -98,6 +120,21 @@ export const taggedStringQuoteTokenizer = new ExternalTokenizer(
         input.acceptToken(TaggedStringDoubleClose);
       }
     } else if (input.next === 39 /* ' */) {
+      // Check for triple-quote first (''')
+      if (input.peek(1) === 39 && input.peek(2) === 39) {
+        if (stack.canShift(TaggedStringOpenTripleSingle)) {
+          input.advance();
+          input.advance();
+          input.advance();
+          input.acceptToken(TaggedStringOpenTripleSingle);
+        } else if (stack.canShift(TaggedStringTripleSingleClose)) {
+          input.advance();
+          input.advance();
+          input.advance();
+          input.acceptToken(TaggedStringTripleSingleClose);
+        }
+        return;
+      }
       if (stack.canShift(TaggedStringOpenSingle)) {
         input.advance();
         input.acceptToken(TaggedStringOpenSingle);
@@ -146,10 +183,57 @@ function readTaggedStringContent(input, closeChar) {
   return hasContent;
 }
 
+// Reads triple-quoted tagged string content up to closing triple-quote or interpolation start.
+function readTripleTaggedStringContent(input, closeChar) {
+  let hasContent = false;
+  while (true) {
+    const ch = input.next;
+    if (ch === -1) break;
+    // Check for closing triple-quote
+    if (
+      ch === closeChar &&
+      input.peek(1) === closeChar &&
+      input.peek(2) === closeChar
+    )
+      break;
+    if (ch === 92 /* \ */) {
+      input.advance();
+      if (input.next !== -1) input.advance();
+      hasContent = true;
+      continue;
+    }
+    if (ch === 123 /* { */) {
+      const next = input.peek(1);
+      if (next === 123 /* {{ → literal { */) {
+        input.advance();
+        input.advance();
+        hasContent = true;
+        continue;
+      }
+      if (identifierStartChar(next)) break; // interpolation start — stop here
+    }
+    if (ch === 125 /* } */) {
+      input.advance();
+      if (input.next === 125 /* }} → literal } */) input.advance();
+      hasContent = true;
+      continue;
+    }
+    input.advance();
+    hasContent = true;
+  }
+  return hasContent;
+}
+
 // Tokenizes the string content between interpolations (or between quotes).
 export const taggedStringContentTokenizer = new ExternalTokenizer(
   (input, stack) => {
-    if (stack.canShift(TaggedStringContentDouble)) {
+    if (stack.canShift(TaggedStringContentTripleDouble)) {
+      if (readTripleTaggedStringContent(input, 34 /* " */))
+        input.acceptToken(TaggedStringContentTripleDouble);
+    } else if (stack.canShift(TaggedStringContentTripleSingle)) {
+      if (readTripleTaggedStringContent(input, 39 /* ' */))
+        input.acceptToken(TaggedStringContentTripleSingle);
+    } else if (stack.canShift(TaggedStringContentDouble)) {
       if (readTaggedStringContent(input, 34 /* " */))
         input.acceptToken(TaggedStringContentDouble);
     } else if (stack.canShift(TaggedStringContentSingle)) {
@@ -176,3 +260,38 @@ export const taggedStringInterpolationTokenizer = new ExternalTokenizer(
   },
   { contextual: true },
 );
+
+// Tokenizes plain triple-quoted strings ("""...""" and '''...''').
+export const tripleStringTokenizer = new ExternalTokenizer((input) => {
+  const quote = input.next;
+  if (quote !== 34 /* " */ && quote !== 39 /* ' */) return;
+  if (input.peek(1) !== quote || input.peek(2) !== quote) return;
+
+  // Consume opening triple-quote
+  input.advance();
+  input.advance();
+  input.advance();
+
+  // Read content until closing triple-quote or EOF
+  while (input.next !== -1) {
+    if (input.next === 92 /* \ */) {
+      input.advance();
+      if (input.next !== -1) input.advance();
+      continue;
+    }
+    if (
+      input.next === quote &&
+      input.peek(1) === quote &&
+      input.peek(2) === quote
+    ) {
+      input.advance();
+      input.advance();
+      input.advance();
+      input.acceptToken(TripleString);
+      return;
+    }
+    input.advance();
+  }
+  // Unterminated triple-quoted string — accept what we have
+  input.acceptToken(TripleString);
+});

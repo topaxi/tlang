@@ -40,10 +40,12 @@ let parserWithMetadata = parser.configure({
       WildcardExpression: t.special(t.variableName),
       Number: t.number,
       String: t.string,
+      TripleString: t.string,
       TagStringTag: t.special(t.regexp),
-      'TaggedStringOpenDouble TaggedStringOpenSingle TaggedStringDoubleClose TaggedStringSingleClose':
+      'TaggedStringOpenDouble TaggedStringOpenSingle TaggedStringDoubleClose TaggedStringSingleClose TaggedStringOpenTripleDouble TaggedStringOpenTripleSingle TaggedStringTripleDoubleClose TaggedStringTripleSingleClose':
         t.regexp,
-      'TaggedStringContentDouble TaggedStringContentSingle': t.regexp,
+      'TaggedStringContentDouble TaggedStringContentSingle TaggedStringContentTripleDouble TaggedStringContentTripleSingle':
+        t.regexp,
       'InterpolationStart InterpolationEnd': t.special(t.brace),
       LineComment: t.lineComment,
       BlockComment: t.blockComment,
@@ -182,7 +184,9 @@ function makeTaggedStringWrap(languages) {
         tag = input.read(cursor.from, cursor.to);
       } else if (
         name === 'TaggedStringContentDouble' ||
-        name === 'TaggedStringContentSingle'
+        name === 'TaggedStringContentSingle' ||
+        name === 'TaggedStringContentTripleDouble' ||
+        name === 'TaggedStringContentTripleSingle'
       ) {
         overlay.push({ from: cursor.from, to: cursor.to });
       }

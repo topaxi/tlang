@@ -69,3 +69,55 @@ html"{getUser().name}"
 ==>
 
 Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenDouble,TaggedStringInterpolation(InterpolationStart,MemberExpression(CallExpression(VariableName,ArgList),PropertyName),InterpolationEnd),TaggedStringDoubleClose)))
+
+# Static double-quoted tagged triple string
+
+html"""<div>hello</div>"""
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenTripleDouble,TaggedStringContentTripleDouble,TaggedStringTripleDoubleClose)))
+
+# Double-quoted tagged triple string with interpolation
+
+html"""<div>{name}</div>"""
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenTripleDouble,TaggedStringContentTripleDouble,TaggedStringInterpolation(InterpolationStart,VariableName,InterpolationEnd),TaggedStringContentTripleDouble,TaggedStringTripleDoubleClose)))
+
+# Static single-quoted tagged triple string
+
+re'''\d+'''
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenTripleSingle,TaggedStringContentTripleSingle,TaggedStringTripleSingleClose)))
+
+# Single-quoted tagged triple string with interpolation
+
+html'''{name}'''
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenTripleSingle,TaggedStringInterpolation(InterpolationStart,VariableName,InterpolationEnd),TaggedStringTripleSingleClose)))
+
+# Tagged triple-quoted multiline string
+
+html"""
+<div>
+  {name}
+</div>
+"""
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenTripleDouble,TaggedStringContentTripleDouble,TaggedStringInterpolation(InterpolationStart,VariableName,InterpolationEnd),TaggedStringContentTripleDouble,TaggedStringTripleDoubleClose)))
+
+# Triple-quoted string with embedded quotes
+
+html"""She said "hello" and 'goodbye'"""
+
+==>
+
+Script(ExpressionStatement(TaggedString(TagStringTag,TaggedStringOpenTripleDouble,TaggedStringContentTripleDouble,TaggedStringTripleDoubleClose)))

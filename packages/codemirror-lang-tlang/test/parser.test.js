@@ -17,3 +17,7 @@ function runCorpus(fileName) {
 describe('tagged strings', () => {
   runCorpus('tagged-strings.txt');
 });
+
+describe('triple-quoted strings', () => {
+  runCorpus('triple-strings.txt');
+});

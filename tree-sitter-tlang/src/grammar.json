@@ -1189,6 +1189,15 @@
               "name": "string"
             },
             {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_triple_string"
+              },
+              "named": true,
+              "value": "string"
+            },
+            {
               "type": "SYMBOL",
               "name": "boolean_literal"
             }
@@ -1933,6 +1942,15 @@
         {
           "type": "SYMBOL",
           "name": "string"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_triple_string"
+          },
+          "named": true,
+          "value": "string"
         },
         {
           "type": "SYMBOL",
@@ -3815,6 +3833,10 @@
     {
       "type": "SYMBOL",
       "name": "tagged_string_end"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_triple_string"
     }
   ],
   "inline": [
