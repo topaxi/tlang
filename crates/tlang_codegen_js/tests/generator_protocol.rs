@@ -72,6 +72,53 @@ fn test_impl_block_method_body() {
     assert!(output.contains("Vec2"));
 }
 
+/// Verifies that the builtin `List` type maps to JavaScript's native `Array`
+/// constructor in `$impl` calls, using the centralized `BUILTIN_TYPE_JS_CONSTRUCTORS`
+/// registry and HirId-based builtin detection (`hir_id().is_none()`).
+#[test]
+fn test_impl_block_for_builtin_list_uses_array_constructor() {
+    let output = compile!(indoc! {"
+        protocol Countable {
+            fn count(self)
+        }
+
+        impl Countable for List {
+            fn count(self) { len(self) }
+        }
+    "});
+    // Builtin `List` → JS `Array` constructor.
+    assert!(
+        output.contains("$impl($Countable, Array,"),
+        "expected `$impl($Countable, Array, ...)` but got:\n{output}"
+    );
+}
+
+/// A user-defined enum named `List` has a HirId and must NOT be remapped to
+/// `Array` — it keeps its own JS class name.
+#[test]
+fn test_impl_block_for_user_defined_list_enum_keeps_name() {
+    let output = compile!(indoc! {"
+        protocol Countable {
+            fn count(self)
+        }
+
+        enum List { Nil, Cons(isize) }
+
+        impl Countable for List {
+            fn count(self) { 0 }
+        }
+    "});
+    // User-defined `List` keeps its own name — must NOT become `Array`.
+    assert!(
+        output.contains("$impl($Countable, List,"),
+        "expected `$impl($Countable, List, ...)` but got:\n{output}"
+    );
+    assert!(
+        !output.contains("$impl($Countable, Array,"),
+        "user-defined List must not be remapped to Array, but got:\n{output}"
+    );
+}
+
 // ── Protocol path expressions ─────────────────────────────────────────────────
 
 #[test]
