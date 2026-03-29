@@ -1,16 +1,12 @@
-mod event_loop;
-mod io_worker;
-mod runtime;
-mod stdlib;
-mod stream;
-
-use runtime::Runtime;
+use tlang_octarine::runtime::Runtime;
 
 fn main() -> std::io::Result<()> {
     env_logger::builder()
         .filter_level(log::LevelFilter::Warn)
         .parse_default_env()
         .init();
+
+    tlang_octarine::init();
 
     let mut runtime = Runtime::new()?;
 

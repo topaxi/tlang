@@ -16,6 +16,12 @@ pub struct StdinStream {
     open: bool,
 }
 
+impl Default for StdinStream {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StdinStream {
     pub fn new() -> Self {
         Self { open: true }
@@ -54,6 +60,12 @@ impl ReadableStream for StdinStream {
 /// Writes complete synchronously on the main thread.
 pub struct StdoutStream {
     open: bool,
+}
+
+impl Default for StdoutStream {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl StdoutStream {
@@ -95,6 +107,12 @@ impl WritableStream for StdoutStream {
 /// Writes complete synchronously on the main thread.
 pub struct StderrStream {
     open: bool,
+}
+
+impl Default for StderrStream {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl StderrStream {
