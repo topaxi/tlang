@@ -1,5 +1,7 @@
 // Copy File — stream-to-stream data transfer
 //
+// Run: cargo run --bin octarine -- crates/tlang_octarine/examples/copy_file.tlang
+//
 // Demonstrates:
 //   • Reading from one stream and writing to another
 //   • Using buffer as an intermediate transform stage

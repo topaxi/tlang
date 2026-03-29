@@ -1,5 +1,7 @@
 // Stderr — writing diagnostics to standard error
 //
+// Run: cargo run --bin octarine -- crates/tlang_octarine/examples/stderr.tlang
+//
 // Demonstrates:
 //   • Streams::stderr() factory
 //   • Separating normal output (stdout) from diagnostics (stderr)

@@ -1,5 +1,7 @@
 // Tee — write to multiple destinations simultaneously
 //
+// Run: cargo run --bin octarine -- crates/tlang_octarine/examples/tee.tlang
+//
 // Demonstrates:
 //   • Writing to stdout and a file at the same time (tee pattern)
 //   • Helper function abstracting over stream handles

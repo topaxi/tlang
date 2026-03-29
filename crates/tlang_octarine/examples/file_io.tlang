@@ -1,5 +1,7 @@
 // File I/O — read and write files using streams
 //
+// Run: cargo run --bin octarine -- crates/tlang_octarine/examples/file_io.tlang
+//
 // Demonstrates:
 //   • Streams::open_write() to create/truncate a file
 //   • Streams::open_read() to read a file

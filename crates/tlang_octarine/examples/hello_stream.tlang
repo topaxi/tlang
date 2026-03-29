@@ -1,5 +1,7 @@
 // Hello World — write to stdout using the stream API
 //
+// Run: cargo run --bin octarine -- crates/tlang_octarine/examples/hello_stream.tlang
+//
 // Demonstrates:
 //   • Streams::stdout() factory
 //   • WriteStream.write() method
