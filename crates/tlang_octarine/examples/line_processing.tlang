@@ -1,5 +1,7 @@
 // Line Processing — transform text line by line
 //
+// Run: cargo run --bin octarine -- crates/tlang_octarine/examples/line_processing.tlang
+//
 // Demonstrates:
 //   • Reading file content into a buffer
 //   • Splitting and processing string data

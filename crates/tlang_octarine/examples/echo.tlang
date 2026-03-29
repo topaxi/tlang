@@ -1,11 +1,11 @@
 // Echo — read from stdin, write to stdout
 //
+// Run: echo "hello octarine" | cargo run --bin octarine -- crates/tlang_octarine/examples/echo.tlang
+//
 // Demonstrates:
 //   • Streams::stdin() for reading user input
 //   • ReadStream.read(size) for partial reads
 //   • Interactive I/O with the terminal
-//
-// Usage: echo "hello octarine" | octarine examples/echo.tlang
 
 let input = Streams::stdin();
 let output = Streams::stdout();

@@ -1,5 +1,7 @@
 // Buffer Stream — in-memory duplex stream
 //
+// Run: cargo run --bin octarine -- crates/tlang_octarine/examples/buffer_stream.tlang
+//
 // Demonstrates:
 //   • Streams::buffer() and Streams::buffer_from() factories
 //   • DuplexStream.write() / .read() / .read_all()
