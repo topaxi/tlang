@@ -630,7 +630,14 @@ impl<'src> Parser<'src> {
                 let fn_stmt = self.parse_function_declaration(Visibility::Private);
                 match fn_stmt.kind {
                     StmtKind::FunctionDeclaration(decl) => methods.push(*decl),
-                    StmtKind::FunctionDeclarations(decls) => methods.extend(decls),
+                    StmtKind::FunctionDeclarations(decls) => {
+                        if decls.is_empty() {
+                            // parse_function_declaration failed and restored state
+                            // without consuming any tokens. Break to avoid infinite loop.
+                            break;
+                        }
+                        methods.extend(decls);
+                    }
                     _ => unreachable!(),
                 }
             }

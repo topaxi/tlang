@@ -79,6 +79,12 @@ fn test_fuzz_crash_short_multiline_comment() {
 }
 
 #[test]
+fn test_fuzz_crash_malformed_impl() {
+    let mut parser = Parser::from_source("impl>u>r:fn");
+    let _ = parser.parse();
+}
+
+#[test]
 fn test_unsigned_literal() {
     let ast = parse!("1;");
 
