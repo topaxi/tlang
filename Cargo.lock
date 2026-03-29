@@ -2241,8 +2241,16 @@ dependencies = [
  "inventory",
  "log",
  "mio",
+ "tlang_ast_lowering",
+ "tlang_defs",
+ "tlang_diagnostics",
+ "tlang_hir",
+ "tlang_hir_opt",
  "tlang_macros",
  "tlang_memory",
+ "tlang_parser",
+ "tlang_semantics",
+ "tlang_vm",
  "tokio",
 ]
 
