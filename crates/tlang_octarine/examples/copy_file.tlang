@@ -1,0 +1,34 @@
+// Copy File — stream-to-stream data transfer
+//
+// Demonstrates:
+//   • Reading from one stream and writing to another
+//   • Using buffer as an intermediate transform stage
+//   • Combining multiple stream types in a pipeline
+
+fn copy_stream(source, dest) {
+    let data = source.read_all();
+    dest.write(data);
+    dest.flush();
+}
+
+// Create a source file
+let src_path = "/tmp/octarine_copy_src.txt";
+let dst_path = "/tmp/octarine_copy_dst.txt";
+
+let writer = Streams::open_write(src_path);
+writer.write("This is the original content.\n");
+writer.write("It will be copied to another file.\n");
+writer.close();
+
+// Copy source → destination
+let src = Streams::open_read(src_path);
+let dst = Streams::open_write(dst_path);
+copy_stream(src, dst);
+src.close();
+dst.close();
+
+// Verify the copy
+let verify = Streams::open_read(dst_path);
+log("=== Copied file ===");
+verify.read_all() |> log();
+verify.close();

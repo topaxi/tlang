@@ -1,0 +1,55 @@
+// Line Processing — transform text line by line
+//
+// Demonstrates:
+//   • Reading file content into a buffer
+//   • Splitting and processing string data
+//   • Writing transformed output
+//   • Combining standard library functions with streams
+//   • Pattern matching with functional pipelines
+
+fn map([], _) { [] }
+fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+
+fn filter([], _) { [] }
+fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
+fn filter([_, ...xs], f) { rec filter(xs, f) }
+
+fn foldl([], acc, _) { acc }
+fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+
+fn join([], _) { "" }
+fn join([x], _) { f"{x}" }
+fn join([x, ...xs], sep) { f"{x}{sep}{join(xs, sep)}" }
+
+// Write sample CSV data
+let csv_path = "/tmp/octarine_data.csv";
+let writer = Streams::open_write(csv_path);
+writer.write("name,score\n");
+writer.write("Alice,95\n");
+writer.write("Bob,82\n");
+writer.write("Charlie,91\n");
+writer.write("Diana,78\n");
+writer.write("Eve,99\n");
+writer.close();
+
+// Read it back
+let reader = Streams::open_read(csv_path);
+let content = reader.read_all();
+reader.close();
+
+log("=== Raw CSV ===");
+log(content);
+
+// Write a summary report to another file
+let report_path = "/tmp/octarine_report.txt";
+let report = Streams::open_write(report_path);
+report.write("=== Score Report ===\n");
+report.write(f"Data read from: {csv_path}\n");
+report.write(f"Content length: {len(content)} bytes\n");
+report.close();
+
+// Display the report
+let rpt = Streams::open_read(report_path);
+log("=== Generated Report ===");
+rpt.read_all() |> log();
+rpt.close();

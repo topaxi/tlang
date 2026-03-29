@@ -1,0 +1,60 @@
+// Tee — write to multiple destinations simultaneously
+//
+// Demonstrates:
+//   • Writing to stdout and a file at the same time (tee pattern)
+//   • Helper function abstracting over stream handles
+//   • Combining multiple WriteStreams
+
+fn tee_write(streams, data) {
+    fn write_each([], _) { 0 }
+    fn write_each([s, ...rest], d) {
+        s.write(d);
+        rec write_each(rest, d)
+    }
+
+    write_each(streams, data);
+}
+
+fn tee_flush(streams) {
+    fn flush_each([]) { 0 }
+    fn flush_each([s, ...rest]) {
+        s.flush();
+        rec flush_each(rest)
+    }
+
+    flush_each(streams);
+}
+
+fn tee_close(streams) {
+    fn close_each([]) { 0 }
+    fn close_each([s, ...rest]) {
+        s.close();
+        rec close_each(rest)
+    }
+
+    close_each(streams);
+}
+
+// Create outputs: stdout + file + buffer
+let file = Streams::open_write("/tmp/octarine_tee.txt");
+let buf = Streams::buffer();
+let outputs = [Streams::stdout(), file, buf];
+
+tee_write(outputs, "Line 1: Written to all three destinations\n");
+tee_write(outputs, "Line 2: stdout, file, and buffer\n");
+tee_write(outputs, "Line 3: The tee pattern in action\n");
+tee_flush(outputs);
+
+// Read back from the buffer to verify
+log("");
+log("=== Buffer contents ===");
+buf.read_all() |> log();
+
+// Close the file (stdout stays open)
+file.close();
+
+// Read back from the file to verify
+let verify = Streams::open_read("/tmp/octarine_tee.txt");
+log("=== File contents ===");
+verify.read_all() |> log();
+verify.close();
