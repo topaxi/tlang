@@ -46,6 +46,9 @@ pub struct EventLoop {
     task_queue: VecDeque<Task>,
     /// Registered I/O event handlers keyed by mio token.
     io_handlers: Vec<(Token, IoHandler)>,
+    /// Tokens that became ready during the last poll, exposed for the
+    /// [`Runtime`](crate::runtime::Runtime) to retry pending stream operations.
+    ready_tokens: Vec<(Token, bool, bool)>,
     /// When `true` the loop will exit at the next opportunity.
     stopped: bool,
 }
@@ -61,6 +64,7 @@ impl EventLoop {
             timers: Vec::new(),
             task_queue: VecDeque::new(),
             io_handlers: Vec::new(),
+            ready_tokens: Vec::new(),
             stopped: false,
         })
     }
@@ -146,6 +150,12 @@ impl EventLoop {
         self.stopped
     }
 
+    /// Tokens that received I/O events during the last [`tick`]. The runtime
+    /// uses this to retry pending stream operations that returned `WouldBlock`.
+    pub fn ready_tokens(&self) -> &[(Token, bool, bool)] {
+        &self.ready_tokens
+    }
+
     /// Returns `true` if there is still work to do (pending tasks, timers, or
     /// registered I/O handlers).
     pub fn has_pending_work(&self) -> bool {
@@ -190,6 +200,7 @@ impl EventLoop {
         self.poll.poll(&mut self.events, timeout)?;
 
         // Collect events before dispatching so we don't hold a borrow on self.
+        self.ready_tokens.clear();
         let events: Vec<(Token, bool, bool)> = self
             .events
             .iter()
@@ -207,6 +218,8 @@ impl EventLoop {
                 "mio event: token={:?}, readable={readable}, writable={writable}",
                 token,
             );
+
+            self.ready_tokens.push((token, readable, writable));
 
             // Dispatch to handler. We use index-based lookup so the handler can
             // be called without conflicting borrows.
