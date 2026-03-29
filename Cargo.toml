@@ -8,6 +8,9 @@ members = [
   "tests/runner",
   "xtask",
 ]
+exclude = [
+  "crates/tlang_parser/fuzz",
+]
 resolver = "2"
 
 [workspace.package]

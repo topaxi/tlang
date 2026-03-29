@@ -1,8 +1,58 @@
 #![feature(box_patterns)]
 
 use pretty_assertions::assert_matches;
+use tlang_parser::Parser;
 
 mod common;
+
+#[test]
+fn test_fuzz_timeout_matc_backtick() {
+    let mut parser = Parser::from_source("matc` x {");
+    let _ = parser.parse();
+}
+
+#[test]
+fn test_fuzz_crash_struct_missing_brace() {
+    let mut parser = Parser::from_source("struct Po: Int }");
+    let _ = parser.parse();
+}
+
+#[test]
+fn test_fuzz_crash_incomplete_type_annotation() {
+    let mut parser = Parser::from_source("struct Foo { x: }");
+    let _ = parser.parse();
+}
+
+#[test]
+fn test_fuzz_crash_incomplete_literal() {
+    // Pattern matching with missing literal after expect
+    let mut parser = Parser::from_source("fn foo(");
+    let _ = parser.parse();
+}
+
+#[test]
+fn test_fuzz_crash_incomplete_pattern() {
+    let mut parser = Parser::from_source("match x { => 1 }");
+    let _ = parser.parse();
+}
+
+#[test]
+fn test_fuzz_crash_bare_rec_keyword() {
+    let mut parser = Parser::from_source("rec");
+    let _ = parser.parse();
+}
+
+#[test]
+fn test_fuzz_crash_unclosed_multiline_comment() {
+    let mut parser = Parser::from_source("/*");
+    let _ = parser.parse();
+}
+
+#[test]
+fn test_fuzz_crash_unterminated_string_escape() {
+    let mut parser = Parser::from_source("A.\"\\");
+    let _ = parser.parse();
+}
 
 #[test]
 fn test_unsigned_literal() {

@@ -339,6 +339,11 @@ impl<'src> Lexer<'src> {
         while self.current_char != quote && self.current_char != '\0' {
             if self.current_char == '\\' {
                 self.advance(); // consume the backslash
+                if self.current_char == '\0' {
+                    // EOF after backslash — unterminated escape
+                    result.push('\\');
+                    break;
+                }
                 match self.current_char {
                     '"' => result.push('"'),
                     '\'' => result.push('\''),
@@ -693,8 +698,11 @@ impl<'src> Lexer<'src> {
                     {
                         self.advance();
                     }
-                    self.advance();
-                    self.advance();
+                    // Only consume the closing `*/` if it exists
+                    if self.source[self.position..].starts_with("*/") {
+                        self.advance();
+                        self.advance();
+                    }
                     self.token(TokenKind::MultiLineComment, start_pos, start_lc)
                 } else {
                     self.advance();
@@ -943,7 +951,10 @@ impl<'src> Lexer<'src> {
                     }
                 }
             }
-            _ => self.token(TokenKind::Unknown, start_pos, start_lc),
+            _ => {
+                self.advance();
+                self.token(TokenKind::Unknown, start_pos, start_lc)
+            }
         }
     }
 }

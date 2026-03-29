@@ -274,8 +274,13 @@ impl<'src> Parser<'src> {
                 }
                 TokenKind::MultiLineComment => {
                     let full = self.lexer.span_text(token.span);
-                    // Strip the leading "/*" and trailing "*/"
-                    (CommentKind::MultiLine, &full[2..full.len() - 2])
+                    // Strip the leading "/*" and trailing "*/" (if present)
+                    let inner = if full.ends_with("*/") {
+                        &full[2..full.len() - 2]
+                    } else {
+                        &full[2..]
+                    };
+                    (CommentKind::MultiLine, inner)
                 }
                 _ => unreachable!(),
             };
@@ -1199,12 +1204,19 @@ impl<'src> Parser<'src> {
     fn parse_recursive_call(&mut self) -> Expr {
         self.advance();
         let expr = self.parse_expression();
+        let span = expr.span;
         let call_expr = match expr.kind {
             ExprKind::Call(call) => call,
-            _ => self.panic_unexpected_expr("call expression", Some(expr)),
+            _ => {
+                self.push_unexpected_token_error("call expression after `rec`", self.current_token);
+                return node::expr!(
+                    self.unique_id(),
+                    Literal(Box::new(Literal::UnsignedInteger(0)))
+                );
+            }
         };
 
-        node::expr!(self.unique_id(), RecursiveCall(call_expr)).with_span(expr.span)
+        node::expr!(self.unique_id(), RecursiveCall(call_expr)).with_span(span)
     }
 
     fn parse_wildcard(&mut self) -> Expr {
@@ -1554,7 +1566,7 @@ impl<'src> Parser<'src> {
 
                 Ty::new(self.unique_id(), identifier).with_parameters(parameters)
             }
-            token => unreachable!("Expected type annotation, found {:?}", token),
+            _ => Ty::new_unknown(self.unique_id()),
         }
     }
 
@@ -1819,9 +1831,9 @@ impl<'src> Parser<'src> {
         match expression.kind {
             ExprKind::Call { .. } | ExprKind::BinaryOp { .. } | ExprKind::UnaryOp { .. } => (),
             _ => {
-                self.panic_unexpected_expr(
+                self.push_unexpected_token_error(
                     "function call, binary logical expression or unary logical expression",
-                    Some(expression.clone()),
+                    self.current_token,
                 );
             }
         }
@@ -1956,7 +1968,7 @@ impl<'src> Parser<'src> {
 
         match self.current_token_kind() {
             TokenKind::Literal(_) => self.advance().literal().unwrap(),
-            _ => unreachable!("Expected literal"),
+            _ => Literal::None,
         }
     }
 
@@ -2000,7 +2012,7 @@ impl<'src> Parser<'src> {
                 _ => self.parse_identifier_pattern(),
             },
             TokenKind::LBracket => self.parse_list_extraction(),
-            _ => unreachable!("Expected pattern, found {:?}", self.current_token_kind()),
+            _ => node::pat!(self.unique_id(), None),
         };
 
         self.end_span_from_previous_token(&mut span);
