@@ -61,6 +61,12 @@ fn test_fuzz_crash_unterminated_char_escape() {
 }
 
 #[test]
+fn test_fuzz_crash_unterminated_triple_quote_escape() {
+    let mut parser = Parser::from_source("match x{r{\"\"\"\\");
+    let _ = parser.parse();
+}
+
+#[test]
 fn test_unsigned_literal() {
     let ast = parse!("1;");
 

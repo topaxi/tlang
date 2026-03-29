@@ -178,6 +178,10 @@ impl<'src> Lexer<'src> {
 
             if self.current_char == '\\' {
                 self.advance(); // consume the backslash
+                if self.current_char == '\0' {
+                    result.push('\\');
+                    return Err("Unterminated triple-quoted string literal".to_string());
+                }
                 match self.current_char {
                     '"' => result.push('"'),
                     '\'' => result.push('\''),
