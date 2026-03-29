@@ -255,6 +255,10 @@ impl<'src> Lexer<'src> {
 
             if self.current_char == '\\' {
                 self.advance(); // consume backslash
+                if self.current_char == '\0' {
+                    current_literal.push('\\');
+                    return Err("Unterminated triple-quoted tagged string literal".to_string());
+                }
                 match self.current_char {
                     '{' | '}' => {
                         current_literal.push(self.current_char);
@@ -473,6 +477,10 @@ impl<'src> Lexer<'src> {
         while self.current_char != quote && self.current_char != '\0' {
             if self.current_char == '\\' {
                 self.advance(); // consume backslash
+                if self.current_char == '\0' {
+                    current_literal.push('\\');
+                    break;
+                }
                 match self.current_char {
                     '{' | '}' => {
                         current_literal.push(self.current_char);

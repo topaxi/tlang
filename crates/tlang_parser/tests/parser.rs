@@ -55,6 +55,12 @@ fn test_fuzz_crash_unterminated_string_escape() {
 }
 
 #[test]
+fn test_fuzz_crash_unterminated_char_escape() {
+    let mut parser = Parser::from_source("f::a'\\");
+    let _ = parser.parse();
+}
+
+#[test]
 fn test_unsigned_literal() {
     let ast = parse!("1;");
 
