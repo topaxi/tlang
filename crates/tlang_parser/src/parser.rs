@@ -1789,6 +1789,11 @@ impl<'src> Parser<'src> {
                         self.panic_unexpected_token("identifier", self.current_token);
                     }
                 }
+            } else if name.is_none() {
+                // No identifier after `fn` keyword and no prior clause name to reuse.
+                self.push_unexpected_token_error("function name", self.current_token);
+                self.restore_state(saved_state);
+                break;
             }
 
             self.expect_token(TokenKind::LParen);
@@ -1799,10 +1804,14 @@ impl<'src> Parser<'src> {
 
             self.end_span_from_previous_token(&mut span);
 
+            let Some(fn_name) = name.clone() else {
+                break;
+            };
+
             declarations.push(FunctionDeclaration {
                 id: self.unique_id(),
                 visibility: clause_visibility,
-                name: name.clone().unwrap(),
+                name: fn_name,
                 parameters,
                 guard,
                 body,
