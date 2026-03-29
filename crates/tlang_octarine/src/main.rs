@@ -2,6 +2,7 @@ mod event_loop;
 mod io_worker;
 mod runtime;
 mod stdlib;
+mod stream;
 
 use runtime::Runtime;
 

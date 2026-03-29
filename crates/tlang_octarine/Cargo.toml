@@ -9,7 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 mio = { version = "1", features = ["os-poll", "os-ext", "net"] }
-tokio = { version = "1", features = ["rt", "fs", "process", "net"] }
+tokio = { version = "1", features = ["rt", "fs", "process", "net", "io-util", "io-std"] }
 log = { workspace = true }
 env_logger = { workspace = true }
 
