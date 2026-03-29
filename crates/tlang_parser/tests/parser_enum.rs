@@ -1,4 +1,5 @@
 use indoc::indoc;
+use tlang_parser::Parser;
 
 mod common;
 
@@ -59,4 +60,44 @@ fn test_enum_extraction() {
         fn unwrap(Option::None) { panic(\"Cannot unwrap None\") }
         fn unwrap(Option::Some(value)) { value }
     "});
+}
+
+#[test]
+fn test_incomplete_enum_does_not_crash() {
+    let mut parser = Parser::from_source("enum ");
+    let result = parser.parse();
+    assert!(
+        result.is_err(),
+        "Incomplete enum should produce a parse error, not crash"
+    );
+}
+
+#[test]
+fn test_incomplete_enum_with_name_does_not_crash() {
+    let mut parser = Parser::from_source("enum Foo");
+    let result = parser.parse();
+    assert!(
+        result.is_err(),
+        "Enum without body should produce a parse error, not crash"
+    );
+}
+
+#[test]
+fn test_incomplete_enum_with_open_brace_does_not_crash() {
+    let mut parser = Parser::from_source("enum Foo {");
+    let result = parser.parse();
+    assert!(
+        result.is_err(),
+        "Enum with unclosed brace should produce a parse error, not crash"
+    );
+}
+
+#[test]
+fn test_incomplete_enum_variant_does_not_crash() {
+    let mut parser = Parser::from_source("enum Foo { Bar(");
+    let result = parser.parse();
+    assert!(
+        result.is_err(),
+        "Enum with unclosed variant should produce a parse error, not crash"
+    );
 }

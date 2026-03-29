@@ -210,6 +210,16 @@ impl<'src> Parser<'src> {
         matches!(self.current_token_kind(), TokenKind::Eof)
     }
 
+    /// Returns `true` while the current token is **not** the expected closing
+    /// delimiter and the parser has not reached EOF.  Use this in every
+    /// delimiter-bounded `while` loop instead of a manual `matches!` check so
+    /// that an unexpected EOF always terminates the loop instead of spinning
+    /// forever on incomplete input.
+    fn not_at_closing(&self, closing: TokenKind) -> bool {
+        let current = self.current_token_kind();
+        current != closing && current != TokenKind::Eof
+    }
+
     fn advance(&mut self) -> Token {
         let consumed = self.current_token;
 
@@ -398,7 +408,7 @@ impl<'src> Parser<'src> {
         let name = self.parse_identifier();
         self.consume_token(TokenKind::LBrace);
         let mut fields = Vec::with_capacity(2);
-        while !matches!(self.current_token_kind(), TokenKind::RBrace) {
+        while self.not_at_closing(TokenKind::RBrace) {
             fields.push(self.parse_struct_field());
 
             if matches!(self.current_token_kind(), TokenKind::Comma) {
@@ -433,7 +443,7 @@ impl<'src> Parser<'src> {
         let name = self.parse_identifier();
         self.consume_token(TokenKind::LBrace);
         let mut variants = Vec::with_capacity(2);
-        while !matches!(self.current_token_kind(), TokenKind::RBrace) {
+        while self.not_at_closing(TokenKind::RBrace) {
             variants.push(self.parse_enum_variant());
 
             if matches!(self.current_token_kind(), TokenKind::Comma) {
@@ -462,7 +472,7 @@ impl<'src> Parser<'src> {
                 self.advance();
                 let mut parameters = Vec::new();
                 let mut index = 0;
-                while !matches!(self.current_token_kind(), TokenKind::RParen) {
+                while self.not_at_closing(TokenKind::RParen) {
                     let ident = Ident::new(&index.to_string(), Span::default());
                     let ty = self.parse_type_annotation();
                     parameters.push(StructField {
@@ -486,7 +496,7 @@ impl<'src> Parser<'src> {
             TokenKind::LBrace => {
                 self.advance();
                 let mut parameters = Vec::new();
-                while !matches!(self.current_token_kind(), TokenKind::RBrace) {
+                while self.not_at_closing(TokenKind::RBrace) {
                     let ident = self.parse_identifier();
                     let ty = if matches!(self.current_token_kind(), TokenKind::Colon) {
                         self.advance();
@@ -534,7 +544,7 @@ impl<'src> Parser<'src> {
         let name = self.parse_identifier();
         self.consume_token(TokenKind::LBrace);
         let mut methods = Vec::new();
-        while !matches!(self.current_token_kind(), TokenKind::RBrace) {
+        while self.not_at_closing(TokenKind::RBrace) {
             methods.push(self.parse_protocol_method_signature());
         }
         self.consume_token(TokenKind::RBrace);
@@ -749,10 +759,7 @@ impl<'src> Parser<'src> {
         let mut statements = Vec::new();
         let mut completion_expression = None;
 
-        while !matches!(
-            self.current_token_kind(),
-            TokenKind::RBrace | TokenKind::Eof
-        ) {
+        while self.not_at_closing(TokenKind::RBrace) {
             if let (consume_semicolon, Some(mut statement)) = self.parse_statement() {
                 if may_complete
                     && matches!(self.current_token_kind(), TokenKind::RBrace)
@@ -879,7 +886,7 @@ impl<'src> Parser<'src> {
         } else {
             self.consume_token(TokenKind::LParen);
             let mut is_first_argument = true;
-            while !matches!(self.current_token_kind(), TokenKind::RParen) {
+            while self.not_at_closing(TokenKind::RParen) {
                 if is_first_argument {
                     is_first_argument = false;
                 } else {
@@ -936,7 +943,7 @@ impl<'src> Parser<'src> {
 
         let mut elements = Vec::new();
         // Only allow literal values, identifiers and and rest params for now.
-        while !matches!(self.current_token_kind(), TokenKind::RBracket) {
+        while self.not_at_closing(TokenKind::RBracket) {
             expect_token_matches!(
                 self,
                 "identifier, literal, wildcard or rest parameter",
@@ -977,7 +984,7 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::LBracket);
 
         let mut elements = Vec::new();
-        while !matches!(self.current_token_kind(), TokenKind::RBracket) {
+        while self.not_at_closing(TokenKind::RBracket) {
             let element = match self.current_token_kind() {
                 TokenKind::DotDotDot => {
                     self.advance();
@@ -1007,7 +1014,7 @@ impl<'src> Parser<'src> {
 
     fn parse_dict_elements(&mut self) -> Vec<(Expr, Expr)> {
         let mut elements = Vec::new();
-        while !matches!(self.current_token_kind(), TokenKind::RBrace) {
+        while self.not_at_closing(TokenKind::RBrace) {
             let key = self.parse_expression();
 
             // If key is an single identifier and we follow up with a comma or rbrace, then we are
@@ -1461,7 +1468,7 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::LBrace);
 
         let mut arms = Vec::new();
-        while !matches!(self.current_token_kind(), TokenKind::RBrace) {
+        while self.not_at_closing(TokenKind::RBrace) {
             let pattern = self.parse_pattern();
             let guard = self.parse_guard_clause();
             self.consume_token(TokenKind::FatArrow);
@@ -1492,7 +1499,7 @@ impl<'src> Parser<'src> {
             self.consume_token(TokenKind::LParen);
 
             let mut is_first_parameter = true;
-            while !matches!(self.current_token_kind(), TokenKind::RParen) {
+            while self.not_at_closing(TokenKind::RParen) {
                 if is_first_parameter {
                     is_first_parameter = false;
                 } else {
@@ -1566,7 +1573,7 @@ impl<'src> Parser<'src> {
 
         if matches!(self.current_token_kind(), TokenKind::LessThan) {
             self.advance();
-            while !matches!(self.current_token_kind(), TokenKind::GreaterThan) {
+            while self.not_at_closing(TokenKind::GreaterThan) {
                 let parameter = self.parse_type_annotation();
                 parameters.push(parameter);
                 if matches!(self.current_token_kind(), TokenKind::Comma) {
@@ -1635,7 +1642,7 @@ impl<'src> Parser<'src> {
         if is_dict_extraction {
             self.consume_token(TokenKind::LBrace);
             let mut elements = Vec::new();
-            while !matches!(self.current_token_kind(), TokenKind::RBrace) {
+            while self.not_at_closing(TokenKind::RBrace) {
                 let ident = self.parse_identifier();
 
                 if matches!(self.current_token_kind(), TokenKind::Colon) {
@@ -1662,7 +1669,7 @@ impl<'src> Parser<'src> {
             self.consume_token(TokenKind::LParen);
             let mut elements = Vec::new();
             let mut index = 0;
-            while !matches!(self.current_token_kind(), TokenKind::RParen) {
+            while self.not_at_closing(TokenKind::RParen) {
                 let ident = Ident::new(&index.to_string(), Span::default());
                 index += 1;
                 elements.push((ident, self.parse_pattern()));
