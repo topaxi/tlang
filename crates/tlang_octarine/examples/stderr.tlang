@@ -1,0 +1,17 @@
+// Stderr — writing diagnostics to standard error
+//
+// Demonstrates:
+//   • Streams::stderr() factory
+//   • Separating normal output (stdout) from diagnostics (stderr)
+//   • WriteStream.write() / .flush()
+
+let out = Streams::stdout();
+let err = Streams::stderr();
+
+err.write("[INFO] Starting program\n");
+
+out.write("Result: 42\n");
+out.flush();
+
+err.write("[INFO] Program finished\n");
+err.flush();

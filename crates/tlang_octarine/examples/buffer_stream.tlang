@@ -1,0 +1,30 @@
+// Buffer Stream — in-memory duplex stream
+//
+// Demonstrates:
+//   • Streams::buffer() and Streams::buffer_from() factories
+//   • DuplexStream.write() / .read() / .read_all()
+//   • DuplexStream.close()
+//   • Pipeline operator with streams
+
+// Create a buffer and write into it
+let buf = Streams::buffer();
+buf.write("hello ");
+buf.write("world");
+
+// Read back everything
+let contents = buf.read_all();
+log(contents);  // "hello world"
+
+// Pre-filled buffer
+let greeting = Streams::buffer_from("octarine streams!");
+greeting.read_all() |> log();  // "octarine streams!"
+
+// Partial reads
+let data = Streams::buffer();
+data.write("abcdefghij");
+
+data.read(3) |> log();  // "abc"
+data.read(4) |> log();  // "defg"
+data.read_all() |> log();  // "hij"
+
+data.close();

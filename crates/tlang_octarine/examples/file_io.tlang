@@ -1,0 +1,37 @@
+// File I/O — read and write files using streams
+//
+// Demonstrates:
+//   • Streams::open_write() to create/truncate a file
+//   • Streams::open_read() to read a file
+//   • Streams::open_append() to append to a file
+//   • ReadStream.read_all() for full file contents
+//   • WriteStream.write() / .flush() / .close()
+
+// Write a file
+let path = "/tmp/octarine_example.txt";
+
+let out = Streams::open_write(path);
+out.write("Line 1: Hello from octarine\n");
+out.write("Line 2: Stream-based file I/O\n");
+out.flush();
+out.close();
+
+// Read it back
+let input = Streams::open_read(path);
+let contents = input.read_all();
+input.close();
+
+log("=== File contents ===");
+log(contents);
+
+// Append more data
+let appender = Streams::open_append(path);
+appender.write("Line 3: Appended later\n");
+appender.flush();
+appender.close();
+
+// Read the updated file
+let updated = Streams::open_read(path);
+log("=== After append ===");
+updated.read_all() |> log();
+updated.close();

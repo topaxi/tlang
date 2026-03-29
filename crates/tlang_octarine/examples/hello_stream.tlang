@@ -1,0 +1,11 @@
+// Hello World — write to stdout using the stream API
+//
+// Demonstrates:
+//   • Streams::stdout() factory
+//   • WriteStream.write() method
+//   • WriteStream.flush() method
+
+let out = Streams::stdout();
+
+out.write("Hello from octarine!\n");
+out.flush();

@@ -1,0 +1,20 @@
+// Echo — read from stdin, write to stdout
+//
+// Demonstrates:
+//   • Streams::stdin() for reading user input
+//   • ReadStream.read(size) for partial reads
+//   • Interactive I/O with the terminal
+//
+// Usage: echo "hello octarine" | octarine examples/echo.tlang
+
+let input = Streams::stdin();
+let output = Streams::stdout();
+
+output.write("Reading from stdin...\n");
+output.flush();
+
+let data = input.read_all();
+
+output.write("You said: ");
+output.write(data);
+output.flush();
