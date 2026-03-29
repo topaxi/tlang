@@ -73,6 +73,12 @@ fn test_fuzz_timeout_impl_with_comment() {
 }
 
 #[test]
+fn test_fuzz_crash_short_multiline_comment() {
+    let mut parser = Parser::from_source("e/*/");
+    let _ = parser.parse();
+}
+
+#[test]
 fn test_unsigned_literal() {
     let ast = parse!("1;");
 

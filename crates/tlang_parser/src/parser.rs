@@ -274,8 +274,9 @@ impl<'src> Parser<'src> {
                 }
                 TokenKind::MultiLineComment => {
                     let full = self.lexer.span_text(token.span);
-                    // Strip the leading "/*" and trailing "*/" (if present)
-                    let inner = if full.ends_with("*/") {
+                    // Strip the leading "/*" and trailing "*/" (if present).
+                    // A properly closed comment is at least 4 chars: "/**/".
+                    let inner = if full.len() >= 4 && full.ends_with("*/") {
                         &full[2..full.len() - 2]
                     } else {
                         &full[2..]
