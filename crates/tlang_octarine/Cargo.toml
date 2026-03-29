@@ -1,0 +1,17 @@
+[package]
+name = "tlang_octarine"
+version = "0.1.0"
+edition.workspace = true
+
+[[bin]]
+name = "octarine"
+path = "src/main.rs"
+
+[dependencies]
+mio = { version = "1", features = ["os-poll", "os-ext", "net"] }
+tokio = { version = "1", features = ["rt", "fs", "process", "net"] }
+log = { workspace = true }
+env_logger = { workspace = true }
+
+[lints]
+workspace = true
