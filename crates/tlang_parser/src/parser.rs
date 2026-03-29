@@ -604,6 +604,16 @@ impl<'src> Parser<'src> {
                 | TokenKind::SingleLineComment
                 | TokenKind::MultiLineComment
         ) {
+            // Consume stray comments so the loop makes progress even if no
+            // fn/apply follows.
+            if matches!(
+                self.current_token_kind(),
+                TokenKind::SingleLineComment | TokenKind::MultiLineComment
+            ) {
+                self.parse_comments();
+                continue;
+            }
+
             if matches!(
                 self.current_token_kind(),
                 TokenKind::Keyword(Keyword::Apply)

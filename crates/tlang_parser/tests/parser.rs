@@ -67,6 +67,12 @@ fn test_fuzz_crash_unterminated_triple_quote_escape() {
 }
 
 #[test]
+fn test_fuzz_timeout_impl_with_comment() {
+    let mut parser = Parser::from_source("{impl{t*i b/*i");
+    let _ = parser.parse();
+}
+
+#[test]
 fn test_unsigned_literal() {
     let ast = parse!("1;");
 
