@@ -18,6 +18,14 @@ log = { workspace = true }
 env_logger = { workspace = true }
 tlang_macros = { path = "../tlang_macros" }
 tlang_memory = { path = "../tlang_core/tlang_memory" }
+tlang_parser = { path = "../tlang_parser" }
+tlang_semantics = { path = "../tlang_semantics" }
+tlang_ast_lowering = { path = "../tlang_ast_lowering" }
+tlang_hir = { path = "../tlang_hir" }
+tlang_hir_opt = { path = "../tlang_hir_opt" }
+tlang_diagnostics = { path = "../tlang_diagnostics" }
+tlang_vm = { path = "../tlang_core/tlang_vm" }
+tlang_defs = { path = "../tlang_defs" }
 inventory = { workspace = true }
 
 [lints]
