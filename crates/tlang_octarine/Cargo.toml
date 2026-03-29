@@ -3,6 +3,10 @@ name = "tlang_octarine"
 version = "0.1.0"
 edition.workspace = true
 
+[lib]
+name = "tlang_octarine"
+path = "src/lib.rs"
+
 [[bin]]
 name = "octarine"
 path = "src/main.rs"
@@ -12,6 +16,9 @@ mio = { version = "1", features = ["os-poll", "os-ext", "net"] }
 tokio = { version = "1", features = ["rt", "fs", "process", "net", "io-util", "io-std"] }
 log = { workspace = true }
 env_logger = { workspace = true }
+tlang_macros = { path = "../tlang_macros" }
+tlang_memory = { path = "../tlang_core/tlang_memory" }
+inventory = { workspace = true }
 
 [lints]
 workspace = true

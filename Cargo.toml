@@ -56,6 +56,7 @@ similar.opt-level = 3
 # Single codegen unit ensures all inventory::submit! constructors in tlang_stdlib
 # are in one object file, so none get dead-stripped when the crate is linked.
 tlang_stdlib.codegen-units = 1
+tlang_octarine.codegen-units = 1
 
 [workspace.lints.clippy]
 semicolon_if_nothing_returned = "warn"

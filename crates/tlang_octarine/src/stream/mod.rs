@@ -19,6 +19,7 @@
 
 pub mod buffer;
 pub mod file;
+pub mod native;
 pub mod stdio;
 pub mod tcp;
 
@@ -200,6 +201,12 @@ impl StreamKind {
 pub struct StreamRegistry {
     streams: HashMap<StreamId, StreamKind>,
     next_id: u64,
+}
+
+impl Default for StreamRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl StreamRegistry {
