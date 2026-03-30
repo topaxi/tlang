@@ -1,12 +1,16 @@
 use insta::assert_snapshot;
 use tlang_hir_opt::anf_transform::{AnfTransform, FullAnfFilter};
+use tlang_hir_opt::tail_call_validation::TailPositionAnalysis;
 
 mod common;
 
 fn optimizer() -> tlang_hir_opt::HirOptimizer {
     tlang_hir_opt::HirOptimizer::new(vec![
-        Box::new(AnfTransform::<FullAnfFilter>::default()),
+        // SymbolResolution must run before ANF so that callee paths have
+        // their `res.hir_id()` set — the ANF pass uses HirId identity to
+        // detect self-referencing tail calls.
         Box::new(tlang_hir_opt::symbol_resolution::SymbolResolution::default()),
+        Box::new(AnfTransform::<FullAnfFilter>::default()),
     ])
 }
 
@@ -233,6 +237,41 @@ fn multi_arm_function_with_guard() {
         fn search(list, target, low, high) { low + high }
     "#;
     let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir));
+}
+
+/// Optimizer that includes TailPositionAnalysis so that `rec` calls become
+/// `TailCall` nodes before ANF runs.
+fn optimizer_with_tail_calls() -> tlang_hir_opt::HirOptimizer {
+    tlang_hir_opt::HirOptimizer::new(vec![
+        Box::new(TailPositionAnalysis),
+        Box::new(tlang_hir_opt::symbol_resolution::SymbolResolution::default()),
+        Box::new(AnfTransform::<FullAnfFilter>::default()),
+    ])
+}
+
+#[test]
+fn self_referencing_tail_call_not_lifted_in_multi_arity_function() {
+    // Regression: when the ANF pass ran before SymbolResolution,
+    // `is_self_referencing_tail_call` always returned false (path.res.hir_id()
+    // was None), causing self-referencing TailCalls to be ANF-lifted into
+    // $anf$ temps instead of being preserved as TailCall nodes. This broke
+    // TCO for all multi-arity functions.
+    let source = r#"
+        fn binary_search(list, target) { binary_search(list, target, 0, 1) }
+        fn binary_search(_, _, low, high) if low > high { -1 }
+        fn binary_search(list, target, low, high) {
+            let mid = low + high;
+            if list == target {
+                mid
+            } else if list == target {
+                rec binary_search(list, target, mid, high)
+            } else {
+                rec binary_search(list, target, low, mid)
+            }
+        }
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer_with_tail_calls());
     assert_snapshot!(common::pretty_print(&hir));
 }
 

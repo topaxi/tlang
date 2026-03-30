@@ -1,0 +1,35 @@
+---
+source: crates/tlang_hir_opt/tests/anf_transform.rs
+assertion_line: 275
+expression: "common::pretty_print(&hir)"
+---
+fn binary_search/2(list: unknown, target: unknown) -> unknown {
+    binary_search/4(list, target, 0, 1)
+}
+fn binary_search/4(list: unknown, target: unknown, low: unknown, high: unknown) -> unknown {
+    let $anf$0: unknown = [list, target, low, high];
+    let $anf$4: unknown = nil;
+    match $anf$0 {
+        [_, _, low, high] if (low > high) => {
+            ($anf$4 = -1);
+        },
+        [list, target, low, high] => {
+            let mid: unknown = (low + high);
+            let $anf$1: unknown = (list == target);
+            let $anf$2: unknown = (list == target);
+            let $anf$3: unknown = nil;
+            if $anf$1 {
+                ($anf$3 = mid);
+            } else if $anf$2 {
+                rec binary_search/4(list, target, mid, high);
+            } else {
+                rec binary_search/4(list, target, low, mid);
+            };
+            ($anf$4 = $anf$3);
+        },
+    };
+    $anf$4
+}
+dyn fn binary_search
+    -> binary_search/2
+    -> binary_search/4;

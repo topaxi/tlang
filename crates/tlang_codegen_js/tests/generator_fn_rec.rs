@@ -321,3 +321,74 @@ fn test_reduce_impl() {
 
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_multi_arity_self_referencing_tail_call_converted_to_loop() {
+    // Regression: multi-arity functions (binary_search/2, binary_search/4)
+    // must still generate TCO loops for self-referencing tail calls. When
+    // SymbolResolution ran after the ANF pass, callee paths had no HirId so
+    // `is_self_referencing_tail_call` always returned false, causing the
+    // `rec` calls to be emitted as regular function calls instead of
+    // `continue rec`.
+    let output = compile!(indoc! {"
+        fn binary_search(list, target) { binary_search(list, target, 0, 1) }
+        fn binary_search(_, _, low, high) if low > high { -1 }
+        fn binary_search(list, target, low, high) {
+            let mid = low + high;
+            if list == target {
+                mid
+            } else if list == target {
+                rec binary_search(list, target, mid, high)
+            } else {
+                rec binary_search(list, target, low, mid)
+            }
+        }
+    "});
+    let expected_output = indoc! {"
+        function binary_search$$2(list, target) {
+            return binary_search$$4(list, target, 0, 1);
+        }
+        function binary_search$$4(list, target, low, high) {
+            rec: while (true) {
+                if (low > high) {
+                    return -1;
+                } else {
+                    let mid = low + high;
+                    let $anf$0;
+                    if (list === target) {
+                        $anf$0 = mid;
+                    } else if (list === target) {
+                        let $tmp$0 = list;
+                        let $tmp$1 = target;
+                        let $tmp$2 = mid;
+                        let $tmp$3 = high;
+                        list = $tmp$0;
+                        target = $tmp$1;
+                        low = $tmp$2;
+                        high = $tmp$3;
+                        continue rec;
+                    } else {
+                        let $tmp$4 = list;
+                        let $tmp$5 = target;
+                        let $tmp$6 = low;
+                        let $tmp$7 = mid;
+                        list = $tmp$4;
+                        target = $tmp$5;
+                        low = $tmp$6;
+                        high = $tmp$7;
+                        continue rec;
+                    }
+                    return $anf$0;
+                }
+            }
+        }
+        function binary_search() {
+            if (arguments.length === 2) {
+                return binary_search$$2(arguments[0], arguments[1]);
+            } else if (arguments.length === 4) {
+                return binary_search$$4(arguments[0], arguments[1], arguments[2], arguments[3]);
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
