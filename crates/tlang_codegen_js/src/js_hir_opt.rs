@@ -12,10 +12,13 @@ impl Default for JsHirOptimizer {
     fn default() -> Self {
         Self::new(vec![
             Box::new(hir_opt::tail_call_validation::TailPositionAnalysis),
+            // SymbolResolution must run before ANF so that callee paths have
+            // their `res.hir_id()` set — the ANF pass uses HirId identity to
+            // detect self-referencing tail calls.
+            Box::new(hir_opt::symbol_resolution::SymbolResolution::default()),
             Box::new(JsAnfTransform::default()),
             Box::new(JsAnfReturnOpt::default()),
             Box::new(BooleanReturnSimplification::default()),
-            Box::new(hir_opt::symbol_resolution::SymbolResolution::default()),
             Box::new(hir_opt::constant_folding::ConstantFolding::default()),
         ])
     }
