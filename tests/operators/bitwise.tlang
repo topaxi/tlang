@@ -12,6 +12,7 @@ log(flags ^ 0b00000100);
 
 // Bitwise NOT
 log(~0);
+log(~flags);
 
 // Binary literals
 log(0b1111);

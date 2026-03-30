@@ -127,12 +127,12 @@ impl<'src> Lexer<'src> {
             self.advance_while(|ch| ch == '0' || ch == '1' || ch == '_');
             let bin_slice = &self.source[bin_start..self.position];
             let digits: String = bin_slice.chars().filter(|&c| c != '_').collect();
-            let value = u64::from_str_radix(&digits, 2).unwrap_or(0);
-            return self.token(
-                TokenKind::Literal(Literal::UnsignedInteger(value)),
-                start_pos,
-                start_lc,
-            );
+            return match (digits.is_empty(), u64::from_str_radix(&digits, 2)) {
+                (false, Ok(value)) => {
+                    self.token(TokenKind::Literal(Literal::UnsignedInteger(value)), start_pos, start_lc)
+                }
+                _ => self.token(TokenKind::Unknown, start_pos, start_lc),
+            };
         }
 
         // Check for hex literal: 0x... or 0X...
@@ -143,12 +143,12 @@ impl<'src> Lexer<'src> {
             self.advance_while(|ch| ch.is_ascii_hexdigit() || ch == '_');
             let hex_slice = &self.source[hex_start..self.position];
             let digits: String = hex_slice.chars().filter(|&c| c != '_').collect();
-            let value = u64::from_str_radix(&digits, 16).unwrap_or(0);
-            return self.token(
-                TokenKind::Literal(Literal::UnsignedInteger(value)),
-                start_pos,
-                start_lc,
-            );
+            return match (digits.is_empty(), u64::from_str_radix(&digits, 16)) {
+                (false, Ok(value)) => {
+                    self.token(TokenKind::Literal(Literal::UnsignedInteger(value)), start_pos, start_lc)
+                }
+                _ => self.token(TokenKind::Unknown, start_pos, start_lc),
+            };
         }
 
         self.advance_while(Self::is_number_literal_char);

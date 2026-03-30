@@ -485,7 +485,7 @@ impl Interpreter {
 
                 EvalResult::Value(match value.as_primitive() {
                     TlangPrimitive::Int(v) => TlangValue::I64(!v),
-                    TlangPrimitive::UInt(v) => TlangValue::U64(!v),
+                    TlangPrimitive::UInt(v) => TlangValue::I64(!(v as i64)),
                     _ => todo!("eval_unary BitwiseNot: incompatible type {:?}", value),
                 })
             }

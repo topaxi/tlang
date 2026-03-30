@@ -767,3 +767,29 @@ fn test_tilde_before_identifier() {
     let mut lexer = Lexer::new("~flags");
     assert_tokens!(lexer, [TokenKind::Tilde, TokenKind::Identifier]);
 }
+
+#[test]
+fn test_binary_literal_no_digits_is_unknown() {
+    let mut lexer = Lexer::new("0b");
+    assert_tokens!(lexer, [TokenKind::Unknown]);
+}
+
+#[test]
+fn test_binary_literal_invalid_digit_stops_before_it() {
+    // '2' is not a valid binary digit; the lexer consumes '0b1' as UnsignedInteger(1)
+    // and leaves '2' as a separate integer token.
+    let mut lexer = Lexer::new("0b12");
+    assert_tokens!(
+        lexer,
+        [
+            TokenKind::Literal(Literal::UnsignedInteger(1)),
+            TokenKind::Literal(Literal::UnsignedInteger(2))
+        ]
+    );
+}
+
+#[test]
+fn test_hex_literal_no_digits_is_unknown() {
+    let mut lexer = Lexer::new("0x");
+    assert_tokens!(lexer, [TokenKind::Unknown]);
+}
