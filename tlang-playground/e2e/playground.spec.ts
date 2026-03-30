@@ -127,8 +127,11 @@ test.describe('Tlang Playground', () => {
     );
 
     // Expected output from the email-validation section.
+    // t-console-message uses display:contents, so check the t-message child.
     const messages = page.locator('t-console-message[type="log"]');
-    await expect(messages.filter({ hasText: 'true' }).first()).toBeVisible();
+    await expect(
+      messages.filter({ hasText: 'true' }).first().locator('t-message'),
+    ).toBeVisible();
   });
 
   test('can toggle constant folding optimization', async ({ page }) => {
@@ -245,7 +248,7 @@ test.describe('Diagnostics panel', () => {
     const panel = page.locator('t-diagnostics');
     await panel.getByLabel('Expand Diagnostics').click();
 
-    const message = panel.locator('.message--error');
+    const message = panel.locator('t-message[severity="error"]');
     await expect(message).toBeVisible();
 
     // Should contain styled spans from ansiToHtml
@@ -266,7 +269,7 @@ test.describe('Diagnostics panel', () => {
     const panel = page.locator('t-diagnostics');
     await panel.getByLabel('Expand Diagnostics').click();
 
-    const message = panel.locator('.message--warning');
+    const message = panel.locator('t-message[severity="warning"]');
     await expect(message).toBeVisible();
 
     // Should contain styled spans from ansiToHtml
