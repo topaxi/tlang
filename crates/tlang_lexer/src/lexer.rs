@@ -128,9 +128,11 @@ impl<'src> Lexer<'src> {
             let bin_slice = &self.source[bin_start..self.position];
             let digits: String = bin_slice.chars().filter(|&c| c != '_').collect();
             return match (digits.is_empty(), u64::from_str_radix(&digits, 2)) {
-                (false, Ok(value)) => {
-                    self.token(TokenKind::Literal(Literal::UnsignedInteger(value)), start_pos, start_lc)
-                }
+                (false, Ok(value)) => self.token(
+                    TokenKind::Literal(Literal::UnsignedInteger(value)),
+                    start_pos,
+                    start_lc,
+                ),
                 _ => self.token(TokenKind::Unknown, start_pos, start_lc),
             };
         }
@@ -144,9 +146,11 @@ impl<'src> Lexer<'src> {
             let hex_slice = &self.source[hex_start..self.position];
             let digits: String = hex_slice.chars().filter(|&c| c != '_').collect();
             return match (digits.is_empty(), u64::from_str_radix(&digits, 16)) {
-                (false, Ok(value)) => {
-                    self.token(TokenKind::Literal(Literal::UnsignedInteger(value)), start_pos, start_lc)
-                }
+                (false, Ok(value)) => self.token(
+                    TokenKind::Literal(Literal::UnsignedInteger(value)),
+                    start_pos,
+                    start_lc,
+                ),
                 _ => self.token(TokenKind::Unknown, start_pos, start_lc),
             };
         }
