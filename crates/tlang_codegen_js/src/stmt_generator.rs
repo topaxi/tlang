@@ -87,7 +87,13 @@ impl<'a> InnerCodegen<'a> {
                             if let Some(discriminant) = &variant.discriminant
                                 && let hir::ExprKind::Literal(lit) = &discriminant.kind
                             {
-                                variant_literals.push((variant.name.to_string(), **lit));
+                                let lit_val = **lit;
+                                variant_literals.push((variant.name.to_string(), lit_val));
+                                // Also populate the per-variant lookup used in match overlap checking.
+                                self.variant_discriminant_values.insert(
+                                    variant.hir_id,
+                                    (decl.name.to_string(), variant.name.to_string(), lit_val),
+                                );
                             }
                         }
                         self.discriminant_enum_info

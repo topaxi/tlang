@@ -546,6 +546,11 @@ pub(crate) struct InnerCodegen<'a> {
     /// Maps each discriminant enum's HirId to its name and the list of
     /// (variant_name, literal_value) pairs for overlap detection.
     pub(crate) discriminant_enum_info: HashMap<hir::HirId, (String, Vec<(String, Literal)>)>,
+    /// Maps each discriminant enum variant's HirId to a tuple of
+    /// `(enum_name, variant_name, discriminant_literal)`.  This provides
+    /// O(1) lookup of a variant's discriminant value by HirId, which is used
+    /// in per-arm overlap detection during match code generation.
+    pub(crate) variant_discriminant_values: HashMap<hir::HirId, (String, String, Literal)>,
     /// When true, suppress `export` keywords on public declarations.
     pub bundle_mode: bool,
     /// Original tlang source text. When non-empty, it's prepended to
@@ -579,6 +584,7 @@ impl<'a> InnerCodegen<'a> {
             discriminant_variant_hir_ids: HashSet::new(),
             variant_to_enum: HashMap::new(),
             discriminant_enum_info: HashMap::new(),
+            variant_discriminant_values: HashMap::new(),
             bundle_mode: false,
             source_text: String::new(),
             comment_source: String::new(),

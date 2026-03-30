@@ -426,3 +426,39 @@ fn test_discriminant_enum_warning_overlapping_values() {
         "Warning should mention overlapping variants, got: {msg}"
     );
 }
+
+#[test]
+fn test_discriminant_enum_warning_single_enum_duplicate_values() {
+    // A single enum with duplicate discriminant values used in a match SHOULD produce a warning.
+    // Note: The semantic analysis pass will emit a warning about the duplicate definition;
+    // this test verifies the codegen-level match-arm overlap check independently
+    // (which operates on the HIR after semantic analysis).
+    let (_output, warnings) = compile_with_warnings!(indoc! {"
+        enum Status {
+            Ok = 1,
+            Success = 1,
+        }
+
+        fn describe(x) {
+            match x {
+                Status::Ok => \"Ok\",
+                Status::Success => \"Success\",
+                _ => \"Unknown\",
+            }
+        }
+    "});
+    // Codegen should warn about the overlap in the match expression.
+    assert!(
+        !warnings.is_empty(),
+        "Expected a warning for duplicate discriminant values in single enum match"
+    );
+    let msg = &warnings[0].message;
+    assert!(
+        msg.contains("Status"),
+        "Warning should mention the enum name, got: {msg}"
+    );
+    assert!(
+        msg.contains("Status::Ok") && msg.contains("Status::Success"),
+        "Warning should mention both variants with duplicate values, got: {msg}"
+    );
+}

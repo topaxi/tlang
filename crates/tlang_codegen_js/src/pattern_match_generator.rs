@@ -563,72 +563,72 @@ impl<'a> InnerCodegen<'a> {
         }
     }
 
-    /// Check if a match expression mixes patterns from multiple distinct
-    /// discriminant enums.  When values overlap across those enums the earlier
-    /// arm will always win (since we emit `===` comparisons), which can mask
-    /// bugs.  A warning is emitted only when overlapping literal discriminant
-    /// values are detected; if all known literal values are disjoint across the
-    /// enums no warning is produced ("safe enough").
+    /// Check if a match expression uses discriminant enum patterns whose
+    /// discriminant values overlap, causing earlier arms to silently shadow
+    /// later ones.
+    ///
+    /// This covers both cases:
+    /// - **Single enum**: `enum E { A = 1, B = 1 }` — both arms are present
+    ///   in the match but only the first can ever be reached.
+    /// - **Multiple enums**: `enum A { a = 1 }` and `enum B { b = 1 }` mixed
+    ///   in the same match.
+    ///
+    /// A warning is emitted only when the actual discriminant values of the
+    /// patterns used in this match overlap; if all values are disjoint no
+    /// warning is produced ("safe enough").
     fn check_multi_discriminant_enum_overlap(
         &mut self,
         arms: &[hir::MatchArm],
         span: tlang_span::Span,
     ) {
-        // Collect the distinct discriminant enum HirIds that appear in the
-        // match arms (only discriminant-enum variant patterns, not wildcards /
-        // identifiers / literals).
-        let mut seen_enums: Vec<(HirId, String)> = Vec::new();
+        // Collect the (enum_name, variant_name, literal) for every
+        // discriminant-enum variant pattern used in the match arms.
+        // We collect these in arm order so the first one wins in the overlap
+        // map below, matching the runtime semantics.
+        let mut used: Vec<(String, String, Literal)> = Vec::new();
+        // Track which distinct enum names appear, for the warning message.
+        let mut enum_names_seen: Vec<String> = Vec::new();
 
         for arm in arms {
             if let hir::PatKind::Enum(path, patterns) = &arm.pat.kind {
                 // Only simple (no-parameter) discriminant enum patterns.
                 if patterns.is_empty()
                     && let Some(variant_hir_id) = path.res.hir_id()
-                    && let Some(&enum_hir_id) = self.variant_to_enum.get(&variant_hir_id)
-                    && !seen_enums.iter().any(|(id, _)| *id == enum_hir_id)
+                    && let Some((enum_name, variant_name, lit)) =
+                        self.variant_discriminant_values.get(&variant_hir_id)
                 {
-                    let enum_name = self
-                        .discriminant_enum_info
-                        .get(&enum_hir_id)
-                        .map(|(name, _)| name.clone())
-                        .unwrap_or_default();
-                    seen_enums.push((enum_hir_id, enum_name));
+                    let enum_name = enum_name.clone();
+                    let variant_name = variant_name.clone();
+                    let lit = *lit;
+                    if !enum_names_seen.contains(&enum_name) {
+                        enum_names_seen.push(enum_name.clone());
+                    }
+                    used.push((enum_name, variant_name, lit));
                 }
             }
         }
 
-        if seen_enums.len() <= 1 {
+        // Need at least two discriminant variant patterns to have an overlap.
+        if used.len() < 2 {
             return;
         }
 
-        // We have multiple discriminant enums.  Check for literal value overlaps.
-        // Build a map from normalised literal key → (enum_name, variant_name) for
-        // the first enum that claims each value, then check subsequent enums.
+        // Build a map from normalised literal key → (enum_name, variant_name)
+        // for the first variant that claims each value, then detect overlaps.
         let mut value_map: HashMap<LiteralKey, (String, String)> = HashMap::new();
-        let mut overlaps: Vec<(String, String, String, String)> = Vec::new(); // (enumA, varA, enumB, varB)
+        let mut overlaps: Vec<(String, String, String, String)> = Vec::new();
 
-        // We can only compare enums whose literal values are fully known, but we
-        // check each enum separately so partially-known enums still participate.
-        for (enum_hir_id, _) in &seen_enums {
-            let Some((enum_name, variant_literals)) = self.discriminant_enum_info.get(enum_hir_id)
-            else {
-                continue;
-            };
-            let enum_name = enum_name.clone();
-            let variant_literals = variant_literals.clone();
-
-            for (variant_name, lit) in &variant_literals {
-                let key = LiteralKey::from_literal(lit);
-                if let Some((prev_enum, prev_variant)) = value_map.get(&key) {
-                    overlaps.push((
-                        prev_enum.clone(),
-                        prev_variant.clone(),
-                        enum_name.clone(),
-                        variant_name.clone(),
-                    ));
-                } else {
-                    value_map.insert(key, (enum_name.clone(), variant_name.clone()));
-                }
+        for (enum_name, variant_name, lit) in &used {
+            let key = LiteralKey::from_literal(lit);
+            if let Some((prev_enum, prev_variant)) = value_map.get(&key) {
+                overlaps.push((
+                    prev_enum.clone(),
+                    prev_variant.clone(),
+                    enum_name.clone(),
+                    variant_name.clone(),
+                ));
+            } else {
+                value_map.insert(key, (enum_name.clone(), variant_name.clone()));
             }
         }
 
@@ -637,20 +637,32 @@ impl<'a> InnerCodegen<'a> {
             return;
         }
 
-        let enum_names: Vec<&str> = seen_enums.iter().map(|(_, n)| n.as_str()).collect();
         let overlap_details: Vec<String> = overlaps
             .iter()
             .map(|(ea, va, eb, vb)| {
-                format!("`{ea}::{va}` and `{eb}::{vb}` share the same discriminant value")
+                if ea == eb {
+                    format!("`{ea}::{va}` and `{ea}::{vb}` share the same discriminant value")
+                } else {
+                    format!("`{ea}::{va}` and `{eb}::{vb}` share the same discriminant value")
+                }
             })
             .collect();
 
-        let message = format!(
-            "match expression uses discriminant enums {} whose values overlap: {}; \
-             earlier arms will shadow later ones",
-            enum_names.join(", "),
-            overlap_details.join(", "),
-        );
+        let message = if enum_names_seen.len() == 1 {
+            format!(
+                "match expression uses variants of `{}` with duplicate discriminant values: {}; \
+                 earlier arms will shadow later ones",
+                enum_names_seen[0],
+                overlap_details.join(", "),
+            )
+        } else {
+            format!(
+                "match expression uses discriminant enums {} whose values overlap: {}; \
+                 earlier arms will shadow later ones",
+                enum_names_seen.join(", "),
+                overlap_details.join(", "),
+            )
+        };
 
         self.warnings.push(CodegenWarning::new(message, span));
     }

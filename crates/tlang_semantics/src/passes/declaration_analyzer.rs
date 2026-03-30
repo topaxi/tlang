@@ -1,16 +1,19 @@
 use log::debug;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use tlang_ast::keyword::kw;
 use tlang_ast::node::{
-    Expr, ExprKind, FunctionDeclaration, FunctionParameter, ImplBlock, Module, Pat, PatKind, Stmt,
-    StmtKind,
+    EnumDeclaration, Expr, ExprKind, FunctionDeclaration, FunctionParameter, ImplBlock, Module,
+    Pat, PatKind, Stmt, StmtKind, UnaryOp,
 };
+use tlang_ast::token::Literal;
 use tlang_ast::visit::{Visitor, walk_expr, walk_stmt};
 use tlang_defs::{Def, DefKind, DefScope};
 use tlang_span::{NodeId, Span};
 
 use crate::analyzer::{SemanticAnalysisContext, SemanticAnalysisPass};
+use crate::diagnostic;
 
 /// The declaration analyzer is responsible for collecting all the declarations in a module.
 #[derive(Default)]
@@ -137,6 +140,116 @@ impl DeclarationAnalyzer {
             self.pop_symbol_table();
         }
     }
+
+    /// Validate discriminant expressions in an enum declaration.
+    ///
+    /// Each discriminant must be a constant literal (or a unary negation of a
+    /// literal) so that the JS backend can embed it directly in a `const`
+    /// object initializer without triggering a temporal dead-zone reference.
+    /// Duplicate discriminant values within the same enum are also flagged as
+    /// a warning because they make match arm shadowing silent and confusing.
+    fn validate_enum_discriminants(
+        &self,
+        decl: &EnumDeclaration,
+        ctx: &mut SemanticAnalysisContext,
+    ) {
+        let mut seen_values: HashMap<DiscriminantKey, &str> = HashMap::new();
+        for variant in &decl.variants {
+            let Some(discriminant_expr) = variant.discriminant.as_deref() else {
+                continue;
+            };
+
+            if !is_const_discriminant_expr(discriminant_expr) {
+                ctx.add_diagnostic(diagnostic::error_at!(
+                    discriminant_expr.span,
+                    "discriminant value for `{}::{}` must be a constant literal",
+                    decl.name,
+                    variant.name,
+                ));
+                continue;
+            }
+
+            if let Some(lit) = extract_discriminant_literal(discriminant_expr) {
+                let key = DiscriminantKey::from_literal(&lit);
+                if let Some(prev_variant) = seen_values.get(&key) {
+                    ctx.add_diagnostic(diagnostic::warn_at!(
+                        variant.span,
+                        "discriminant value of `{}::{}` is the same as `{}::{}`, earlier patterns will shadow this one",
+                        decl.name,
+                        variant.name,
+                        decl.name,
+                        prev_variant,
+                    ));
+                } else {
+                    seen_values.insert(key, variant.name.as_str());
+                }
+            }
+        }
+    }
+}
+
+/// Check whether an expression is a constant-literal discriminant (i.e. a
+/// value that can be computed without any references to the enclosing scope).
+/// Acceptable forms are:
+/// - A plain literal (`1`, `"foo"`, `true`, …)
+/// - A unary negation applied directly to a numeric literal (`-1`)
+///
+/// Everything else (path references, binary expressions, function calls, …)
+/// is rejected because in the JavaScript backend discriminant values are
+/// embedded inside a single `const EnumName = { … }` initializer, so any
+/// self-reference to `EnumName` would trigger a temporal dead-zone (TDZ)
+/// reference error at runtime.
+fn is_const_discriminant_expr(expr: &Expr) -> bool {
+    match &expr.kind {
+        ExprKind::Literal(_) => true,
+        ExprKind::UnaryOp(UnaryOp::Minus, inner) => {
+            matches!(inner.kind, ExprKind::Literal(_))
+        }
+        _ => false,
+    }
+}
+
+/// Extract the normalised `Literal` from a constant-discriminant expression.
+/// Returns `None` if the expression is not a constant literal (callers should
+/// have validated with [`is_const_discriminant_expr`] first).
+fn extract_discriminant_literal(expr: &Expr) -> Option<Literal> {
+    match &expr.kind {
+        ExprKind::Literal(lit) => Some(**lit),
+        ExprKind::UnaryOp(UnaryOp::Minus, inner) => {
+            if let ExprKind::Literal(lit) = &inner.kind {
+                Some(lit.invert_sign())
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// A normalised, comparable representation of a discriminant literal used for
+/// duplicate-value detection.  Integers and unsigned integers are normalised
+/// to the same `i128` bucket so that `Integer(1)` and `UnsignedInteger(1)`
+/// are considered equal.
+#[derive(PartialEq, Eq, Hash, Debug)]
+enum DiscriminantKey {
+    Integer(i128),
+    Float(u64),
+    String(String),
+    Bool(bool),
+    None,
+}
+
+impl DiscriminantKey {
+    fn from_literal(lit: &Literal) -> Self {
+        match lit {
+            Literal::Integer(n) => Self::Integer(*n as i128),
+            Literal::UnsignedInteger(n) => Self::Integer(*n as i128),
+            Literal::Float(f) => Self::Float(f.to_bits()),
+            Literal::String(s) | Literal::Char(s) => Self::String(s.to_string()),
+            Literal::Boolean(b) => Self::Bool(*b),
+            Literal::None => Self::None,
+        }
+    }
 }
 
 impl SemanticAnalysisPass for DeclarationAnalyzer {
@@ -209,6 +322,8 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                         element.span.end_lc.line,
                     );
                 }
+
+                self.validate_enum_discriminants(decl, ctx);
             }
             StmtKind::StructDeclaration(decl) => {
                 self.declare_symbol(
