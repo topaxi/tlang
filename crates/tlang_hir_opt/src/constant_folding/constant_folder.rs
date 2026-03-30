@@ -245,7 +245,7 @@ impl ConstantFolder {
             (UnaryOp::Minus, Literal::Integer(v)) => v.checked_neg().map(Literal::Integer),
             (UnaryOp::Minus, Literal::Float(v)) => Some(Literal::Float(-v)),
             (UnaryOp::BitwiseNot, Literal::UnsignedInteger(v)) => {
-                Some(Literal::UnsignedInteger(!v))
+                Some(Literal::Integer(!(*v as i64)))
             }
             (UnaryOp::BitwiseNot, Literal::Integer(v)) => Some(Literal::Integer(!v)),
             _ => None,
