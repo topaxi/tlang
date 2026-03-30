@@ -76,6 +76,12 @@ impl<'a> InnerCodegen<'a> {
                         let variant_js = format!("{enum_js}.{}", variant.name.as_str());
                         self.name_map.register_exact(variant.hir_id, &variant_js);
                     }
+                    // Track discriminant enum variants for pattern-match strategy selection.
+                    if decl.is_discriminant_enum() {
+                        for variant in &decl.variants {
+                            self.discriminant_variant_hir_ids.insert(variant.hir_id);
+                        }
+                    }
                 }
                 _ => {}
             }

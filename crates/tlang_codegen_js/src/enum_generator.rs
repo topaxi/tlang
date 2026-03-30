@@ -20,6 +20,10 @@ impl<'a> InnerCodegen<'a> {
                     .register_local(decl.hir_id, decl.name.as_str())
             });
 
+        if decl.is_discriminant_enum() {
+            return self.generate_discriminant_enum_declaration(&name, decl);
+        }
+
         let mut elements = Vec::new();
 
         // tag = this
@@ -114,6 +118,44 @@ impl<'a> InnerCodegen<'a> {
             false,
             false,
         ))
+    }
+
+    /// Generate a `const EnumName = { Variant1: expr1, Variant2: expr2, ... };`
+    /// declaration for a discriminant enum (all simple variants with explicit
+    /// discriminant values).
+    fn generate_discriminant_enum_declaration(
+        &mut self,
+        name: &str,
+        decl: &hir::EnumDeclaration,
+    ) -> Statement<'a> {
+        let props: Vec<ObjectPropertyKind<'a>> = decl
+            .variants
+            .iter()
+            .map(|variant| {
+                let key = PropertyKey::StaticIdentifier(
+                    self.ast
+                        .alloc_identifier_name(SPAN, self.alloc_str(variant.name.as_str())),
+                );
+                // Safe: is_discriminant_enum() guarantees all variants have discriminants.
+                let discriminant = variant.discriminant.as_deref().unwrap();
+                let value = self.generate_expr(discriminant);
+                ObjectPropertyKind::ObjectProperty(self.ast.alloc_object_property(
+                    SPAN,
+                    PropertyKind::Init,
+                    key,
+                    value,
+                    false,
+                    false,
+                    false,
+                ))
+            })
+            .collect();
+
+        let obj = self
+            .ast
+            .expression_object(SPAN, self.ast.vec_from_iter(props));
+        let name_str = self.alloc_str(name);
+        self.const_decl(name_str, obj)
     }
 
     fn generate_enum_variant_element(

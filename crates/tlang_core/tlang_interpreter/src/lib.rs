@@ -886,8 +886,14 @@ impl Interpreter {
         // TODO: AND has no functions attached to it.
 
         if is_simple_enum {
-            for (value, _variant) in decl.variants.iter().enumerate() {
-                let v = TlangValue::from(value);
+            for (index, variant) in decl.variants.iter().enumerate() {
+                let v = if decl.is_discriminant_enum() {
+                    // Safe: is_discriminant_enum() guarantees all variants have discriminants.
+                    let discriminant = variant.discriminant.as_deref().unwrap();
+                    self.eval_expr(state, discriminant).unwrap_value()
+                } else {
+                    TlangValue::from(index)
+                };
                 if state.is_global_scope() || !state.current_scope_has_slots() {
                     state.execution.scope_stack.push_value(v);
                 } else {
@@ -1956,6 +1962,14 @@ impl Interpreter {
             }
             hir::PatKind::Enum(path, kvs) if state.get_struct(value).is_some() => {
                 self.eval_pat_struct(state, path, kvs, value)
+            }
+            hir::PatKind::Enum(path, kvs) if kvs.is_empty() => {
+                // Handle simple enum variants (no parameters) stored as plain values.
+                // This covers both auto-indexed enums (variants stored as 0, 1, 2, …)
+                // and discriminant enums (variants stored as their explicit value).
+                // Previously this case was missing, causing simple enum pattern matching
+                // to always return false when the value was not a TlangEnum object.
+                state.resolve_value(path) == Some(value)
             }
             hir::PatKind::Enum(_path, _kvs) => false,
             hir::PatKind::Rest(_) => unreachable!("Rest patterns can only appear in list patterns"),

@@ -467,8 +467,8 @@ impl<'src> Parser<'src> {
         )
     }
 
-    /// Parses an enum variant, e.g. `Foo`, `Foo(1, 2, 3)` and
-    /// `Foo { bar, baz }`.
+    /// Parses an enum variant, e.g. `Foo`, `Foo(1, 2, 3)`, `Foo { bar, baz }`,
+    /// and `Foo = <expr>` for simple variants with discriminant values.
     fn parse_enum_variant(&mut self) -> EnumVariant {
         let span = self.create_span_from_current_token();
         let name = self.parse_identifier();
@@ -496,6 +496,7 @@ impl<'src> Parser<'src> {
                     id: self.unique_id(),
                     name,
                     parameters,
+                    discriminant: None,
                     span,
                 }
             }
@@ -530,15 +531,25 @@ impl<'src> Parser<'src> {
                     id: self.unique_id(),
                     name,
                     parameters,
+                    discriminant: None,
                     span,
                 }
             }
-            _ => EnumVariant {
-                id: self.unique_id(),
-                name,
-                parameters: Vec::new(),
-                span,
-            },
+            _ => {
+                let discriminant = if matches!(self.current_token_kind(), TokenKind::EqualSign) {
+                    self.advance();
+                    Some(Box::new(self.parse_expression()))
+                } else {
+                    None
+                };
+                EnumVariant {
+                    id: self.unique_id(),
+                    name,
+                    parameters: Vec::new(),
+                    discriminant,
+                    span,
+                }
+            }
         };
 
         self.end_span_from_previous_token(&mut node.span);

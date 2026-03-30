@@ -523,6 +523,10 @@ pub(crate) struct InnerCodegen<'a> {
     pub name_map: NameMap,
     pub function_context_stack: Vec<FunctionContext>,
     pub protocol_names: HashSet<String>,
+    /// HirIds of enum variants that belong to a discriminant enum (all simple
+    /// variants with explicit discriminant values). Used to select the correct
+    /// pattern-matching strategy (`===` vs `.tag ===`).
+    pub discriminant_variant_hir_ids: HashSet<hir::HirId>,
     /// When true, suppress `export` keywords on public declarations.
     pub bundle_mode: bool,
     /// Original tlang source text. When non-empty, it's prepended to
@@ -551,6 +555,7 @@ impl<'a> InnerCodegen<'a> {
             name_map: NameMap::new(),
             function_context_stack: Vec::new(),
             protocol_names,
+            discriminant_variant_hir_ids: HashSet::new(),
             bundle_mode: false,
             source_text: String::new(),
             comment_source: String::new(),

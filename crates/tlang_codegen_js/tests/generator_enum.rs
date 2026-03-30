@@ -288,3 +288,49 @@ fn test_enum_is_variant_with_positional_fields() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_discriminant_enum() {
+    let output = compile!(indoc! {"
+        enum HttpStatus {
+            Ok = 200,
+            Created = 201,
+            NotFound = 404,
+        }
+    "});
+    let expected_output = indoc! {"
+        const HttpStatus = {
+            Ok: 200,
+            Created: 201,
+            NotFound: 404
+        };
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_discriminant_enum_pattern_matching() {
+    let output = compile!(indoc! {"
+        enum HttpStatus {
+            Ok = 200,
+            NotFound = 404,
+        }
+
+        fn describe(HttpStatus::Ok) { \"OK\" }
+        fn describe(HttpStatus::NotFound) { \"Not Found\" }
+    "});
+    let expected_output = indoc! {"
+        const HttpStatus = {
+            Ok: 200,
+            NotFound: 404
+        };
+        function describe(httpstatus) {
+            if (httpstatus === HttpStatus.Ok) {
+                return \"OK\";
+            } else if (httpstatus === HttpStatus.NotFound) {
+                return \"Not Found\";
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}

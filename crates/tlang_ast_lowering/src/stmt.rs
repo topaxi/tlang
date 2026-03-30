@@ -259,6 +259,10 @@ impl LoweringContext {
                         .iter()
                         .map(|field| self.lower_struct_field(field))
                         .collect(),
+                    discriminant: variant
+                        .discriminant
+                        .as_deref()
+                        .map(|expr| Box::new(self.lower_expr(expr))),
                     span: variant.span,
                 })
                 .collect::<Vec<_>>(),

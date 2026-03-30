@@ -79,6 +79,7 @@ Module(
                 ),
               ),
             ],
+            discriminant: None,
             span: Span(
               start: 18,
               end: 28,
@@ -110,6 +111,7 @@ Module(
               ),
             ),
             parameters: [],
+            discriminant: None,
             span: Span(
               start: 34,
               end: 38,

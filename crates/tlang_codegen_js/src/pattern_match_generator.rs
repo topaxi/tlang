@@ -407,6 +407,12 @@ impl<'a> InnerCodegen<'a> {
                 .unwrap_or_else(|| path.join("."))
         };
 
+        // Check if this variant belongs to a discriminant enum.
+        let is_discriminant_variant = path
+            .res
+            .hir_id()
+            .is_some_and(|id| self.discriminant_variant_hir_ids.contains(&id));
+
         let mut cond = if is_struct {
             // Struct patterns use `instanceof` checks since JS structs are
             // constructor functions without a `.tag` property.
@@ -415,6 +421,16 @@ impl<'a> InnerCodegen<'a> {
                 SPAN,
                 parent_expr,
                 BinaryOperator::Instanceof,
+                self.ident_expr(&resolved),
+            )
+        } else if is_discriminant_variant {
+            // Discriminant enum variants are plain values (not objects),
+            // so compare directly with `===`.
+            let parent_expr = self.access_path_to_expr(access);
+            self.ast.expression_binary(
+                SPAN,
+                parent_expr,
+                BinaryOperator::StrictEquality,
                 self.ident_expr(&resolved),
             )
         } else {
