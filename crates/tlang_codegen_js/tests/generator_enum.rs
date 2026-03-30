@@ -165,7 +165,7 @@ fn test_maximum_depth_tree() {
                 return 1;
             } else if (tree.tag === Tree.Node && (left = tree.left, true) && (right = tree.right, true)) {
                 return 1 + Math.max(maximum_depth(left), maximum_depth(right));
-            }
+            } else $matchError(tree);
         }
         function main() {
             let x = Tree.Node({
@@ -212,7 +212,7 @@ fn test_maximum_depth_tree_positional() {
                 return 1;
             } else if (tree.tag === Tree.Node && (left = tree[0], true) && (right = tree[1], true)) {
                 return 1 + Math.max(maximum_depth(left), maximum_depth(right));
-            }
+            } else $matchError(tree);
         }
     "};
     assert_eq!(output, expected_output);

@@ -68,6 +68,42 @@ export function $assert(cond, msg) {
   if (!cond) throw new $AssertError(typeof msg === 'function' ? msg() : msg);
 }
 
+/**
+ * @param {string | () => string} msg - The error message to throw when called.
+ */
+export function $unreachable(msg = 'Reached unreachable code') {
+  $assert(false, msg);
+}
+
+function $enumTagName(value) {
+  if (value == null || typeof value !== 'object') return null;
+  const tag = value.tag;
+  if (tag == null) return null;
+  if (typeof tag === 'function') return tag.name;
+  // For singleton enum variants: find the matching static property on the constructor
+  const ctor = value.constructor;
+  if (ctor != null) {
+    for (const key of Object.keys(ctor)) {
+      if (ctor[key] === tag) return key;
+    }
+  }
+  return null;
+}
+
+/**
+ * Throws a descriptive error for a non-exhaustive pattern match.
+ * @param {unknown} [value] - The unmatched value.
+ */
+export function $matchError(value) {
+  const typeName = value?.constructor?.name;
+  const tagName = $enumTagName(value);
+  const desc =
+    typeName && tagName
+      ? `${typeName}::${tagName}`
+      : (tagName ?? typeName ?? $getType(value));
+  throw new $AssertError(`Non-exhaustive pattern match: unmatched value of type ${desc}`);
+}
+
 export const $uncurryThis = (() => {
   const cache = new WeakMap();
   const uncurry = Function.prototype.bind.bind(Function.prototype.call);

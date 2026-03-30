@@ -133,7 +133,7 @@ fn test_recursive_sum() {
                 return 0;
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
                 return x + sum(xs);
-            }
+            } else $matchError(arg0);
         }
     "};
     assert_eq!(output, expected_output);
@@ -152,7 +152,7 @@ fn test_recursive_map() {
                 return [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
                 return [f(x), ...$spread(map(xs, f))];
-            }
+            } else $matchError();
         }
     "};
     assert_eq!(output, expected_output);
@@ -174,7 +174,7 @@ fn test_function_declarations_with_guard() {
                 return [x, ...$spread(filter(xs, f))];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
                 return filter(xs, f);
-            }
+            } else $matchError();
         }
     "};
     assert_eq!(output, expected_output);
@@ -196,7 +196,7 @@ fn test_function_declarations_with_if_let_guard() {
                 return [y, ...$spread(filter_map(xs, f))];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
                 return filter_map(xs, f);
-            }
+            } else $matchError();
         }
     "};
     assert_eq!(output, expected_output);
@@ -218,7 +218,7 @@ fn test_function_declarations_with_if_let_guard_enum() {
                 return [y, ...$spread(filter_map(xs, f))];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
                 return filter_map(xs, f);
-            }
+            } else $matchError();
         }
     "};
     assert_eq!(output, expected_output);
@@ -240,7 +240,7 @@ fn test_function_declarations_with_if_let_guard_named_fields_enum() {
                 return [value, ...$spread(filter_map(xs, f))];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
                 return filter_map(xs, f);
-            }
+            } else $matchError();
         }
     "};
     assert_eq!(output, expected_output);
@@ -271,7 +271,7 @@ fn test_function_declarations_with_comments_inbetween() {
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
                 // Comment 3
                 return filter_map(xs, f);
-            }
+            } else $matchError();
         }
     "};
     assert_eq!(output, expected_output);

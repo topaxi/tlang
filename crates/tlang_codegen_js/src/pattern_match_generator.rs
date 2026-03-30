@@ -258,7 +258,17 @@ impl<'a> InnerCodegen<'a> {
         let_guard_var: &str,
     ) -> Option<Statement<'a>> {
         if arms.is_empty() {
-            return None;
+            // Generate a runtime error for non-exhaustive matches. Only pass
+            // the match value when the root maps to a real JS identifier.
+            let callee = self.ident_expr("$matchError");
+            let args = match root {
+                AccessPath::Ident(name) if !name.is_empty() => {
+                    vec![Argument::from(self.access_path_to_expr(root))]
+                }
+                _ => vec![],
+            };
+            let call = self.call_expr(callee, args);
+            return Some(self.expr_stmt(call));
         }
 
         let arm = &arms[0];
