@@ -1197,6 +1197,18 @@ impl<'src> Parser<'src> {
                 )
             }
 
+            TokenKind::Tilde => {
+                self.advance();
+
+                node::expr!(
+                    self.unique_id(),
+                    UnaryOp(
+                        UnaryOp::BitwiseNot,
+                        Box::new(self.parse_primary_expression())
+                    )
+                )
+            }
+
             _ => unreachable!("Unexpected token kind"),
         }
     }
@@ -1387,6 +1399,7 @@ impl<'src> Parser<'src> {
             "primary expression",
             TokenKind::Minus
                 | TokenKind::ExclamationMark
+                | TokenKind::Tilde
                 | TokenKind::LParen
                 | TokenKind::LBrace
                 | TokenKind::LBracket
@@ -1420,9 +1433,10 @@ impl<'src> Parser<'src> {
                 self.parse_signed_numeric_literal()
             }
 
-            TokenKind::Minus | TokenKind::ExclamationMark | TokenKind::Keyword(Keyword::Not) => {
-                self.parse_unary_expression()
-            }
+            TokenKind::Minus
+            | TokenKind::ExclamationMark
+            | TokenKind::Keyword(Keyword::Not)
+            | TokenKind::Tilde => self.parse_unary_expression(),
             TokenKind::LParen => self.parse_parenthesized_expression(),
             TokenKind::LBrace => self.parse_block_or_dict(),
             TokenKind::LBracket => self.parse_list_expression(),

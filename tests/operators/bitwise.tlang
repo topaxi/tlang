@@ -1,0 +1,32 @@
+let flags = 0b00000101;
+let mask = 0b00000011;
+
+// Bitwise AND
+log(flags & mask);
+
+// Bitwise OR
+log(flags | 0b11110000);
+
+// Bitwise XOR
+log(flags ^ 0b00000100);
+
+// Bitwise NOT
+log(~0);
+log(~flags);
+
+// Binary literals
+log(0b1111);
+log(0b1010_1010);
+
+// Hex literals
+log(0xFF);
+log(0x0A);
+log(0xDEAD);
+
+// Hex with uppercase prefix
+log(0XFF);
+
+// Combining hex and bitwise operators
+log(0xFF & 0x0F);
+log(0xF0 | 0x0F);
+log(0xFF ^ 0xF0);

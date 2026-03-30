@@ -329,6 +329,7 @@ impl HirPretty {
                 match op {
                     UnaryOp::Minus => self.push_char('-'),
                     UnaryOp::Not => self.push_char('!'),
+                    UnaryOp::BitwiseNot => self.push_char('~'),
                     UnaryOp::Spread => self.push_str("..."),
                     UnaryOp::Rest => self.push_str("..."),
                 }

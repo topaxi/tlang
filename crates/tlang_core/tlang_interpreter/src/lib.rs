@@ -480,6 +480,15 @@ impl Interpreter {
 
                 EvalResult::Value(TlangValue::Bool(!state.is_truthy(value)))
             }
+            UnaryOp::BitwiseNot => {
+                let value = eval_value!(state, self.eval_expr(state, expr));
+
+                EvalResult::Value(match value.as_primitive() {
+                    TlangPrimitive::Int(v) => TlangValue::I64(!v),
+                    TlangPrimitive::UInt(v) => TlangValue::I64(!(v as i64)),
+                    _ => todo!("eval_unary BitwiseNot: incompatible type {:?}", value),
+                })
+            }
             UnaryOp::Rest => unreachable!("Rest operator implemented in eval_list_expr"),
             _ => todo!("eval_unary: {:?}", op),
         }
@@ -600,9 +609,15 @@ impl Interpreter {
             hir::BinaryOpKind::Less => self.eval_comparison_op(lhs, rhs, |a, b| a < b),
             hir::BinaryOpKind::LessEq => self.eval_comparison_op(lhs, rhs, |a, b| a <= b),
 
-            hir::BinaryOpKind::BitwiseAnd => self.eval_bitwise_op(lhs, rhs, |a, b| a & b),
-            hir::BinaryOpKind::BitwiseOr => self.eval_bitwise_op(lhs, rhs, |a, b| a | b),
-            hir::BinaryOpKind::BitwiseXor => self.eval_bitwise_op(lhs, rhs, |a, b| a ^ b),
+            hir::BinaryOpKind::BitwiseAnd => {
+                self.eval_bitwise_op(lhs, rhs, |a, b| a & b, |a, b| a & b)
+            }
+            hir::BinaryOpKind::BitwiseOr => {
+                self.eval_bitwise_op(lhs, rhs, |a, b| a | b, |a, b| a | b)
+            }
+            hir::BinaryOpKind::BitwiseXor => {
+                self.eval_bitwise_op(lhs, rhs, |a, b| a ^ b, |a, b| a ^ b)
+            }
 
             hir::BinaryOpKind::Assign | hir::BinaryOpKind::And | hir::BinaryOpKind::Or => {
                 unreachable!("{:?} should be handled before", op)
@@ -700,12 +715,20 @@ impl Interpreter {
         }
     }
 
-    fn eval_bitwise_op<F>(&self, lhs: TlangValue, rhs: TlangValue, op: F) -> TlangValue
+    fn eval_bitwise_op<F, G>(
+        &self,
+        lhs: TlangValue,
+        rhs: TlangValue,
+        int_op: F,
+        uint_op: G,
+    ) -> TlangValue
     where
         F: Fn(i64, i64) -> i64,
+        G: Fn(u64, u64) -> u64,
     {
-        match (lhs, rhs) {
-            (TlangValue::I64(lhs), TlangValue::I64(rhs)) => TlangValue::I64(op(lhs, rhs)),
+        match (lhs.as_primitive(), rhs.as_primitive()) {
+            (TlangPrimitive::Int(l), TlangPrimitive::Int(r)) => TlangValue::I64(int_op(l, r)),
+            (TlangPrimitive::UInt(l), TlangPrimitive::UInt(r)) => TlangValue::U64(uint_op(l, r)),
             _ => todo!("eval_bitwise_op: incompatible types"),
         }
     }

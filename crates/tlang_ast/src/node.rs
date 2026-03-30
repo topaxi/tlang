@@ -706,6 +706,7 @@ impl Module {
 pub enum UnaryOp {
     Minus,
     Not,
+    BitwiseNot,
     Rest,
     Spread,
 }
