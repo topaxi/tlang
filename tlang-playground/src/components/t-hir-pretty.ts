@@ -31,10 +31,6 @@ export class HirPrettyElement extends LitElement {
       align-items: center;
     }
 
-    .indent-size::before {
-      content: '\\00a0\\00a0';
-    }
-
     .indent-size > label {
       margin-right: 0.25em;
     }

@@ -14,10 +14,18 @@ import {
 import { hostListener } from '../decorators/host-listener';
 import { ButtonElement } from './t-button';
 
+const paddingCss = css`
+  :host::before {
+    content: var(--t-menuitem-padding-string);
+  }
+`;
+
 @customElement('t-menu')
 export class MenuElement extends LitElement {
   static override styles = css`
     :host {
+      --t-menuitem-padding-string-default: '\\00a0\\00a0';
+
       padding: 0;
       border: 1px solid var(--ctp-macchiato-surface0);
       background-color: var(--ctp-macchiato-base);
@@ -40,6 +48,16 @@ export class MenuElement extends LitElement {
     switch (event.type) {
       case 'slotchange': {
         this.updateTabIndex(0);
+        this.style.setProperty(
+          '--t-menuitem-padding-string',
+          this.menuItems.some(
+            (item) =>
+              item instanceof MenuItemCheckboxElement ||
+              item instanceof MenuItemRadioElement,
+          )
+            ? 'var(--t-menuitem-padding-string-default)'
+            : '',
+        );
         break;
       }
       case 'keydown': {
@@ -115,15 +133,18 @@ export class MenuItemLinkElement extends LitElement {
 
 @customElement('t-menuitem-group')
 export class MenuItemGroupElement extends LitElement {
-  static override styles: CSSResultGroup = css`
-    :host {
-      display: block;
-      padding: 0.25em 0.5em;
-      cursor: default;
-      user-select: none;
-      background-color: var(--t-button-background-color);
-    }
-  `;
+  static override styles: CSSResultGroup = [
+    paddingCss,
+    css`
+      :host {
+        display: block;
+        padding: 0.25em 0.5em;
+        cursor: default;
+        user-select: none;
+        background-color: var(--t-button-background-color);
+      }
+    `,
+  ];
 
   override role = 'group';
 
@@ -138,11 +159,11 @@ export class MenuItemRadioElement extends MenuItemButtonElement {
     super.styles,
     css`
       ::part(icon)::before {
-        content: '';
+        content: var(--t-menuitem-radio-unchecked, '');
       }
 
       :host(:state(checked))::part(icon)::before {
-        content: '';
+        content: var(--t-menuitem-radio-checked, '');
       }
     `,
   ];
@@ -181,7 +202,7 @@ export class MenuItemCheckboxElement extends MenuItemButtonElement {
       }
 
       :host(:state(checked))::part(icon)::before {
-        content: '✓';
+        content: var(--t-menuitem-checkmark, '✓');
       }
     `,
   ];

@@ -42,6 +42,7 @@ export class ButtonElement extends LitElement {
         padding: 0.25em 0.5em;
         font-size: 0.85rem;
         min-width: 1.5em;
+        flex-shrink: 0;
       }
 
       :host(:not([hidden])) {

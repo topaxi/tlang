@@ -13,6 +13,7 @@ import './components/t-select';
 import './components/t-shortcuts';
 import './components/t-split';
 import './components/t-tabs';
+import './components/t-toolbar';
 import { type TCodeMirror } from './components/t-codemirror';
 import { ConsoleElement, ConsoleMessage } from './components/t-console';
 import { FlashElement } from './components/t-flash';
@@ -221,14 +222,9 @@ export class TlangPlayground extends LitElement {
       flex: 1;
     }
 
-    .toolbar {
-      display: flex;
-      gap: 1ch;
-    }
-
     .repo-link {
-      margin-left: auto;
-      margin-right: 1rem;
+      margin-right: 1ch;
+      white-space: nowrap;
     }
 
     .repo-link a {
@@ -243,10 +239,6 @@ export class TlangPlayground extends LitElement {
     .anf-mode {
       display: flex;
       align-items: center;
-    }
-
-    .anf-mode::before {
-      content: '\\00a0\\00a0';
     }
 
     .anf-mode > label {
@@ -515,7 +507,7 @@ export class TlangPlayground extends LitElement {
     return html`
       <t-shortcuts>
         <header>
-          <div class="toolbar">
+          <t-toolbar>
             <t-button
               @click=${this.run}
               shortcut="ctrl+enter"
@@ -586,7 +578,6 @@ export class TlangPlayground extends LitElement {
                       Return position optimization
                     </t-menuitem-checkbox>`}
             </t-menu>
-            <t-button @click=${this.share}>Share</t-button>
             <t-select
               class="toolbar__example"
               @change=${this.handleExampleSelect}
@@ -598,13 +589,18 @@ export class TlangPlayground extends LitElement {
                 (key) => html`<option>${key}</option>`,
               )}
             </t-select>
-            <t-button @click=${this.showKeyboardShortcuts} aria-label="Help">
+            <t-button @click=${this.share}>Share</t-button>
+            <t-button
+              slot="end"
+              @click=${this.showKeyboardShortcuts}
+              aria-label="Help"
+            >
               ?
             </t-button>
-            <div class="repo-link">
+            <div slot="end" class="repo-link">
               <a href="https://github.com/topaxi/tlang">Source Code</a>
             </div>
-          </div>
+          </t-toolbar>
         </header>
         <main>
           <t-split
