@@ -248,7 +248,7 @@ fn test_codegen_pattern_match_nested_enum() {
             $anf$0 = 0;
         } else if ($tmp$0.tag === Option.None) {
             $anf$0 = 0;
-        }
+        } else $matchError($tmp$0);
         let y = $anf$0;
     "};
     assert_eq!(output, expected_output);

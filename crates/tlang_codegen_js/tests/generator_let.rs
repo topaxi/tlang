@@ -87,7 +87,7 @@ fn test_codegen_if_let() {
             let $tmp$0 = Option.Some(42), x;
             if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
                 return x;
-            }
+            } else $matchError($tmp$0);
         }
     "};
     assert_eq!(output, expected_output);
