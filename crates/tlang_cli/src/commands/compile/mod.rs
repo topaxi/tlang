@@ -130,6 +130,28 @@ fn compile_to_hir(
         std::process::exit(1);
     }
 
+    // Display HIR optimizer warnings (e.g. non-self-referencing tail calls)
+    if show_warnings {
+        let warnings: Vec<_> = ctx
+            .diagnostics
+            .iter()
+            .filter(|d| d.is_warning())
+            .cloned()
+            .collect();
+
+        if !warnings.is_empty() {
+            eprint!(
+                "{}",
+                render_diagnostics(
+                    source_name,
+                    source,
+                    &warnings,
+                    std::io::IsTerminal::is_terminal(&std::io::stderr())
+                )
+            );
+        }
+    }
+
     Ok(module)
 }
 

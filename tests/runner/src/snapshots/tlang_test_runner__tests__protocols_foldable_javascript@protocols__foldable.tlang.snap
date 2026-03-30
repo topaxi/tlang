@@ -5,3 +5,9 @@ expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/protocols/foldable.tlang
 ---
 6
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+   ┌─ [WORKSPACE_ROOT]/tests/protocols/foldable.tlang:13:5
+   │
+13 │     rec foldl(tail, f(acc, head), f)
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

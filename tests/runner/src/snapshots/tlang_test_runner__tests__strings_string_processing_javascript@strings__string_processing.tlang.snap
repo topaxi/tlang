@@ -21,3 +21,15 @@ warning: Unused function `is_alpha/1`
    │
 24 │ fn is_alpha("") { true }
    │    ^^^^^^^^
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+  ┌─ [WORKSPACE_ROOT]/tests/strings/string_processing.tlang:8:5
+  │
+8 │     rec reverse_string(rest, c + acc)
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+   ┌─ [WORKSPACE_ROOT]/tests/strings/string_processing.tlang:20:5
+   │
+20 │     rec count_char(rest, target) 
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

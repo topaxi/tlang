@@ -5,3 +5,9 @@ expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/functions/partial/partial.tlang
 ---
 20
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+  ┌─ [WORKSPACE_ROOT]/tests/functions/partial/partial.tlang:3:32
+  │
+3 │ fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+  │                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^

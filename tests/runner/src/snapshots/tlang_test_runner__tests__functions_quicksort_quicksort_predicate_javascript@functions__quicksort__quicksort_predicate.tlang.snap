@@ -9,3 +9,15 @@ input_file: tests/functions/quicksort/quicksort_predicate.tlang
   4, 3, 3, 2, 1,
   1
 ]
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+   ┌─ [WORKSPACE_ROOT]/tests/functions/quicksort/quicksort_predicate.tlang:10:3
+   │
+10 │   rec partition(xs, predicate, [...satisfies, x], does_not_satisfy)
+   │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+   ┌─ [WORKSPACE_ROOT]/tests/functions/quicksort/quicksort_predicate.tlang:13:3
+   │
+13 │   rec partition(xs, predicate, satisfies, [...does_not_satisfy, x])
+   │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

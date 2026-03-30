@@ -6,3 +6,15 @@ input_file: tests/functions/tco/tco_mutual.tlang
 ---
 true
 false
+
+warning: `rec` call is not self-referencing; tail call optimization is not available in the JavaScript backend
+  ┌─ [WORKSPACE_ROOT]/tests/functions/tco/tco_mutual.tlang:2:16
+  │
+2 │ fn isEven(n) { rec isOdd(n - 1) }
+  │                ^^^^^^^^^^^^^^^^
+
+warning: `rec` call is not self-referencing; tail call optimization is not available in the JavaScript backend
+  ┌─ [WORKSPACE_ROOT]/tests/functions/tco/tco_mutual.tlang:5:15
+  │
+5 │ fn isOdd(n) { rec isEven(n - 1) }
+  │               ^^^^^^^^^^^^^^^^^

@@ -32,3 +32,9 @@ Fibonacci numbers:
 2
 3
 5
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+   ┌─ [WORKSPACE_ROOT]/tests/functions/pattern_matching.tlang:35:28
+   │
+35 │ fn filter([_, ...xs], f) { rec filter(xs, f) }
+   │                            ^^^^^^^^^^^^^^^^^

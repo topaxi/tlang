@@ -6,3 +6,9 @@ input_file: tests/functions/fold/fold.tlang
 ---
 15
 120
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+  ┌─ [WORKSPACE_ROOT]/tests/functions/fold/fold.tlang:3:32
+  │
+3 │ fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+  │                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^

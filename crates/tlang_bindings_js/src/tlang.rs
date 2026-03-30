@@ -121,6 +121,7 @@ pub struct BuildArtifacts {
     parse_result: Option<Result<ast::Module, ParseError>>,
     constant_pool_node_ids: Vec<tlang_span::NodeId>,
     hir: Option<hir::Module>,
+    hir_opt_diagnostics: Vec<tlang_diagnostics::Diagnostic>,
     analyzed: bool,
 }
 
@@ -390,6 +391,7 @@ impl Tlang {
 
             self.interpreter
                 .register_constant_pool_ids(constant_pool_ids);
+            self.build.hir_opt_diagnostics = ctx.diagnostics;
             self.build.hir = Some(module);
         }
     }
@@ -398,6 +400,7 @@ impl Tlang {
     pub fn set_optimizations(&mut self, options: JsOptimizationOptions) {
         self.optimization_options = options;
         self.build.hir = None;
+        self.build.hir_opt_diagnostics.clear();
         self.js = CodegenJS::default();
     }
 
@@ -485,7 +488,12 @@ impl Tlang {
 
     #[wasm_bindgen(js_name = "renderDiagnostics")]
     pub fn render_diagnostics(&mut self) -> String {
-        let diagnostics = self.analyzer.get_diagnostics();
+        let diagnostics: Vec<_> = self
+            .analyzer
+            .get_diagnostics()
+            .into_iter()
+            .chain(self.build.hir_opt_diagnostics.iter().cloned())
+            .collect();
         if diagnostics.is_empty() {
             return String::new();
         }
@@ -498,6 +506,7 @@ impl Tlang {
             .analyzer
             .get_diagnostics()
             .into_iter()
+            .chain(self.build.hir_opt_diagnostics.iter().cloned())
             .filter(|d| d.is_error())
             .collect();
         if diagnostics.is_empty() {
@@ -512,6 +521,7 @@ impl Tlang {
             .analyzer
             .get_diagnostics()
             .into_iter()
+            .chain(self.build.hir_opt_diagnostics.iter().cloned())
             .filter(|d| d.is_warning())
             .collect();
         if diagnostics.is_empty() {
@@ -536,6 +546,7 @@ impl Tlang {
             .analyzer
             .get_diagnostics()
             .iter()
+            .chain(self.build.hir_opt_diagnostics.iter())
             .map(|diagnostic| JsDiagnostic::from(diagnostic.clone()))
             .collect();
         Ok(serde_wasm_bindgen::to_value(&diagnostics)?.unchecked_into())
@@ -549,6 +560,7 @@ impl Tlang {
             .analyzer
             .get_diagnostics()
             .iter()
+            .chain(self.build.hir_opt_diagnostics.iter())
             .map(codemirror::from_tlang_diagnostic)
             .collect::<Vec<_>>();
         let parse_errors = self.parse_issues().iter().map(codemirror::from_parse_issue);

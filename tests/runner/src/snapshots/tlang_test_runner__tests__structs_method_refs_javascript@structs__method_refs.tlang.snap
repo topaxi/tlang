@@ -7,3 +7,9 @@ input_file: tests/structs/method_refs.tlang
 2
 2
 [ 78.53981633974483, 12, 3.141592653589793, 12 ]
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+   ┌─ [WORKSPACE_ROOT]/tests/structs/method_refs.tlang:20:28
+   │
+20 │ fn filter([_, ...xs], f) { rec filter(xs, f) }
+   │                            ^^^^^^^^^^^^^^^^^

@@ -51,3 +51,21 @@ input_file: tests/functions/mandelbrot/mandelbrot.tlang
     0, 0, 15, 5,  3
   ]
 ]
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+  ┌─ [WORKSPACE_ROOT]/tests/functions/mandelbrot/mandelbrot.tlang:2:32
+  │
+2 │ fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+  │                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+  ┌─ [WORKSPACE_ROOT]/tests/functions/mandelbrot/mandelbrot.tlang:9:29
+  │
+9 │ fn range(start, end, acc) { rec range(start + 1, end, [...acc, start]) }
+  │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+   ┌─ [WORKSPACE_ROOT]/tests/functions/mandelbrot/mandelbrot.tlang:17:5
+   │
+17 │     rec mandelbrot(c_real, c_imag, max_iter - 1, new_real, new_imag, iter + 1)
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

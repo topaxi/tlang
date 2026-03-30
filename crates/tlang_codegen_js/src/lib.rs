@@ -15,5 +15,6 @@ mod name_map;
 mod pattern_match_generator;
 mod stmt_generator;
 mod struct_generator;
+pub mod tail_call_self_reference_validation;
 
 pub use error::CodegenError;

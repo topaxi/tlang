@@ -16,6 +16,9 @@ impl Default for JsHirOptimizer {
             // their `res.hir_id()` set — the ANF pass uses HirId identity to
             // detect self-referencing tail calls.
             Box::new(hir_opt::symbol_resolution::SymbolResolution::default()),
+            // Warn about non-self-referencing `rec` calls that the JS backend
+            // cannot compile into loops. Must run after SymbolResolution.
+            Box::new(crate::tail_call_self_reference_validation::TailCallSelfReferenceValidation::default()),
             Box::new(JsAnfTransform::default()),
             Box::new(JsAnfReturnOpt::default()),
             Box::new(BooleanReturnSimplification::default()),

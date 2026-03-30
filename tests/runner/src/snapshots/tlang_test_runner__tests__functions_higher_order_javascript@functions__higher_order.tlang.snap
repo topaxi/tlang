@@ -36,3 +36,15 @@ Predicate filtering:
 [ 6, 7, 8, 9, 10 ]
 Complex function pipeline:
 224
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+  ┌─ [WORKSPACE_ROOT]/tests/functions/higher_order.tlang:7:28
+  │
+7 │ fn filter([_, ...xs], f) { rec filter(xs, f) }
+  │                            ^^^^^^^^^^^^^^^^^
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+   ┌─ [WORKSPACE_ROOT]/tests/functions/higher_order.tlang:10:32
+   │
+10 │ fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+   │                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^

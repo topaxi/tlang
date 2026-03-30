@@ -17,3 +17,15 @@ Empty list sort:
 []
 Single element:
 [ 42 ]
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+  ┌─ [WORKSPACE_ROOT]/tests/algorithms/sorting.tlang:7:28
+  │
+7 │ fn filter([_, ...xs], f) { rec filter(xs, f) }
+  │                            ^^^^^^^^^^^^^^^^^
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+   ┌─ [WORKSPACE_ROOT]/tests/algorithms/sorting.tlang:39:5
+   │
+39 │     rec reverse_helper(xs, [x, ...acc])
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

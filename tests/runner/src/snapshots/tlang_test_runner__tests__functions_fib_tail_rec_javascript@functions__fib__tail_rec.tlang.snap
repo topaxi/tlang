@@ -5,3 +5,9 @@ expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/functions/fib/tail_rec.tlang
 ---
 12586269025
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+  ┌─ [WORKSPACE_ROOT]/tests/functions/fib/tail_rec.tlang:4:19
+  │
+4 │ fn fib(n, a, b) { rec fib(n - 1, b, a + b) }
+  │                   ^^^^^^^^^^^^^^^^^^^^^^^^

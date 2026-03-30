@@ -12,6 +12,7 @@ oxc_sourcemap = { workspace = true }
 oxc_estree = { workspace = true }
 oxc_span = { workspace = true }
 tlang_ast = { path = "../tlang_ast" }
+tlang_diagnostics = { path = "../tlang_diagnostics" }
 tlang_intern = { path = "../tlang_intern" }
 tlang_hir = { path = "../tlang_hir" }
 tlang_hir_opt = { path = "../tlang_hir_opt" }
