@@ -137,7 +137,7 @@ export class DiagnosticsElement extends LitElement {
             ? 'Collapse Diagnostics'
             : 'Expand Diagnostics'}
         >
-          ${this.expanded ? '' : ''}
+          ${this.expanded ? '' : ''}
         </t-toggle-button>
         <span class="toolbar__title">Diagnostics</span>
         ${this.errorCount > 0
@@ -166,11 +166,8 @@ export class DiagnosticsElement extends LitElement {
         ? html`
             <div class="messages" aria-label="Diagnostic messages">
               ${this.messages.map(
-                (msg) => html`
-                  <div class="message message--${msg.severity}">
-                    ${unsafeHTML(msg.html)}
-                  </div>
-                `,
+                // prettier-ignore
+                (msg) => html`<div class="message message--${msg.severity}">${unsafeHTML(msg.html)}</div>`,
               )}
             </div>
           `
