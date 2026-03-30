@@ -54,11 +54,11 @@ export class ConsoleElement extends LitElement {
       min-height: 24em;
     }
 
-    t-console-message[type='group'][indent='0'] {
+    t-console-message[type='group'][indent='0']::part(message) {
       border: none;
     }
 
-    t-console-message[type='group'][indent='0']:not(:first-child) {
+    t-console-message[type='group'][indent='0']:not(:first-child)::part(message) {
       margin-top: 0.5rem;
     }
   `;

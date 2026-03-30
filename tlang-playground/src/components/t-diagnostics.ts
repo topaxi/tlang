@@ -1,6 +1,7 @@
 import { css, html, LitElement, PropertyValueMap } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import './t-message';
 import './t-toggle-button';
 
 export interface DiagnosticMessage {
@@ -55,45 +56,16 @@ export class DiagnosticsElement extends LitElement {
 
     .messages {
       overflow: auto;
+      font-size: 0.875rem;
     }
 
-    .message {
+    t-message {
       padding: 0.5rem 1ch;
-      border-bottom: 1px solid var(--ctp-macchiato-surface0);
-      font-size: 0.875rem;
       white-space: pre-wrap;
     }
 
-    .message:last-child {
+    t-message:last-child {
       border-bottom: none;
-    }
-
-    .message--error {
-      --console-message-color: var(--ctp-macchiato-red);
-      --console-message-border-color: hsl(
-        from var(--ctp-macchiato-red) h s calc(l - 40)
-      );
-      --console-message-background: hsl(
-        from var(--ctp-macchiato-red) h s calc(l - 60)
-      );
-
-      color: var(--console-message-color);
-      background: var(--console-message-background);
-      border-color: var(--console-message-border-color);
-    }
-
-    .message--warning {
-      --console-message-color: var(--ctp-macchiato-yellow);
-      --console-message-border-color: hsl(
-        from var(--ctp-macchiato-yellow) h s calc(l - 40)
-      );
-      --console-message-background: hsl(
-        from var(--ctp-macchiato-yellow) h s calc(l - 60)
-      );
-
-      color: var(--console-message-color);
-      background: var(--console-message-background);
-      border-color: var(--console-message-border-color);
     }
   `;
 
@@ -129,8 +101,8 @@ export class DiagnosticsElement extends LitElement {
     return html`
       <div class="toolbar">
         <t-toggle-button
-          type="collapsable"
-          .pressed=${!this.expanded}
+          type="expandable"
+          .pressed=${this.expanded}
           @click=${this.toggle}
           title=${this.expanded ? 'Collapse Diagnostics' : 'Expand Diagnostics'}
           aria-label=${this.expanded
@@ -141,22 +113,12 @@ export class DiagnosticsElement extends LitElement {
         </t-toggle-button>
         <span class="toolbar__title">Diagnostics</span>
         ${this.errorCount > 0
-          ? html`<span
-              class="severity-count severity-count--error"
-              aria-label="${this.errorCount} ${this.errorCount === 1
-                ? 'error'
-                : 'errors'}"
-            >
+          ? html`<span class="severity-count severity-count--error">
               ${this.errorCount} ${this.errorCount === 1 ? 'error' : 'errors'}
             </span>`
           : null}
         ${this.warningCount > 0
-          ? html`<span
-              class="severity-count severity-count--warning"
-              aria-label="${this.warningCount} ${this.warningCount === 1
-                ? 'warning'
-                : 'warnings'}"
-            >
+          ? html`<span class="severity-count severity-count--warning">
               ${this.warningCount}
               ${this.warningCount === 1 ? 'warning' : 'warnings'}
             </span>`
@@ -164,10 +126,10 @@ export class DiagnosticsElement extends LitElement {
       </div>
       ${this.expanded
         ? html`
-            <div class="messages" aria-label="Diagnostic messages">
+            <div class="messages" role="list" aria-label="Diagnostic messages">
               ${this.messages.map(
                 // prettier-ignore
-                (msg) => html`<div class="message message--${msg.severity}">${unsafeHTML(msg.html)}</div>`,
+                (msg) => html`<t-message role="listitem" severity=${msg.severity}><div>${unsafeHTML(msg.html)}</div></t-message>`,
               )}
             </div>
           `
