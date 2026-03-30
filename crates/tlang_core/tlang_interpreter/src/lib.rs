@@ -480,6 +480,14 @@ impl Interpreter {
 
                 EvalResult::Value(TlangValue::Bool(!state.is_truthy(value)))
             }
+            UnaryOp::BitwiseNot => {
+                let value = eval_value!(state, self.eval_expr(state, expr));
+
+                EvalResult::Value(match value {
+                    TlangValue::I64(v) => TlangValue::I64(!v),
+                    _ => todo!("eval_unary BitwiseNot: incompatible type {:?}", value),
+                })
+            }
             UnaryOp::Rest => unreachable!("Rest operator implemented in eval_list_expr"),
             _ => todo!("eval_unary: {:?}", op),
         }

@@ -28,6 +28,7 @@ pub enum TokenKind {
     // Tokens for special characters
     Ampersand,
     Pipe,
+    Tilde,
     Colon,
     Comma,
     EqualSign,

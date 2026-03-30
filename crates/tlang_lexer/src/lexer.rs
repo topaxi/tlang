@@ -119,6 +119,38 @@ impl<'src> Lexer<'src> {
     fn read_number_literal(&mut self, start_pos: u32, start_lc: LineColumn) -> Token {
         let start_position = self.position;
 
+        // Check for binary literal: 0b... or 0B...
+        if self.current_char == '0' && (self.next_char == 'b' || self.next_char == 'B') {
+            self.advance(); // consume '0'
+            self.advance(); // consume 'b'/'B'
+            let bin_start = self.position;
+            self.advance_while(|ch| ch == '0' || ch == '1' || ch == '_');
+            let bin_slice = &self.source[bin_start..self.position];
+            let digits: String = bin_slice.chars().filter(|&c| c != '_').collect();
+            let value = u64::from_str_radix(&digits, 2).unwrap_or(0);
+            return self.token(
+                TokenKind::Literal(Literal::UnsignedInteger(value)),
+                start_pos,
+                start_lc,
+            );
+        }
+
+        // Check for hex literal: 0x... or 0X...
+        if self.current_char == '0' && (self.next_char == 'x' || self.next_char == 'X') {
+            self.advance(); // consume '0'
+            self.advance(); // consume 'x'/'X'
+            let hex_start = self.position;
+            self.advance_while(|ch| ch.is_ascii_hexdigit() || ch == '_');
+            let hex_slice = &self.source[hex_start..self.position];
+            let digits: String = hex_slice.chars().filter(|&c| c != '_').collect();
+            let value = u64::from_str_radix(&digits, 16).unwrap_or(0);
+            return self.token(
+                TokenKind::Literal(Literal::UnsignedInteger(value)),
+                start_pos,
+                start_lc,
+            );
+        }
+
         self.advance_while(Self::is_number_literal_char);
 
         let slice = &self.source[start_position..self.position];
@@ -728,6 +760,10 @@ impl<'src> Lexer<'src> {
             '^' => {
                 self.advance();
                 self.token(TokenKind::Caret, start_pos, start_lc)
+            }
+            '~' => {
+                self.advance();
+                self.token(TokenKind::Tilde, start_pos, start_lc)
             }
             '|' => {
                 if self.next_char == '|' {

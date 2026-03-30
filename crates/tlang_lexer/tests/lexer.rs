@@ -704,3 +704,66 @@ fn test_triple_quoted_tagged_string_contains_single_quote() {
         vec![TaggedStringPart::Literal("say \"hi\" now".into())]
     );
 }
+
+#[test]
+fn test_binary_literal() {
+    let mut lexer = Lexer::new("0b1010");
+    assert_tokens!(
+        lexer,
+        [TokenKind::Literal(Literal::UnsignedInteger(0b1010))]
+    );
+}
+
+#[test]
+fn test_binary_literal_with_underscores() {
+    let mut lexer = Lexer::new("0b1111_0000");
+    assert_tokens!(
+        lexer,
+        [TokenKind::Literal(Literal::UnsignedInteger(0b1111_0000))]
+    );
+}
+
+#[test]
+fn test_binary_literal_uppercase_prefix() {
+    let mut lexer = Lexer::new("0B00000101");
+    assert_tokens!(
+        lexer,
+        [TokenKind::Literal(Literal::UnsignedInteger(0b00000101))]
+    );
+}
+
+#[test]
+fn test_hex_literal() {
+    let mut lexer = Lexer::new("0xFF");
+    assert_tokens!(lexer, [TokenKind::Literal(Literal::UnsignedInteger(0xFF))]);
+}
+
+#[test]
+fn test_hex_literal_with_underscores() {
+    let mut lexer = Lexer::new("0xFF_00");
+    assert_tokens!(
+        lexer,
+        [TokenKind::Literal(Literal::UnsignedInteger(0xFF00))]
+    );
+}
+
+#[test]
+fn test_hex_literal_uppercase_prefix() {
+    let mut lexer = Lexer::new("0XDeAdBeEf");
+    assert_tokens!(
+        lexer,
+        [TokenKind::Literal(Literal::UnsignedInteger(0xDEADBEEF))]
+    );
+}
+
+#[test]
+fn test_tilde_token() {
+    let mut lexer = Lexer::new("~");
+    assert_tokens!(lexer, [TokenKind::Tilde]);
+}
+
+#[test]
+fn test_tilde_before_identifier() {
+    let mut lexer = Lexer::new("~flags");
+    assert_tokens!(lexer, [TokenKind::Tilde, TokenKind::Identifier]);
+}

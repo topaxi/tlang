@@ -34,6 +34,7 @@ pub(crate) fn map_unary_op(op: &ast::UnaryOp) -> UnaryOperator {
     match op {
         ast::UnaryOp::Not => UnaryOperator::LogicalNot,
         ast::UnaryOp::Minus => UnaryOperator::UnaryNegation,
+        ast::UnaryOp::BitwiseNot => UnaryOperator::BitwiseNot,
         ast::UnaryOp::Spread | ast::UnaryOp::Rest => {
             unreachable!("Spread/Rest are not unary operators")
         }
