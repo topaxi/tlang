@@ -2,10 +2,12 @@ import { LitElement, PropertyValueMap, css, html } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
 import { examples } from './examples';
 import { TlangController } from './controllers/tlang-controller';
+import { type DiagnosticMessage } from './controllers/tlang-controller';
 
 import './components/t-button';
 import './components/t-codemirror';
 import './components/t-console';
+import './components/t-diagnostics';
 import './components/t-hir-pretty';
 import './components/t-live';
 import './components/t-menu';
@@ -254,6 +256,13 @@ export class TlangPlayground extends LitElement {
       display: flex;
     }
 
+    .editor-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex: 1;
+    }
+
     t-codemirror,
     .output-tabs {
       flex: 1;
@@ -300,6 +309,15 @@ export class TlangPlayground extends LitElement {
 
   @state()
   private consoleMessages: ConsoleMessage[] = [];
+
+  @state()
+  private diagnosticMessages: DiagnosticMessage[] = [];
+
+  @state()
+  private diagnosticErrorCount = 0;
+
+  @state()
+  private diagnosticWarningCount = 0;
 
   @state()
   private display: OutputDisplay = defaultDisplay();
@@ -365,7 +383,15 @@ export class TlangPlayground extends LitElement {
 
     if (changedProperties.has('source') || changedProperties.has('runner')) {
       this.tlang.updateTlang(this.source, this.runner);
-      this.codemirror.diagnostics = this.tlang.analyze();
+      const codemirrorDiagnostics = this.tlang.analyze();
+      this.codemirror.diagnostics = codemirrorDiagnostics;
+      this.diagnosticMessages = [...this.tlang.diagnosticMessages];
+      this.diagnosticErrorCount = codemirrorDiagnostics.filter(
+        (d) => d.severity === 'error',
+      ).length;
+      this.diagnosticWarningCount = codemirrorDiagnostics.filter(
+        (d) => d.severity === 'warning',
+      ).length;
       this.consoleMessages = [...this.tlang.consoleMessages];
     }
   }
@@ -607,12 +633,18 @@ export class TlangPlayground extends LitElement {
             class="editor-split"
             direction=${this.desktop ? 'vertical' : 'horizontal'}
           >
-            <t-codemirror
-              slot="first"
-              class="editor"
-              with-diagnostics
-              @source-change=${this.handleSourceChange}
-            ></t-codemirror>
+            <div slot="first" class="editor-panel">
+              <t-codemirror
+                class="editor"
+                with-diagnostics
+                @source-change=${this.handleSourceChange}
+              ></t-codemirror>
+              <t-diagnostics
+                .messages=${this.diagnosticMessages}
+                .errorCount=${this.diagnosticErrorCount}
+                .warningCount=${this.diagnosticWarningCount}
+              ></t-diagnostics>
+            </div>
             <t-split
               slot="second"
               direction="horizontal"
