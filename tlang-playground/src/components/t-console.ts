@@ -58,7 +58,9 @@ export class ConsoleElement extends LitElement {
       border: none;
     }
 
-    t-console-message[type='group'][indent='0']:not(:first-child)::part(message) {
+    t-console-message[type='group'][indent='0']:not(:first-child)::part(
+        message
+      ) {
       margin-top: 0.5rem;
     }
   `;
