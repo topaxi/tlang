@@ -1,6 +1,5 @@
 use tlang_codegen_js::generator::CodegenJS;
-use tlang_codegen_js::js_anf_transform::JsAnfTransform;
-use tlang_codegen_js::js_hir_opt::JsHirOptimizer;
+use tlang_codegen_js::{JsAnfTransform, JsHirOptimizer};
 use tlang_defs::DefKind;
 use tlang_hir_opt::HirPass;
 use tlang_hir_opt::symbol_resolution::SymbolResolution;
@@ -17,6 +16,7 @@ fn before_all() {
 }
 
 pub struct CodegenOptions<'a> {
+    #[allow(unused)]
     pub builtin_symbols: Vec<(&'a str, DefKind)>,
     pub optimize: bool,
 }
@@ -47,6 +47,7 @@ impl<'a> From<Vec<(&'a str, DefKind)>> for CodegenOptions<'a> {
     }
 }
 
+#[allow(unused)]
 pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
     let mut parser = Parser::from_source(source);
     let (mut ast, parse_meta) = match parser.parse() {

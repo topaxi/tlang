@@ -1,20 +1,21 @@
 mod binary_operator_generator;
-pub mod boolean_return_simplification;
 mod builtins;
 mod enum_generator;
 pub mod error;
 mod expr_generator;
 mod function_generator;
 pub mod generator;
+mod hir_passes;
 mod js;
-pub mod js_anf_return_opt;
-pub mod js_anf_transform;
-mod js_boolean_return_simplification;
+pub mod js_boolean_return_simplification;
 pub mod js_hir_opt;
 mod name_map;
 mod pattern_match_generator;
 mod stmt_generator;
 mod struct_generator;
-pub mod tail_call_self_reference_validation;
 
 pub use error::CodegenError;
+pub use hir_passes::{
+    BooleanReturnSimplification, JsAnfReturnOpt, JsAnfTransform, TailCallSelfReferenceValidation,
+};
+pub use js_hir_opt::JsHirOptimizer;

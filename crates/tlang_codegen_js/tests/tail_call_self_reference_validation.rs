@@ -1,7 +1,6 @@
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_codegen_js::js_hir_opt::JsHirOptimizer;
 use tlang_diagnostics::Severity;
-use tlang_hir_opt::HirPass;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 
