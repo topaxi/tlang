@@ -5,6 +5,8 @@ import { DiagnosticHtml } from '../utils/ansi-to-html';
 import './t-button';
 import './t-menu';
 import './t-toggle-button';
+import './t-message';
+import type { MessageSeverity } from './t-message';
 
 function stringify(value: unknown) {
   function bigintToJSON(n: bigint) {
@@ -32,42 +34,11 @@ export interface ConsoleMessage {
 export class ConsoleMessageElement extends LitElement {
   static override styles = css`
     :host {
-      display: flex;
-      position: relative;
-      margin-top: -1px;
+      display: contents;
+    }
+
+    t-message {
       padding-left: 1ch;
-
-      --console-message-color: var(--ctp-macchiato-text);
-      --console-message-border-color: var(--ctp-macchiato-surface0);
-
-      color: var(--console-message-color);
-      background: var(--console-message-background);
-      border-top: 1px solid var(--console-message-border-color);
-      border-bottom: 1px solid var(--console-message-border-color);
-    }
-
-    :host([type='warn']) {
-      --console-message-color: var(--ctp-macchiato-yellow);
-
-      --console-message-border-color: hsl(
-        from var(--ctp-macchiato-yellow) h s calc(l - 40)
-      );
-
-      --console-message-background: hsl(
-        from var(--ctp-macchiato-yellow) h s calc(l - 60)
-      );
-    }
-
-    :host([type='error']) {
-      --console-message-color: var(--ctp-macchiato-red);
-
-      --console-message-border-color: hsl(
-        from var(--ctp-macchiato-red) h s calc(l - 40)
-      );
-
-      --console-message-background: hsl(
-        from var(--ctp-macchiato-red) h s calc(l - 60)
-      );
     }
 
     [part='timestamp'] {
@@ -143,6 +114,12 @@ export class ConsoleMessageElement extends LitElement {
 
   @property({ type: Boolean })
   forceIcon = false;
+
+  private get severity(): MessageSeverity {
+    if (this.type === 'error') return 'error';
+    if (this.type === 'warn') return 'warning';
+    return 'log';
+  }
 
   private collapse() {
     this.dispatchEvent(
@@ -248,7 +225,8 @@ export class ConsoleMessageElement extends LitElement {
       `;
     }
 
-    return rendered;
+    // prettier-ignore
+    return html`<t-message part="message" severity=${this.severity}>${rendered}</t-message>`;
   }
 }
 

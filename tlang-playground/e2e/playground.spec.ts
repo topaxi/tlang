@@ -127,8 +127,11 @@ test.describe('Tlang Playground', () => {
     );
 
     // Expected output from the email-validation section.
+    // t-console-message uses display:contents, so check the t-message child.
     const messages = page.locator('t-console-message[type="log"]');
-    await expect(messages.filter({ hasText: 'true' }).first()).toBeVisible();
+    await expect(
+      messages.filter({ hasText: 'true' }).first().locator('t-message'),
+    ).toBeVisible();
   });
 
   test('can toggle constant folding optimization', async ({ page }) => {
@@ -148,91 +151,161 @@ test.describe('Tlang Playground', () => {
   });
 });
 
-test.describe('Diagnostics in console', () => {
-  test('semantic error appears exactly once in the console', async ({
+test.describe('Diagnostics panel', () => {
+  test('diagnostics panel is hidden when there are no diagnostics', async ({
+    page,
+  }) => {
+    // Default example should have no diagnostics (or at least no errors)
+    await gotoPlayground(page);
+    // t-diagnostics should either not exist or be hidden
+    const panel = page.locator('t-diagnostics');
+    // The hidden attribute is set when there are no messages
+    await expect(panel).toHaveJSProperty('hidden', true);
+  });
+
+  test('diagnostics panel is visible when there are errors', async ({
     page,
   }) => {
     // Source: `missing_var;` — triggers "Use of undeclared variable" error
     await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
 
-    await expect(page.locator('t-console-message[type="error"]')).toHaveCount(
-      1,
-    );
+    const panel = page.locator('t-diagnostics');
+    await expect(panel).toHaveJSProperty('hidden', false);
   });
 
-  test('parse error appears exactly once in the console', async ({ page }) => {
-    // Source: `let x = ;` — triggers a parse error
-    await gotoPlayground(page, '#source=DYUwLgBAHhC8EG4g');
-
-    await expect(page.locator('t-console-message[type="error"]')).toHaveCount(
-      1,
-    );
-  });
-
-  test('warning appears as warn, not error, in the console', async ({
+  test('diagnostics panel is visible when there are warnings', async ({
     page,
   }) => {
     // Source: `let x = 42;` — triggers "Unused variable" warning only
     await gotoPlayground(page, '#source=DYUwLgBAHhC8EBYBMBuIA');
 
-    await expect(page.locator('t-console-message[type="warn"]')).toHaveCount(1);
+    const panel = page.locator('t-diagnostics');
+    await expect(panel).toHaveJSProperty('hidden', false);
+  });
+
+  test('diagnostics panel shows error count', async ({ page }) => {
+    // Source: `missing_var;` — triggers "Use of undeclared variable" error
+    await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
+
+    const panel = page.locator('t-diagnostics');
+    await expect(panel.locator('.severity-count--error')).toContainText(
+      'error',
+    );
+  });
+
+  test('diagnostics panel shows warning count', async ({ page }) => {
+    // Source: `let x = 42;` — triggers "Unused variable" warning only
+    await gotoPlayground(page, '#source=DYUwLgBAHhC8EBYBMBuIA');
+
+    const panel = page.locator('t-diagnostics');
+    await expect(panel.locator('.severity-count--warning')).toContainText(
+      'warning',
+    );
+  });
+
+  test('diagnostics panel is collapsed by default', async ({ page }) => {
+    // Source: `missing_var;` — triggers "Use of undeclared variable" error
+    await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
+
+    const panel = page.locator('t-diagnostics');
+    // The messages container should not be visible when collapsed
+    await expect(panel.locator('.messages')).not.toBeVisible();
+  });
+
+  test('diagnostics panel can be expanded with toggle button', async ({
+    page,
+  }) => {
+    // Source: `missing_var;` — triggers "Use of undeclared variable" error
+    await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
+
+    const panel = page.locator('t-diagnostics');
+    await panel.getByLabel('Expand Diagnostics').click();
+
+    // Messages should now be visible
+    await expect(panel.locator('.messages')).toBeVisible();
+  });
+
+  test('diagnostics panel can be collapsed after expanding', async ({
+    page,
+  }) => {
+    // Source: `missing_var;` — triggers "Use of undeclared variable" error
+    await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
+
+    const panel = page.locator('t-diagnostics');
+    await panel.getByLabel('Expand Diagnostics').click();
+    await expect(panel.locator('.messages')).toBeVisible();
+
+    await panel.getByLabel('Collapse Diagnostics').click();
+    await expect(panel.locator('.messages')).not.toBeVisible();
+  });
+
+  test('semantic error is rendered as HTML in diagnostics panel, not ANSI codes', async ({
+    page,
+  }) => {
+    // Source: `missing_var;` — triggers "Use of undeclared variable" error
+    await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
+
+    const panel = page.locator('t-diagnostics');
+    await panel.getByLabel('Expand Diagnostics').click();
+
+    const message = panel.locator('t-message[severity="error"]');
+    await expect(message).toBeVisible();
+
+    // Should contain styled spans from ansiToHtml
+    const styledSpan = message.locator('span[style]');
+    await expect(styledSpan).not.toHaveCount(0);
+
+    // ANSI escape codes must NOT be present
+    const textContent = await message.textContent();
+    expect(textContent).not.toContain('\x1b[');
+  });
+
+  test('warning is rendered as HTML in diagnostics panel, not ANSI codes', async ({
+    page,
+  }) => {
+    // Source: `let x = 42;` — triggers "Unused variable" warning only
+    await gotoPlayground(page, '#source=DYUwLgBAHhC8EBYBMBuIA');
+
+    const panel = page.locator('t-diagnostics');
+    await panel.getByLabel('Expand Diagnostics').click();
+
+    const message = panel.locator('t-message[severity="warning"]');
+    await expect(message).toBeVisible();
+
+    // Should contain styled spans from ansiToHtml
+    const styledSpan = message.locator('span[style]');
+    await expect(styledSpan).not.toHaveCount(0);
+
+    // ANSI escape codes must NOT be present
+    const textContent = await message.textContent();
+    expect(textContent).not.toContain('\x1b[');
+  });
+
+  test('parse error is shown in diagnostics panel', async ({ page }) => {
+    // Source: `let x = ;` — triggers a parse error
+    await gotoPlayground(page, '#source=DYUwLgBAHhC8EG4g');
+
+    const panel = page.locator('t-diagnostics');
+    await expect(panel).toHaveJSProperty('hidden', false);
+    await expect(panel.locator('.severity-count--error')).toBeVisible();
+  });
+
+  test('diagnostics do not appear in the console', async ({ page }) => {
+    // Source: `missing_var;` — triggers "Use of undeclared variable" error
+    await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
+
+    // Console should have no error or warn messages from diagnostics
     await expect(page.locator('t-console-message[type="error"]')).toHaveCount(
       0,
     );
+    await expect(page.locator('t-console-message[type="warn"]')).toHaveCount(0);
   });
 
-  test('semantic error diagnostic is rendered as HTML, not ANSI escape codes', async ({
-    page,
-  }) => {
-    // Source: `missing_var;` — triggers "Use of undeclared variable" error
-    await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
-
-    const errorMessage = page.locator('t-console-message[type="error"]');
-    await expect(errorMessage).toHaveCount(1);
-
-    // The diagnostic should contain styled <span> elements from ansiToHtml
-    const styledSpan = errorMessage.locator('span[style]');
-    await expect(styledSpan).not.toHaveCount(0);
-
-    // ANSI escape codes (ESC [ ... m) must NOT be present in the rendered text
-    const textContent = await errorMessage.textContent();
-    expect(textContent).not.toContain('\x1b[');
-  });
-
-  test('parse error diagnostic is rendered as HTML, not ANSI escape codes', async ({
-    page,
-  }) => {
-    // Source: `let x = ;` — triggers a parse error
-    await gotoPlayground(page, '#source=DYUwLgBAHhC8EG4g');
-
-    const errorMessage = page.locator('t-console-message[type="error"]');
-    await expect(errorMessage).toHaveCount(1);
-
-    // The diagnostic should contain styled <span> elements from ansiToHtml
-    const styledSpan = errorMessage.locator('span[style]');
-    await expect(styledSpan).not.toHaveCount(0);
-
-    // ANSI escape codes (ESC [ ... m) must NOT be present in the rendered text
-    const textContent = await errorMessage.textContent();
-    expect(textContent).not.toContain('\x1b[');
-  });
-
-  test('warning diagnostic is rendered as HTML, not ANSI escape codes', async ({
-    page,
-  }) => {
+  test('warnings do not appear in the console', async ({ page }) => {
     // Source: `let x = 42;` — triggers "Unused variable" warning only
     await gotoPlayground(page, '#source=DYUwLgBAHhC8EBYBMBuIA');
 
-    const warnMessage = page.locator('t-console-message[type="warn"]');
-    await expect(warnMessage).toHaveCount(1);
-
-    // The diagnostic should contain styled <span> elements from ansiToHtml
-    const styledSpan = warnMessage.locator('span[style]');
-    await expect(styledSpan).not.toHaveCount(0);
-
-    // ANSI escape codes (ESC [ ... m) must NOT be present in the rendered text
-    const textContent = await warnMessage.textContent();
-    expect(textContent).not.toContain('\x1b[');
+    await expect(page.locator('t-console-message[type="warn"]')).toHaveCount(0);
   });
 });
 

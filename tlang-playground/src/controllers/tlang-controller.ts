@@ -7,12 +7,15 @@ import {
   type Runner,
 } from '../tlang';
 import { ConsoleMessage, createConsoleMessage } from '../components/t-console';
+import { type DiagnosticMessage } from '../components/t-diagnostics';
 import {
   type ParsedSourceMap,
   parseSourceMap,
   remapStack,
 } from '../utils/source-map';
-import { ansiToHtml, DiagnosticHtml } from '../utils/ansi-to-html';
+import { ansiToHtml } from '../utils/ansi-to-html';
+
+export type { DiagnosticMessage };
 
 type CodemirrorSeverity = 'hint' | 'info' | 'warning' | 'error';
 
@@ -30,6 +33,7 @@ export interface LocalDiagnostic {
 export class TlangController {
   private tlang: Tlang;
   consoleMessages: ConsoleMessage[] = [];
+  diagnosticMessages: DiagnosticMessage[] = [];
   private readonly tlangConsole = {
     log: (...args: unknown[]) => this.logToConsole('log', ...args),
     warn: (...args: unknown[]) => this.logToConsole('warn', ...args),
@@ -99,28 +103,30 @@ export class TlangController {
   analyze(): CodemirrorDiagnostic[] {
     this.tlang.analyze();
 
+    this.diagnosticMessages = [];
+
     const renderedParseErrors = this.tlang.renderParseErrors();
     if (renderedParseErrors) {
-      this.logToConsole(
-        'error',
-        new DiagnosticHtml(ansiToHtml(renderedParseErrors)),
-      );
+      this.diagnosticMessages.push({
+        severity: 'error',
+        html: ansiToHtml(renderedParseErrors),
+      });
     }
 
     const renderedErrors = this.tlang.renderErrorDiagnostics();
     if (renderedErrors) {
-      this.logToConsole(
-        'error',
-        new DiagnosticHtml(ansiToHtml(renderedErrors)),
-      );
+      this.diagnosticMessages.push({
+        severity: 'error',
+        html: ansiToHtml(renderedErrors),
+      });
     }
 
     const renderedWarnings = this.tlang.renderWarningDiagnostics();
     if (renderedWarnings) {
-      this.logToConsole(
-        'warn',
-        new DiagnosticHtml(ansiToHtml(renderedWarnings)),
-      );
+      this.diagnosticMessages.push({
+        severity: 'warning',
+        html: ansiToHtml(renderedWarnings),
+      });
     }
 
     return this.tlang.getCodemirrorDiagnostics();
