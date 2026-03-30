@@ -49,6 +49,13 @@ impl<'a> From<Vec<(&'a str, DefKind)>> for CodegenOptions<'a> {
 
 #[allow(unused)]
 pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
+    compile_src_with_warnings(source, options).0
+}
+
+pub fn compile_src_with_warnings(
+    source: &str,
+    options: &CodegenOptions,
+) -> (String, Vec<tlang_codegen_js::CodegenWarning>) {
     let mut parser = Parser::from_source(source);
     let (mut ast, parse_meta) = match parser.parse() {
         Ok(result) => result,
@@ -93,7 +100,8 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
             codegen
                 .generate_code(&module)
                 .expect("codegen should succeed");
-            codegen.get_output().to_string()
+            let warnings = codegen.get_warnings().to_vec();
+            (codegen.get_output().to_string(), warnings)
         }
         Err(diagnostics) => panic!("{diagnostics:#?}"),
     }
@@ -103,4 +111,10 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
 macro_rules! compile {
     ($source:expr) => {{ $crate::common::compile_src($source, &Default::default()) }};
     ($source:expr, $options:expr) => {{ $crate::common::compile_src($source, &$options.into()) }};
+}
+
+#[macro_export]
+macro_rules! compile_with_warnings {
+    ($source:expr) => {{ $crate::common::compile_src_with_warnings($source, &Default::default()) }};
+    ($source:expr, $options:expr) => {{ $crate::common::compile_src_with_warnings($source, &$options.into()) }};
 }

@@ -8,7 +8,10 @@ impl CompileTarget for HirRawTarget {
         &self,
         _source: &str,
         module: &mut tlang_hir::Module,
-    ) -> Result<String, Vec<Diagnostic>> {
-        Ok(ron::ser::to_string_pretty(module, ron::ser::PrettyConfig::default()).unwrap())
+    ) -> Result<(String, Vec<Diagnostic>), Vec<Diagnostic>> {
+        Ok((
+            ron::ser::to_string_pretty(module, ron::ser::PrettyConfig::default()).unwrap(),
+            Vec::new(),
+        ))
     }
 }

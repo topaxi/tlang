@@ -76,11 +76,22 @@ impl<'a> InnerCodegen<'a> {
                         let variant_js = format!("{enum_js}.{}", variant.name.as_str());
                         self.name_map.register_exact(variant.hir_id, &variant_js);
                     }
-                    // Track discriminant enum variants for pattern-match strategy selection.
+                    // Track discriminant enum variants for pattern-match strategy selection
+                    // and for multi-enum overlap detection.
                     if decl.is_discriminant_enum() {
+                        let mut variant_literals = Vec::new();
                         for variant in &decl.variants {
                             self.discriminant_variant_hir_ids.insert(variant.hir_id);
+                            self.variant_to_enum.insert(variant.hir_id, decl.hir_id);
+                            // Collect literal discriminant values for overlap detection.
+                            if let Some(discriminant) = &variant.discriminant
+                                && let hir::ExprKind::Literal(lit) = &discriminant.kind
+                            {
+                                variant_literals.push((variant.name.to_string(), **lit));
+                            }
                         }
+                        self.discriminant_enum_info
+                            .insert(decl.hir_id, (decl.name.to_string(), variant_literals));
                     }
                 }
                 _ => {}

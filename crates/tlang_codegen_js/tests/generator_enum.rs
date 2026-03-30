@@ -334,3 +334,95 @@ fn test_discriminant_enum_pattern_matching() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_discriminant_enum_no_warning_single_enum() {
+    let (_output, warnings) = compile_with_warnings!(indoc! {"
+        enum HttpStatus {
+            Ok = 200,
+            NotFound = 404,
+        }
+
+        fn describe(status) {
+            match status {
+                HttpStatus::Ok => \"OK\",
+                HttpStatus::NotFound => \"Not Found\",
+                _ => \"Unknown\",
+            }
+        }
+    "});
+    assert!(
+        warnings.is_empty(),
+        "Expected no warnings for single discriminant enum match, got: {warnings:?}"
+    );
+}
+
+#[test]
+fn test_discriminant_enum_no_warning_disjoint_values() {
+    // Two enums with disjoint values should NOT produce a warning.
+    let (_output, warnings) = compile_with_warnings!(indoc! {"
+        enum A {
+            a = 1,
+            b = 2,
+        }
+
+        enum B {
+            c = 10,
+            d = 20,
+        }
+
+        fn describe(x) {
+            match x {
+                A::a => \"A::a\",
+                A::b => \"A::b\",
+                B::c => \"B::c\",
+                B::d => \"B::d\",
+                _ => \"Unknown\",
+            }
+        }
+    "});
+    assert!(
+        warnings.is_empty(),
+        "Expected no warnings for disjoint discriminant enum values, got: {warnings:?}"
+    );
+}
+
+#[test]
+fn test_discriminant_enum_warning_overlapping_values() {
+    // Two enums with overlapping values SHOULD produce a warning.
+    let (_output, warnings) = compile_with_warnings!(indoc! {"
+        enum A {
+            a = 1,
+            b = 2,
+        }
+
+        enum B {
+            c = 1,
+            d = 3,
+        }
+
+        fn describe(x) {
+            match x {
+                A::a => \"A::a\",
+                A::b => \"A::b\",
+                B::c => \"B::c\",
+                B::d => \"B::d\",
+                _ => \"Unknown\",
+            }
+        }
+    "});
+    assert_eq!(
+        warnings.len(),
+        1,
+        "Expected exactly one warning for overlapping discriminant enum values"
+    );
+    let msg = &warnings[0].message;
+    assert!(
+        msg.contains("A") && msg.contains("B"),
+        "Warning should mention both enum names, got: {msg}"
+    );
+    assert!(
+        msg.contains("A::a") && msg.contains("B::c"),
+        "Warning should mention overlapping variants, got: {msg}"
+    );
+}

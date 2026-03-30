@@ -7,8 +7,8 @@ use std::{
 };
 
 use output::{
-    CompileTarget, ast::AstTarget, codegen_errors_to_diagnostics, hir::HirTarget,
-    hir_raw::HirRawTarget, js::JsTarget,
+    CompileTarget, ast::AstTarget, codegen_errors_to_diagnostics, codegen_warnings_to_diagnostics,
+    hir::HirTarget, hir_raw::HirRawTarget, js::JsTarget,
 };
 use tlang_ast_lowering::lower_to_hir;
 use tlang_codegen_js::{
@@ -245,7 +245,9 @@ fn compile_source(
                             .generate_code_with_source_map(&module, &source_name, source)
                             .map_err(codegen_errors_to_diagnostics)?;
                         pending_source_map = generator.get_source_map_json();
-                        Ok(generator.get_output().to_string())
+                        let warnings =
+                            codegen_warnings_to_diagnostics(generator.get_warnings().to_vec());
+                        Ok((generator.get_output().to_string(), warnings))
                     } else {
                         JsTarget.compile(source, &mut module)
                     }
@@ -258,7 +260,20 @@ fn compile_source(
         }
     };
 
-    let output = output_result?;
+    let (output, codegen_warnings) = output_result?;
+
+    // Display codegen warnings (unless suppressed).
+    if !options.quiet_warnings && !codegen_warnings.is_empty() {
+        eprint!(
+            "{}",
+            render_diagnostics(
+                &source_name,
+                source,
+                &codegen_warnings,
+                std::io::IsTerminal::is_terminal(&std::io::stderr()),
+            )
+        );
+    }
 
     let output = if matches!(
         (&options.target, &options.output_format),
