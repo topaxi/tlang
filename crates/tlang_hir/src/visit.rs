@@ -117,6 +117,7 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
                 visitor.visit_ty(&mut field.ty, ctx);
             }
             for const_item in &mut decl.consts {
+                visitor.visit_ty(&mut const_item.ty, ctx);
                 visitor.visit_expr(&mut const_item.value, ctx);
             }
         }
@@ -130,6 +131,7 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
                 }
             }
             for const_item in &mut decl.consts {
+                visitor.visit_ty(&mut const_item.ty, ctx);
                 visitor.visit_expr(&mut const_item.value, ctx);
             }
         }
@@ -142,6 +144,7 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
                 visitor.visit_ident(&mut method.name, ctx);
             }
             for const_item in &mut decl.consts {
+                visitor.visit_ty(&mut const_item.ty, ctx);
                 visitor.visit_expr(&mut const_item.value, ctx);
             }
         }

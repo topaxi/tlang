@@ -8,6 +8,3 @@ input_file: tests/consts/struct_const.tlang
 30
 3
 12.56636
-
-[TIMESTAMP] WARN  tlang_hir_opt::symbol_resolution::identifier_resolver] No type declaration found for type path 'Float' on line 28.
-[TIMESTAMP] WARN  tlang_hir_opt::symbol_resolution::identifier_resolver] No type declaration found for type path 'Float' on line 28.

@@ -350,8 +350,9 @@ fn collect_import_symbols(
                 if name == &resolved_sym.original_name {
                     import_symbols.push((local_name.clone(), *kind));
 
-                    // Auto-import child symbols for enums (variants) and protocols (methods)
-                    if matches!(kind, DefKind::Enum | DefKind::Protocol) {
+                    // Auto-import child symbols for enums (variants + consts),
+                    // structs (consts), and protocols (methods + consts)
+                    if matches!(kind, DefKind::Enum | DefKind::Protocol | DefKind::Struct) {
                         let prefix = format!("{}::", resolved_sym.original_name);
                         for (child_name, child_kind) in exports {
                             if child_name.starts_with(&prefix) {

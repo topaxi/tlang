@@ -9,6 +9,7 @@ use tlang_hir::HirId;
 use crate::builtins;
 use crate::error::CodegenError;
 use crate::generator::{CodegenJS, InnerCodegen};
+use crate::js;
 
 impl<'a> InnerCodegen<'a> {
     pub fn generate_stmts(&mut self, stmts: &[hir::Stmt]) -> Vec<Statement<'a>> {
@@ -64,9 +65,6 @@ impl<'a> InnerCodegen<'a> {
                 hir::StmtKind::StructDeclaration(decl) if !self.name_map.has(decl.hir_id) => {
                     self.name_map
                         .register_local(decl.hir_id, decl.name.as_str());
-                    // Register const items so that `StructName::CONST` path
-                    // references resolve correctly.
-                    self.register_type_const_item_names(&decl.consts);
                 }
                 hir::StmtKind::EnumDeclaration(decl) if !self.name_map.has(decl.hir_id) => {
                     let enum_js = self
@@ -81,7 +79,6 @@ impl<'a> InnerCodegen<'a> {
                     }
                     // Register const items so that `EnumName::CONST` path
                     // references resolve correctly.
-                    self.register_type_const_item_names(&decl.consts);
                     // Track discriminant enum variants for pattern-match strategy selection
                     // and for multi-enum overlap detection.
                     if decl.is_discriminant_enum() {
@@ -111,35 +108,28 @@ impl<'a> InnerCodegen<'a> {
         }
     }
 
-    /// Pre-register const item names for a type definition (struct, enum, or
-    /// protocol) so that `TypeName::CONST` path references resolve correctly
-    /// during code generation.
-    fn register_type_const_item_names(&mut self, consts: &[hir::ConstItem]) {
-        for const_item in consts {
-            if !self.name_map.has(const_item.hir_id) {
-                self.name_map
-                    .register_local(const_item.hir_id, const_item.name.as_str());
-            }
-        }
-    }
-
+    /// Generate property assignments for const items of a type definition
+    /// (struct, enum, or protocol). These are emitted as `TypeName.CONST = value;`
+    /// so that `TypeName::CONST` → `TypeName.CONST` member access works at runtime.
     fn generate_type_const_items(
         &mut self,
-        _type_name: &str,
+        type_name: &str,
         consts: &[hir::ConstItem],
     ) -> Vec<Statement<'a>> {
+        let type_js_name = self
+            .name_map
+            .resolve_by_name(type_name)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| js::safe_js_variable_name(type_name));
+
         consts
             .iter()
-            .flat_map(|const_item| {
+            .map(|const_item| {
                 let init = self.generate_expr(&const_item.value);
-                // Use the pre-registered name, or register now if not pre-registered.
-                let js_name = if let Some(name) = self.name_map.resolve(const_item.hir_id) {
-                    name.to_string()
-                } else {
-                    self.name_map
-                        .register(const_item.hir_id, const_item.name.as_str())
-                };
-                vec![self.const_decl(&js_name, init)]
+                let const_name = const_item.name.as_str();
+                let target =
+                    self.assignment_target_member(self.ident_expr(&type_js_name), const_name);
+                self.expr_stmt(self.assign_expr(target, init))
             })
             .collect()
     }

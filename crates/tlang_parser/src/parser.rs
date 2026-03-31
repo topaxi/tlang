@@ -410,12 +410,21 @@ impl<'src> Parser<'src> {
         node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span)
     }
 
-    fn parse_item_visibility(&mut self) -> Visibility {
-        if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Pub)) {
-            self.advance();
-            Visibility::Public
+    /// Check if the current position is at a `const` or `pub const` item.
+    /// Returns `Some(visibility)` if so, `None` otherwise.
+    fn try_parse_const_item_visibility(&mut self) -> Option<Visibility> {
+        if matches!(
+            self.current_token_kind(),
+            TokenKind::Keyword(Keyword::Const)
+        ) {
+            Some(Visibility::Private)
+        } else if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Pub))
+            && matches!(self.peek_token_kind(), TokenKind::Keyword(Keyword::Const))
+        {
+            self.advance(); // consume `pub`
+            Some(Visibility::Public)
         } else {
-            Visibility::Private
+            None
         }
     }
 
@@ -453,12 +462,7 @@ impl<'src> Parser<'src> {
         let mut fields = Vec::with_capacity(2);
         let mut consts = Vec::new();
         while self.not_at_closing(TokenKind::RBrace) {
-            let item_visibility = self.parse_item_visibility();
-
-            if matches!(
-                self.current_token_kind(),
-                TokenKind::Keyword(Keyword::Const)
-            ) {
+            if let Some(item_visibility) = self.try_parse_const_item_visibility() {
                 consts.push(self.parse_const_item(item_visibility));
             } else {
                 fields.push(self.parse_struct_field());
@@ -499,12 +503,7 @@ impl<'src> Parser<'src> {
         let mut variants = Vec::with_capacity(2);
         let mut consts = Vec::new();
         while self.not_at_closing(TokenKind::RBrace) {
-            let item_visibility = self.parse_item_visibility();
-
-            if matches!(
-                self.current_token_kind(),
-                TokenKind::Keyword(Keyword::Const)
-            ) {
+            if let Some(item_visibility) = self.try_parse_const_item_visibility() {
                 consts.push(self.parse_const_item(item_visibility));
             } else {
                 variants.push(self.parse_enum_variant());
@@ -622,12 +621,7 @@ impl<'src> Parser<'src> {
         let mut methods = Vec::new();
         let mut consts = Vec::new();
         while self.not_at_closing(TokenKind::RBrace) {
-            let item_visibility = self.parse_item_visibility();
-
-            if matches!(
-                self.current_token_kind(),
-                TokenKind::Keyword(Keyword::Const)
-            ) {
+            if let Some(item_visibility) = self.try_parse_const_item_visibility() {
                 consts.push(self.parse_const_item(item_visibility));
             } else {
                 methods.push(self.parse_protocol_method_signature());

@@ -239,6 +239,10 @@ pub fn walk_stmt<'ast, V: Visitor<'ast>>(
             for method in &decl.methods {
                 visitor.visit_ident(&method.name, ctx);
             }
+            for const_decl in &decl.consts {
+                visitor.visit_ident(&const_decl.name, ctx);
+                visitor.visit_expr(&const_decl.expression, ctx);
+            }
         }
         node::StmtKind::ImplBlock(impl_block) => {
             for decl in &impl_block.methods {
@@ -258,6 +262,11 @@ pub fn walk_enum_decl<'ast, V: Visitor<'ast>>(
 
     for variant in &decl.variants {
         visitor.visit_variant(variant, ctx);
+    }
+
+    for const_decl in &decl.consts {
+        visitor.visit_ident(&const_decl.name, ctx);
+        visitor.visit_expr(&const_decl.expression, ctx);
     }
 }
 
