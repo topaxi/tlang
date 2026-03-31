@@ -66,12 +66,7 @@ impl<'a> InnerCodegen<'a> {
                         .register_local(decl.hir_id, decl.name.as_str());
                     // Register const items so that `StructName::CONST` path
                     // references resolve correctly.
-                    for const_item in &decl.consts {
-                        if !self.name_map.has(const_item.hir_id) {
-                            self.name_map
-                                .register_local(const_item.hir_id, const_item.name.as_str());
-                        }
-                    }
+                    self.register_type_const_item_names(&decl.consts);
                 }
                 hir::StmtKind::EnumDeclaration(decl) if !self.name_map.has(decl.hir_id) => {
                     let enum_js = self
@@ -86,12 +81,7 @@ impl<'a> InnerCodegen<'a> {
                     }
                     // Register const items so that `EnumName::CONST` path
                     // references resolve correctly.
-                    for const_item in &decl.consts {
-                        if !self.name_map.has(const_item.hir_id) {
-                            self.name_map
-                                .register_local(const_item.hir_id, const_item.name.as_str());
-                        }
-                    }
+                    self.register_type_const_item_names(&decl.consts);
                     // Track discriminant enum variants for pattern-match strategy selection
                     // and for multi-enum overlap detection.
                     if decl.is_discriminant_enum() {
@@ -121,9 +111,18 @@ impl<'a> InnerCodegen<'a> {
         }
     }
 
-    /// Generate JS `const` declarations for const items associated with a
-    /// type definition (struct, enum, or protocol). These items are accessed
-    /// via path resolution (e.g., `Three::THREE`).
+    /// Pre-register const item names for a type definition (struct, enum, or
+    /// protocol) so that `TypeName::CONST` path references resolve correctly
+    /// during code generation.
+    fn register_type_const_item_names(&mut self, consts: &[hir::ConstItem]) {
+        for const_item in consts {
+            if !self.name_map.has(const_item.hir_id) {
+                self.name_map
+                    .register_local(const_item.hir_id, const_item.name.as_str());
+            }
+        }
+    }
+
     fn generate_type_const_items(
         &mut self,
         _type_name: &str,

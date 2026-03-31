@@ -410,6 +410,42 @@ impl<'src> Parser<'src> {
         node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span)
     }
 
+    fn parse_item_visibility(&mut self) -> Visibility {
+        if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Pub)) {
+            self.advance();
+            Visibility::Public
+        } else {
+            Visibility::Private
+        }
+    }
+
+    fn parse_const_item(&mut self, item_visibility: Visibility) -> ConstDeclaration {
+        let mut span = self.create_span_from_current_token();
+        self.consume_keyword_token(Keyword::Const);
+        let const_name = self.parse_identifier();
+        let type_annotation = match self.current_token_kind() {
+            TokenKind::Colon => {
+                self.advance();
+                self.parse_optional_type_annotation()
+            }
+            _ => None,
+        };
+        self.consume_token(TokenKind::EqualSign);
+        let expression = self.parse_expression();
+        self.end_span_from_previous_token(&mut span);
+        if matches!(self.current_token_kind(), TokenKind::Semicolon) {
+            self.advance();
+        }
+        ConstDeclaration {
+            id: self.unique_id(),
+            visibility: item_visibility,
+            name: const_name,
+            expression,
+            type_annotation,
+            span,
+        }
+    }
+
     fn parse_struct_declaration(&mut self, visibility: Visibility) -> Stmt {
         self.consume_keyword_token(Keyword::Struct);
         let name = self.parse_identifier();
@@ -417,42 +453,13 @@ impl<'src> Parser<'src> {
         let mut fields = Vec::with_capacity(2);
         let mut consts = Vec::new();
         while self.not_at_closing(TokenKind::RBrace) {
-            let item_visibility =
-                if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Pub)) {
-                    self.advance();
-                    Visibility::Public
-                } else {
-                    Visibility::Private
-                };
+            let item_visibility = self.parse_item_visibility();
 
             if matches!(
                 self.current_token_kind(),
                 TokenKind::Keyword(Keyword::Const)
             ) {
-                let mut span = self.create_span_from_current_token();
-                self.consume_keyword_token(Keyword::Const);
-                let const_name = self.parse_identifier();
-                let type_annotation = match self.current_token_kind() {
-                    TokenKind::Colon => {
-                        self.advance();
-                        self.parse_optional_type_annotation()
-                    }
-                    _ => None,
-                };
-                self.consume_token(TokenKind::EqualSign);
-                let expression = self.parse_expression();
-                self.end_span_from_previous_token(&mut span);
-                consts.push(ConstDeclaration {
-                    id: self.unique_id(),
-                    visibility: item_visibility,
-                    name: const_name,
-                    expression,
-                    type_annotation,
-                    span,
-                });
-                if matches!(self.current_token_kind(), TokenKind::Semicolon) {
-                    self.advance();
-                }
+                consts.push(self.parse_const_item(item_visibility));
             } else {
                 fields.push(self.parse_struct_field());
 
@@ -492,42 +499,13 @@ impl<'src> Parser<'src> {
         let mut variants = Vec::with_capacity(2);
         let mut consts = Vec::new();
         while self.not_at_closing(TokenKind::RBrace) {
-            let item_visibility =
-                if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Pub)) {
-                    self.advance();
-                    Visibility::Public
-                } else {
-                    Visibility::Private
-                };
+            let item_visibility = self.parse_item_visibility();
 
             if matches!(
                 self.current_token_kind(),
                 TokenKind::Keyword(Keyword::Const)
             ) {
-                let mut span = self.create_span_from_current_token();
-                self.consume_keyword_token(Keyword::Const);
-                let const_name = self.parse_identifier();
-                let type_annotation = match self.current_token_kind() {
-                    TokenKind::Colon => {
-                        self.advance();
-                        self.parse_optional_type_annotation()
-                    }
-                    _ => None,
-                };
-                self.consume_token(TokenKind::EqualSign);
-                let expression = self.parse_expression();
-                self.end_span_from_previous_token(&mut span);
-                consts.push(ConstDeclaration {
-                    id: self.unique_id(),
-                    visibility: item_visibility,
-                    name: const_name,
-                    expression,
-                    type_annotation,
-                    span,
-                });
-                if matches!(self.current_token_kind(), TokenKind::Semicolon) {
-                    self.advance();
-                }
+                consts.push(self.parse_const_item(item_visibility));
             } else {
                 variants.push(self.parse_enum_variant());
 
@@ -644,42 +622,13 @@ impl<'src> Parser<'src> {
         let mut methods = Vec::new();
         let mut consts = Vec::new();
         while self.not_at_closing(TokenKind::RBrace) {
-            let item_visibility =
-                if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Pub)) {
-                    self.advance();
-                    Visibility::Public
-                } else {
-                    Visibility::Private
-                };
+            let item_visibility = self.parse_item_visibility();
 
             if matches!(
                 self.current_token_kind(),
                 TokenKind::Keyword(Keyword::Const)
             ) {
-                let mut span = self.create_span_from_current_token();
-                self.consume_keyword_token(Keyword::Const);
-                let const_name = self.parse_identifier();
-                let type_annotation = match self.current_token_kind() {
-                    TokenKind::Colon => {
-                        self.advance();
-                        self.parse_optional_type_annotation()
-                    }
-                    _ => None,
-                };
-                self.consume_token(TokenKind::EqualSign);
-                let expression = self.parse_expression();
-                self.end_span_from_previous_token(&mut span);
-                consts.push(ConstDeclaration {
-                    id: self.unique_id(),
-                    visibility: item_visibility,
-                    name: const_name,
-                    expression,
-                    type_annotation,
-                    span,
-                });
-                if matches!(self.current_token_kind(), TokenKind::Semicolon) {
-                    self.advance();
-                }
+                consts.push(self.parse_const_item(item_visibility));
             } else {
                 methods.push(self.parse_protocol_method_signature());
             }
