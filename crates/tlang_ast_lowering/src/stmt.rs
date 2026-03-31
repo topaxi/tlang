@@ -94,29 +94,7 @@ impl LoweringContext {
                 }]
             }
             ast::node::StmtKind::StructDeclaration(decl) => {
-                let hir_decl = hir::StructDeclaration {
-                    hir_id: self.lower_node_id(node.id),
-                    visibility: decl.visibility,
-                    name: decl.name,
-                    fields: decl
-                        .fields
-                        .iter()
-                        .map(|field| self.lower_struct_field(field))
-                        .collect(),
-                    consts: decl
-                        .consts
-                        .iter()
-                        .map(|c| self.lower_const_item(c))
-                        .collect(),
-                };
-
-                vec![hir::Stmt {
-                    hir_id: self.lower_node_id(node.id),
-                    kind: hir::StmtKind::StructDeclaration(Box::new(hir_decl)),
-                    span: node.span,
-                    leading_comments: node.leading_comments.clone(),
-                    trailing_comments: node.trailing_comments.clone(),
-                }]
+                vec![self.lower_struct_decl(node, decl)]
             }
             ast::node::StmtKind::EnumDeclaration(decl) => vec![self.lower_enum_decl(node, decl)],
             ast::node::StmtKind::ProtocolDeclaration(decl) => {
@@ -266,6 +244,36 @@ impl LoweringContext {
                 leading_comments,
                 trailing_comments: node.trailing_comments.clone(),
             }]
+        }
+    }
+
+    fn lower_struct_decl(
+        &mut self,
+        node: &ast::node::Stmt,
+        decl: &ast::node::StructDeclaration,
+    ) -> hir::Stmt {
+        let hir_decl = hir::StructDeclaration {
+            hir_id: self.lower_node_id(node.id),
+            visibility: decl.visibility,
+            name: decl.name,
+            fields: decl
+                .fields
+                .iter()
+                .map(|field| self.lower_struct_field(field))
+                .collect(),
+            consts: decl
+                .consts
+                .iter()
+                .map(|c| self.lower_const_item(c))
+                .collect(),
+        };
+
+        hir::Stmt {
+            hir_id: self.lower_node_id(node.id),
+            kind: hir::StmtKind::StructDeclaration(Box::new(hir_decl)),
+            span: node.span,
+            leading_comments: node.leading_comments.clone(),
+            trailing_comments: node.trailing_comments.clone(),
         }
     }
 
