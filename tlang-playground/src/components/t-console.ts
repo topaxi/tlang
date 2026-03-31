@@ -3,6 +3,7 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import './t-button';
 import './t-console-message';
+import './t-icon';
 import './t-menu';
 import './t-toggle-button';
 import { ConsoleMessage } from './t-console-message';
@@ -166,7 +167,9 @@ export class ConsoleElement extends LitElement {
           title=${this.collapsed ? 'Expand Console' : 'Collapse Console'}
           aria-label=${this.collapsed ? 'Expand Console' : 'Collapse Console'}
         >
-          ${this.collapsed ? '' : ''}
+          <t-icon
+            name=${this.collapsed ? 'chevron-down' : 'chevron-right'}
+          ></t-icon>
         </t-toggle-button>
         <div id="title" class="toolbar__title">Console</div>
         <t-button
@@ -178,14 +181,14 @@ export class ConsoleElement extends LitElement {
           title="Clear Console"
           aria-label="Clear Console"
         >
-          
+          <t-icon name="trash"></t-icon>
         </t-button>
         <t-button
           popovertarget="menu"
           title="Console Settings"
           aria-label="Console Settings"
         >
-          
+          <t-icon name="settings"></t-icon>
         </t-button>
         <t-menu id="menu" popover=${floating()}>
           <t-menuitem-checkbox

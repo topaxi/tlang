@@ -5,6 +5,7 @@ import { TlangController } from './controllers/tlang-controller';
 import { type DiagnosticMessage } from './controllers/tlang-controller';
 
 import './components/t-button';
+import './components/t-icon';
 import './components/t-codemirror';
 import './components/t-console';
 import './components/t-diagnostics';
@@ -553,7 +554,11 @@ export class TlangPlayground extends LitElement {
               popovertarget="optimization-options"
               aria-label="Optimization Settings"
             >
-              ${this.hasOptimizationsEnabled() ? '󰉁' : '󰛕'}
+              <t-icon
+                name=${this.hasOptimizationsEnabled()
+                  ? 'lightning-on'
+                  : 'lightning-off'}
+              ></t-icon>
             </t-button>
             <t-menu id="optimization-options" popover=${floating()}>
               <t-menuitem-checkbox

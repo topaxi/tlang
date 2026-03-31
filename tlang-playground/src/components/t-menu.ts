@@ -5,7 +5,9 @@ import {
   LitElement,
   PropertyValues,
   TemplateResult,
+  unsafeCSS,
 } from 'lit';
+import { icon } from '../utils/icons';
 import {
   customElement,
   property,
@@ -159,11 +161,17 @@ export class MenuItemRadioElement extends MenuItemButtonElement {
     super.styles,
     css`
       ::part(icon)::before {
-        content: var(--t-menuitem-radio-unchecked, '');
+        content: var(
+          --t-menuitem-radio-unchecked,
+          ${unsafeCSS(`'${icon('radio-unchecked')}'`)}
+        );
       }
 
       :host(:state(checked))::part(icon)::before {
-        content: var(--t-menuitem-radio-checked, '');
+        content: var(
+          --t-menuitem-radio-checked,
+          ${unsafeCSS(`'${icon('radio-checked')}'`)}
+        );
       }
     `,
   ];
@@ -202,7 +210,10 @@ export class MenuItemCheckboxElement extends MenuItemButtonElement {
       }
 
       :host(:state(checked))::part(icon)::before {
-        content: var(--t-menuitem-checkmark, '✓');
+        content: var(
+          --t-menuitem-checkmark,
+          ${unsafeCSS(`'${icon('checkmark')}'`)}
+        );
       }
     `,
   ];

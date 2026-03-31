@@ -2,7 +2,9 @@ import { css, html, LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { DiagnosticHtml } from '../utils/ansi-to-html';
+import { icon } from '../utils/icons';
 import './t-button';
+import './t-icon';
 import './t-menu';
 import './t-toggle-button';
 import './t-message';
@@ -132,9 +134,15 @@ export class ConsoleMessageElement extends LitElement {
   protected renderMessageIcon() {
     switch (this.type) {
       case 'warn':
-        return html`<i part="icon icon-${this.type}" data-icon=""></i>`;
+        return html`<i
+          part="icon icon-${this.type}"
+          data-icon=${icon('warning')}
+        ></i>`;
       case 'error':
-        return html`<i part="icon icon-${this.type}" data-icon=""></i>`;
+        return html`<i
+          part="icon icon-${this.type}"
+          data-icon=${icon('error')}
+        ></i>`;
       default:
         return this.forceIcon
           ? html`<i part="icon icon-${this.type} icon-none"></i>`
@@ -202,7 +210,9 @@ export class ConsoleMessageElement extends LitElement {
           aria-label="Toggle Group"
           @click=${this.collapse}
         >
-          ${this.collapsed ? '' : ''}</button
+          <t-icon
+            name=${this.collapsed ? 'chevron-down' : 'chevron-right'}
+          ></t-icon></button
         >${rendered}`;
     }
 

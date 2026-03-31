@@ -6,6 +6,10 @@ const icons = {
   'lightning-on': '󰉁',
   'lightning-off': '󰛕',
   checkmark: '✓',
+  warning: '',
+  error: '',
+  trash: '',
+  settings: '',
 } as const;
 
 export type IconName = keyof typeof icons;

@@ -2,6 +2,7 @@ import { css, html, LitElement, PropertyValueMap } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { mediaQuery } from '../decorators/media-query';
+import './t-icon';
 import './t-message';
 import './t-toggle-button';
 
@@ -170,7 +171,9 @@ export class DiagnosticsElement extends LitElement {
             ? 'Collapse Diagnostics'
             : 'Expand Diagnostics'}
         >
-          ${this.expanded ? '' : ''}
+          <t-icon
+            name=${this.expanded ? 'chevron-down' : 'chevron-right'}
+          ></t-icon>
         </t-toggle-button>
         <span class="toolbar__title">Diagnostics</span>
         ${this.errorCount > 0
