@@ -288,3 +288,177 @@ fn test_enum_is_variant_with_positional_fields() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_discriminant_enum() {
+    let output = compile!(indoc! {"
+        enum HttpStatus {
+            Ok = 200,
+            Created = 201,
+            NotFound = 404,
+        }
+    "});
+    let expected_output = indoc! {"
+        const HttpStatus = {
+            Ok: 200,
+            Created: 201,
+            NotFound: 404
+        };
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_discriminant_enum_pattern_matching() {
+    let output = compile!(indoc! {"
+        enum HttpStatus {
+            Ok = 200,
+            NotFound = 404,
+        }
+
+        fn describe(HttpStatus::Ok) { \"OK\" }
+        fn describe(HttpStatus::NotFound) { \"Not Found\" }
+    "});
+    let expected_output = indoc! {"
+        const HttpStatus = {
+            Ok: 200,
+            NotFound: 404
+        };
+        function describe(httpstatus) {
+            if (httpstatus === HttpStatus.Ok) {
+                return \"OK\";
+            } else if (httpstatus === HttpStatus.NotFound) {
+                return \"Not Found\";
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_discriminant_enum_no_warning_single_enum() {
+    let (_output, warnings) = compile_with_warnings!(indoc! {"
+        enum HttpStatus {
+            Ok = 200,
+            NotFound = 404,
+        }
+
+        fn describe(status) {
+            match status {
+                HttpStatus::Ok => \"OK\",
+                HttpStatus::NotFound => \"Not Found\",
+                _ => \"Unknown\",
+            }
+        }
+    "});
+    assert!(
+        warnings.is_empty(),
+        "Expected no warnings for single discriminant enum match, got: {warnings:?}"
+    );
+}
+
+#[test]
+fn test_discriminant_enum_no_warning_disjoint_values() {
+    // Two enums with disjoint values should NOT produce a warning.
+    let (_output, warnings) = compile_with_warnings!(indoc! {"
+        enum A {
+            a = 1,
+            b = 2,
+        }
+
+        enum B {
+            c = 10,
+            d = 20,
+        }
+
+        fn describe(x) {
+            match x {
+                A::a => \"A::a\",
+                A::b => \"A::b\",
+                B::c => \"B::c\",
+                B::d => \"B::d\",
+                _ => \"Unknown\",
+            }
+        }
+    "});
+    assert!(
+        warnings.is_empty(),
+        "Expected no warnings for disjoint discriminant enum values, got: {warnings:?}"
+    );
+}
+
+#[test]
+fn test_discriminant_enum_warning_overlapping_values() {
+    // Two enums with overlapping values SHOULD produce a warning.
+    let (_output, warnings) = compile_with_warnings!(indoc! {"
+        enum A {
+            a = 1,
+            b = 2,
+        }
+
+        enum B {
+            c = 1,
+            d = 3,
+        }
+
+        fn describe(x) {
+            match x {
+                A::a => \"A::a\",
+                A::b => \"A::b\",
+                B::c => \"B::c\",
+                B::d => \"B::d\",
+                _ => \"Unknown\",
+            }
+        }
+    "});
+    assert_eq!(
+        warnings.len(),
+        1,
+        "Expected exactly one warning for overlapping discriminant enum values"
+    );
+    let msg = &warnings[0].message;
+    assert!(
+        msg.contains("A") && msg.contains("B"),
+        "Warning should mention both enum names, got: {msg}"
+    );
+    assert!(
+        msg.contains("A::a") && msg.contains("B::c"),
+        "Warning should mention overlapping variants, got: {msg}"
+    );
+}
+
+#[test]
+fn test_discriminant_enum_warning_single_enum_duplicate_values() {
+    // A single enum with duplicate discriminant values used in a match SHOULD produce a warning.
+    // Note: The semantic analysis pass will emit a warning about the duplicate definition;
+    // this test verifies the codegen-level match-arm overlap check independently
+    // (which operates on the HIR after semantic analysis).
+    let (_output, warnings) = compile_with_warnings!(indoc! {"
+        enum Status {
+            Ok = 1,
+            Success = 1,
+        }
+
+        fn describe(x) {
+            match x {
+                Status::Ok => \"Ok\",
+                Status::Success => \"Success\",
+                _ => \"Unknown\",
+            }
+        }
+    "});
+    // Codegen should warn about the overlap in the match expression.
+    assert!(
+        !warnings.is_empty(),
+        "Expected a warning for duplicate discriminant values in single enum match"
+    );
+    let msg = &warnings[0].message;
+    assert!(
+        msg.contains("Status"),
+        "Warning should mention the enum name, got: {msg}"
+    );
+    assert!(
+        msg.contains("Status::Ok") && msg.contains("Status::Success"),
+        "Warning should mention both variants with duplicate values, got: {msg}"
+    );
+}

@@ -1,0 +1,12 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/enums/discriminant_enum.tlang
+---
+200
+404
+OK
+Created
+Not Found
+Internal Server Error

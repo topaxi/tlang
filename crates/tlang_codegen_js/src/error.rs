@@ -2,6 +2,30 @@ use std::fmt;
 
 use tlang_span::Span;
 
+/// A warning produced by the JavaScript code generator.
+#[derive(Debug, Clone)]
+pub struct CodegenWarning {
+    /// Human-readable description of the warning.
+    pub message: String,
+    /// Source span of the node that triggered the warning.
+    pub span: Span,
+}
+
+impl CodegenWarning {
+    pub fn new(message: impl Into<String>, span: Span) -> Self {
+        Self {
+            message: message.into(),
+            span,
+        }
+    }
+}
+
+impl fmt::Display for CodegenWarning {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
 /// An error produced by the JavaScript code generator.
 #[derive(Debug, Clone)]
 pub struct CodegenError {

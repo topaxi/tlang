@@ -480,6 +480,7 @@ pub struct EnumVariant {
     pub id: NodeId,
     pub name: Ident,
     pub parameters: Vec<StructField>,
+    pub discriminant: Option<Box<Expr>>,
     pub span: Span,
 }
 

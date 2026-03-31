@@ -10,9 +10,9 @@ impl CompileTarget for HirTarget {
         &self,
         _source: &str,
         module: &mut tlang_hir::Module,
-    ) -> Result<String, Vec<Diagnostic>> {
+    ) -> Result<(String, Vec<Diagnostic>), Vec<Diagnostic>> {
         let mut printer = HirPretty::default();
         printer.print_module(module);
-        Ok(printer.output().to_string())
+        Ok((printer.output().to_string(), Vec::new()))
     }
 }

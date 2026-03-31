@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
 use oxc_allocator::{Allocator, Vec as OxcVec};
@@ -10,9 +10,10 @@ use oxc_sourcemap::{SourceMap, Token};
 use oxc_span::SPAN;
 
 use crate::builtins::JS_BUILTINS;
-use crate::error::CodegenError;
+use crate::error::{CodegenError, CodegenWarning};
 use crate::name_map::NameMap;
 use oxc_estree::{ESTree, PrettyJSSerializer};
+use tlang_ast::token::Literal;
 use tlang_defs::DefKind;
 use tlang_hir as hir;
 use tlang_span::Span as TlangSpan;
@@ -33,6 +34,8 @@ pub struct CodegenJS {
     /// When true, suppress `export` keywords on public declarations.
     /// Used when generating a bundled multi-module output.
     bundle_mode: bool,
+    /// Warnings collected during code generation (e.g. overlapping discriminant values).
+    warnings: Vec<CodegenWarning>,
 }
 
 impl Default for CodegenJS {
@@ -55,6 +58,7 @@ impl CodegenJS {
             source_map: None,
             protocol_names,
             bundle_mode: false,
+            warnings: Vec::new(),
         }
     }
 
@@ -302,6 +306,9 @@ impl CodegenJS {
         }
         let mut program = inner.generate_module(module);
 
+        // Collect warnings before checking for errors.
+        self.warnings = inner.warnings;
+
         if !inner.errors.is_empty() {
             // Clear any stale output from a previous successful run so that
             // callers cannot accidentally use old output after an error.
@@ -345,6 +352,11 @@ impl CodegenJS {
 
     pub fn get_source_map(&self) -> Option<&SourceMap> {
         self.source_map.as_ref()
+    }
+
+    /// Returns any warnings produced during code generation.
+    pub fn get_warnings(&self) -> &[CodegenWarning] {
+        &self.warnings
     }
 
     /// Returns the source map serialized as a JSON string, or `None` if no
@@ -523,6 +535,22 @@ pub(crate) struct InnerCodegen<'a> {
     pub name_map: NameMap,
     pub function_context_stack: Vec<FunctionContext>,
     pub protocol_names: HashSet<String>,
+    /// HirIds of enum variants that belong to a discriminant enum (all simple
+    /// variants with explicit discriminant values). Used to select the correct
+    /// pattern-matching strategy (`===` vs `.tag ===`).
+    pub discriminant_variant_hir_ids: HashSet<hir::HirId>,
+    /// Maps each discriminant enum variant's HirId to its parent enum's HirId.
+    /// Used to detect when a match expression mixes variants from different
+    /// discriminant enums, which may cause value overlap issues.
+    pub(crate) variant_to_enum: HashMap<hir::HirId, hir::HirId>,
+    /// Maps each discriminant enum's HirId to its name and the list of
+    /// (variant_name, literal_value) pairs for overlap detection.
+    pub(crate) discriminant_enum_info: HashMap<hir::HirId, (String, Vec<(String, Literal)>)>,
+    /// Maps each discriminant enum variant's HirId to a tuple of
+    /// `(enum_name, variant_name, discriminant_literal)`.  This provides
+    /// O(1) lookup of a variant's discriminant value by HirId, which is used
+    /// in per-arm overlap detection during match code generation.
+    pub(crate) variant_discriminant_values: HashMap<hir::HirId, (String, String, Literal)>,
     /// When true, suppress `export` keywords on public declarations.
     pub bundle_mode: bool,
     /// Original tlang source text. When non-empty, it's prepended to
@@ -542,6 +570,8 @@ pub(crate) struct InnerCodegen<'a> {
     /// Checked at the end of [`generate_module`]; if non-empty the caller
     /// should return an error instead of emitting output.
     pub(crate) errors: Vec<CodegenError>,
+    /// Warnings accumulated during code generation (e.g. overlapping discriminant values).
+    pub(crate) warnings: Vec<CodegenWarning>,
 }
 
 impl<'a> InnerCodegen<'a> {
@@ -551,12 +581,17 @@ impl<'a> InnerCodegen<'a> {
             name_map: NameMap::new(),
             function_context_stack: Vec::new(),
             protocol_names,
+            discriminant_variant_hir_ids: HashSet::new(),
+            variant_to_enum: HashMap::new(),
+            discriminant_enum_info: HashMap::new(),
+            variant_discriminant_values: HashMap::new(),
             bundle_mode: false,
             source_text: String::new(),
             comment_source: String::new(),
             oxc_comments: Vec::new(),
             span_counter: 1,
             errors: Vec::new(),
+            warnings: Vec::new(),
         }
     }
 

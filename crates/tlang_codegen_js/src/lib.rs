@@ -14,7 +14,7 @@ mod pattern_match_generator;
 mod stmt_generator;
 mod struct_generator;
 
-pub use error::CodegenError;
+pub use error::{CodegenError, CodegenWarning};
 pub use hir_passes::{
     BooleanReturnSimplification, JsAnfReturnOpt, JsAnfTransform, TailCallSelfReferenceValidation,
 };

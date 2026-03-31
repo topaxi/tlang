@@ -936,12 +936,27 @@ pub struct EnumDeclaration {
     pub variants: Vec<EnumVariant>,
 }
 
+impl EnumDeclaration {
+    /// Returns `true` if all variants are simple (no parameters) and every
+    /// variant has an explicit discriminant value.  Such enums are represented
+    /// as plain const objects in the JS backend and their variants are stored
+    /// as plain values (not enum objects) in the interpreter.
+    pub fn is_discriminant_enum(&self) -> bool {
+        !self.variants.is_empty()
+            && self
+                .variants
+                .iter()
+                .all(|v| v.parameters.is_empty() && v.discriminant.is_some())
+    }
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct EnumVariant {
     pub hir_id: HirId,
     pub name: Ident,
     pub parameters: Vec<StructField>,
+    pub discriminant: Option<Box<Expr>>,
     pub span: Span,
 }
 

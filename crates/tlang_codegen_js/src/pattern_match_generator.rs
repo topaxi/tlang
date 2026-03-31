@@ -3,10 +3,12 @@ use std::collections::HashMap;
 use oxc_ast::NONE;
 use oxc_ast::ast::*;
 use oxc_span::SPAN;
+use tlang_ast::token::Literal;
 use tlang_hir as hir;
 use tlang_hir::HirId;
 
 use crate::builtins;
+use crate::error::CodegenWarning;
 use crate::generator::InnerCodegen;
 use tlang_ast::node::Ident;
 
@@ -132,6 +134,9 @@ impl<'a> InnerCodegen<'a> {
         {
             result.push(stmt);
         }
+
+        // 5. Check for overlapping discriminant values across multiple enums.
+        self.check_multi_discriminant_enum_overlap(arms, expr.span);
 
         result
     }
@@ -407,6 +412,12 @@ impl<'a> InnerCodegen<'a> {
                 .unwrap_or_else(|| path.join("."))
         };
 
+        // Check if this variant belongs to a discriminant enum.
+        let is_discriminant_variant = path
+            .res
+            .hir_id()
+            .is_some_and(|id| self.discriminant_variant_hir_ids.contains(&id));
+
         let mut cond = if is_struct {
             // Struct patterns use `instanceof` checks since JS structs are
             // constructor functions without a `.tag` property.
@@ -415,6 +426,16 @@ impl<'a> InnerCodegen<'a> {
                 SPAN,
                 parent_expr,
                 BinaryOperator::Instanceof,
+                self.ident_expr(&resolved),
+            )
+        } else if is_discriminant_variant {
+            // Discriminant enum variants are plain values (not objects),
+            // so compare directly with `===`.
+            let parent_expr = self.access_path_to_expr(access);
+            self.ast.expression_binary(
+                SPAN,
+                parent_expr,
+                BinaryOperator::StrictEquality,
                 self.ident_expr(&resolved),
             )
         } else {
@@ -541,6 +562,110 @@ impl<'a> InnerCodegen<'a> {
             self.generate_expr(guard)
         }
     }
+
+    /// Check if a match expression uses discriminant enum patterns whose
+    /// discriminant values overlap, causing earlier arms to silently shadow
+    /// later ones.
+    ///
+    /// This covers both cases:
+    /// - **Single enum**: `enum E { A = 1, B = 1 }` — both arms are present
+    ///   in the match but only the first can ever be reached.
+    /// - **Multiple enums**: `enum A { a = 1 }` and `enum B { b = 1 }` mixed
+    ///   in the same match.
+    ///
+    /// A warning is emitted only when the actual discriminant values of the
+    /// patterns used in this match overlap; if all values are disjoint no
+    /// warning is produced ("safe enough").
+    fn check_multi_discriminant_enum_overlap(
+        &mut self,
+        arms: &[hir::MatchArm],
+        span: tlang_span::Span,
+    ) {
+        // Collect the (enum_name, variant_name, literal) for every
+        // discriminant-enum variant pattern used in the match arms.
+        // We collect these in arm order so the first one wins in the overlap
+        // map below, matching the runtime semantics.
+        let mut used: Vec<(String, String, Literal)> = Vec::new();
+        // Track which distinct enum names appear, for the warning message.
+        let mut enum_names_seen: Vec<String> = Vec::new();
+
+        for arm in arms {
+            if let hir::PatKind::Enum(path, patterns) = &arm.pat.kind {
+                // Only simple (no-parameter) discriminant enum patterns.
+                if patterns.is_empty()
+                    && let Some(variant_hir_id) = path.res.hir_id()
+                    && let Some((enum_name, variant_name, lit)) =
+                        self.variant_discriminant_values.get(&variant_hir_id)
+                {
+                    let enum_name = enum_name.clone();
+                    let variant_name = variant_name.clone();
+                    let lit = *lit;
+                    if !enum_names_seen.contains(&enum_name) {
+                        enum_names_seen.push(enum_name.clone());
+                    }
+                    used.push((enum_name, variant_name, lit));
+                }
+            }
+        }
+
+        // Need at least two discriminant variant patterns to have an overlap.
+        if used.len() < 2 {
+            return;
+        }
+
+        // Build a map from normalised literal key → (enum_name, variant_name)
+        // for the first variant that claims each value, then detect overlaps.
+        let mut value_map: HashMap<LiteralKey, (String, String)> = HashMap::new();
+        let mut overlaps: Vec<(String, String, String, String)> = Vec::new();
+
+        for (enum_name, variant_name, lit) in &used {
+            let key = LiteralKey::from_literal(lit);
+            if let Some((prev_enum, prev_variant)) = value_map.get(&key) {
+                overlaps.push((
+                    prev_enum.clone(),
+                    prev_variant.clone(),
+                    enum_name.clone(),
+                    variant_name.clone(),
+                ));
+            } else {
+                value_map.insert(key, (enum_name.clone(), variant_name.clone()));
+            }
+        }
+
+        if overlaps.is_empty() {
+            // Values are disjoint — safe enough to not warn.
+            return;
+        }
+
+        let overlap_details: Vec<String> = overlaps
+            .iter()
+            .map(|(ea, va, eb, vb)| {
+                if ea == eb {
+                    format!("`{ea}::{va}` and `{ea}::{vb}` share the same discriminant value")
+                } else {
+                    format!("`{ea}::{va}` and `{eb}::{vb}` share the same discriminant value")
+                }
+            })
+            .collect();
+
+        let message = if enum_names_seen.len() == 1 {
+            format!(
+                "match expression uses variants of `{}` with duplicate discriminant values: {}; \
+                 earlier arms will shadow later ones",
+                enum_names_seen[0],
+                overlap_details.join(", "),
+            )
+        } else {
+            format!(
+                "match expression uses discriminant enums {} whose values overlap: {}; \
+                 earlier arms will shadow later ones",
+                enum_names_seen.join(", "),
+                overlap_details.join(", "),
+            )
+        };
+
+        self.warnings.push(CodegenWarning::new(message, span));
+    }
 }
 
 fn get_pat_identifiers(pattern: &hir::Pat) -> Vec<(HirId, String)> {
@@ -593,5 +718,36 @@ fn is_fixed_list_pattern(pat: &hir::Pat) -> bool {
             !pats.is_empty() && pats.iter().all(|pat| pat.is_wildcard() || pat.is_ident())
         }
         _ => false,
+    }
+}
+
+/// A normalised, hashable key derived from a discriminant [`Literal`] value.
+///
+/// Integer variants (`Integer` / `UnsignedInteger`) are normalised to `i128`
+/// so that `Integer(1)` and `UnsignedInteger(1)` hash to the same bucket and
+/// compare as equal (all `u64` values fit in `i128`).  `Float` values use
+/// their bit representation for hashing (so `NaN != NaN` and `-0.0 != 0.0`,
+/// which matches JavaScript `===` semantics).  String and char values compare
+/// by their symbol text.  `None` has its own dedicated variant to avoid
+/// confusion with a string-discriminant enum whose value happens to be `"nil"`.
+#[derive(PartialEq, Eq, Hash)]
+enum LiteralKey {
+    Integer(i128),
+    Float(u64),
+    String(String),
+    Bool(bool),
+    None,
+}
+
+impl LiteralKey {
+    fn from_literal(lit: &Literal) -> Self {
+        match lit {
+            Literal::Integer(n) => LiteralKey::Integer(*n as i128),
+            Literal::UnsignedInteger(n) => LiteralKey::Integer(*n as i128),
+            Literal::Float(f) => LiteralKey::Float(f.to_bits()),
+            Literal::String(s) | Literal::Char(s) => LiteralKey::String(s.to_string()),
+            Literal::Boolean(b) => LiteralKey::Bool(*b),
+            Literal::None => LiteralKey::None,
+        }
     }
 }
