@@ -158,6 +158,7 @@ Module(
             ),
           ),
         ],
+        consts: [],
       )),
       span: Span(
         start: 0,

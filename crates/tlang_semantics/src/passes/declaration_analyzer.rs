@@ -323,6 +323,20 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     );
                 }
 
+                // Register enum const members with qualified names
+                for const_item in &decl.consts {
+                    let qualified_name =
+                        format!("{}::{}", decl.name.as_str(), const_item.name.as_str());
+                    self.declare_symbol(
+                        ctx,
+                        const_item.id,
+                        &qualified_name,
+                        DefKind::Const,
+                        const_item.span,
+                        const_item.span.end_lc.line,
+                    );
+                }
+
                 self.validate_enum_discriminants(decl, ctx);
             }
             StmtKind::StructDeclaration(decl) => {
@@ -334,6 +348,20 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     stmt.span,
                     stmt.span.end_lc.line,
                 );
+
+                // Register struct const members with qualified names
+                for const_item in &decl.consts {
+                    let qualified_name =
+                        format!("{}::{}", decl.name.as_str(), const_item.name.as_str());
+                    self.declare_symbol(
+                        ctx,
+                        const_item.id,
+                        &qualified_name,
+                        DefKind::Const,
+                        const_item.span,
+                        const_item.span.end_lc.line,
+                    );
+                }
 
                 // Also store the struct declaration for later reference
                 ctx.struct_declarations
@@ -348,6 +376,20 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     stmt.span,
                     stmt.span.end_lc.line,
                 );
+
+                // Register protocol const members with qualified names
+                for const_item in &decl.consts {
+                    let qualified_name =
+                        format!("{}::{}", decl.name.as_str(), const_item.name.as_str());
+                    self.declare_symbol(
+                        ctx,
+                        const_item.id,
+                        &qualified_name,
+                        DefKind::Const,
+                        const_item.span,
+                        const_item.span.end_lc.line,
+                    );
+                }
             }
             StmtKind::ImplBlock(impl_block) => {
                 self.visit_impl_block(impl_block, ctx);
@@ -356,6 +398,18 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             StmtKind::Let(decl) => {
                 self.visit_expr(&decl.expression, ctx);
                 self.collect_pattern(&decl.pattern, stmt.span.end_lc.line, ctx);
+                return; // Don't walk the statement again
+            }
+            StmtKind::Const(decl) => {
+                self.visit_expr(&decl.expression, ctx);
+                self.declare_symbol(
+                    ctx,
+                    decl.id,
+                    decl.name.as_str(),
+                    DefKind::Const,
+                    decl.span,
+                    decl.span.end_lc.line,
+                );
                 return; // Don't walk the statement again
             }
             _ => {}
@@ -371,6 +425,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                 | StmtKind::ProtocolDeclaration(_)
                 | StmtKind::ImplBlock(_)
                 | StmtKind::Let(_)
+                | StmtKind::Const(_)
         ) {
             walk_stmt(self, stmt, ctx);
         }

@@ -549,6 +549,9 @@ fn rewrite_break_values_in_stmt<F: AnfFilter>(
         hir::StmtKind::Let(_, expr, _) => {
             rewrite_break_values_in_expr(temp_name, pat_hir_id, expr, folder);
         }
+        hir::StmtKind::Const(_, _, expr, _) => {
+            rewrite_break_values_in_expr(temp_name, pat_hir_id, expr, folder);
+        }
         hir::StmtKind::Return(Some(expr)) => {
             rewrite_break_values_in_expr(temp_name, pat_hir_id, expr, folder);
         }

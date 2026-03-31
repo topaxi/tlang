@@ -88,6 +88,11 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
             visitor.visit_pat(pat, ctx);
             visitor.visit_ty(ty, ctx);
         }
+        hir::StmtKind::Const(_, pat, expr, ty) => {
+            visitor.visit_expr(expr, ctx);
+            visitor.visit_pat(pat, ctx);
+            visitor.visit_ty(ty, ctx);
+        }
         hir::StmtKind::Expr(expr) => visitor.visit_expr(expr, ctx),
         hir::StmtKind::Return(expr) => {
             if let Some(expr) = expr.as_mut() {
@@ -111,6 +116,9 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
                 visitor.visit_ident(&mut field.name, ctx);
                 visitor.visit_ty(&mut field.ty, ctx);
             }
+            for const_item in &mut decl.consts {
+                visitor.visit_expr(&mut const_item.value, ctx);
+            }
         }
         hir::StmtKind::EnumDeclaration(decl) => {
             for variant in &mut decl.variants {
@@ -121,6 +129,9 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
                     visitor.visit_ty(&mut field.ty, ctx);
                 }
             }
+            for const_item in &mut decl.consts {
+                visitor.visit_expr(&mut const_item.value, ctx);
+            }
         }
         hir::StmtKind::DynFunctionDeclaration(decl) => {
             visitor.visit_expr(&mut decl.name, ctx);
@@ -129,6 +140,9 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
             visitor.visit_ident(&mut decl.name, ctx);
             for method in &mut decl.methods {
                 visitor.visit_ident(&mut method.name, ctx);
+            }
+            for const_item in &mut decl.consts {
+                visitor.visit_expr(&mut const_item.value, ctx);
             }
         }
         hir::StmtKind::ImplBlock(impl_block) => {

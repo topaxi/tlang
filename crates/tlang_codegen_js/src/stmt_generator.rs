@@ -64,6 +64,14 @@ impl<'a> InnerCodegen<'a> {
                 hir::StmtKind::StructDeclaration(decl) if !self.name_map.has(decl.hir_id) => {
                     self.name_map
                         .register_local(decl.hir_id, decl.name.as_str());
+                    // Register const items so that `StructName::CONST` path
+                    // references resolve correctly.
+                    for const_item in &decl.consts {
+                        if !self.name_map.has(const_item.hir_id) {
+                            self.name_map
+                                .register_local(const_item.hir_id, const_item.name.as_str());
+                        }
+                    }
                 }
                 hir::StmtKind::EnumDeclaration(decl) if !self.name_map.has(decl.hir_id) => {
                     let enum_js = self
@@ -75,6 +83,14 @@ impl<'a> InnerCodegen<'a> {
                     for variant in &decl.variants {
                         let variant_js = format!("{enum_js}.{}", variant.name.as_str());
                         self.name_map.register_exact(variant.hir_id, &variant_js);
+                    }
+                    // Register const items so that `EnumName::CONST` path
+                    // references resolve correctly.
+                    for const_item in &decl.consts {
+                        if !self.name_map.has(const_item.hir_id) {
+                            self.name_map
+                                .register_local(const_item.hir_id, const_item.name.as_str());
+                        }
                     }
                     // Track discriminant enum variants for pattern-match strategy selection
                     // and for multi-enum overlap detection.
@@ -105,11 +121,46 @@ impl<'a> InnerCodegen<'a> {
         }
     }
 
+    /// Generate JS `const` declarations for const items associated with a
+    /// type definition (struct, enum, or protocol). These items are accessed
+    /// via path resolution (e.g., `Three::THREE`).
+    fn generate_type_const_items(
+        &mut self,
+        _type_name: &str,
+        consts: &[hir::ConstItem],
+    ) -> Vec<Statement<'a>> {
+        consts
+            .iter()
+            .flat_map(|const_item| {
+                let init = self.generate_expr(&const_item.value);
+                // Use the pre-registered name, or register now if not pre-registered.
+                let js_name = if let Some(name) = self.name_map.resolve(const_item.hir_id) {
+                    name.to_string()
+                } else {
+                    self.name_map
+                        .register(const_item.hir_id, const_item.name.as_str())
+                };
+                vec![self.const_decl(&js_name, init)]
+            })
+            .collect()
+    }
+
     pub fn generate_stmt(&mut self, statement: &hir::Stmt) -> Vec<Statement<'a>> {
         match &statement.kind {
             hir::StmtKind::Expr(expr) => self.generate_expr_stmt(expr),
             hir::StmtKind::Let(pattern, expression, _ty) => {
                 self.generate_variable_declaration(pattern, expression)
+            }
+            hir::StmtKind::Const(visibility, pattern, expression, _ty) => {
+                let stmts = self.generate_const_declaration(pattern, expression);
+                if *visibility == Visibility::Public {
+                    stmts
+                        .into_iter()
+                        .map(|s| self.wrap_export_named(s))
+                        .collect()
+                } else {
+                    stmts
+                }
             }
             hir::StmtKind::FunctionDeclaration(decl) => {
                 let stmts = self.generate_function_declaration(decl);
@@ -128,30 +179,41 @@ impl<'a> InnerCodegen<'a> {
             hir::StmtKind::Return(expr) => self.generate_return_stmt(expr.as_deref()),
             hir::StmtKind::EnumDeclaration(decl) => {
                 let stmt = self.generate_enum_declaration(decl);
-                if decl.visibility == Visibility::Public {
+                let mut stmts = if decl.visibility == Visibility::Public {
                     vec![self.wrap_export_named(stmt)]
                 } else {
                     vec![stmt]
-                }
+                };
+                // Emit qualified const items (e.g., `const EnumName$CONST = value;`)
+                stmts.extend(self.generate_type_const_items(&decl.name.to_string(), &decl.consts));
+                stmts
             }
             hir::StmtKind::StructDeclaration(decl) => {
                 let stmt = self.generate_struct_declaration(decl);
-                if decl.visibility == Visibility::Public {
+                let mut stmts = if decl.visibility == Visibility::Public {
                     vec![self.wrap_export_named(stmt)]
                 } else {
                     vec![stmt]
-                }
+                };
+                // Emit qualified const items (e.g., `const StructName$CONST = value;`)
+                stmts.extend(
+                    self.generate_type_const_items(&decl.name.to_string(), &decl.consts),
+                );
+                stmts
             }
             hir::StmtKind::ProtocolDeclaration(decl) => {
-                let stmts = self.generate_protocol_declaration(decl);
+                let mut stmts = self.generate_protocol_declaration(decl);
                 if decl.visibility == Visibility::Public {
-                    stmts
+                    stmts = stmts
                         .into_iter()
                         .map(|s| self.wrap_export_named(s))
-                        .collect()
-                } else {
-                    stmts
+                        .collect();
                 }
+                // Emit qualified const items (e.g., `const ProtocolName$CONST = value;`)
+                stmts.extend(
+                    self.generate_type_const_items(&decl.name.to_string(), &decl.consts),
+                );
+                stmts
             }
             hir::StmtKind::ImplBlock(impl_block) => self.generate_impl_block(impl_block),
         }
@@ -230,6 +292,36 @@ impl<'a> InnerCodegen<'a> {
                 vec![]
             }
         }
+    }
+
+    fn generate_const_declaration(
+        &mut self,
+        pattern: &hir::Pat,
+        value: &hir::Expr,
+    ) -> Vec<Statement<'a>> {
+        match &pattern.kind {
+            hir::PatKind::Identifier(hir_id, ident) => {
+                self.generate_const_declaration_identifier(*hir_id, ident.as_str(), value)
+            }
+            _ => {
+                self.errors.push(CodegenError::unsupported(
+                    "const declaration pattern matching",
+                    pattern.span,
+                ));
+                vec![]
+            }
+        }
+    }
+
+    fn generate_const_declaration_identifier(
+        &mut self,
+        hir_id: HirId,
+        name: &str,
+        value: &hir::Expr,
+    ) -> Vec<Statement<'a>> {
+        let init = self.generate_expr(value);
+        let var_name = self.name_map.register(hir_id, name);
+        vec![self.const_decl(&var_name, init)]
     }
 
     fn generate_variable_declaration_identifier(

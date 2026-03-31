@@ -79,6 +79,22 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
                     }
                 }
             }
+            // Const declarations are always propagatable since they can never be reassigned.
+            StmtKind::Const(
+                _,
+                box Pat {
+                    kind: PatKind::Identifier(hir_id, _ident),
+                    ..
+                },
+                expr,
+                ..,
+            ) => {
+                self.visit_expr(expr, ctx);
+
+                if let ExprKind::Literal(lit) = &expr.kind {
+                    self.constants.insert(*hir_id, *lit.clone());
+                }
+            }
             _ => visit::walk_stmt(self, stmt, ctx),
         }
     }

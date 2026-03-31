@@ -187,6 +187,7 @@ fn symbol_visibility(ast: &tlang_ast::node::Module, name: &str, require_pub: boo
             StmtKind::ProtocolDeclaration(decl) if decl.name.as_str() == name => {
                 vis_ok(&decl.visibility)
             }
+            StmtKind::Const(decl) if decl.name.as_str() == name => vis_ok(&decl.visibility),
             _ => false,
         };
         if found {

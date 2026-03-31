@@ -40,6 +40,11 @@ pub trait Visitor<'ast>: Sized {
             self.visit_ident(name, ctx);
             self.visit_ty(ty, ctx);
         }
+
+        for const_decl in &decl.consts {
+            self.visit_ident(&const_decl.name, ctx);
+            self.visit_expr(&const_decl.expression, ctx);
+        }
     }
 
     fn visit_enum_decl(&mut self, decl: &'ast node::EnumDeclaration, ctx: &mut Self::Context) {
@@ -205,6 +210,14 @@ pub fn walk_stmt<'ast, V: Visitor<'ast>>(
             visitor.visit_expr(&let_decl.expression, ctx);
 
             if let Some(ty) = &let_decl.type_annotation {
+                visitor.visit_ty(ty, ctx);
+            }
+        }
+        node::StmtKind::Const(const_decl) => {
+            visitor.visit_ident(&const_decl.name, ctx);
+            visitor.visit_expr(&const_decl.expression, ctx);
+
+            if let Some(ty) = &const_decl.type_annotation {
                 visitor.visit_ty(ty, ctx);
             }
         }

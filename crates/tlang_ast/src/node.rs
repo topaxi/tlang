@@ -105,6 +105,17 @@ pub enum Visibility {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct ConstDeclaration {
+    pub id: NodeId,
+    pub visibility: Visibility,
+    pub name: Ident,
+    pub expression: Expr,
+    pub type_annotation: Option<Ty>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct FunctionDeclaration {
     pub id: NodeId,
     pub visibility: Visibility,
@@ -490,6 +501,7 @@ pub struct EnumDeclaration {
     pub visibility: Visibility,
     pub name: Ident,
     pub variants: Vec<EnumVariant>,
+    pub consts: Vec<ConstDeclaration>,
 }
 
 #[derive(Debug, Clone)]
@@ -525,6 +537,7 @@ pub struct ProtocolDeclaration {
     pub visibility: Visibility,
     pub name: Ident,
     pub methods: Vec<ProtocolMethodSignature>,
+    pub consts: Vec<ConstDeclaration>,
 }
 
 #[derive(Debug, Clone)]
@@ -591,6 +604,7 @@ pub enum StmtKind {
     None,
     Expr(Box<Expr>),
     Let(Box<LetDeclaration>),
+    Const(Box<ConstDeclaration>),
     FunctionDeclaration(Box<FunctionDeclaration>),
     // TODO: We should probably deal with this in HIR instead.
     FunctionDeclarations(Vec<FunctionDeclaration>),
@@ -617,6 +631,7 @@ pub struct StructDeclaration {
     pub visibility: Visibility,
     pub name: Ident,
     pub fields: Vec<StructField>,
+    pub consts: Vec<ConstDeclaration>,
 }
 
 #[derive(Debug, Clone)]

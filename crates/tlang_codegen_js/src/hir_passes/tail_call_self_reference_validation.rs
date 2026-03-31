@@ -48,6 +48,7 @@ fn check_block(block: &hir::Block, current_fn: Option<HirId>, diagnostics: &mut 
 fn check_stmt(stmt: &hir::Stmt, current_fn: Option<HirId>, diagnostics: &mut Vec<Diagnostic>) {
     match &stmt.kind {
         hir::StmtKind::Let(_, expr, _) => check_expr(expr, current_fn, diagnostics),
+        hir::StmtKind::Const(_, _, expr, _) => check_expr(expr, current_fn, diagnostics),
         hir::StmtKind::Expr(expr) => check_expr(expr, current_fn, diagnostics),
         hir::StmtKind::Return(Some(expr)) => check_expr(expr, current_fn, diagnostics),
         hir::StmtKind::Return(None) => {}

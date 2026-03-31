@@ -119,6 +119,12 @@ pub fn fold_stmt<F: Folder>(folder: &mut F, stmt: hir::Stmt) -> SmallVec<hir::St
             Box::new(folder.fold_expr(*expr)),
             Box::new(folder.fold_ty(*ty)),
         ),
+        hir::StmtKind::Const(visibility, pat, expr, ty) => hir::StmtKind::Const(
+            visibility,
+            Box::new(folder.fold_pat(*pat)),
+            Box::new(folder.fold_expr(*expr)),
+            Box::new(folder.fold_ty(*ty)),
+        ),
         hir::StmtKind::Return(expr) => {
             hir::StmtKind::Return(expr.map(|e| Box::new(folder.fold_expr(*e))))
         }
