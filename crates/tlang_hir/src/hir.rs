@@ -92,6 +92,7 @@ impl From<DefKind> for BindingKind {
     fn from(kind: DefKind) -> Self {
         match kind {
             DefKind::Variable => BindingKind::Local,
+            DefKind::Const => BindingKind::Local,
             DefKind::Struct => BindingKind::Struct,
             DefKind::Enum => BindingKind::Enum,
             DefKind::EnumVariant(_) => BindingKind::Variant,
@@ -592,6 +593,7 @@ impl Stmt {
 pub enum StmtKind {
     Expr(Box<Expr>),
     Let(Box<Pat>, Box<Expr>, Box<Ty>),
+    Const(Visibility, Box<Pat>, Box<Expr>, Box<Ty>),
     FunctionDeclaration(Box<FunctionDeclaration>),
     DynFunctionDeclaration(Box<DynFunctionDeclaration>),
     Return(Option<Box<Expr>>),
@@ -910,6 +912,19 @@ pub struct DynFunctionDeclaration {
     pub variants: Vec<(usize, HirId)>,
 }
 
+/// A constant item defined inside a struct, enum, or protocol body.
+/// These are accessible via path resolution (e.g., `StructName::CONST_NAME`).
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct ConstItem {
+    pub hir_id: HirId,
+    pub visibility: Visibility,
+    pub name: Ident,
+    pub value: Expr,
+    pub ty: Ty,
+    pub span: Span,
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct StructDeclaration {
@@ -917,6 +932,7 @@ pub struct StructDeclaration {
     pub visibility: Visibility,
     pub name: Ident,
     pub fields: Vec<StructField>,
+    pub consts: Vec<ConstItem>,
 }
 
 #[derive(Debug, Clone)]
@@ -934,6 +950,7 @@ pub struct EnumDeclaration {
     pub visibility: Visibility,
     pub name: Ident,
     pub variants: Vec<EnumVariant>,
+    pub consts: Vec<ConstItem>,
 }
 
 impl EnumDeclaration {
@@ -967,6 +984,7 @@ pub struct ProtocolDeclaration {
     pub visibility: Visibility,
     pub name: Ident,
     pub methods: Vec<ProtocolMethodSignature>,
+    pub consts: Vec<ConstItem>,
 }
 
 #[derive(Debug, Clone)]

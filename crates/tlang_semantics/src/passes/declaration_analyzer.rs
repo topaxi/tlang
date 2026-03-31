@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use tlang_ast::keyword::kw;
 use tlang_ast::node::{
-    EnumDeclaration, Expr, ExprKind, FunctionDeclaration, FunctionParameter, ImplBlock, Module,
-    Pat, PatKind, Stmt, StmtKind, UnaryOp,
+    ConstDeclaration, EnumDeclaration, Expr, ExprKind, FunctionDeclaration, FunctionParameter,
+    ImplBlock, Module, Pat, PatKind, Stmt, StmtKind, UnaryOp,
 };
 use tlang_ast::token::Literal;
 use tlang_ast::visit::{Visitor, walk_expr, walk_stmt};
@@ -92,6 +92,25 @@ impl DeclarationAnalyzer {
         debug!("Declaring symbol: {symbol_info:#?}");
 
         self.current_symbol_table().borrow_mut().insert(symbol_info);
+    }
+
+    fn register_type_const_items(
+        &mut self,
+        ctx: &mut SemanticAnalysisContext,
+        type_name: &str,
+        consts: &[ConstDeclaration],
+    ) {
+        for const_item in consts {
+            let qualified_name = format!("{}::{}", type_name, const_item.name.as_str());
+            self.declare_symbol(
+                ctx,
+                const_item.id,
+                &qualified_name,
+                DefKind::Const,
+                const_item.span,
+                const_item.span.end_lc.line,
+            );
+        }
     }
 
     fn visit_impl_block(&mut self, impl_block: &ImplBlock, ctx: &mut SemanticAnalysisContext) {
@@ -323,6 +342,9 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     );
                 }
 
+                // Register enum const members with qualified names
+                self.register_type_const_items(ctx, decl.name.as_str(), &decl.consts);
+
                 self.validate_enum_discriminants(decl, ctx);
             }
             StmtKind::StructDeclaration(decl) => {
@@ -334,6 +356,9 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     stmt.span,
                     stmt.span.end_lc.line,
                 );
+
+                // Register struct const members with qualified names
+                self.register_type_const_items(ctx, decl.name.as_str(), &decl.consts);
 
                 // Also store the struct declaration for later reference
                 ctx.struct_declarations
@@ -348,6 +373,9 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     stmt.span,
                     stmt.span.end_lc.line,
                 );
+
+                // Register protocol const members with qualified names
+                self.register_type_const_items(ctx, decl.name.as_str(), &decl.consts);
             }
             StmtKind::ImplBlock(impl_block) => {
                 self.visit_impl_block(impl_block, ctx);
@@ -356,6 +384,18 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             StmtKind::Let(decl) => {
                 self.visit_expr(&decl.expression, ctx);
                 self.collect_pattern(&decl.pattern, stmt.span.end_lc.line, ctx);
+                return; // Don't walk the statement again
+            }
+            StmtKind::Const(decl) => {
+                self.visit_expr(&decl.expression, ctx);
+                self.declare_symbol(
+                    ctx,
+                    decl.id,
+                    decl.name.as_str(),
+                    DefKind::Const,
+                    decl.span,
+                    decl.span.end_lc.line,
+                );
                 return; // Don't walk the statement again
             }
             _ => {}
@@ -371,6 +411,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                 | StmtKind::ProtocolDeclaration(_)
                 | StmtKind::ImplBlock(_)
                 | StmtKind::Let(_)
+                | StmtKind::Const(_)
         ) {
             walk_stmt(self, stmt, ctx);
         }

@@ -270,6 +270,7 @@ impl Interpreter {
                 EvalResult::Void
             }
             hir::StmtKind::Let(pat, expr, ty) => self.eval_let_stmt(state, pat, expr, ty),
+            hir::StmtKind::Const(_, pat, expr, ty) => self.eval_let_stmt(state, pat, expr, ty),
             hir::StmtKind::ProtocolDeclaration(decl) => {
                 self.eval_protocol_decl(state, decl);
                 EvalResult::Void

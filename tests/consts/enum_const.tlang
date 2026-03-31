@@ -1,0 +1,17 @@
+enum Status {
+    Active,
+    Inactive,
+    const DEFAULT = 0;
+}
+
+enum Priority {
+    Low,
+    Medium,
+    High,
+    const MIN = 0;
+    const MAX = 2;
+}
+
+log(Status::DEFAULT);
+log(Priority::MIN);
+log(Priority::MAX);

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use log::debug;
 use tlang_ast as ast;
-use tlang_ast::node::{FunctionDeclaration, Ident, LetDeclaration};
+use tlang_ast::node::{ConstDeclaration, FunctionDeclaration, Ident, LetDeclaration};
 use tlang_defs::DefKind;
 use tlang_hir as hir;
 
@@ -33,6 +33,31 @@ impl LoweringContext {
                 vec![hir::Stmt {
                     hir_id: self.lower_node_id(node.id),
                     kind: hir::StmtKind::Let(Box::new(pat), Box::new(expr), Box::new(ty)),
+                    span: node.span,
+                    leading_comments: node.leading_comments.clone(),
+                    trailing_comments: node.trailing_comments.clone(),
+                }]
+            }
+            ast::node::StmtKind::Const(box ConstDeclaration {
+                id: const_id,
+                visibility,
+                name,
+                expression,
+                type_annotation,
+                ..
+            }) => {
+                let expr = self.lower_expr(expression);
+                let ty = self.lower_ty(type_annotation.as_ref());
+                let pat = self.lower_ident_pat(*const_id, name);
+
+                vec![hir::Stmt {
+                    hir_id: self.lower_node_id(node.id),
+                    kind: hir::StmtKind::Const(
+                        *visibility,
+                        Box::new(pat),
+                        Box::new(expr),
+                        Box::new(ty),
+                    ),
                     span: node.span,
                     leading_comments: node.leading_comments.clone(),
                     trailing_comments: node.trailing_comments.clone(),
@@ -69,24 +94,7 @@ impl LoweringContext {
                 }]
             }
             ast::node::StmtKind::StructDeclaration(decl) => {
-                let decl = hir::StructDeclaration {
-                    hir_id: self.lower_node_id(node.id),
-                    visibility: decl.visibility,
-                    name: decl.name,
-                    fields: decl
-                        .fields
-                        .iter()
-                        .map(|field| self.lower_struct_field(field))
-                        .collect(),
-                };
-
-                vec![hir::Stmt {
-                    hir_id: self.lower_node_id(node.id),
-                    kind: hir::StmtKind::StructDeclaration(Box::new(decl)),
-                    span: node.span,
-                    leading_comments: node.leading_comments.clone(),
-                    trailing_comments: node.trailing_comments.clone(),
-                }]
+                vec![self.lower_struct_decl(node, decl)]
             }
             ast::node::StmtKind::EnumDeclaration(decl) => vec![self.lower_enum_decl(node, decl)],
             ast::node::StmtKind::ProtocolDeclaration(decl) => {
@@ -239,6 +247,36 @@ impl LoweringContext {
         }
     }
 
+    fn lower_struct_decl(
+        &mut self,
+        node: &ast::node::Stmt,
+        decl: &ast::node::StructDeclaration,
+    ) -> hir::Stmt {
+        let hir_decl = hir::StructDeclaration {
+            hir_id: self.lower_node_id(node.id),
+            visibility: decl.visibility,
+            name: decl.name,
+            fields: decl
+                .fields
+                .iter()
+                .map(|field| self.lower_struct_field(field))
+                .collect(),
+            consts: decl
+                .consts
+                .iter()
+                .map(|c| self.lower_const_item(c))
+                .collect(),
+        };
+
+        hir::Stmt {
+            hir_id: self.lower_node_id(node.id),
+            kind: hir::StmtKind::StructDeclaration(Box::new(hir_decl)),
+            span: node.span,
+            leading_comments: node.leading_comments.clone(),
+            trailing_comments: node.trailing_comments.clone(),
+        }
+    }
+
     fn lower_enum_decl(
         &mut self,
         node: &ast::node::Stmt,
@@ -266,6 +304,11 @@ impl LoweringContext {
                     span: variant.span,
                 })
                 .collect::<Vec<_>>(),
+            consts: decl
+                .consts
+                .iter()
+                .map(|c| self.lower_const_item(c))
+                .collect(),
         };
 
         hir::Stmt {
@@ -319,6 +362,11 @@ impl LoweringContext {
             visibility: decl.visibility,
             name: decl.name,
             methods,
+            consts: decl
+                .consts
+                .iter()
+                .map(|c| self.lower_const_item(c))
+                .collect(),
         };
 
         hir::Stmt {
@@ -386,6 +434,35 @@ impl LoweringContext {
             hir_id: self.lower_node_id(field.id),
             name: field.name,
             ty: self.lower_ty(Some(&field.ty)),
+        }
+    }
+
+    pub(crate) fn lower_const_item(
+        &mut self,
+        const_decl: &ast::node::ConstDeclaration,
+    ) -> hir::ConstItem {
+        hir::ConstItem {
+            hir_id: self.lower_node_id(const_decl.id),
+            visibility: const_decl.visibility,
+            name: const_decl.name,
+            value: self.lower_expr(&const_decl.expression),
+            ty: self.lower_ty(const_decl.type_annotation.as_ref()),
+            span: const_decl.span,
+        }
+    }
+
+    /// Lower an identifier to a simple identifier pattern (not destructuring).
+    /// Used for `const NAME = expr` where the name is always a simple identifier.
+    pub(crate) fn lower_ident_pat(
+        &mut self,
+        node_id: tlang_span::NodeId,
+        name: &ast::node::Ident,
+    ) -> hir::Pat {
+        let hir_id = self.lower_node_id(node_id);
+        hir::Pat {
+            kind: hir::PatKind::Identifier(hir_id, Box::new(*name)),
+            ty: hir::Ty::unknown(),
+            span: name.span,
         }
     }
 

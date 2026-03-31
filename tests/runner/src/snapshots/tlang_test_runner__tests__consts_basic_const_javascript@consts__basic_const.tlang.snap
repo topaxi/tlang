@@ -1,0 +1,11 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: javascript"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/consts/basic_const.tlang
+---
+1
+3.14159
+Hello, World!
+true
+42

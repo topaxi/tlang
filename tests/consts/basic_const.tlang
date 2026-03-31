@@ -1,0 +1,14 @@
+const ONE = 1;
+const PI = 3.14159;
+const GREETING = "Hello, World!";
+const IS_ENABLED = true;
+
+fn add_one(val) {
+    val + ONE
+}
+
+log(ONE);
+log(PI);
+log(GREETING);
+log(IS_ENABLED);
+log(add_one(41));

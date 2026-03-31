@@ -40,6 +40,11 @@ pub trait Visitor<'ast>: Sized {
             self.visit_ident(name, ctx);
             self.visit_ty(ty, ctx);
         }
+
+        for const_decl in &decl.consts {
+            self.visit_ident(&const_decl.name, ctx);
+            self.visit_expr(&const_decl.expression, ctx);
+        }
     }
 
     fn visit_enum_decl(&mut self, decl: &'ast node::EnumDeclaration, ctx: &mut Self::Context) {
@@ -208,6 +213,14 @@ pub fn walk_stmt<'ast, V: Visitor<'ast>>(
                 visitor.visit_ty(ty, ctx);
             }
         }
+        node::StmtKind::Const(const_decl) => {
+            visitor.visit_ident(&const_decl.name, ctx);
+            visitor.visit_expr(&const_decl.expression, ctx);
+
+            if let Some(ty) = &const_decl.type_annotation {
+                visitor.visit_ty(ty, ctx);
+            }
+        }
         node::StmtKind::FunctionDeclaration(declaration) => {
             visitor.visit_fn_decl(declaration, ctx);
         }
@@ -225,6 +238,10 @@ pub fn walk_stmt<'ast, V: Visitor<'ast>>(
             visitor.visit_ident(&decl.name, ctx);
             for method in &decl.methods {
                 visitor.visit_ident(&method.name, ctx);
+            }
+            for const_decl in &decl.consts {
+                visitor.visit_ident(&const_decl.name, ctx);
+                visitor.visit_expr(&const_decl.expression, ctx);
             }
         }
         node::StmtKind::ImplBlock(impl_block) => {
@@ -245,6 +262,11 @@ pub fn walk_enum_decl<'ast, V: Visitor<'ast>>(
 
     for variant in &decl.variants {
         visitor.visit_variant(variant, ctx);
+    }
+
+    for const_decl in &decl.consts {
+        visitor.visit_ident(&const_decl.name, ctx);
+        visitor.visit_expr(&const_decl.expression, ctx);
     }
 }
 

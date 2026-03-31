@@ -479,6 +479,7 @@ fn has_top_level_executable_code(ast: &node::Module) -> bool {
             | StmtKind::ImplBlock(_)
             | StmtKind::UseDeclaration(_)
             | StmtKind::ModDeclaration(_)
+            | StmtKind::Const(_)
             | StmtKind::None => {}
             // Let declarations and expressions are executable code
             StmtKind::Let(_) | StmtKind::Expr(_) | StmtKind::Return(_) => {

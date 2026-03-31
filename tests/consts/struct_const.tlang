@@ -1,0 +1,18 @@
+struct Circle {
+    radius: f64,
+    const PI = 3.14159;
+}
+
+struct Config {
+    const DEFAULT_TIMEOUT = 30;
+    const MAX_RETRIES = 3;
+}
+
+fn area(radius) {
+    Circle::PI * radius * radius
+}
+
+log(Circle::PI);
+log(Config::DEFAULT_TIMEOUT);
+log(Config::MAX_RETRIES);
+log(area(2.0));

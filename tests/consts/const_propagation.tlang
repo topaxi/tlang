@@ -1,0 +1,10 @@
+const INLINE_ME = 42;
+
+fn uses_const() {
+    INLINE_ME + 1
+}
+
+log(INLINE_ME);
+log(INLINE_ME + 1);
+log(INLINE_ME * 2);
+log(uses_const());

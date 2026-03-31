@@ -1,7 +1,7 @@
 use tlang_ast::keyword::{Keyword, kw};
 use tlang_ast::node::{
-    self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
-    EnumDeclaration, EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression,
+    self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ConstDeclaration,
+    ElseClause, EnumDeclaration, EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression,
     FunctionDeclaration, FunctionParameter, Ident, IfElseExpression, ImplBlock,
     IndexAccessExpression, LetDeclaration, MatchArm, MatchExpression, ModDeclaration, Module,
     OperatorInfo, Pat, Path, ProtocolDeclaration, ProtocolMethodSignature, Stmt, StmtKind,
@@ -329,6 +329,7 @@ impl<'src> Parser<'src> {
             TokenKind::Keyword(Keyword::Use) => self.parse_use_declaration(),
             TokenKind::Keyword(Keyword::Mod) => self.parse_mod_declaration(visibility),
             TokenKind::Keyword(Keyword::Let) => self.parse_variable_declaration(),
+            TokenKind::Keyword(Keyword::Const) => self.parse_const_declaration(visibility),
             TokenKind::Keyword(Keyword::Fn)
                 // If the next token is an identifier, we assume a function declaration.
                 // If it's not, we assume a function expression which is handled as a primary expression.
@@ -409,16 +410,66 @@ impl<'src> Parser<'src> {
         node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span)
     }
 
+    /// Check if the current position is at a `const` or `pub const` item.
+    /// Returns `Some(visibility)` if so, `None` otherwise.
+    fn try_parse_const_item_visibility(&mut self) -> Option<Visibility> {
+        if matches!(
+            self.current_token_kind(),
+            TokenKind::Keyword(Keyword::Const)
+        ) {
+            Some(Visibility::Private)
+        } else if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Pub))
+            && matches!(self.peek_token_kind(), TokenKind::Keyword(Keyword::Const))
+        {
+            self.advance(); // consume `pub`
+            Some(Visibility::Public)
+        } else {
+            None
+        }
+    }
+
+    fn parse_const_item(&mut self, item_visibility: Visibility) -> ConstDeclaration {
+        let mut span = self.create_span_from_current_token();
+        self.consume_keyword_token(Keyword::Const);
+        let const_name = self.parse_identifier();
+        let type_annotation = match self.current_token_kind() {
+            TokenKind::Colon => {
+                self.advance();
+                self.parse_optional_type_annotation()
+            }
+            _ => None,
+        };
+        self.consume_token(TokenKind::EqualSign);
+        let expression = self.parse_expression();
+        self.end_span_from_previous_token(&mut span);
+        if matches!(self.current_token_kind(), TokenKind::Semicolon) {
+            self.advance();
+        }
+        ConstDeclaration {
+            id: self.unique_id(),
+            visibility: item_visibility,
+            name: const_name,
+            expression,
+            type_annotation,
+            span,
+        }
+    }
+
     fn parse_struct_declaration(&mut self, visibility: Visibility) -> Stmt {
         self.consume_keyword_token(Keyword::Struct);
         let name = self.parse_identifier();
         self.consume_token(TokenKind::LBrace);
         let mut fields = Vec::with_capacity(2);
+        let mut consts = Vec::new();
         while self.not_at_closing(TokenKind::RBrace) {
-            fields.push(self.parse_struct_field());
+            if let Some(item_visibility) = self.try_parse_const_item_visibility() {
+                consts.push(self.parse_const_item(item_visibility));
+            } else {
+                fields.push(self.parse_struct_field());
 
-            if matches!(self.current_token_kind(), TokenKind::Comma) {
-                self.advance();
+                if matches!(self.current_token_kind(), TokenKind::Comma) {
+                    self.advance();
+                }
             }
         }
         self.consume_token(TokenKind::RBrace);
@@ -427,7 +478,8 @@ impl<'src> Parser<'src> {
             StructDeclaration(Box::new(StructDeclaration {
                 visibility,
                 name,
-                fields
+                fields,
+                consts,
             }))
         )
     }
@@ -449,11 +501,16 @@ impl<'src> Parser<'src> {
         let name = self.parse_identifier();
         self.consume_token(TokenKind::LBrace);
         let mut variants = Vec::with_capacity(2);
+        let mut consts = Vec::new();
         while self.not_at_closing(TokenKind::RBrace) {
-            variants.push(self.parse_enum_variant());
+            if let Some(item_visibility) = self.try_parse_const_item_visibility() {
+                consts.push(self.parse_const_item(item_visibility));
+            } else {
+                variants.push(self.parse_enum_variant());
 
-            if matches!(self.current_token_kind(), TokenKind::Comma) {
-                self.advance();
+                if matches!(self.current_token_kind(), TokenKind::Comma) {
+                    self.advance();
+                }
             }
         }
         self.consume_token(TokenKind::RBrace);
@@ -462,7 +519,8 @@ impl<'src> Parser<'src> {
             EnumDeclaration(Box::new(EnumDeclaration {
                 visibility,
                 name,
-                variants
+                variants,
+                consts,
             }))
         )
     }
@@ -561,8 +619,13 @@ impl<'src> Parser<'src> {
         let name = self.parse_identifier();
         self.consume_token(TokenKind::LBrace);
         let mut methods = Vec::new();
+        let mut consts = Vec::new();
         while self.not_at_closing(TokenKind::RBrace) {
-            methods.push(self.parse_protocol_method_signature());
+            if let Some(item_visibility) = self.try_parse_const_item_visibility() {
+                consts.push(self.parse_const_item(item_visibility));
+            } else {
+                methods.push(self.parse_protocol_method_signature());
+            }
         }
         self.consume_token(TokenKind::RBrace);
         node::stmt!(
@@ -570,7 +633,8 @@ impl<'src> Parser<'src> {
             ProtocolDeclaration(Box::new(ProtocolDeclaration {
                 visibility,
                 name,
-                methods
+                methods,
+                consts,
             }))
         )
     }
@@ -902,7 +966,37 @@ impl<'src> Parser<'src> {
         )
     }
 
-    /// Parses a function call expression, e.g. `foo()`, `foo(1, 2, 3)` and
+    fn parse_const_declaration(&mut self, visibility: Visibility) -> Stmt {
+        debug!("Parsing const declaration");
+        let mut span = self.create_span_from_current_token();
+        self.consume_keyword_token(Keyword::Const);
+
+        let name = self.parse_identifier();
+
+        let type_annotation = match self.current_token_kind() {
+            TokenKind::Colon => {
+                self.advance();
+                self.parse_optional_type_annotation()
+            }
+            _ => None,
+        };
+        self.consume_token(TokenKind::EqualSign);
+        let expression = self.parse_expression();
+
+        self.end_span_from_previous_token(&mut span);
+        node::stmt!(
+            self.unique_id(),
+            Const(Box::new(ConstDeclaration {
+                id: self.unique_id(),
+                visibility,
+                name,
+                expression,
+                type_annotation,
+                span,
+            }))
+        )
+    }
+
     /// `foo { bar, baz }`.
     fn parse_call_expression(&mut self, expr: Expr) -> Expr {
         let mut span = expr.span;

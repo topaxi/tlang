@@ -1,0 +1,13 @@
+fn compute() {
+    const FACTOR = 10;
+    const OFFSET = 5;
+    FACTOR + OFFSET
+}
+
+fn multiply_by_constant(x) {
+    const MULTIPLIER = 3;
+    x * MULTIPLIER
+}
+
+log(compute());
+log(multiply_by_constant(7));

@@ -188,6 +188,14 @@ impl HirPretty {
                 self.print_variable_declaration(pat, expr, ty);
                 self.push_char(';');
             }
+            hir::StmtKind::Const(visibility, pat, expr, _ty) => {
+                self.print_visibility(*visibility);
+                self.push_str("const ");
+                self.print_pat(pat);
+                self.push_str(" = ");
+                self.print_expr(expr);
+                self.push_char(';');
+            }
             hir::StmtKind::Return(expr) => {
                 self.push_str("return");
 

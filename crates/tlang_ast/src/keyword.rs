@@ -34,6 +34,8 @@ define_keywords! {
     Mod => "mod",
     Use => "use",
 
+    Const => "const",
+
     // Reserved keywords, unused at the moment
     SelfUpper => "Self",
     While => "while"

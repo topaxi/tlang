@@ -284,11 +284,25 @@ fn collect_exported_symbols(graph: &ModuleGraph) -> HashMap<ModulePath, Vec<(Str
                             DefKind::EnumVariant(variant.parameters.len() as u16),
                         ));
                     }
+                    for const_item in &decl.consts {
+                        if const_item.visibility == tlang_ast::node::Visibility::Public {
+                            let qualified =
+                                format!("{}::{}", decl.name.as_str(), const_item.name.as_str());
+                            symbols.push((qualified, DefKind::Const));
+                        }
+                    }
                 }
                 StmtKind::StructDeclaration(decl)
                     if decl.visibility == tlang_ast::node::Visibility::Public =>
                 {
                     symbols.push((decl.name.as_str().to_string(), DefKind::Struct));
+                    for const_item in &decl.consts {
+                        if const_item.visibility == tlang_ast::node::Visibility::Public {
+                            let qualified =
+                                format!("{}::{}", decl.name.as_str(), const_item.name.as_str());
+                            symbols.push((qualified, DefKind::Const));
+                        }
+                    }
                 }
                 StmtKind::ProtocolDeclaration(decl)
                     if decl.visibility == tlang_ast::node::Visibility::Public =>
@@ -301,6 +315,16 @@ fn collect_exported_symbols(graph: &ModuleGraph) -> HashMap<ModulePath, Vec<(Str
                             DefKind::ProtocolMethod(method.parameters.len() as u16),
                         ));
                     }
+                    for const_item in &decl.consts {
+                        if const_item.visibility == tlang_ast::node::Visibility::Public {
+                            let qualified =
+                                format!("{}::{}", decl.name.as_str(), const_item.name.as_str());
+                            symbols.push((qualified, DefKind::Const));
+                        }
+                    }
+                }
+                StmtKind::Const(decl) if decl.visibility == tlang_ast::node::Visibility::Public => {
+                    symbols.push((decl.name.as_str().to_string(), DefKind::Const));
                 }
                 _ => {}
             }
@@ -326,8 +350,9 @@ fn collect_import_symbols(
                 if name == &resolved_sym.original_name {
                     import_symbols.push((local_name.clone(), *kind));
 
-                    // Auto-import child symbols for enums (variants) and protocols (methods)
-                    if matches!(kind, DefKind::Enum | DefKind::Protocol) {
+                    // Auto-import child symbols for enums (variants + consts),
+                    // structs (consts), and protocols (methods + consts)
+                    if matches!(kind, DefKind::Enum | DefKind::Protocol | DefKind::Struct) {
                         let prefix = format!("{}::", resolved_sym.original_name);
                         for (child_name, child_kind) in exports {
                             if child_name.starts_with(&prefix) {

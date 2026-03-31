@@ -9,6 +9,7 @@ use tlang_hir::HirId;
 use crate::builtins;
 use crate::error::CodegenError;
 use crate::generator::{CodegenJS, InnerCodegen};
+use crate::js;
 
 impl<'a> InnerCodegen<'a> {
     pub fn generate_stmts(&mut self, stmts: &[hir::Stmt]) -> Vec<Statement<'a>> {
@@ -76,6 +77,8 @@ impl<'a> InnerCodegen<'a> {
                         let variant_js = format!("{enum_js}.{}", variant.name.as_str());
                         self.name_map.register_exact(variant.hir_id, &variant_js);
                     }
+                    // Register const items so that `EnumName::CONST` path
+                    // references resolve correctly.
                     // Track discriminant enum variants for pattern-match strategy selection
                     // and for multi-enum overlap detection.
                     if decl.is_discriminant_enum() {
@@ -105,11 +108,48 @@ impl<'a> InnerCodegen<'a> {
         }
     }
 
+    /// Generate property assignments for const items of a type definition
+    /// (struct, enum, or protocol). These are emitted as `TypeName.CONST = value;`
+    /// so that `TypeName::CONST` → `TypeName.CONST` member access works at runtime.
+    fn generate_type_const_items(
+        &mut self,
+        type_name: &str,
+        consts: &[hir::ConstItem],
+    ) -> Vec<Statement<'a>> {
+        let type_js_name = self
+            .name_map
+            .resolve_by_name(type_name)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| js::safe_js_variable_name(type_name));
+
+        consts
+            .iter()
+            .map(|const_item| {
+                let init = self.generate_expr(&const_item.value);
+                let const_name = const_item.name.as_str();
+                let target =
+                    self.assignment_target_member(self.ident_expr(&type_js_name), const_name);
+                self.expr_stmt(self.assign_expr(target, init))
+            })
+            .collect()
+    }
+
     pub fn generate_stmt(&mut self, statement: &hir::Stmt) -> Vec<Statement<'a>> {
         match &statement.kind {
             hir::StmtKind::Expr(expr) => self.generate_expr_stmt(expr),
             hir::StmtKind::Let(pattern, expression, _ty) => {
                 self.generate_variable_declaration(pattern, expression)
+            }
+            hir::StmtKind::Const(visibility, pattern, expression, _ty) => {
+                let stmts = self.generate_const_declaration(pattern, expression);
+                if *visibility == Visibility::Public {
+                    stmts
+                        .into_iter()
+                        .map(|s| self.wrap_export_named(s))
+                        .collect()
+                } else {
+                    stmts
+                }
             }
             hir::StmtKind::FunctionDeclaration(decl) => {
                 let stmts = self.generate_function_declaration(decl);
@@ -128,30 +168,37 @@ impl<'a> InnerCodegen<'a> {
             hir::StmtKind::Return(expr) => self.generate_return_stmt(expr.as_deref()),
             hir::StmtKind::EnumDeclaration(decl) => {
                 let stmt = self.generate_enum_declaration(decl);
-                if decl.visibility == Visibility::Public {
+                let mut stmts = if decl.visibility == Visibility::Public {
                     vec![self.wrap_export_named(stmt)]
                 } else {
                     vec![stmt]
-                }
+                };
+                // Emit qualified const items (e.g., `const EnumName$CONST = value;`)
+                stmts.extend(self.generate_type_const_items(&decl.name.to_string(), &decl.consts));
+                stmts
             }
             hir::StmtKind::StructDeclaration(decl) => {
                 let stmt = self.generate_struct_declaration(decl);
-                if decl.visibility == Visibility::Public {
+                let mut stmts = if decl.visibility == Visibility::Public {
                     vec![self.wrap_export_named(stmt)]
                 } else {
                     vec![stmt]
-                }
+                };
+                // Emit qualified const items (e.g., `const StructName$CONST = value;`)
+                stmts.extend(self.generate_type_const_items(&decl.name.to_string(), &decl.consts));
+                stmts
             }
             hir::StmtKind::ProtocolDeclaration(decl) => {
-                let stmts = self.generate_protocol_declaration(decl);
+                let mut stmts = self.generate_protocol_declaration(decl);
                 if decl.visibility == Visibility::Public {
-                    stmts
+                    stmts = stmts
                         .into_iter()
                         .map(|s| self.wrap_export_named(s))
-                        .collect()
-                } else {
-                    stmts
+                        .collect();
                 }
+                // Emit qualified const items (e.g., `const ProtocolName$CONST = value;`)
+                stmts.extend(self.generate_type_const_items(&decl.name.to_string(), &decl.consts));
+                stmts
             }
             hir::StmtKind::ImplBlock(impl_block) => self.generate_impl_block(impl_block),
         }
@@ -230,6 +277,36 @@ impl<'a> InnerCodegen<'a> {
                 vec![]
             }
         }
+    }
+
+    fn generate_const_declaration(
+        &mut self,
+        pattern: &hir::Pat,
+        value: &hir::Expr,
+    ) -> Vec<Statement<'a>> {
+        match &pattern.kind {
+            hir::PatKind::Identifier(hir_id, ident) => {
+                self.generate_const_declaration_identifier(*hir_id, ident.as_str(), value)
+            }
+            _ => {
+                self.errors.push(CodegenError::unsupported(
+                    "const declaration pattern matching",
+                    pattern.span,
+                ));
+                vec![]
+            }
+        }
+    }
+
+    fn generate_const_declaration_identifier(
+        &mut self,
+        hir_id: HirId,
+        name: &str,
+        value: &hir::Expr,
+    ) -> Vec<Statement<'a>> {
+        let init = self.generate_expr(value);
+        let var_name = self.name_map.register(hir_id, name);
+        vec![self.const_decl(&var_name, init)]
     }
 
     fn generate_variable_declaration_identifier(

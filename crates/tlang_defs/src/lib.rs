@@ -20,6 +20,7 @@ pub enum DefKind {
     Module,
     #[default]
     Variable,
+    Const,
     Function(u16),
     FunctionSelfRef(u16),
     Parameter,
@@ -50,6 +51,7 @@ impl Display for DefKind {
         match self {
             DefKind::Module => write!(f, "module"),
             DefKind::Variable => write!(f, "variable"),
+            DefKind::Const => write!(f, "constant"),
             DefKind::Function(_)
             | DefKind::FunctionSelfRef(_)
             | DefKind::ProtocolMethod(_)
