@@ -232,11 +232,17 @@ test.describe('Diagnostics panel', () => {
     await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
 
     const panel = page.locator('t-diagnostics');
-    await panel.getByLabel('Expand Diagnostics').click();
-    await expect(panel.locator('.messages')).toBeVisible();
+    await panel.getByLabel('Expand Diagnostics').first().click();
+    await expect(panel.locator('.messages').first()).toBeVisible();
 
-    await panel.getByLabel('Collapse Diagnostics').click();
-    await expect(panel.locator('.messages')).not.toBeVisible();
+    // At compact viewports (default 1280×720), the dialog covers the outer
+    // toolbar, so collapse via the dialog's button if open, else outer toolbar.
+    const dialog = panel.locator('dialog');
+    const collapseTarget = (await dialog.isVisible())
+      ? dialog.getByLabel('Collapse Diagnostics')
+      : panel.getByLabel('Collapse Diagnostics').first();
+    await collapseTarget.click();
+    await expect(panel.locator('.messages').first()).not.toBeVisible();
   });
 
   test('semantic error is rendered as HTML in diagnostics panel, not ANSI codes', async ({
@@ -306,6 +312,105 @@ test.describe('Diagnostics panel', () => {
     await gotoPlayground(page, '#source=DYUwLgBAHhC8EBYBMBuIA');
 
     await expect(page.locator('t-console-message[type="warn"]')).toHaveCount(0);
+  });
+
+  test('on compact viewport, expand opens a fullscreen dialog', async ({
+    page,
+  }) => {
+    // Compact: max-width 640px OR max-height 800px
+    await page.setViewportSize({ width: 640, height: 780 });
+    // Source: `missing_var;` — triggers "Use of undeclared variable" error
+    await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
+
+    const panel = page.locator('t-diagnostics');
+    await expect(panel).toHaveJSProperty('hidden', false);
+    const dialog = panel.locator('dialog');
+
+    // Dialog element exists but is not open
+    await expect(dialog).toBeAttached();
+    await expect(dialog).not.toBeVisible();
+
+    // Click via JS — toolbar may be fully obscured at small compact sizes
+    await panel
+      .getByLabel('Expand Diagnostics')
+      .evaluate((el) => (el as HTMLElement).click());
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('.messages')).toBeVisible();
+  });
+
+  test('on compact viewport, dialog can be closed with collapse button', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 640, height: 780 });
+    await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
+
+    const panel = page.locator('t-diagnostics');
+    await expect(panel).toHaveJSProperty('hidden', false);
+    const dialog = panel.locator('dialog');
+
+    await panel
+      .getByLabel('Expand Diagnostics')
+      .evaluate((el) => (el as HTMLElement).click());
+    await expect(dialog).toBeVisible();
+
+    // The toolbar inside the dialog has a collapse button
+    await dialog.getByLabel('Collapse Diagnostics').click();
+    await expect(dialog).not.toBeVisible();
+  });
+
+  test('on compact viewport, dialog can be closed with Escape', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 640, height: 780 });
+    await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
+
+    const panel = page.locator('t-diagnostics');
+    await expect(panel).toHaveJSProperty('hidden', false);
+    const dialog = panel.locator('dialog');
+
+    await panel
+      .getByLabel('Expand Diagnostics')
+      .evaluate((el) => (el as HTMLElement).click());
+    await expect(dialog).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+  });
+
+  test('inline expansion collapses when viewport shrinks to compact', async ({
+    page,
+  }) => {
+    // Start with a large viewport (non-compact)
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
+
+    const panel = page.locator('t-diagnostics');
+    await expect(panel).toHaveJSProperty('hidden', false);
+
+    // Expand inline
+    await panel.getByLabel('Expand Diagnostics').click();
+    await expect(panel.locator('.messages')).toBeVisible();
+
+    // Shrink viewport to compact — inline expansion should collapse
+    await page.setViewportSize({ width: 640, height: 780 });
+    await expect(panel.locator('dialog')).not.toBeVisible();
+  });
+
+  test('on desktop viewport, expand shows inline messages without dialog', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await gotoPlayground(page, '#source=LYSwzmIHYOYPoDcCGAnA3EA');
+
+    const panel = page.locator('t-diagnostics');
+    await expect(panel).toHaveJSProperty('hidden', false);
+
+    await panel.getByLabel('Expand Diagnostics').click();
+
+    // Messages should be inline, not inside a dialog
+    const dialog = panel.locator('dialog');
+    await expect(dialog).not.toBeAttached();
+    await expect(panel.locator('.messages')).toBeVisible();
   });
 });
 

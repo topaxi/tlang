@@ -1,6 +1,7 @@
 import { css, html, LitElement, PropertyValueMap } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, property, query, state } from 'lit/decorators.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import { mediaQuery } from '../decorators/media-query';
 import './t-message';
 import './t-toggle-button';
 
@@ -67,7 +68,37 @@ export class DiagnosticsElement extends LitElement {
     t-message:last-child {
       border-bottom: none;
     }
+
+    dialog {
+      background-color: var(--t-background-color);
+      color: var(--t-foreground-color);
+      border: none;
+      outline: none;
+      padding: 0;
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      max-width: 100dvw;
+      max-height: 100dvh;
+      overflow: hidden;
+    }
+
+    dialog[open] {
+      display: flex;
+      flex-direction: column;
+    }
+
+    dialog::backdrop {
+      background: rgb(0 0 0 / 50%);
+    }
+
+    dialog .messages {
+      flex: 1;
+    }
   `;
+
+  @mediaQuery('(max-width: 640px), (max-height: 800px)')
+  private compact!: boolean;
 
   @property({ type: Array })
   messages: DiagnosticMessage[] = [];
@@ -81,6 +112,9 @@ export class DiagnosticsElement extends LitElement {
   @state()
   private expanded = false;
 
+  @query('dialog')
+  private dialog!: HTMLDialogElement | null;
+
   protected override willUpdate(
     changedProperties: PropertyValueMap<this>,
   ): void {
@@ -93,11 +127,38 @@ export class DiagnosticsElement extends LitElement {
     }
   }
 
+  @state()
+  private wasCompact = false;
+
+  protected override updated(): void {
+    // Collapse inline expansion when entering compact mode
+    if (this.compact && !this.wasCompact && this.expanded) {
+      this.expanded = false;
+    }
+    this.wasCompact = this.compact;
+
+    if (this.compact) {
+      if (this.expanded && !this.dialog?.open) {
+        this.dialog?.showModal();
+      } else if (!this.expanded && this.dialog?.open) {
+        this.dialog?.close();
+      }
+    } else {
+      if (this.dialog?.open) {
+        this.dialog?.close();
+      }
+    }
+  }
+
   private toggle() {
     this.expanded = !this.expanded;
   }
 
-  protected override render() {
+  private onDialogClose() {
+    this.expanded = false;
+  }
+
+  private renderToolbar() {
     return html`
       <div class="toolbar">
         <t-toggle-button
@@ -124,16 +185,34 @@ export class DiagnosticsElement extends LitElement {
             </span>`
           : null}
       </div>
-      ${this.expanded
+    `;
+  }
+
+  private renderMessages() {
+    return html`
+      <div class="messages" role="list" aria-label="Diagnostic messages">
+        ${this.messages.map(
+          // prettier-ignore
+          (msg) => html`<t-message role="listitem" severity=${msg.severity}><div>${unsafeHTML(msg.html)}</div></t-message>`,
+        )}
+      </div>
+    `;
+  }
+
+  protected override render() {
+    return html`
+      ${this.renderToolbar()}
+      ${this.compact
         ? html`
-            <div class="messages" role="list" aria-label="Diagnostic messages">
-              ${this.messages.map(
-                // prettier-ignore
-                (msg) => html`<t-message role="listitem" severity=${msg.severity}><div>${unsafeHTML(msg.html)}</div></t-message>`,
-              )}
-            </div>
+            <dialog @close=${this.onDialogClose} aria-label="Diagnostics">
+              ${this.expanded
+                ? html`${this.renderToolbar()} ${this.renderMessages()}`
+                : null}
+            </dialog>
           `
-        : null}
+        : this.expanded
+          ? this.renderMessages()
+          : null}
     `;
   }
 }
