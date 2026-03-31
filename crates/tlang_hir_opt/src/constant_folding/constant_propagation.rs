@@ -95,6 +95,34 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
                     self.constants.insert(*hir_id, *lit.clone());
                 }
             }
+            // Collect const items from struct/enum/protocol declarations so that
+            // qualified references (e.g. `Config::DEFAULT_TIMEOUT`) get inlined.
+            StmtKind::StructDeclaration(decl) => {
+                for const_item in &mut decl.consts {
+                    self.visit_expr(&mut const_item.value, ctx);
+                    if let ExprKind::Literal(lit) = &const_item.value.kind {
+                        self.constants.insert(const_item.hir_id, *lit.clone());
+                    }
+                }
+            }
+            StmtKind::EnumDeclaration(decl) => {
+                for const_item in &mut decl.consts {
+                    self.visit_expr(&mut const_item.value, ctx);
+                    if let ExprKind::Literal(lit) = &const_item.value.kind {
+                        self.constants.insert(const_item.hir_id, *lit.clone());
+                    }
+                }
+                visit::walk_stmt(self, stmt, ctx);
+            }
+            StmtKind::ProtocolDeclaration(decl) => {
+                for const_item in &mut decl.consts {
+                    self.visit_expr(&mut const_item.value, ctx);
+                    if let ExprKind::Literal(lit) = &const_item.value.kind {
+                        self.constants.insert(const_item.hir_id, *lit.clone());
+                    }
+                }
+                visit::walk_stmt(self, stmt, ctx);
+            }
             _ => visit::walk_stmt(self, stmt, ctx),
         }
     }

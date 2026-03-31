@@ -196,9 +196,7 @@ impl<'a> InnerCodegen<'a> {
                     vec![stmt]
                 };
                 // Emit qualified const items (e.g., `const StructName$CONST = value;`)
-                stmts.extend(
-                    self.generate_type_const_items(&decl.name.to_string(), &decl.consts),
-                );
+                stmts.extend(self.generate_type_const_items(&decl.name.to_string(), &decl.consts));
                 stmts
             }
             hir::StmtKind::ProtocolDeclaration(decl) => {
@@ -210,9 +208,7 @@ impl<'a> InnerCodegen<'a> {
                         .collect();
                 }
                 // Emit qualified const items (e.g., `const ProtocolName$CONST = value;`)
-                stmts.extend(
-                    self.generate_type_const_items(&decl.name.to_string(), &decl.consts),
-                );
+                stmts.extend(self.generate_type_const_items(&decl.name.to_string(), &decl.consts));
                 stmts
             }
             hir::StmtKind::ImplBlock(impl_block) => self.generate_impl_block(impl_block),

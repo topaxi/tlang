@@ -1,0 +1,39 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: javascript"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/consts/enum_const.tlang
+---
+0
+0
+2
+
+warning: Unused enum variant `Status::Active`, if this is intentional, prefix the name with an underscore: `_Status::Active`
+  ┌─ [WORKSPACE_ROOT]/tests/consts/enum_const.tlang:2:5
+  │
+2 │     Active,
+  │     ^^^^^^
+
+warning: Unused enum variant `Status::Inactive`, if this is intentional, prefix the name with an underscore: `_Status::Inactive`
+  ┌─ [WORKSPACE_ROOT]/tests/consts/enum_const.tlang:3:5
+  │
+3 │     Inactive,
+  │     ^^^^^^^^
+
+warning: Unused enum variant `Priority::Low`, if this is intentional, prefix the name with an underscore: `_Priority::Low`
+  ┌─ [WORKSPACE_ROOT]/tests/consts/enum_const.tlang:8:5
+  │
+8 │     Low,
+  │     ^^^
+
+warning: Unused enum variant `Priority::Medium`, if this is intentional, prefix the name with an underscore: `_Priority::Medium`
+  ┌─ [WORKSPACE_ROOT]/tests/consts/enum_const.tlang:9:5
+  │
+9 │     Medium,
+  │     ^^^^^^
+
+warning: Unused enum variant `Priority::High`, if this is intentional, prefix the name with an underscore: `_Priority::High`
+   ┌─ [WORKSPACE_ROOT]/tests/consts/enum_const.tlang:10:5
+   │
+10 │     High,
+   │     ^^^^

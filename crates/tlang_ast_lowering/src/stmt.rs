@@ -39,6 +39,7 @@ impl LoweringContext {
                 }]
             }
             ast::node::StmtKind::Const(box ConstDeclaration {
+                id: const_id,
                 visibility,
                 name,
                 expression,
@@ -47,7 +48,7 @@ impl LoweringContext {
             }) => {
                 let expr = self.lower_expr(expression);
                 let ty = self.lower_ty(type_annotation.as_ref());
-                let pat = self.lower_ident_pat(node.id, name);
+                let pat = self.lower_ident_pat(*const_id, name);
 
                 vec![hir::Stmt {
                     hir_id: self.lower_node_id(node.id),

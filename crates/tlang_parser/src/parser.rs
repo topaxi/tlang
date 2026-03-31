@@ -425,7 +425,10 @@ impl<'src> Parser<'src> {
                     Visibility::Private
                 };
 
-            if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Const)) {
+            if matches!(
+                self.current_token_kind(),
+                TokenKind::Keyword(Keyword::Const)
+            ) {
                 let mut span = self.create_span_from_current_token();
                 self.consume_keyword_token(Keyword::Const);
                 let const_name = self.parse_identifier();
@@ -497,7 +500,10 @@ impl<'src> Parser<'src> {
                     Visibility::Private
                 };
 
-            if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Const)) {
+            if matches!(
+                self.current_token_kind(),
+                TokenKind::Keyword(Keyword::Const)
+            ) {
                 let mut span = self.create_span_from_current_token();
                 self.consume_keyword_token(Keyword::Const);
                 let const_name = self.parse_identifier();
@@ -646,7 +652,10 @@ impl<'src> Parser<'src> {
                     Visibility::Private
                 };
 
-            if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Const)) {
+            if matches!(
+                self.current_token_kind(),
+                TokenKind::Keyword(Keyword::Const)
+            ) {
                 let mut span = self.create_span_from_current_token();
                 self.consume_keyword_token(Keyword::Const);
                 let const_name = self.parse_identifier();
@@ -1044,7 +1053,6 @@ impl<'src> Parser<'src> {
             }))
         )
     }
-
 
     /// `foo { bar, baz }`.
     fn parse_call_expression(&mut self, expr: Expr) -> Expr {

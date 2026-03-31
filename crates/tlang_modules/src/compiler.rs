@@ -286,11 +286,8 @@ fn collect_exported_symbols(graph: &ModuleGraph) -> HashMap<ModulePath, Vec<(Str
                     }
                     for const_item in &decl.consts {
                         if const_item.visibility == tlang_ast::node::Visibility::Public {
-                            let qualified = format!(
-                                "{}::{}",
-                                decl.name.as_str(),
-                                const_item.name.as_str()
-                            );
+                            let qualified =
+                                format!("{}::{}", decl.name.as_str(), const_item.name.as_str());
                             symbols.push((qualified, DefKind::Const));
                         }
                     }
@@ -301,11 +298,8 @@ fn collect_exported_symbols(graph: &ModuleGraph) -> HashMap<ModulePath, Vec<(Str
                     symbols.push((decl.name.as_str().to_string(), DefKind::Struct));
                     for const_item in &decl.consts {
                         if const_item.visibility == tlang_ast::node::Visibility::Public {
-                            let qualified = format!(
-                                "{}::{}",
-                                decl.name.as_str(),
-                                const_item.name.as_str()
-                            );
+                            let qualified =
+                                format!("{}::{}", decl.name.as_str(), const_item.name.as_str());
                             symbols.push((qualified, DefKind::Const));
                         }
                     }
@@ -323,18 +317,13 @@ fn collect_exported_symbols(graph: &ModuleGraph) -> HashMap<ModulePath, Vec<(Str
                     }
                     for const_item in &decl.consts {
                         if const_item.visibility == tlang_ast::node::Visibility::Public {
-                            let qualified = format!(
-                                "{}::{}",
-                                decl.name.as_str(),
-                                const_item.name.as_str()
-                            );
+                            let qualified =
+                                format!("{}::{}", decl.name.as_str(), const_item.name.as_str());
                             symbols.push((qualified, DefKind::Const));
                         }
                     }
                 }
-                StmtKind::Const(decl)
-                    if decl.visibility == tlang_ast::node::Visibility::Public =>
-                {
+                StmtKind::Const(decl) if decl.visibility == tlang_ast::node::Visibility::Public => {
                     symbols.push((decl.name.as_str().to_string(), DefKind::Const));
                 }
                 _ => {}
