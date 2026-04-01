@@ -126,7 +126,13 @@ impl CodegenJS {
         .expect("stdlib lowering should succeed");
         let mut ctx: HirOptContext = meta.into();
 
-        let mut optimizer = crate::js_hir_opt::JsHirOptimizer::default();
+        let mut optimizer = crate::js_hir_opt::JsHirOptimizer::from(
+            crate::js_hir_opt::DefaultJsOptimizations::default()
+                // DeadCodeElimination is intentionally excluded.
+                // The stdlib module has non-pub bindings (e.g. `let map = Functor::map`)
+                // that are part of the public API but lack `pub` visibility.
+                .without("DeadCodeElimination"),
+        );
         optimizer
             .optimize_hir(&mut module, &mut ctx)
             .expect("internal compiler error: stdlib HIR optimizer failed to converge");

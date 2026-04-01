@@ -47,7 +47,12 @@ pub fn compile(source: &str, analyzer: &mut SemanticAnalyzer) -> (hir::Module, H
     )
     .expect("lowering should succeed");
 
-    let mut optimizer = tlang_hir_opt::HirOptimizer::default();
+    let mut optimizer = tlang_hir_opt::HirOptimizer::from(
+        tlang_hir_opt::DefaultOptimizations::default()
+            // No DCE: REPL-like tests evaluate single expressions that DCE would
+            // eliminate as pure, unused top-level statements.
+            .without("DeadCodeElimination"),
+    );
     let constant_pool_ids = meta.constant_pool_ids.clone();
     let mut ctx = meta.into();
     optimizer

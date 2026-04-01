@@ -98,6 +98,8 @@ pub struct JsOptimizationOptions {
     /// Replace ANF temporaries in return position with direct `return` statements.
     /// Defaults to `true` when the JS ANF transform is active.
     pub anf_return_opt: Option<bool>,
+    /// Remove unreferenced bindings and declarations. Defaults to `true`.
+    pub dead_code_elimination: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -166,6 +168,7 @@ impl Tlang {
                 constant_folding: Some(true),
                 anf_transform: None,
                 anf_return_opt: Some(true),
+                dead_code_elimination: Some(true),
             },
             build: BuildArtifacts::default(),
             analyzer,
@@ -356,6 +359,16 @@ impl Tlang {
                         ));
                     }
 
+                    if self
+                        .optimization_options
+                        .dead_code_elimination
+                        .unwrap_or(true)
+                    {
+                        passes.push(Box::new(
+                            tlang_hir_opt::dead_code_elimination::DeadCodeElimination::default(),
+                        ));
+                    }
+
                     let mut optimizer = JsHirOptimizer::new(passes);
                     optimizer
                         .optimize_hir(&mut module, &mut ctx)
@@ -385,6 +398,16 @@ impl Tlang {
                     if self.optimization_options.constant_folding.unwrap_or(true) {
                         passes.push(Box::new(
                             tlang_hir_opt::constant_folding::ConstantFolding::default(),
+                        ));
+                    }
+
+                    if self
+                        .optimization_options
+                        .dead_code_elimination
+                        .unwrap_or(true)
+                    {
+                        passes.push(Box::new(
+                            tlang_hir_opt::dead_code_elimination::DeadCodeElimination::default(),
                         ));
                     }
 

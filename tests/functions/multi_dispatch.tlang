@@ -1,0 +1,11 @@
+// Multi-clause function dispatch: DCE must keep the entire DynFunctionDeclaration
+// group alive whenever any variant is referenced.
+fn add(a, b) { a + b }
+fn add(a) { add(a, 1) }
+add(5) |> log();
+
+// Reassignment to a multi-clause function must resolve through the
+// DynFunctionDeclaration so arity dispatch still works at runtime.
+let add2 = add;
+add2(10) |> log();
+add2(3, 4) |> log();

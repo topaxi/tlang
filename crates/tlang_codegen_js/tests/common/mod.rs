@@ -1,5 +1,6 @@
+use tlang_codegen_js::JsAnfTransform;
 use tlang_codegen_js::generator::CodegenJS;
-use tlang_codegen_js::{JsAnfTransform, JsHirOptimizer};
+use tlang_codegen_js::js_hir_opt::{DefaultJsOptimizations, JsHirOptimizer};
 use tlang_defs::DefKind;
 use tlang_hir_opt::HirPass;
 use tlang_hir_opt::symbol_resolution::SymbolResolution;
@@ -76,7 +77,13 @@ pub fn compile_src_with_warnings(
             .expect("lowering should succeed");
 
             if options.optimize {
-                let mut optimizer = JsHirOptimizer::default();
+                let mut optimizer = JsHirOptimizer::from(
+                    DefaultJsOptimizations::default()
+                        // DeadCodeElimination is intentionally excluded.
+                        // These tests compile isolated snippets (REPL-like), so
+                        // top-level declarations would be incorrectly removed by DCE.
+                        .without("DeadCodeElimination"),
+                );
                 let mut ctx = meta.into();
                 optimizer
                     .optimize_hir(&mut module, &mut ctx)

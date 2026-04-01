@@ -133,18 +133,16 @@ impl LoweringContext {
 
         if has_variadic_arguments {
             // Group by arguments length and emit a function for each variant.
-            // Not using a hashmap here, as the amount of fn decls should be farily small.
-            // Therefore we just sort the declarations and start with short argument lists
-            // first.
-            // Currently the easiest way is to split up
-            // ast::node::SmtKind::FunctionDeclarations by argument length and create a
-            // new unique name for each declaration.
-            let mut fn_variants = decls
+            // Preserve source order (order of first occurrence per arity) so that
+            // HIR emit order matches the symbol-table insertion order that
+            // SlotAllocator uses. Sorting by arity here would invert the two
+            // orderings and cause slot-index mismatches at runtime.
+            let mut seen_arities = std::collections::HashSet::new();
+            let fn_variants: Vec<usize> = decls
                 .iter()
                 .map(|decl| decl.parameters.len())
-                .collect::<Vec<_>>();
-            fn_variants.sort();
-            fn_variants.dedup();
+                .filter(|arity| seen_arities.insert(*arity))
+                .collect();
 
             let mut fn_variant_ids = vec![];
 
@@ -213,11 +211,27 @@ impl LoweringContext {
             // Use name_or_invalid() here — any error will be reported by
             // fn_name_or_error() inside lower_fn_decl_matching for each arity variant.
             let fn_name_str = first_declaration.name_or_invalid();
+            // FIXME: `scope_start = 0` is a workaround for a span-unit mismatch.
+            //
+            // `get_closest_by_name` compares `scope_start < span.start_lc.line` (line
+            // numbers), but `define_symbol_after` historically received byte offsets from
+            // `first_declaration.span.start`.  Passing 0 makes the DynFunctionDeclaration
+            // visible from any line, so callers can always find it — but it also means a
+            // reference that textually precedes the first clause would resolve to the dyn
+            // dispatch node rather than being rejected, which is semantically wrong.
+            //
+            // The correct value to pass would be the **end** of the last declaration
+            // (i.e. `last_declaration.span.end_lc.line`): a DynFunctionDeclaration
+            // logically spans from the first clause to the last, so any reference after
+            // that final clause should find it, but references before it should not.
+            // `get_closest_*` uses start spans for proximity comparisons, and the dyn
+            // node's own span already covers first-to-last, so using the end line of the
+            // last declaration as `scope_start` would be semantically accurate.
             self.define_symbol_after(
                 dyn_fn_decl.hir_id,
                 &fn_name_str,
                 DefKind::Variable, // TODO, add symbol type for dyn dispatch functions
-                first_declaration.span.start,
+                0,
                 |symbol| symbol.node_id == last_decl_id,
             );
 

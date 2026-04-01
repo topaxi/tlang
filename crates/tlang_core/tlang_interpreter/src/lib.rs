@@ -2204,7 +2204,14 @@ mod tests {
             )
             .expect("lowering should succeed");
 
-            let mut optimizer = HirOptimizer::default();
+            let mut optimizer = HirOptimizer::from(
+                tlang_hir_opt::DefaultOptimizations::default()
+                    // DeadCodeElimination is intentionally excluded here.
+                    // The TestInterpreter evaluates declarations incrementally
+                    // (REPL-like), so top-level bindings from earlier calls must
+                    // survive even when unreferenced within the current unit.
+                    .without("DeadCodeElimination"),
+            );
             debug!("LowerResultMeta = {:?}", meta);
             let constant_pool_ids = meta.constant_pool_ids.clone();
             let mut ctx = meta.into();
@@ -3364,5 +3371,271 @@ mod tests {
         // map over string maps over each character
         let result = t.eval(r#"map("abc", fn(c) { c + c })"#);
         assert_eq!(t.state_mut().stringify(result), "aabbcc");
+    }
+
+    // -------------------------------------------------------------------------
+    // Pipeline debug tests for multi-arity dispatch (add/1 + add/2 + DynFnDecl)
+    // -------------------------------------------------------------------------
+    const MULTI_DISPATCH_SRC: &str = indoc! {"
+        fn add(a, b) { a + b }
+        fn add(a) { add(a, 1) }
+        add(5) |> log();
+        let add2 = add;
+        add2(10) |> log();
+        add2(3, 4) |> log();
+    "};
+
+    /// Parse + semantic-analyse, then lower WITHOUT any optimizer.
+    fn pipeline_lower(
+        src: &str,
+    ) -> (
+        hir::Module,
+        hir::LowerResultMeta,
+        tlang_semantics::SemanticAnalyzer,
+    ) {
+        let mut semantic_analyzer = tlang_semantics::SemanticAnalyzer::default();
+        semantic_analyzer.add_builtin_symbols_with_slots(&tlang_vm::VM::builtin_symbols());
+
+        let mut parser = tlang_parser::Parser::from_source(src);
+        let (mut ast, parse_meta) = parser.parse().unwrap();
+        semantic_analyzer
+            .analyze_as_root_module(&mut ast)
+            .expect("semantic analysis failed");
+
+        let mut lowering_context = tlang_ast_lowering::LoweringContext::new(
+            semantic_analyzer.symbol_id_allocator(),
+            semantic_analyzer.root_symbol_table(),
+            semantic_analyzer.symbol_tables().clone(),
+        );
+        let (module, meta) = tlang_ast_lowering::lower(
+            &mut lowering_context,
+            &ast,
+            &parse_meta.constant_pool_node_ids,
+        )
+        .expect("lowering failed");
+
+        (module, meta, semantic_analyzer)
+    }
+
+    /// Verify semantic analysis produces correct symbol table entries for
+    /// multi-arity `add`: two Function variants and one Variable (DynFnDecl).
+    #[test]
+    fn test_multi_dispatch_semantic_analysis() {
+        let mut semantic_analyzer = tlang_semantics::SemanticAnalyzer::default();
+        semantic_analyzer.add_builtin_symbols_with_slots(&tlang_vm::VM::builtin_symbols());
+
+        let mut parser = tlang_parser::Parser::from_source(MULTI_DISPATCH_SRC);
+        let (mut ast, _) = parser.parse().unwrap();
+        semantic_analyzer
+            .analyze_as_root_module(&mut ast)
+            .expect("semantic analysis failed");
+
+        let root = semantic_analyzer.root_symbol_table();
+        let root = root.borrow();
+        let add_syms: Vec<_> = root
+            .get_all_local_symbols()
+            .iter()
+            .filter(|s| *s.name == *"add")
+            .collect();
+
+        eprintln!("add symbols after semantic analysis: {add_syms:#?}");
+
+        // Expect exactly two Function variants (arity 1 and 2) at this point.
+        // The Variable (DynFnDecl) entry is inserted during HIR lowering, not here.
+        let fn_variants: Vec<_> = add_syms
+            .iter()
+            .filter(|s| matches!(s.kind, tlang_defs::DefKind::Function(_)))
+            .collect();
+        assert_eq!(
+            fn_variants.len(),
+            2,
+            "Expected 2 Function entries for `add` after semantic analysis, got: {add_syms:#?}"
+        );
+
+        let arities: std::collections::HashSet<u16> =
+            fn_variants.iter().filter_map(|s| s.kind.arity()).collect();
+        assert!(
+            arities.contains(&1),
+            "Missing arity-1 variant in symbol table: {add_syms:#?}"
+        );
+        assert!(
+            arities.contains(&2),
+            "Missing arity-2 variant in symbol table: {add_syms:#?}"
+        );
+    }
+
+    /// Verify HIR lowering produces FnDecl(add/2), FnDecl(add/1), DynFnDecl(add)
+    /// with matching variant hir_ids.
+    #[test]
+    fn test_multi_dispatch_lowering() {
+        let (module, _meta, _sem) = pipeline_lower(MULTI_DISPATCH_SRC);
+
+        let fn_decls: Vec<_> = module
+            .block
+            .stmts
+            .iter()
+            .filter_map(|s| {
+                if let hir::StmtKind::FunctionDeclaration(f) = &s.kind {
+                    Some((f.hir_id, f.name()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let dyn_decls: Vec<_> = module
+            .block
+            .stmts
+            .iter()
+            .filter_map(|s| {
+                if let hir::StmtKind::DynFunctionDeclaration(d) = &s.kind {
+                    Some(d.as_ref())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        eprintln!("FnDecls after lowering: {fn_decls:#?}");
+        eprintln!("DynFnDecls after lowering: {dyn_decls:#?}");
+
+        assert_eq!(fn_decls.len(), 2, "Expected 2 FnDecls (add/2 and add/1)");
+        assert_eq!(dyn_decls.len(), 1, "Expected 1 DynFnDecl");
+
+        let dyn_decl = dyn_decls[0];
+        let arities: Vec<usize> = dyn_decl.variants.iter().map(|(a, _)| *a).collect();
+        assert_eq!(
+            arities,
+            vec![2, 1],
+            "DynFnDecl should list variants in source order (arity 2 first, then 1)"
+        );
+
+        let fn_hir_ids: Vec<_> = fn_decls.iter().map(|(id, _)| *id).collect();
+        for (arity, variant_id) in &dyn_decl.variants {
+            assert!(
+                fn_hir_ids.contains(variant_id),
+                "DynFnDecl arity-{arity} variant hir_id {variant_id:?} not in FnDecl ids {fn_hir_ids:?}"
+            );
+        }
+    }
+
+    /// Run the full default optimizer pipeline and verify it does not panic,
+    /// then confirm the interpreter produces 6, 11, 7.
+    #[test]
+    fn test_multi_dispatch_full_pipeline() {
+        let (mut module, meta, _sem) = pipeline_lower(MULTI_DISPATCH_SRC);
+
+        let mut optimizer = HirOptimizer::default();
+        let constant_pool_ids = meta.constant_pool_ids.clone();
+        let mut ctx = meta.into();
+        optimizer
+            .optimize_hir(&mut module, &mut ctx)
+            .expect("optimizer failed");
+
+        // Log what the module looks like after full optimization for diagnostics
+        let stmt_kinds: Vec<_> = module
+            .block
+            .stmts
+            .iter()
+            .map(|s| match &s.kind {
+                hir::StmtKind::FunctionDeclaration(f) => {
+                    format!("FnDecl({}#{:?})", f.name(), f.hir_id)
+                }
+                hir::StmtKind::DynFunctionDeclaration(d) => format!("DynFnDecl({:?})", d.hir_id),
+                hir::StmtKind::Let(..) => "Let".to_string(),
+                hir::StmtKind::Expr(_) => "Expr".to_string(),
+                other => format!("{other:?}"),
+            })
+            .collect();
+        eprintln!("Top-level stmts after full optimization: {stmt_kinds:#?}");
+
+        let vm = tlang_vm::VM::new();
+        let mut state = vm.into_state();
+        state.register_constant_pool_ids(constant_pool_ids);
+
+        let logged = Rc::new(RefCell::new(vec![]));
+        let logged_clone = logged.clone();
+        let log_fn = state.new_native_fn("log", move |state, args| {
+            let msg = args
+                .iter()
+                .map(|v| state.stringify(*v))
+                .collect::<Vec<_>>()
+                .join(", ");
+            logged_clone.borrow_mut().push(msg);
+            NativeFnReturn::Return(TlangValue::Nil)
+        });
+        state.set_global("log".to_string(), log_fn);
+
+        Interpreter.eval(&mut state, &module);
+
+        let output = logged.borrow().clone();
+        assert_eq!(
+            output,
+            vec!["6".to_string(), "11".to_string(), "7".to_string()],
+            "Expected log output [6, 11, 7] but got: {output:#?}"
+        );
+    }
+
+    /// Regression test: optimizer must not disturb slot-ordering of multi-dispatch variants.
+    ///
+    /// The HirOptimizer runs multiple passes until convergence. This test verifies that after
+    /// full optimization the FnDecls appear in the same source order as the symbol-table records
+    /// them, so interpreter slot assignments stay consistent.
+    #[test]
+    fn test_multi_dispatch_optimizer_bisect() {
+        let (mut module, meta, _sem) = pipeline_lower(MULTI_DISPATCH_SRC);
+        let constant_pool_ids = meta.constant_pool_ids.clone();
+        let mut ctx = meta.into();
+
+        let mut optimizer = HirOptimizer::default();
+        optimizer
+            .optimize_hir(&mut module, &mut ctx)
+            .expect("optimizer failed");
+
+        // FnDecls must be emitted in source order (add/2 first, add/1 second) so that
+        // interpreter slot assignments match the symbol-table order established during
+        // semantic analysis.
+        let fn_decl_names: Vec<_> = module
+            .block
+            .stmts
+            .iter()
+            .filter_map(|s| {
+                if let hir::StmtKind::FunctionDeclaration(f) = &s.kind {
+                    Some(f.name())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(
+            fn_decl_names,
+            vec!["add/2", "add/1"],
+            "FnDecls must be in source order; got: {fn_decl_names:?}"
+        );
+
+        let vm = tlang_vm::VM::new();
+        let mut state = vm.into_state();
+        state.register_constant_pool_ids(constant_pool_ids);
+
+        let logged = Rc::new(RefCell::new(vec![]));
+        let logged_clone = logged.clone();
+        let log_fn = state.new_native_fn("log", move |state, args| {
+            let msg = args
+                .iter()
+                .map(|v| state.stringify(*v))
+                .collect::<Vec<_>>()
+                .join(", ");
+            logged_clone.borrow_mut().push(msg);
+            NativeFnReturn::Return(TlangValue::Nil)
+        });
+        state.set_global("log".to_string(), log_fn);
+
+        Interpreter.eval(&mut state, &module);
+
+        let output = logged.borrow().clone();
+        assert_eq!(
+            output,
+            vec!["6", "11", "7"],
+            "Expected [6, 11, 7]: {output:?}"
+        );
     }
 }

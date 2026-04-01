@@ -16,12 +16,6 @@ Character counting:
 Alphabetic string tests:
 [ true, false, true, true ]
 
-warning: Unused function `is_alpha/1`
-   ┌─ [WORKSPACE_ROOT]/tests/strings/string_processing.tlang:24:4
-   │
-24 │ fn is_alpha("") { true }
-   │    ^^^^^^^^
-
 warning: `rec` call is not in tail position; the `rec` annotation has no effect
   ┌─ [WORKSPACE_ROOT]/tests/strings/string_processing.tlang:8:5
   │

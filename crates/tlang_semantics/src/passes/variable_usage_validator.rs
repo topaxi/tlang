@@ -94,9 +94,26 @@ impl VariableUsageValidator {
             .borrow()
             .get_closest_by_name(name, span);
         if let Some(symbol_info) = symbol_info {
-            self.current_symbol_table()
-                .borrow_mut()
-                .mark_as_used(symbol_info.id);
+            // When a multi-arity function is referenced via a plain path (not a direct call),
+            // we cannot know which arity will be invoked at runtime (explicit dynamic dispatch).
+            // Mark all variants with the same name as used so no arity is falsely reported
+            // as unused.
+            if symbol_info.is_any_fn() {
+                let all_ids: Vec<_> = self
+                    .current_symbol_table()
+                    .borrow()
+                    .get_by_name(name)
+                    .into_iter()
+                    .map(|s| s.id)
+                    .collect();
+                for id in all_ids {
+                    self.current_symbol_table().borrow_mut().mark_as_used(id);
+                }
+            } else {
+                self.current_symbol_table()
+                    .borrow_mut()
+                    .mark_as_used(symbol_info.id);
+            }
         } else {
             self.report_undeclared_variable(name, span, &self.current_symbol_table(), ctx);
         }

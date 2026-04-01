@@ -407,6 +407,38 @@ fn should_handle_fn_guard_variables() {
 }
 
 #[test]
+fn should_not_warn_about_multi_arity_fn_aliased_via_path() {
+    // Assigning a multi-clause function to a variable enables dynamic dispatch, so all
+    // arities must be considered used even though none is called directly by name.
+    let diagnostics = analyze_diag!(
+        indoc! {"
+        fn binary_search(list, target) { binary_search(list, target, 0, len(list) - 1) }
+        fn binary_search(_, _, low, high) if low > high; { -1 }
+        fn binary_search(list, target, low, high) {
+            let mid = floor((low + high) / 2);
+            let midValue = list[mid];
+
+            if midValue == target; {
+                mid
+            } else if midValue < target; {
+                binary_search(list, target, mid + 1, high)
+            } else {
+                binary_search(list, target, low, mid - 1)
+            }
+        }
+
+        let search = binary_search;
+        search([1, 2, 3, 4, 5], 3);
+    "},
+        [
+            ("len", DefKind::Function(1)),
+            ("floor", DefKind::Function(1))
+        ]
+    );
+    assert_eq!(diagnostics, vec![]);
+}
+
+#[test]
 fn test_should_warn_on_invalid_escape_sequences() {
     let diagnostics = analyze_diag!(
         r#"
