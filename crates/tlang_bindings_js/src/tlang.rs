@@ -337,11 +337,11 @@ impl Tlang {
                     passes.push(Box::new(TailCallSelfReferenceValidation::default()));
 
                     match anf_mode {
-                        "full" => passes.push(Box::new(
-                            tlang_hir_opt::anf_transform::AnfTransform::<
+                        "full" => {
+                            passes.push(Box::new(tlang_hir_opt::anf_transform::AnfTransform::<
                                 tlang_hir_opt::anf_transform::FullAnfFilter,
-                            >::default(),
-                        )),
+                            >::default()))
+                        }
                         // "minimal" or any other value: use JS-specific filter
                         _ => passes.push(Box::new(JsAnfTransform::default())),
                     }
