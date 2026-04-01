@@ -5,7 +5,9 @@ use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
-use tlang_codegen_js::{JsAnfReturnOpt, JsAnfTransform, JsHirOptimizer};
+use tlang_codegen_js::{
+    JsAnfReturnOpt, JsAnfTransform, JsHirOptimizer, TailCallSelfReferenceValidation,
+};
 use tlang_defs::{DefKind, DefScope};
 use tlang_diagnostics::{render_ice, render_parse_issues, render_semantic_diagnostics};
 use tlang_hir as hir;
@@ -318,21 +320,35 @@ impl Tlang {
                         .as_deref()
                         .unwrap_or("minimal");
 
-                    let mut passes: Vec<Box<dyn HirPass>> = match anf_mode {
-                        "full" => vec![Box::new(tlang_hir_opt::anf_transform::AnfTransform::<
-                            tlang_hir_opt::anf_transform::FullAnfFilter,
-                        >::default())],
+                    // TailPositionAnalysis must run first to annotate rec call sites.
+                    let mut passes: Vec<Box<dyn HirPass>> = vec![Box::new(
+                        tlang_hir_opt::tail_call_validation::TailPositionAnalysis,
+                    )];
+
+                    // SymbolResolution must run before ANF so that callee paths have
+                    // their `res.hir_id()` set — the ANF pass uses HirId identity to
+                    // detect self-referencing tail calls.
+                    passes.push(Box::new(
+                        tlang_hir_opt::symbol_resolution::SymbolResolution::default(),
+                    ));
+
+                    // Warn about non-self-referencing `rec` calls that the JS backend
+                    // cannot compile into loops. Must run after SymbolResolution.
+                    passes.push(Box::new(TailCallSelfReferenceValidation::default()));
+
+                    match anf_mode {
+                        "full" => passes.push(Box::new(
+                            tlang_hir_opt::anf_transform::AnfTransform::<
+                                tlang_hir_opt::anf_transform::FullAnfFilter,
+                            >::default(),
+                        )),
                         // "minimal" or any other value: use JS-specific filter
-                        _ => vec![Box::new(JsAnfTransform::default())],
-                    };
+                        _ => passes.push(Box::new(JsAnfTransform::default())),
+                    }
 
                     if self.optimization_options.anf_return_opt.unwrap_or(true) {
                         passes.push(Box::new(JsAnfReturnOpt::default()));
                     }
-
-                    passes.push(Box::new(
-                        tlang_hir_opt::symbol_resolution::SymbolResolution::default(),
-                    ));
 
                     if self.optimization_options.constant_folding.unwrap_or(true) {
                         passes.push(Box::new(
