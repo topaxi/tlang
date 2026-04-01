@@ -19,7 +19,7 @@
   ],
   "main": "grammar.js",
   "devDependencies": {
-    "tree-sitter-cli": "^0.26.7"
+    "tree-sitter-cli": "^0.26.8"
   },
   "scripts": {
     "generate": "tree-sitter generate",
