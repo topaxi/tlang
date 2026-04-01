@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use log::debug;
 use tlang_ast::node::{Module, StructDeclaration};
 use tlang_defs::{DefIdAllocator, DefKind, DefScope};
-use tlang_span::NodeId;
+use tlang_span::{NodeId, Span};
 
 use crate::{
     diagnostic::Diagnostic,
@@ -23,8 +23,9 @@ pub struct SemanticAnalysisContext {
     pub diagnostics: Vec<Diagnostic>,
     /// Maps protocol name → list of direct constraint protocol names.
     pub protocol_constraints: HashMap<String, Vec<String>>,
-    /// Tracks which (protocol, type) pairs have impl blocks.
-    pub protocol_impls: Vec<(String, String)>,
+    /// Tracks which (protocol, type) pairs have impl blocks, along with the
+    /// span of the impl block for use in diagnostics.
+    pub protocol_impls: Vec<(String, String, Span)>,
 }
 
 impl SemanticAnalysisContext {

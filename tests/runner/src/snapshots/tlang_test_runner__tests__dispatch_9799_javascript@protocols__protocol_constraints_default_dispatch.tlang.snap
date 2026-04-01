@@ -4,11 +4,6 @@ description: "Backend: javascript"
 expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/protocols/protocol_constraints_default_dispatch.tlang
 ---
-true
-false
-true
-false
-
 warning: Unused function `PartialEq::eq/2`
    ┌─ [WORKSPACE_ROOT]/tests/protocols/protocol_constraints_default_dispatch.tlang:26:3
    │
@@ -24,3 +19,21 @@ warning: Unused function `Ord::cmp/2`
 35 │ │     else { 0 }
 36 │ │   }
    │ ╰───^
+
+[stdin]:636
+    return !self.eq(other);
+                 ^
+
+TypeError: self.eq is not a function
+    at Object.neq ([stdin]:636:18)
+    at #call ([stdin]:43:19)
+    at $Protocol.neq ([stdin]:35:41)
+    at [stdin]:667:17
+    at runScriptInThisContext (node:internal/vm:218:10)
+    at node:internal/process/execution:456:12
+    at [stdin]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:454:60)
+    at evalFunction (node:internal/process/execution:286:30)
+    at evalTypeScript (node:internal/process/execution:298:3)
+
+Node.js v24.0.2

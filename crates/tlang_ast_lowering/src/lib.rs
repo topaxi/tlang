@@ -1,6 +1,6 @@
 #![feature(box_patterns)]
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::rc::Rc;
 
@@ -422,11 +422,14 @@ impl LoweringContext {
             map.insert(method_name.clone(), current_protocol_ident);
         }
 
-        // Transitively add constraint protocol methods.
-        let mut to_visit: Vec<String> = constraints.to_vec();
+        // Transitively add constraint protocol methods using FIFO traversal so
+        // that left-to-right declaration order is preserved.  Because `or_insert`
+        // keeps the first-seen owner, earlier (left-hand) constraints win on
+        // method-name conflicts, which matches the documented priority.
+        let mut to_visit: VecDeque<String> = constraints.iter().cloned().collect();
         let mut visited: HashSet<String> = HashSet::new();
 
-        while let Some(constraint_name) = to_visit.pop() {
+        while let Some(constraint_name) = to_visit.pop_front() {
             if !visited.insert(constraint_name.clone()) {
                 continue; // Already processed — handles diamond constraints.
             }
@@ -437,7 +440,7 @@ impl LoweringContext {
                 }
                 // Queue this constraint's own constraints for transitive lookup.
                 for nested in &entry.constraints {
-                    to_visit.push(nested.clone());
+                    to_visit.push_back(nested.clone());
                 }
             }
         }

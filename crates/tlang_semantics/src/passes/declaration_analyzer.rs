@@ -117,9 +117,12 @@ impl DeclarationAnalyzer {
         let protocol_name = impl_block.protocol_name.to_string();
         let target_type = impl_block.target_type.to_string();
 
-        // Track this impl for constraint validation
-        ctx.protocol_impls
-            .push((protocol_name.clone(), target_type));
+        // Track this impl for constraint validation (including span for diagnostics)
+        ctx.protocol_impls.push((
+            protocol_name.clone(),
+            target_type,
+            impl_block.protocol_name.span,
+        ));
 
         for method in &impl_block.methods {
             // Register the protocol-qualified path (e.g., Greet::greet)

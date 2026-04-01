@@ -41,14 +41,14 @@ impl SemanticAnalysisPass for ProtocolConstraintValidator {
         let impl_set: HashSet<(String, String)> = ctx
             .protocol_impls
             .iter()
-            .map(|(p, t)| (p.clone(), t.clone()))
+            .map(|(p, t, _span)| (p.clone(), t.clone()))
             .collect();
 
         // Collect diagnostics separately to avoid borrowing ctx mutably while reading it
         let mut diagnostics = Vec::new();
 
         // For each impl block, check that all transitive constraints are satisfied
-        for (protocol_name, target_type) in &ctx.protocol_impls {
+        for (protocol_name, target_type, impl_span) in &ctx.protocol_impls {
             let mut required = HashSet::new();
             Self::collect_transitive_constraints(
                 protocol_name,
@@ -58,17 +58,22 @@ impl SemanticAnalysisPass for ProtocolConstraintValidator {
             // Remove the protocol itself — we only care about its constraints
             required.remove(protocol_name);
 
-            for required_protocol in &required {
-                if !impl_set.contains(&(required_protocol.clone(), target_type.clone())) {
-                    diagnostics.push(diagnostic::error_at!(
-                        tlang_span::Span::default(),
-                        "type `{}` implements `{}` but is missing `impl {} for {}`",
-                        target_type,
-                        protocol_name,
-                        required_protocol,
-                        target_type,
-                    ));
-                }
+            // Collect and sort missing protocols for deterministic error output
+            let mut missing: Vec<_> = required
+                .into_iter()
+                .filter(|req| !impl_set.contains(&(req.clone(), target_type.clone())))
+                .collect();
+            missing.sort();
+
+            for required_protocol in &missing {
+                diagnostics.push(diagnostic::error_at!(
+                    *impl_span,
+                    "type `{}` implements `{}` but is missing `impl {} for {}`",
+                    target_type,
+                    protocol_name,
+                    required_protocol,
+                    target_type,
+                ));
             }
         }
 
