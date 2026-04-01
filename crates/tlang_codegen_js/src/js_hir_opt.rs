@@ -23,6 +23,7 @@ impl Default for JsHirOptimizer {
             Box::new(JsAnfReturnOpt::default()),
             Box::new(BooleanReturnSimplification::default()),
             Box::new(hir_opt::constant_folding::ConstantFolding::default()),
+            Box::new(hir_opt::dead_code_elimination::DeadCodeElimination::default()),
         ])
     }
 }

@@ -292,6 +292,12 @@ impl DefScope {
         }
     }
 
+    /// Remove symbols whose `hir_id` is in the given set.
+    pub fn remove_symbols_by_hir_ids(&mut self, ids: &std::collections::HashSet<HirId>) {
+        self.symbols
+            .retain(|s| s.hir_id.is_none_or(|id| !ids.contains(&id)));
+    }
+
     fn get_locals(&self, predicate: impl Fn(&Def) -> bool) -> Vec<&Def> {
         self.symbols
             .iter()

@@ -2204,7 +2204,17 @@ mod tests {
             )
             .expect("lowering should succeed");
 
-            let mut optimizer = HirOptimizer::default();
+            let mut optimizer = HirOptimizer::new(vec![
+                Box::new(tlang_hir_opt::TailPositionAnalysis),
+                Box::new(tlang_hir_opt::SymbolResolution::default()),
+                Box::new(tlang_hir_opt::ConstantFolding::default()),
+                // NOTE: DeadCodeElimination is intentionally excluded here.
+                // The TestInterpreter evaluates declarations incrementally
+                // (REPL-like), so top-level bindings from earlier calls must
+                // survive even when unreferenced within the current unit.
+                Box::new(tlang_hir_opt::SlotAllocation::default()),
+                Box::new(tlang_hir_opt::FreeVariableAnalysis),
+            ]);
             debug!("LowerResultMeta = {:?}", meta);
             let constant_pool_ids = meta.constant_pool_ids.clone();
             let mut ctx = meta.into();
