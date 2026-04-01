@@ -111,9 +111,16 @@ fn expr_has_side_effects(expr: &hir::Expr) -> bool {
         ExprKind::Unary(_, inner) | ExprKind::Cast(inner, _) => expr_has_side_effects(inner),
         ExprKind::Binary(_, lhs, rhs) => expr_has_side_effects(lhs) || expr_has_side_effects(rhs),
         ExprKind::Let(_, inner) => expr_has_side_effects(inner),
-        // Field and index access may panic (nil dereference, out-of-bounds), so they are
-        // considered side-effectful even when the base expression is pure.
-        ExprKind::FieldAccess(_, _) | ExprKind::IndexAccess(_, _) => true,
+        // Field and index access are treated as pure: tlang has no getters/setters, so
+        // the access itself has no observable effect beyond returning a value.  A potential
+        // nil-dereference or out-of-bounds panic is deterministic given the same inputs
+        // (i.e. the access would *always* panic for that value), so eliminating a dead
+        // access is safe — we recurse into the sub-expressions so any side-effectful sub-
+        // expression (e.g. a call in the index position) is still preserved.
+        ExprKind::FieldAccess(base, _) => expr_has_side_effects(base),
+        ExprKind::IndexAccess(base, index) => {
+            expr_has_side_effects(base) || expr_has_side_effects(index)
+        }
         ExprKind::List(items) => items.iter().any(expr_has_side_effects),
         ExprKind::Dict(pairs) => pairs
             .iter()
