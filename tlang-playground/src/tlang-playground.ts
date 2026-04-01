@@ -577,7 +577,8 @@ export class TlangPlayground extends LitElement {
               </t-menuitem-checkbox>
               <t-menuitem-checkbox
                 @change=${() => this.toggleOptimization('deadCodeElimination')}
-                .checked=${this.optimizationOptions.deadCodeElimination !== false}
+                .checked=${this.optimizationOptions.deadCodeElimination !==
+                false}
               >
                 Dead code elimination
               </t-menuitem-checkbox>

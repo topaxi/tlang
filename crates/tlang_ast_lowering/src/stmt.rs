@@ -213,11 +213,15 @@ impl LoweringContext {
             // Use name_or_invalid() here — any error will be reported by
             // fn_name_or_error() inside lower_fn_decl_matching for each arity variant.
             let fn_name_str = first_declaration.name_or_invalid();
+            // Use scope_start = 0 so the DynFunctionDeclaration is always found before
+            // any arity-specific variant by get_closest_by_name (which compares scope_start
+            // against span.start_lc.line). Using span.start here would store a byte offset
+            // instead of a line number, causing the comparison to fail.
             self.define_symbol_after(
                 dyn_fn_decl.hir_id,
                 &fn_name_str,
                 DefKind::Variable, // TODO, add symbol type for dyn dispatch functions
-                first_declaration.span.start,
+                0,
                 |symbol| symbol.node_id == last_decl_id,
             );
 

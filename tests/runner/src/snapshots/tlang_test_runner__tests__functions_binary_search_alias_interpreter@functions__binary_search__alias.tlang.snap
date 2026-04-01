@@ -1,9 +1,7 @@
 ---
 source: tests/runner/src/main.rs
-description: "Backend: javascript"
+description: "Backend: interpreter"
 expression: "apply_redactions(&output, workspace_root)"
-input_file: tests/functions/multi_dispatch.tlang
+input_file: tests/functions/binary_search/alias.tlang
 ---
 6
-11
-7
