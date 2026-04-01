@@ -301,13 +301,21 @@ impl HirPass for DeadCodeElimination {
         //
         // A DynFunctionDeclaration (multi-clause dispatch node) survives if:
         //   - it is referenced by a path (callers), OR
+        //   - any of its variant FunctionDeclarations is directly referenced
+        //     (e.g. a call site resolved to a specific arity variant), OR
         //   - any of its variant FunctionDeclarations is `pub` (top-level export).
         //
         // When it survives, ALL its variant FunctionDeclarations must also
         // survive (even private ones), so we add their hir_ids to refs.
+        //
+        // Note: call sites that know the exact arity at compile time resolve
+        // directly to the variant hir_id (not the DynFunctionDeclaration), so
+        // the DynFD itself may not be in `refs` even when the function is used.
+        // We must therefore also check whether any variant is in `refs`.
         for stmt in &module.block.stmts {
             if let StmtKind::DynFunctionDeclaration(decl) = &stmt.kind {
                 let dyn_alive = refs.contains(&decl.hir_id)
+                    || decl.variants.iter().any(|(_, id)| refs.contains(id))
                     || module.block.stmts.iter().any(|s| {
                         if let StmtKind::FunctionDeclaration(fd) = &s.kind {
                             decl.variants.iter().any(|(_, id)| *id == fd.hir_id)

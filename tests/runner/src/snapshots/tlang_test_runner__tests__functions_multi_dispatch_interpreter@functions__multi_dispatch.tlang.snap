@@ -1,0 +1,11 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/functions/multi_dispatch.tlang
+---
+thread 'main' panicked at crates/tlang_core/tlang_memory/src/state.rs:895:9:
+Function `"add/2"` expects 2 arguments, but got 1
+  at root 185
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

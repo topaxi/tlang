@@ -270,3 +270,49 @@ fn removes_only_unused_functions() {
     println(used_fn());
     "###);
 }
+
+// ---- Multi-clause (dyn dispatch) function DCE ----
+
+#[test]
+fn keeps_dyn_fn_group_when_arity_call_is_used() {
+    // A direct arity-matched call resolves to the variant FunctionDeclaration, not
+    // the DynFunctionDeclaration.  DCE must keep the whole group alive so that
+    // the DynFn dispatch node and all variants retain their correct slots.
+    let source = r#"
+        fn add(a, b) { a + b }
+        fn add(a) { add(a, 1) }
+        println(add(5));
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    let pretty = common::pretty_print(&hir);
+    // Both variants and the dyn dispatch wrapper must survive.
+    assert!(pretty.contains("fn add/2"), "add/2 missing:\n{pretty}");
+    assert!(pretty.contains("fn add/1"), "add/1 missing:\n{pretty}");
+    // The call site must still exist.
+    assert!(
+        pretty.contains("println"),
+        "println call missing:\n{pretty}"
+    );
+}
+
+#[test]
+fn keeps_dyn_fn_group_when_reassigned_and_called() {
+    // When a multi-clause function is assigned to a variable the plain-name
+    // path resolves to the DynFunctionDeclaration.  DCE must keep the whole
+    // group alive so the dynamic dispatch still works at runtime.
+    let source = r#"
+        fn add(a, b) { a + b }
+        fn add(a) { add(a, 1) }
+        let f = add;
+        println(f(5));
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    let pretty = common::pretty_print(&hir);
+    assert!(pretty.contains("fn add/2"), "add/2 missing:\n{pretty}");
+    assert!(pretty.contains("fn add/1"), "add/1 missing:\n{pretty}");
+    assert!(pretty.contains("let f"), "let f missing:\n{pretty}");
+    assert!(
+        pretty.contains("println"),
+        "println call missing:\n{pretty}"
+    );
+}

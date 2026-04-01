@@ -51,6 +51,7 @@ export class TlangController {
     constantFolding: true,
     anfTransform: undefined,
     anfReturnOpt: true,
+    deadCodeElimination: true,
   };
 
   /**

@@ -366,7 +366,7 @@ fn interpreter_loop_with_break() -> Result<(), JsError> {
 
 #[wasm_bindgen_test]
 fn js_runner_produces_nonempty_output() -> Result<(), JsError> {
-    let mut tlang = Tlang::new("fn add(a, b) { a + b }".to_string(), Runner::JavaScript);
+    let mut tlang = Tlang::new("pub fn add(a, b) { a + b }".to_string(), Runner::JavaScript);
     tlang.compile_to_js()?;
     assert!(!tlang.js().is_empty());
     Ok(())
@@ -374,7 +374,7 @@ fn js_runner_produces_nonempty_output() -> Result<(), JsError> {
 
 #[wasm_bindgen_test]
 fn js_runner_output_contains_function_name() -> Result<(), JsError> {
-    let mut tlang = Tlang::new("fn add(a, b) { a + b }".to_string(), Runner::JavaScript);
+    let mut tlang = Tlang::new("pub fn add(a, b) { a + b }".to_string(), Runner::JavaScript);
     tlang.compile_to_js()?;
     let js = tlang.js();
     assert!(js.contains("add"), "Expected 'add' in generated JS:\n{js}");
@@ -418,7 +418,7 @@ fn get_ast_string_nonempty() -> Result<(), JsError> {
 
 #[wasm_bindgen_test]
 fn get_hir_pretty_nonempty() -> Result<(), JsError> {
-    let mut tlang = Tlang::new("fn foo() { 1 + 2 }".to_string(), Runner::Interpreter);
+    let mut tlang = Tlang::new("pub fn foo() { 1 + 2 }".to_string(), Runner::Interpreter);
     let pretty = tlang.hir_pretty(None)?;
     assert!(!pretty.is_empty());
     Ok(())

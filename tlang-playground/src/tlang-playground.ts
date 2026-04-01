@@ -139,7 +139,7 @@ async function updateDisplayHashparam(display: string) {
 
 // Optimization options are serialized as comma-separated `key:value` pairs in
 // the `opt` hash param.  Only non-default values are stored to keep URLs clean.
-// Short keys:  cf → constantFolding,  anf → anfTransform,  ro → anfReturnOpt
+// Short keys:  cf → constantFolding,  anf → anfTransform,  ro → anfReturnOpt,  dce → deadCodeElimination
 function serializeOptimizations(options: JsOptimizationOptions): string {
   let parts: string[] = [];
 
@@ -151,6 +151,9 @@ function serializeOptimizations(options: JsOptimizationOptions): string {
   }
   if (options.anfReturnOpt === false) {
     parts.push('ro:false');
+  }
+  if (options.deadCodeElimination === false) {
+    parts.push('dce:false');
   }
 
   return parts.join(',');
@@ -165,6 +168,7 @@ function deserializeOptimizations(
     constantFolding: true,
     anfTransform: undefined,
     anfReturnOpt: true,
+    deadCodeElimination: true,
   };
 
   for (const part of raw.split(',')) {
@@ -176,6 +180,8 @@ function deserializeOptimizations(
       options.anfTransform = value;
     } else if (key === 'ro') {
       options.anfReturnOpt = value !== 'false';
+    } else if (key === 'dce') {
+      options.deadCodeElimination = value !== 'false';
     }
   }
 
@@ -189,6 +195,7 @@ function defaultOptimizationOptions(): JsOptimizationOptions {
       constantFolding: true,
       anfTransform: undefined,
       anfReturnOpt: true,
+      deadCodeElimination: true,
     }
   );
 }
@@ -525,6 +532,7 @@ export class TlangPlayground extends LitElement {
   private hasOptimizationsEnabled(): boolean {
     return (
       this.optimizationOptions.constantFolding ||
+      this.optimizationOptions.deadCodeElimination !== false ||
       (this.optimizationOptions.anfTransform != null &&
         this.optimizationOptions.anfTransform !== 'off')
     );
@@ -566,6 +574,12 @@ export class TlangPlayground extends LitElement {
                 .checked=${this.optimizationOptions.constantFolding}
               >
                 Constant folding
+              </t-menuitem-checkbox>
+              <t-menuitem-checkbox
+                @change=${() => this.toggleOptimization('deadCodeElimination')}
+                .checked=${this.optimizationOptions.deadCodeElimination !== false}
+              >
+                Dead code elimination
               </t-menuitem-checkbox>
               ${this.runner === 'Interpreter'
                 ? html`<t-menuitem-checkbox
