@@ -391,8 +391,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                         continue;
                     }
 
-                    let qualified_name =
-                        format!("{}::{}", protocol_name, method.name.as_str());
+                    let qualified_name = format!("{}::{}", protocol_name, method.name.as_str());
                     self.declare_symbol(
                         ctx,
                         method.id,
@@ -405,17 +404,38 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     // Create a function scope so that the `self` parameter is
                     // reachable during lowering (for the implicit self-dispatch
                     // rewrite performed in `lower_protocol_decl`).
+                    //
+                    // Mirrors the scope setup in `visit_impl_block`: first a
+                    // FunctionSelfRef for the method name, then parameters.
                     self.push_function_symbol_table(method.id, ctx);
+
+                    // Declare the function self-reference binding (needed by the
+                    // slot allocator — slot 0 is always the callee).
+                    self.declare_symbol(
+                        ctx,
+                        method.id,
+                        method.name.as_str(),
+                        DefKind::FunctionSelfRef(method.parameters.len() as u16),
+                        method.name.span,
+                        method.name.span.end_lc.line,
+                    );
 
                     self.symbol_type_context.push(DefKind::Parameter);
                     for param in &method.parameters {
-                        self.collect_pattern(
-                            &param.pattern,
-                            param.span.end_lc.line,
-                            ctx,
-                        );
+                        self.collect_pattern(&param.pattern, param.span.end_lc.line, ctx);
                     }
                     self.symbol_type_context.pop();
+
+                    // Walk the default body so that identifiers within it are
+                    // visible to the variable-usage validator.
+                    if let Some(body) = &method.body {
+                        for stmt in &body.statements {
+                            self.visit_stmt(stmt, ctx);
+                        }
+                        if let Some(expr) = &body.expression {
+                            self.visit_expr(expr, ctx);
+                        }
+                    }
 
                     self.pop_symbol_table();
                 }

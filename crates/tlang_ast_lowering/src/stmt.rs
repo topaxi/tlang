@@ -351,6 +351,7 @@ impl LoweringContext {
             .methods
             .iter()
             .map(|method| {
+                let has_body = method.body.is_some();
                 let params: Vec<hir::FunctionParameter> = method
                     .parameters
                     .iter()
@@ -360,8 +361,17 @@ impl LoweringContext {
                             ast::node::PatKind::_Self => Ident::new("self", param.pattern.span),
                             _ => Ident::new("_", param.pattern.span),
                         };
+                        // For default implementations, use `lower_node_id` to create
+                        // the NodeId→HirId mapping. `symbol_tables()` will then
+                        // assign HirIds to the semantic analyzer's existing symbols
+                        // in this scope, which avoids creating duplicate entries.
+                        let hir_id = if has_body {
+                            self.lower_node_id(param.pattern.id)
+                        } else {
+                            self.unique_id()
+                        };
                         hir::FunctionParameter {
-                            hir_id: self.unique_id(),
+                            hir_id,
                             name,
                             type_annotation: self.lower_ty(param.type_annotation.as_ref()),
                             span: param.pattern.span,
@@ -406,28 +416,14 @@ impl LoweringContext {
                         // can later resolve `self` and other parameters inside the
                         // default body.
                         //
-                        // Also call `define_symbol` for the function and each
-                        // parameter so that the HIR-keyed scope contains entries
-                        // with `hir_id`s. `IdentifierResolver` requires `hir_id` to
-                        // be set in order to assign a slot index for interpreter
-                        // execution (and JS codegen).
-                        let result = self.with_scope(method.id, |this| {
-                            this.define_symbol(
-                                method_hir_id,
-                                method.name.as_str(),
-                                DefKind::FunctionSelfRef(method.parameters.len() as u16),
-                                method.span.start,
-                            );
-                            for param in &params {
-                                this.define_symbol(
-                                    param.hir_id,
-                                    param.name.as_str(),
-                                    DefKind::Parameter,
-                                    param.span.start,
-                                );
-                            }
-                            this.lower_block(b)
-                        });
+                        // The semantic analyser already placed the correct symbols
+                        // (function self-ref + parameters) in this scope. Their
+                        // `hir_id`s will be assigned by `symbol_tables()` using
+                        // the NodeId→HirId mappings created by `lower_node_id`
+                        // above (for params) and at line 387+ (for method_hir_id).
+                        // We must NOT call `define_symbol` here, as that would
+                        // create duplicate entries and shift the slot indices.
+                        let result = self.with_scope(method.id, |this| this.lower_block(b));
 
                         self.protocol_dispatch_ctx = previous_ctx;
                         result
