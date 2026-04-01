@@ -1,6 +1,6 @@
+use tlang_codegen_js::JsAnfTransform;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_codegen_js::js_hir_opt::{DefaultJsOptimizations, JsHirOptimizer};
-use tlang_codegen_js::JsAnfTransform;
 use tlang_defs::DefKind;
 use tlang_hir_opt::HirPass;
 use tlang_hir_opt::symbol_resolution::SymbolResolution;

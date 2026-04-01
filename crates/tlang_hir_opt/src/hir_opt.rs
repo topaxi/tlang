@@ -317,7 +317,11 @@ mod tests {
         assert_eq!(defaults.passes.len(), 6, "should start with 6 passes");
 
         let without_dce = defaults.without("DeadCodeElimination");
-        assert_eq!(without_dce.passes.len(), 5, "should have 5 passes after removing DCE");
+        assert_eq!(
+            without_dce.passes.len(),
+            5,
+            "should have 5 passes after removing DCE"
+        );
 
         let names: Vec<_> = without_dce.passes.iter().map(|p| p.name()).collect();
         assert!(
