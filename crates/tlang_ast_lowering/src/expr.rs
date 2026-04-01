@@ -275,17 +275,12 @@ impl LoweringContext {
         // Inside a protocol default method body, a call of the form
         //   `self.method(arg1, arg2, …)`
         // is rewritten to
-        //   `Protocol::method(self, arg1, arg2, …)`
+        //   `OwningProtocol::method(self, arg1, arg2, …)`
         //
-        // This rewrite requires that:
-        //   1. We are currently lowering a protocol default method body
-        //      (`protocol_dispatch_ctx` is active).
-        //   2. The callee is a field-access expression on `self`
-        //      (i.e. `ExprKind::FieldExpression` whose base is the `self` keyword).
-        //   3. The field name is one of the methods declared in the protocol
-        //      (checked against `context.method_names` which was populated from
-        //      the protocol's own AST declaration — compiler information, not a
-        //      hard-coded list).
+        // `method_dispatch_map` maps method name → the Ident of the protocol
+        // that declares it.  It covers the current protocol's own methods AND
+        // all methods from transitively-reachable constraint protocols, so
+        // that default bodies can call methods from constraint protocols.
         if let ast::node::ExprKind::FieldExpression(box ast::node::FieldAccessExpression {
             base,
             field,
@@ -320,12 +315,13 @@ impl LoweringContext {
                 false
             };
 
-            if is_self_receiver && ctx.method_names.contains(field.as_str()) {
-                // Build the qualified callee path `Protocol::method_name`.
+            if is_self_receiver
+                && let Some(&protocol_ident) = ctx.method_dispatch_map.get(field.as_str())
+            {
+                // Build the qualified callee path `OwningProtocol::method_name`.
                 // When the protocol method is defined with multiple arities,
                 // append the `/arity` suffix (total arity = 1 for `self` +
                 // the number of explicit arguments).
-                let protocol_name = ctx.protocol_name;
                 let method_str = field.as_str();
                 let total_arity = node.arguments.len() + 1; // +1 for self
 
@@ -338,7 +334,7 @@ impl LoweringContext {
                 let span = node.callee.span;
                 let path = hir::Path::new(
                     vec![
-                        hir::PathSegment::from_str(protocol_name.as_str(), protocol_name.span),
+                        hir::PathSegment::from_str(protocol_ident.as_str(), protocol_ident.span),
                         hir::PathSegment::from_str(&method_segment_name, field.span),
                     ],
                     span,

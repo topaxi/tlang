@@ -1,0 +1,46 @@
+protocol PartialEq {
+  fn eq(self, other)
+}
+
+protocol Eq : PartialEq {
+  fn neq(self, other) {
+    !(self.eq(other))
+  }
+}
+
+protocol Ord : Eq {
+  fn cmp(self, other)
+
+  fn lt(self, other) {
+    self.cmp(other) < 0
+  }
+
+  fn gt(self, other) {
+    self.cmp(other) > 0
+  }
+}
+
+struct Value { n: int }
+
+impl PartialEq for Value {
+  fn eq(a, b) { a.n == b.n }
+}
+
+impl Eq for Value {}
+
+impl Ord for Value {
+  fn cmp(a, b) {
+    if a.n < b.n { -1 }
+    else if a.n > b.n { 1 }
+    else { 0 }
+  }
+}
+
+let a = Value { n: 1 };
+let b = Value { n: 2 };
+let c = Value { n: 1 };
+
+Eq::neq(a, b) |> log();
+Eq::neq(a, c) |> log();
+Ord::lt(a, b) |> log();
+Ord::gt(a, b) |> log();

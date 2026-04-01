@@ -384,10 +384,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                 // Register protocol constraints for later validation
                 ctx.protocol_constraints.insert(
                     decl.name.to_string(),
-                    decl.constraints
-                        .iter()
-                        .map(|c| c.to_string())
-                        .collect(),
+                    decl.constraints.iter().map(|c| c.to_string()).collect(),
                 );
 
                 // Register protocol const members with qualified names
