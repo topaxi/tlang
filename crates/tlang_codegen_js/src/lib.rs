@@ -18,4 +18,4 @@ pub use error::{CodegenError, CodegenWarning};
 pub use hir_passes::{
     BooleanReturnSimplification, JsAnfReturnOpt, JsAnfTransform, TailCallSelfReferenceValidation,
 };
-pub use js_hir_opt::JsHirOptimizer;
+pub use js_hir_opt::{DefaultJsOptimizations, JsHirOptimizer};

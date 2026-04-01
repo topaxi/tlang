@@ -86,6 +86,15 @@ impl HirOptGroup {
     pub fn add_pass(&mut self, pass: Box<dyn HirPass>) {
         self.passes.push(pass);
     }
+
+    /// Remove all passes with the given name.
+    ///
+    /// Matches against each pass's [`HirPass::name()`] at runtime — no type
+    /// parameters or `Any` plumbing required.
+    pub fn without(mut self, name: &str) -> Self {
+        self.passes.retain(|p| p.name() != name);
+        self
+    }
 }
 
 impl HirPass for HirOptGroup {
@@ -132,18 +141,81 @@ impl HirPass for HirOptGroup {
     }
 }
 
+/// The default set of HIR optimization passes for the interpreter/bytecode backend.
+///
+/// Modelled after Bevy's `DefaultPlugins`: the group itself implements `HirPass`
+/// (running each pass once per call, leaving convergence to the outer
+/// `HirOptimizer`), and supports a builder-style `without()` to remove
+/// individual passes before handing the group to an optimizer:
+///
+/// ```ignore
+/// // All defaults, minus DCE:
+/// HirOptimizer::from(DefaultOptimizations::default().without("DeadCodeElimination"))
+/// ```
+pub struct DefaultOptimizations {
+    passes: Vec<Box<dyn HirPass>>,
+}
+
+impl Default for DefaultOptimizations {
+    fn default() -> Self {
+        Self {
+            passes: vec![
+                Box::new(crate::tail_call_validation::TailPositionAnalysis),
+                Box::new(crate::symbol_resolution::SymbolResolution::default()),
+                Box::new(crate::constant_folding::ConstantFolding::default()),
+                Box::new(crate::dead_code_elimination::DeadCodeElimination::default()),
+                Box::new(crate::slot_allocation::SlotAllocation::default()),
+                Box::new(crate::free_variable_analysis::FreeVariableAnalysis),
+            ],
+        }
+    }
+}
+
+impl DefaultOptimizations {
+    /// Remove all passes with the given name.
+    ///
+    /// Matches against each pass's [`HirPass::name()`] at runtime.
+    pub fn without(mut self, name: &str) -> Self {
+        self.passes.retain(|p| p.name() != name);
+        self
+    }
+}
+
+impl HirPass for DefaultOptimizations {
+    fn name(&self) -> &'static str {
+        "DefaultOptimizations"
+    }
+
+    fn init_context(&mut self, ctx: &mut HirOptContext) {
+        for pass in &mut self.passes {
+            pass.init_context(ctx);
+        }
+    }
+
+    fn optimize_hir(
+        &mut self,
+        module: &mut hir::Module,
+        ctx: &mut HirOptContext,
+    ) -> Result<bool, HirOptError> {
+        let mut changed = false;
+        for pass in &mut self.passes {
+            changed |= pass.optimize_hir(module, ctx)?;
+        }
+        Ok(changed)
+    }
+}
+
 pub struct HirOptimizer(HirOptGroup);
 
 impl Default for HirOptimizer {
     fn default() -> Self {
-        Self::new(vec![
-            Box::new(crate::tail_call_validation::TailPositionAnalysis),
-            Box::new(crate::symbol_resolution::SymbolResolution::default()),
-            Box::new(crate::constant_folding::ConstantFolding::default()),
-            Box::new(crate::dead_code_elimination::DeadCodeElimination::default()),
-            Box::new(crate::slot_allocation::SlotAllocation::default()),
-            Box::new(crate::free_variable_analysis::FreeVariableAnalysis),
-        ])
+        Self::from(DefaultOptimizations::default())
+    }
+}
+
+impl From<DefaultOptimizations> for HirOptimizer {
+    fn from(defaults: DefaultOptimizations) -> Self {
+        Self::new(vec![Box::new(defaults)])
     }
 }
 
@@ -236,6 +308,21 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "HIR optimizer pass 'my_pass' did not converge after 10 iterations"
+        );
+    }
+
+    #[test]
+    fn test_default_optimizations_without_removes_dce() {
+        let defaults = DefaultOptimizations::default();
+        assert_eq!(defaults.passes.len(), 6, "should start with 6 passes");
+
+        let without_dce = defaults.without("DeadCodeElimination");
+        assert_eq!(without_dce.passes.len(), 5, "should have 5 passes after removing DCE");
+
+        let names: Vec<_> = without_dce.passes.iter().map(|p| p.name()).collect();
+        assert!(
+            !names.iter().any(|n| n.contains("DeadCodeElimination")),
+            "DCE should be removed: {names:?}"
         );
     }
 }
