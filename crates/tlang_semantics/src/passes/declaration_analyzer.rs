@@ -376,6 +376,51 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
 
                 // Register protocol const members with qualified names
                 self.register_type_const_items(ctx, decl.name.as_str(), &decl.consts);
+
+                // Register protocol default method implementations as qualified
+                // symbols so that call-site validation (`Foldable::sum(xs)`)
+                // can resolve them, and so that lowering can create the correct
+                // symbol-table scope.
+                //
+                // Abstract methods (those without a body) are NOT registered
+                // here — they are registered later by the `impl` block that
+                // provides the concrete implementation.
+                let protocol_name = decl.name.as_str();
+                for method in &decl.methods {
+                    if method.body.is_none() {
+                        continue;
+                    }
+
+                    let qualified_name =
+                        format!("{}::{}", protocol_name, method.name.as_str());
+                    self.declare_symbol(
+                        ctx,
+                        method.id,
+                        &qualified_name,
+                        DefKind::ProtocolMethod(method.parameters.len() as u16),
+                        method.span,
+                        method.span.end_lc.line,
+                    );
+
+                    // Create a function scope so that the `self` parameter is
+                    // reachable during lowering (for the implicit self-dispatch
+                    // rewrite performed in `lower_protocol_decl`).
+                    self.push_function_symbol_table(method.id, ctx);
+
+                    self.symbol_type_context.push(DefKind::Parameter);
+                    for param in &method.parameters {
+                        self.collect_pattern(
+                            &param.pattern,
+                            param.span.end_lc.line,
+                            ctx,
+                        );
+                    }
+                    self.symbol_type_context.pop();
+
+                    self.pop_symbol_table();
+                }
+
+                return; // Don't walk the statement again
             }
             StmtKind::ImplBlock(impl_block) => {
                 self.visit_impl_block(impl_block, ctx);

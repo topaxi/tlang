@@ -226,6 +226,10 @@ impl HirPretty {
                         self.push_str(param.name.as_str());
                     }
                     self.push_char(')');
+                    if let Some(body) = &method.body {
+                        self.push_char(' ');
+                        self.print_block(body);
+                    }
                     self.push_newline();
                 }
                 self.dec_indent();
