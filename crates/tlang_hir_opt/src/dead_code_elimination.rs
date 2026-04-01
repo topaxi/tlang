@@ -111,10 +111,9 @@ fn expr_has_side_effects(expr: &hir::Expr) -> bool {
         ExprKind::Unary(_, inner) | ExprKind::Cast(inner, _) => expr_has_side_effects(inner),
         ExprKind::Binary(_, lhs, rhs) => expr_has_side_effects(lhs) || expr_has_side_effects(rhs),
         ExprKind::Let(_, inner) => expr_has_side_effects(inner),
-        ExprKind::FieldAccess(base, _) => expr_has_side_effects(base),
-        ExprKind::IndexAccess(base, index) => {
-            expr_has_side_effects(base) || expr_has_side_effects(index)
-        }
+        // Field and index access may panic (nil dereference, out-of-bounds), so they are
+        // considered side-effectful even when the base expression is pure.
+        ExprKind::FieldAccess(_, _) | ExprKind::IndexAccess(_, _) => true,
         ExprKind::List(items) => items.iter().any(expr_has_side_effects),
         ExprKind::Dict(pairs) => pairs
             .iter()
@@ -312,18 +311,28 @@ impl HirPass for DeadCodeElimination {
         // directly to the variant hir_id (not the DynFunctionDeclaration), so
         // the DynFD itself may not be in `refs` even when the function is used.
         // We must therefore also check whether any variant is in `refs`.
+
+        // Precompute the set of `pub` FunctionDeclaration hir_ids so the loop
+        // below is O(n) instead of O(n²).
+        let pub_fn_ids: HashSet<HirId> = module
+            .block
+            .stmts
+            .iter()
+            .filter_map(|s| {
+                if let StmtKind::FunctionDeclaration(fd) = &s.kind
+                    && fd.visibility == Visibility::Public
+                {
+                    return Some(fd.hir_id);
+                }
+                None
+            })
+            .collect();
+
         for stmt in &module.block.stmts {
             if let StmtKind::DynFunctionDeclaration(decl) = &stmt.kind {
                 let dyn_alive = refs.contains(&decl.hir_id)
                     || decl.variants.iter().any(|(_, id)| refs.contains(id))
-                    || module.block.stmts.iter().any(|s| {
-                        if let StmtKind::FunctionDeclaration(fd) = &s.kind {
-                            decl.variants.iter().any(|(_, id)| *id == fd.hir_id)
-                                && fd.visibility == Visibility::Public
-                        } else {
-                            false
-                        }
-                    });
+                    || decl.variants.iter().any(|(_, id)| pub_fn_ids.contains(id));
 
                 if dyn_alive {
                     // Keep the dyn dispatch node itself alive.
