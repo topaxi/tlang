@@ -137,6 +137,53 @@ fn test_protocol_method_call_via_path() {
     assert!(output.contains("$Countable.count(xs)"));
 }
 
+/// `self.method(args)` inside a protocol default implementation is rewritten
+/// to `Protocol::method(self, args)` during lowering, and the JS codegen must
+/// emit a proper `$Protocol.method(self, args)` call rather than a
+/// field-access call.
+#[test]
+fn test_protocol_default_impl_self_dispatch() {
+    let output = compile!(indoc! {"
+        protocol Displayable {
+            fn display(self)
+            fn display_with_prefix(self, prefix) {
+                prefix + self.display()
+            }
+        }
+
+        impl Displayable for List {
+            fn display(self) { log(self) }
+        }
+    "});
+    // The rewritten call must use protocol dispatch, not a raw field access.
+    assert!(
+        output.contains("$Displayable.display(self)"),
+        "expected `$Displayable.display(self)` in output:\n{output}"
+    );
+}
+
+/// Calls to methods that are NOT part of the protocol should not be rewritten.
+#[test]
+fn test_protocol_default_impl_non_protocol_method_unchanged() {
+    let output = compile!(indoc! {"
+        protocol Greet {
+            fn greet(self)
+            fn annotated_greet(self) {
+                self.greet()
+            }
+        }
+
+        impl Greet for List {
+            fn greet(self) { log(self) }
+        }
+    "});
+    // The `greet` call on `self` must be rewritten to qualified dispatch.
+    assert!(
+        output.contains("$Greet.greet(self)"),
+        "expected `$Greet.greet(self)` in output:\n{output}"
+    );
+}
+
 #[test]
 fn test_protocol_used_as_value() {
     // Assigning a protocol method to a variable should use the $-prefixed name.

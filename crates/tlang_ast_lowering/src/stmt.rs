@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use log::debug;
 use tlang_ast as ast;
@@ -6,7 +6,7 @@ use tlang_ast::node::{ConstDeclaration, FunctionDeclaration, Ident, LetDeclarati
 use tlang_defs::DefKind;
 use tlang_hir as hir;
 
-use crate::LoweringContext;
+use crate::{LoweringContext, ProtocolDispatchContext};
 
 impl LoweringContext {
     pub(crate) fn lower_stmt(&mut self, node: &ast::node::Stmt) -> Vec<hir::Stmt> {
@@ -339,11 +339,20 @@ impl LoweringContext {
         node: &ast::node::Stmt,
         decl: &ast::node::ProtocolDeclaration,
     ) -> hir::Stmt {
+        // Collect all method names declared in this protocol.  These are used by the
+        // implicit self-dispatch rewrite (see `ProtocolDispatchContext`).
+        let protocol_method_names: HashSet<String> = decl
+            .methods
+            .iter()
+            .map(|m| m.name.as_str().to_string())
+            .collect();
+
         let methods = decl
             .methods
             .iter()
             .map(|method| {
-                let params = method
+                let has_body = method.body.is_some();
+                let params: Vec<hir::FunctionParameter> = method
                     .parameters
                     .iter()
                     .map(|param| {
@@ -352,20 +361,83 @@ impl LoweringContext {
                             ast::node::PatKind::_Self => Ident::new("self", param.pattern.span),
                             _ => Ident::new("_", param.pattern.span),
                         };
+                        // For default implementations, use `lower_node_id` to create
+                        // the NodeId→HirId mapping. `symbol_tables()` will then
+                        // assign HirIds to the semantic analyzer's existing symbols
+                        // in this scope, which avoids creating duplicate entries.
+                        let hir_id = if has_body {
+                            self.lower_node_id(param.pattern.id)
+                        } else {
+                            self.unique_id()
+                        };
                         hir::FunctionParameter {
-                            hir_id: self.unique_id(),
+                            hir_id,
                             name,
                             type_annotation: self.lower_ty(param.type_annotation.as_ref()),
                             span: param.pattern.span,
                         }
                     })
                     .collect();
+
+                // Find the `self` parameter for this method (pattern kind `_Self`).
+                let self_param = method
+                    .parameters
+                    .iter()
+                    .find(|p| matches!(p.pattern.kind, ast::node::PatKind::_Self));
+
+                // Lower the default body, activating self-dispatch rewriting when a
+                // `self` parameter is present and the method has a body.
+                //
+                // Calling `lower_node_id(method.id)` creates the mapping
+                // `method.id → HirId` in `node_id_to_hir_id`.  `symbol_tables()`
+                // later uses this mapping to translate the semantic analyser's
+                // `NodeId`-keyed scope to an `HirId`-keyed one, making the scope
+                // (which contains the `self` parameter) visible to HIR passes such
+                // as `SymbolResolution`.
+                let method_hir_id = if method.body.is_some() {
+                    self.lower_node_id(method.id)
+                } else {
+                    self.unique_id()
+                };
+
+                let body = if let Some(self_param) = self_param {
+                    method.body.as_ref().map(|b| {
+                        // Set up the dispatch context so that `lower_call_expr` can
+                        // rewrite `self.method(args)` → `Protocol::method(self, args)`.
+                        let previous_ctx = self.protocol_dispatch_ctx.take();
+                        self.protocol_dispatch_ctx = Some(ProtocolDispatchContext {
+                            protocol_name: decl.name,
+                            method_names: protocol_method_names.clone(),
+                            self_param_node_id: self_param.pattern.id,
+                        });
+
+                        // Enter the method's own scope (created by the semantic
+                        // analyser with key `method.id`) so that `SymbolResolution`
+                        // can later resolve `self` and other parameters inside the
+                        // default body.
+                        //
+                        // The semantic analyser already placed the correct symbols
+                        // (function self-ref + parameters) in this scope. Their
+                        // `hir_id`s will be assigned by `symbol_tables()` using
+                        // the NodeId→HirId mappings created by `lower_node_id`
+                        // above (for params) and at line 387+ (for method_hir_id).
+                        // We must NOT call `define_symbol` here, as that would
+                        // create duplicate entries and shift the slot indices.
+                        let result = self.with_scope(method.id, |this| this.lower_block(b));
+
+                        self.protocol_dispatch_ctx = previous_ctx;
+                        result
+                    })
+                } else {
+                    method.body.as_ref().map(|b| self.lower_block(b))
+                };
+
                 hir::ProtocolMethodSignature {
-                    hir_id: self.unique_id(),
+                    hir_id: method_hir_id,
                     name: method.name,
                     parameters: params,
                     return_type: self.lower_ty(method.return_type_annotation.as_ref()),
-                    body: method.body.as_ref().map(|b| self.lower_block(b)),
+                    body,
                     span: method.span,
                 }
             })

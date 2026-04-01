@@ -1,6 +1,6 @@
 #![feature(box_patterns)]
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::rc::Rc;
 
@@ -11,6 +11,25 @@ use tlang_ast::node::{EnumPattern, FunctionDeclaration, Ident};
 use tlang_defs::{Def, DefIdAllocator, DefKind, DefScope};
 use tlang_hir as hir;
 use tlang_span::{HirId, HirIdAllocator, NodeId, Span};
+
+/// Context for implicit self-dispatch in protocol default method implementations.
+///
+/// When lowering a protocol default method body, this context tracks the protocol
+/// name, the set of method names declared in the protocol, and the `NodeId` of the
+/// `self` parameter.  Any `self.method(args…)` call where `method` is in
+/// `method_names` is automatically rewritten to `Protocol::method(self, args…)`.
+#[derive(Debug, Clone)]
+pub(crate) struct ProtocolDispatchContext {
+    /// Name of the protocol being lowered (e.g. `Foldable`).
+    pub(crate) protocol_name: Ident,
+    /// Names of all methods declared in this protocol.  Used to decide whether a
+    /// field-access call on `self` should be rewritten to a qualified dispatch.
+    pub(crate) method_names: HashSet<String>,
+    /// The `NodeId` of the `self` parameter's pattern node in the current default
+    /// method.  Stored here so that later passes can cross-check the identity of the
+    /// `self` receiver without relying on string comparison alone.
+    pub(crate) self_param_node_id: NodeId,
+}
 
 /// Errors that can occur during AST-to-HIR lowering.
 #[derive(Debug, Clone)]
@@ -93,6 +112,9 @@ pub struct LoweringContext {
     new_symbol_tables: HashMap<HirId, Rc<RefCell<DefScope>>>,
     current_symbol_table: Rc<RefCell<DefScope>>,
     errors: Vec<LoweringError>,
+    /// Active protocol self-dispatch context, set while lowering a protocol
+    /// default method body.  `None` outside of such bodies.
+    pub(crate) protocol_dispatch_ctx: Option<ProtocolDispatchContext>,
 }
 
 impl LoweringContext {
@@ -110,6 +132,7 @@ impl LoweringContext {
             new_symbol_tables: HashMap::default(),
             current_symbol_table: root_symbol_table,
             errors: Vec::new(),
+            protocol_dispatch_ctx: None,
         }
     }
 

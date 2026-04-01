@@ -142,6 +142,18 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
             visitor.visit_ident(&mut decl.name, ctx);
             for method in &mut decl.methods {
                 visitor.visit_ident(&mut method.name, ctx);
+                // Visit default method bodies with their own scope so that
+                // `SymbolResolution` (and other HIR passes) can resolve
+                // identifiers like `self` and other parameters inside them.
+                if let Some(body) = &mut method.body {
+                    visitor.enter_scope(method.hir_id, ctx);
+                    for param in &mut method.parameters {
+                        visitor.visit_ident(&mut param.name, ctx);
+                        visitor.visit_ty(&mut param.type_annotation, ctx);
+                    }
+                    visitor.visit_block(body, ctx);
+                    visitor.leave_scope(method.hir_id, ctx);
+                }
             }
             for const_item in &mut decl.consts {
                 visitor.visit_ty(&mut const_item.ty, ctx);

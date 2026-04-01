@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use log::debug;
 use tlang_ast as ast;
+use tlang_ast::keyword::kw;
 use tlang_ast::node::{BinaryOpExpression, BinaryOpKind, UnaryOp};
 use tlang_hir as hir;
 
@@ -41,9 +42,7 @@ impl LoweringContext {
                 hir::ExprKind::Unary(*op, Box::new(self.lower_expr(expr)))
             }
             ast::node::ExprKind::Path(path) => hir::ExprKind::Path(Box::new(self.lower_path(path))),
-            ast::node::ExprKind::FunctionExpression(decl) => {
-                hir::ExprKind::FunctionExpression(Box::new(self.lower_fn_decl(decl)))
-            }
+            ast::node::ExprKind::FunctionExpression(decl) => self.lower_fn_expr(decl),
             ast::node::ExprKind::List(exprs) => hir::ExprKind::List(self.lower_exprs(exprs)),
             ast::node::ExprKind::Dict(entries) => {
                 let entries = entries
@@ -116,6 +115,17 @@ impl LoweringContext {
             ty: hir::Ty::unknown(),
             span: node.span,
         }
+    }
+
+    fn lower_fn_expr(&mut self, decl: &ast::node::FunctionDeclaration) -> hir::ExprKind {
+        // Suspend the protocol dispatch context while lowering a nested
+        // function expression: its own `self` (if any) is unrelated to
+        // the outer protocol's `self`, so we must not rewrite field-access
+        // calls inside the nested body.
+        let saved_ctx = self.protocol_dispatch_ctx.take();
+        let result = hir::ExprKind::FunctionExpression(Box::new(self.lower_fn_decl(decl)));
+        self.protocol_dispatch_ctx = saved_ctx;
+        result
     }
 
     fn lower_match(&mut self, match_expr: &ast::node::MatchExpression) -> hir::ExprKind {
@@ -260,6 +270,96 @@ impl LoweringContext {
     }
 
     fn lower_call_expr(&mut self, node: &ast::node::CallExpression) -> hir::CallExpression {
+        // ── Implicit self-dispatch in protocol default implementations ──────────
+        //
+        // Inside a protocol default method body, a call of the form
+        //   `self.method(arg1, arg2, …)`
+        // is rewritten to
+        //   `Protocol::method(self, arg1, arg2, …)`
+        //
+        // This rewrite requires that:
+        //   1. We are currently lowering a protocol default method body
+        //      (`protocol_dispatch_ctx` is active).
+        //   2. The callee is a field-access expression on `self`
+        //      (i.e. `ExprKind::FieldExpression` whose base is the `self` keyword).
+        //   3. The field name is one of the methods declared in the protocol
+        //      (checked against `context.method_names` which was populated from
+        //      the protocol's own AST declaration — compiler information, not a
+        //      hard-coded list).
+        if let ast::node::ExprKind::FieldExpression(box ast::node::FieldAccessExpression {
+            base,
+            field,
+        }) = &node.callee.kind
+            && let Some(ctx) = self.protocol_dispatch_ctx.as_ref()
+        {
+            // Identify the `self` receiver using compiler information:
+            //
+            // 1. Primary check – the path segment is the compiler's reserved
+            //    `kw::_Self` keyword ("self"), which the parser only emits for
+            //    the genuine `self` keyword, never for a regular identifier.
+            //
+            // 2. Reinforcing check – if semantic analysis has resolved the path
+            //    to a specific declaration (`Res::Def(node_id)`), verify that
+            //    the declaration is our tracked `self` parameter node.  This
+            //    handles shadowing: a `let self = …` binding would resolve to a
+            //    *different* NodeId and fail this check.
+            let is_self_receiver = if let ast::node::ExprKind::Path(path) = &base.kind {
+                if path.segments.len() == 1 && path.segments[0].as_str() == kw::_Self {
+                    // If the AST resolver has already set a Def node id,
+                    // use it for identity confirmation; otherwise fall back
+                    // to the keyword check alone.
+                    match path.res {
+                        ast::node::Res::Def(node_id) => node_id == ctx.self_param_node_id,
+                        ast::node::Res::Unresolved => true,
+                        ast::node::Res::PrimTy => false,
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            if is_self_receiver && ctx.method_names.contains(field.as_str()) {
+                // Build the qualified callee path `Protocol::method_name`.
+                // When the protocol method is defined with multiple arities,
+                // append the `/arity` suffix (total arity = 1 for `self` +
+                // the number of explicit arguments).
+                let protocol_name = ctx.protocol_name;
+                let method_str = field.as_str();
+                let total_arity = node.arguments.len() + 1; // +1 for self
+
+                let method_segment_name = if self.has_multi_arity_fn(method_str, total_arity) {
+                    format!("{method_str}/{total_arity}")
+                } else {
+                    method_str.to_string()
+                };
+
+                let span = node.callee.span;
+                let path = hir::Path::new(
+                    vec![
+                        hir::PathSegment::from_str(protocol_name.as_str(), protocol_name.span),
+                        hir::PathSegment::from_str(&method_segment_name, field.span),
+                    ],
+                    span,
+                );
+
+                let callee_hir = self.expr(span, hir::ExprKind::Path(Box::new(path)));
+
+                // The first argument is the `self` receiver; the rest follow.
+                let self_arg = self.lower_expr(base);
+                let mut arguments = vec![self_arg];
+                arguments.extend(self.lower_exprs(&node.arguments));
+
+                return hir::CallExpression {
+                    hir_id: self.unique_id(),
+                    callee: callee_hir,
+                    arguments,
+                };
+            }
+        }
+
+        // Normal (non-rewritten) call lowering.
         let arguments = self.lower_exprs(&node.arguments);
         let callee = self.lower_callee(&node.callee, node.arguments.len());
 
