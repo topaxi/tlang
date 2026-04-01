@@ -983,6 +983,7 @@ pub struct ProtocolDeclaration {
     pub hir_id: HirId,
     pub visibility: Visibility,
     pub name: Ident,
+    pub constraints: Vec<Path>,
     pub methods: Vec<ProtocolMethodSignature>,
     pub consts: Vec<ConstItem>,
 }

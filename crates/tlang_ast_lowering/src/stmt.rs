@@ -447,6 +447,11 @@ impl LoweringContext {
             hir_id: self.lower_node_id(node.id),
             visibility: decl.visibility,
             name: decl.name,
+            constraints: decl
+                .constraints
+                .iter()
+                .map(|c| self.lower_path(c))
+                .collect(),
             methods,
             consts: decl
                 .consts

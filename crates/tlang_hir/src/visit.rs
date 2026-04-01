@@ -140,6 +140,9 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
         }
         hir::StmtKind::ProtocolDeclaration(decl) => {
             visitor.visit_ident(&mut decl.name, ctx);
+            for constraint in &mut decl.constraints {
+                visitor.visit_path(constraint, ctx);
+            }
             for method in &mut decl.methods {
                 visitor.visit_ident(&mut method.name, ctx);
                 // Visit default method bodies with their own scope so that

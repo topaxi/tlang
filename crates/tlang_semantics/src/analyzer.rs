@@ -8,8 +8,8 @@ use tlang_span::NodeId;
 use crate::{
     diagnostic::Diagnostic,
     passes::{
-        DeclarationAnalyzer, FnParamTypeInference, StringLiteralValidator, VariableUsageValidator,
-        VisibilityValidator,
+        DeclarationAnalyzer, FnParamTypeInference, ProtocolConstraintValidator,
+        StringLiteralValidator, VariableUsageValidator, VisibilityValidator,
     },
 };
 
@@ -21,6 +21,10 @@ pub struct SemanticAnalysisContext {
     pub root_symbol_table: Rc<RefCell<DefScope>>,
     pub struct_declarations: HashMap<String, StructDeclaration>,
     pub diagnostics: Vec<Diagnostic>,
+    /// Maps protocol name → list of direct constraint protocol names.
+    pub protocol_constraints: HashMap<String, Vec<String>>,
+    /// Tracks which (protocol, type) pairs have impl blocks.
+    pub protocol_impls: Vec<(String, String)>,
 }
 
 impl SemanticAnalysisContext {
@@ -32,6 +36,8 @@ impl SemanticAnalysisContext {
             root_symbol_table,
             struct_declarations: HashMap::new(),
             diagnostics: Vec::new(),
+            protocol_constraints: HashMap::new(),
+            protocol_impls: Vec::new(),
         }
     }
 
@@ -161,6 +167,7 @@ impl Default for SemanticAnalyzer {
         Self::new(vec![
             Box::new(FnParamTypeInference::default()),
             Box::new(DeclarationAnalyzer::default()),
+            Box::new(ProtocolConstraintValidator),
             Box::new(VariableUsageValidator::default()),
             Box::new(StringLiteralValidator),
             Box::new(VisibilityValidator),

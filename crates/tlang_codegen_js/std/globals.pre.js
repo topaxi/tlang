@@ -11,9 +11,11 @@ export function $getType(value) {
 export class $Protocol {
   #def;
   #impls = new Map();
+  #constraints;
 
-  constructor(def) {
+  constructor(def, constraints = []) {
     this.#def = def;
+    this.#constraints = constraints;
 
     for (let methodName in def) {
       this[methodName] = this.#apply(methodName);
@@ -22,6 +24,10 @@ export class $Protocol {
 
   $setImpl(Type, methods) {
     this.#impls.set(Type, methods);
+  }
+
+  $getConstraints() {
+    return this.#constraints;
   }
 
   #apply(methodName) {
@@ -37,8 +43,8 @@ export class $Protocol {
   }
 }
 
-export function $protocol(def) {
-  return new $Protocol(def);
+export function $protocol(def, constraints = []) {
+  return new $Protocol(def, constraints);
 }
 
 export function $impl(protocol, Type, methods) {

@@ -536,6 +536,7 @@ impl Stmt {
 pub struct ProtocolDeclaration {
     pub visibility: Visibility,
     pub name: Ident,
+    pub constraints: Vec<Path>,
     pub methods: Vec<ProtocolMethodSignature>,
     pub consts: Vec<ConstDeclaration>,
 }
