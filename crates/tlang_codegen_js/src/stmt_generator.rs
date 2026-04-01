@@ -476,7 +476,7 @@ impl<'a> InnerCodegen<'a> {
                     hir::ExprKind::FieldAccess(_, ident) => ident.to_string(),
                     _ => unreachable!(),
                 };
-                let func = self.generate_function_expression(method);
+                let func = self.generate_method_expression(method);
                 ObjectPropertyKind::ObjectProperty(
                     self.ast.alloc_object_property(
                         SPAN,
@@ -486,7 +486,7 @@ impl<'a> InnerCodegen<'a> {
                                 .alloc_identifier_name(SPAN, self.alloc_str(&method_name)),
                         ),
                         func,
-                        false,
+                        true,
                         false,
                         false,
                     ),

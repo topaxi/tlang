@@ -178,6 +178,21 @@ impl<'a> InnerCodegen<'a> {
         &mut self,
         declaration: &hir::FunctionDeclaration,
     ) -> Expression<'a> {
+        self.generate_function_expression_inner(declaration, true)
+    }
+
+    pub fn generate_method_expression(
+        &mut self,
+        declaration: &hir::FunctionDeclaration,
+    ) -> Expression<'a> {
+        self.generate_function_expression_inner(declaration, false)
+    }
+
+    fn generate_function_expression_inner(
+        &mut self,
+        declaration: &hir::FunctionDeclaration,
+        named: bool,
+    ) -> Expression<'a> {
         self.push_scope();
 
         let name_as_str = fn_identifier_to_string(&declaration.name);
@@ -228,7 +243,7 @@ impl<'a> InnerCodegen<'a> {
             let body_stmts = self.generate_function_body(&declaration.body, is_tail_recursive);
             let body = self.fn_body(self.ast.vec_from_iter(body_stmts));
 
-            let id = if is_anonymous {
+            let id = if is_anonymous || !named {
                 None
             } else {
                 Some(self.binding_ident(&name_as_str))
