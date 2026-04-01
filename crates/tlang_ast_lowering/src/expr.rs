@@ -42,16 +42,7 @@ impl LoweringContext {
                 hir::ExprKind::Unary(*op, Box::new(self.lower_expr(expr)))
             }
             ast::node::ExprKind::Path(path) => hir::ExprKind::Path(Box::new(self.lower_path(path))),
-            ast::node::ExprKind::FunctionExpression(decl) => {
-                // Suspend the protocol dispatch context while lowering a nested
-                // function expression: its own `self` (if any) is unrelated to
-                // the outer protocol's `self`, so we must not rewrite field-access
-                // calls inside the nested body.
-                let saved_ctx = self.protocol_dispatch_ctx.take();
-                let result = hir::ExprKind::FunctionExpression(Box::new(self.lower_fn_decl(decl)));
-                self.protocol_dispatch_ctx = saved_ctx;
-                result
-            }
+            ast::node::ExprKind::FunctionExpression(decl) => self.lower_fn_expr(decl),
             ast::node::ExprKind::List(exprs) => hir::ExprKind::List(self.lower_exprs(exprs)),
             ast::node::ExprKind::Dict(entries) => {
                 let entries = entries
@@ -124,6 +115,17 @@ impl LoweringContext {
             ty: hir::Ty::unknown(),
             span: node.span,
         }
+    }
+
+    fn lower_fn_expr(&mut self, decl: &ast::node::FunctionDeclaration) -> hir::ExprKind {
+        // Suspend the protocol dispatch context while lowering a nested
+        // function expression: its own `self` (if any) is unrelated to
+        // the outer protocol's `self`, so we must not rewrite field-access
+        // calls inside the nested body.
+        let saved_ctx = self.protocol_dispatch_ctx.take();
+        let result = hir::ExprKind::FunctionExpression(Box::new(self.lower_fn_decl(decl)));
+        self.protocol_dispatch_ctx = saved_ctx;
+        result
     }
 
     fn lower_match(&mut self, match_expr: &ast::node::MatchExpression) -> hir::ExprKind {
