@@ -311,6 +311,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn visit_stmt(&mut self, stmt: &'ast Stmt, ctx: &mut Self::Context) {
         match &stmt.kind {
             StmtKind::FunctionDeclaration(decl) => {
