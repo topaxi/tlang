@@ -1,0 +1,36 @@
+protocol PartialEq {
+  fn eq(self, other)
+}
+
+protocol Eq : PartialEq {}
+
+protocol Ord : Eq {
+  fn cmp(self, other)
+}
+
+struct Point { x: int, y: int }
+
+impl PartialEq for Point {
+  fn eq(a, b) {
+    a.x == b.x && a.y == b.y
+  }
+}
+
+impl Eq for Point {}
+
+impl Ord for Point {
+  fn cmp(a, b) {
+    if a.x < b.x { -1 }
+    else if a.x > b.x { 1 }
+    else { 0 }
+  }
+}
+
+let a = Point { x: 1, y: 2 };
+let b = Point { x: 1, y: 2 };
+let c = Point { x: 3, y: 4 };
+
+PartialEq::eq(a, b) |> log();
+PartialEq::eq(a, c) |> log();
+Ord::cmp(a, c) |> log();
+Ord::cmp(c, a) |> log();

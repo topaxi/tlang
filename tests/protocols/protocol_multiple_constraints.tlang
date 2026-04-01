@@ -1,0 +1,26 @@
+protocol MyDisplay {
+  fn display(self)
+}
+
+protocol MyDebug {
+  fn debug(self)
+}
+
+protocol Printable : MyDisplay + MyDebug {}
+
+struct Message { text: string }
+
+impl MyDisplay for Message {
+  fn display(Message { text }) { "Display: " + text }
+}
+
+impl MyDebug for Message {
+  fn debug(Message { text }) { "Debug: " + text }
+}
+
+impl Printable for Message {}
+
+let msg = Message { text: "hello" };
+
+MyDisplay::display(msg) |> log();
+MyDebug::debug(msg) |> log();
