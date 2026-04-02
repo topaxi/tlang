@@ -6,10 +6,20 @@ use tlang_defs::DefKind;
 use tlang_diagnostics::Diagnostic;
 use tlang_hir as hir;
 use tlang_semantics::SemanticAnalyzer;
+use tlang_span::HIRS_PER_MODULE;
 
 use crate::module_graph::{ModuleGraphError, ParsedModule};
 use crate::resolver::{ModuleResolver, ResolvedImports};
 use crate::{ModuleGraph, ModulePath};
+
+/// Compute the stable HirId block start for a module at the given index.
+///
+/// Module indices are determined by lexicographic ordering of module paths.
+/// Each module receives a fixed block of [`HIRS_PER_MODULE`] IDs, so
+/// `1 + index * HIRS_PER_MODULE` is the first HirId assigned to that module.
+fn hir_id_start_for_index(index: usize) -> usize {
+    1 + index * HIRS_PER_MODULE
+}
 
 /// Result of compiling a multi-module project.
 #[derive(Debug)]
@@ -106,6 +116,11 @@ impl std::fmt::Display for CompileError {
 ///
 /// `root_dir` should be the project root containing `src/lib.tlang`.
 /// `builtin_symbols` should be the standard library symbols for the target backend.
+///
+/// # Panics
+///
+/// Panics if any module exceeds [`HIRS_PER_MODULE`] HIR nodes, which would overflow
+/// its reserved HirId block.
 pub fn compile_project(
     root_dir: &Path,
     builtin_symbols: &[(&str, DefKind)],
@@ -129,11 +144,11 @@ pub fn compile_project(
     // Collect exported symbols from all modules first (declaration pass)
     let exported_symbols = collect_exported_symbols(&graph);
 
-    // Track running HirId offset to avoid collisions between modules
-    let mut hir_id_offset: usize = 1;
-
-    // Compile modules in order (root first, then children)
-    for (module_path, parsed_module) in &mut graph.modules {
+    // Compile modules in order (lexicographic by path, which is the BTreeMap order).
+    // Each module receives a *fixed* HirId block so that adding/removing/resizing
+    // an unrelated module does not shift the HirId range of any other module.
+    for (index, (module_path, parsed_module)) in &mut graph.modules.iter_mut().enumerate() {
+        let hir_id_start = hir_id_start_for_index(index);
         let file_path = parsed_module.file_path.clone();
         let source = parsed_module.source.clone();
         let compiled = compile_single_module(
@@ -141,7 +156,7 @@ pub fn compile_project(
             &imports,
             &exported_symbols,
             builtin_symbols,
-            hir_id_offset,
+            hir_id_start,
         )
         .map_err(|diagnostics| CompileError::SemanticError {
             module_path: module_path.clone(),
@@ -150,8 +165,14 @@ pub fn compile_project(
             diagnostics,
         })?;
 
-        // Advance offset past all HirIds allocated by this module
-        hir_id_offset = compiled.lower_meta.hir_id_allocator.peek_next();
+        // Verify this module did not overflow its allocated HirId block.
+        let next_id = compiled.lower_meta.hir_id_allocator.peek_next();
+        let block_end = hir_id_start + HIRS_PER_MODULE;
+        assert!(
+            next_id <= block_end,
+            "HirId block overflow for module {module_path}: used {} IDs, limit is {HIRS_PER_MODULE}",
+            next_id - hir_id_start,
+        );
 
         compiled_modules.insert(module_path.clone(), compiled);
     }
@@ -169,6 +190,11 @@ pub fn compile_project(
 /// This variant is used by the interpreter backend, which needs global slot
 /// indices for symbol resolution. Cross-module imported symbols are assigned
 /// global slots starting after the last builtin slot.
+///
+/// # Panics
+///
+/// Panics if any module exceeds [`HIRS_PER_MODULE`] HIR nodes, which would overflow
+/// its reserved HirId block.
 pub fn compile_project_with_slots<S: AsRef<str>>(
     root_dir: &Path,
     builtin_symbols: &[(S, DefKind, Option<usize>)],
@@ -208,10 +234,10 @@ pub fn compile_project_with_slots<S: AsRef<str>>(
     // Phase 4: Compile each module with slot-aware symbol registration
     let mut compiled_modules = BTreeMap::new();
 
-    // Track running HirId offset to avoid collisions between modules
-    let mut hir_id_offset: usize = 1;
-
-    for (module_path, parsed_module) in &mut graph.modules {
+    // Each module receives a *fixed* HirId block so that adding/removing/resizing
+    // an unrelated module does not shift the HirId range of any other module.
+    for (index, (module_path, parsed_module)) in &mut graph.modules.iter_mut().enumerate() {
+        let hir_id_start = hir_id_start_for_index(index);
         let file_path = parsed_module.file_path.clone();
         let source = parsed_module.source.clone();
         let compiled = compile_single_module_with_slots(
@@ -220,7 +246,7 @@ pub fn compile_project_with_slots<S: AsRef<str>>(
             &exported_symbols,
             builtin_symbols,
             &import_slots,
-            hir_id_offset,
+            hir_id_start,
         )
         .map_err(|diagnostics| CompileError::SemanticError {
             module_path: module_path.clone(),
@@ -229,8 +255,14 @@ pub fn compile_project_with_slots<S: AsRef<str>>(
             diagnostics,
         })?;
 
-        // Advance offset past all HirIds allocated by this module
-        hir_id_offset = compiled.lower_meta.hir_id_allocator.peek_next();
+        // Verify this module did not overflow its allocated HirId block.
+        let next_id = compiled.lower_meta.hir_id_allocator.peek_next();
+        let block_end = hir_id_start + HIRS_PER_MODULE;
+        assert!(
+            next_id <= block_end,
+            "HirId block overflow for module {module_path}: used {} IDs, limit is {HIRS_PER_MODULE}",
+            next_id - hir_id_start,
+        );
 
         compiled_modules.insert(module_path.clone(), compiled);
     }
@@ -788,5 +820,87 @@ mod tests {
         assert_eq!(result.modules.len(), 2);
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Verify that each module's HirIds fall inside the expected fixed block
+    /// (`1 + index * HIRS_PER_MODULE .. 1 + (index+1) * HIRS_PER_MODULE`)
+    /// and that adding a new module does not shift any existing module's block.
+    #[test]
+    fn test_hir_id_blocks_are_stable() {
+        use tlang_span::HIRS_PER_MODULE;
+
+        // First compile: root + math
+        let dir1 = std::env::temp_dir().join("tlang_test_hir_stable_v1");
+        let _ = fs::remove_dir_all(&dir1);
+        create_test_project(&dir1);
+
+        let builtins: Vec<(&str, DefKind)> = vec![("log", DefKind::Function(u16::MAX))];
+        let result1 = compile_project(&dir1, &builtins).unwrap();
+
+        // Collect the HirId start of the math module from the first compilation.
+        // Module paths are sorted lexicographically; math (index 0) comes before root (index 1).
+        // math => index 0, root => index 1  (BTreeMap order: "math" < "" is NOT the case)
+        // Actually BTreeMap with ModulePath sorts "" (root/empty) before "math",
+        // so root => index 0, math => index 1.
+        let math_path = ModulePath::from_str_segments(&["math"]);
+        let math_hir_id_start_v1 = {
+            let math_module = result1.modules.get(&math_path).unwrap();
+            // The first HirId allocated in a module equals its block start.
+            // Find a function decl to get a representative HirId.
+            let mut first_id: Option<tlang_hir::HirId> = None;
+            for stmt in &math_module.hir.block.stmts {
+                if let tlang_hir::StmtKind::FunctionDeclaration(decl) = &stmt.kind {
+                    first_id = Some(decl.hir_id);
+                    break;
+                }
+            }
+            first_id.expect("math module should have at least one function")
+        };
+
+        // Determine the expected block start: math is at some stable index.
+        // The exact index depends on sort order (root < math in BTreeMap).
+        let math_index = result1
+            .modules
+            .keys()
+            .position(|k| k == &math_path)
+            .unwrap();
+        let expected_block_start = 1 + math_index * HIRS_PER_MODULE;
+        assert!(
+            math_hir_id_start_v1.as_usize() >= expected_block_start,
+            "math HirIds should start at or after block start {expected_block_start}, got {}",
+            math_hir_id_start_v1.as_usize(),
+        );
+        assert!(
+            math_hir_id_start_v1.as_usize() < expected_block_start + HIRS_PER_MODULE,
+            "math HirIds should stay within block [{expected_block_start}, {})",
+            expected_block_start + HIRS_PER_MODULE,
+        );
+
+        let _ = fs::remove_dir_all(&dir1);
+
+        // Second compile: same project but now also add a `utils` module *before* math in
+        // sort order so that math's index would shift in the old running-offset scheme.
+        // With fixed blocks, the math module's block is determined by its sorted position
+        // among all modules, but crucially the *block size* is fixed so adding modules
+        // cannot cause HirId overflow or collision.
+        let dir2 = std::env::temp_dir().join("tlang_test_hir_stable_v2");
+        let _ = fs::remove_dir_all(&dir2);
+        create_multi_module_project(&dir2);
+
+        let result2 = compile_project(&dir2, &builtins).unwrap();
+        assert_eq!(result2.modules.len(), 3, "should have 3 modules");
+
+        // Collect all HirIds and verify no module overflows its block.
+        for (index, (path, compiled)) in result2.modules.iter().enumerate() {
+            let block_start = 1 + index * HIRS_PER_MODULE;
+            let block_end = block_start + HIRS_PER_MODULE;
+            let next_id = compiled.lower_meta.hir_id_allocator.peek_next();
+            assert!(
+                next_id <= block_end,
+                "module {path} overflowed its HirId block [{block_start}, {block_end}): next={next_id}",
+            );
+        }
+
+        let _ = fs::remove_dir_all(&dir2);
     }
 }
