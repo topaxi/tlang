@@ -751,30 +751,14 @@ impl IncrementalCompiler {
         // Re-parse and update the graph
         self.reparse_module(&module_path, path, source, new_hash)
             .inspect_err(|_| {
-                // Roll back hash so the next call with fixed source isn't skipped
-                match old_hash {
-                    Some(h) => {
-                        self.source_hashes.insert(module_path.clone(), h);
-                    }
-                    None => {
-                        self.source_hashes.remove(&module_path);
-                    }
-                }
+                self.rollback_source_hash(&module_path, old_hash);
             })?;
 
         // Re-resolve imports for the whole graph
         let (imports, import_errors) = ModuleResolver::resolve_imports(&self.graph);
         if !import_errors.is_empty() {
             let sources = self.graph.source_info();
-            // Roll back hash so the next call with fixed source isn't skipped
-            match old_hash {
-                Some(h) => {
-                    self.source_hashes.insert(module_path.clone(), h);
-                }
-                None => {
-                    self.source_hashes.remove(&module_path);
-                }
-            }
+            self.rollback_source_hash(&module_path, old_hash);
             return Err(CompileError::ImportErrors {
                 errors: import_errors,
                 sources,
@@ -807,21 +791,25 @@ impl IncrementalCompiler {
         let result = self.recompile_modules(&to_recompile);
 
         // Only commit the new hash after the full pipeline succeeds
-        match &result {
-            Ok(_) => {
-                self.source_hashes.insert(module_path, new_hash);
-            }
-            Err(_) => match old_hash {
-                Some(h) => {
-                    self.source_hashes.insert(module_path, h);
-                }
-                None => {
-                    self.source_hashes.remove(&module_path);
-                }
-            },
+        if result.is_ok() {
+            self.source_hashes.insert(module_path, new_hash);
+        } else {
+            self.rollback_source_hash(&module_path, old_hash);
         }
 
         result
+    }
+
+    /// Restore the source hash for a module to its previous value (or remove it).
+    fn rollback_source_hash(&mut self, module_path: &ModulePath, old_hash: Option<u64>) {
+        match old_hash {
+            Some(h) => {
+                self.source_hashes.insert(module_path.clone(), h);
+            }
+            None => {
+                self.source_hashes.remove(module_path);
+            }
+        }
     }
 
     /// Re-parse a single module and update the graph.
