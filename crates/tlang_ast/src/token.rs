@@ -4,7 +4,7 @@ use serde::Serialize;
 use tlang_intern::Symbol;
 use tlang_span::Span;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum TokenKind {
     // Tokens for binary operators
@@ -114,6 +114,8 @@ impl PartialEq for TaggedStringPart {
     }
 }
 
+impl Eq for TaggedStringPart {}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum Literal {
@@ -144,7 +146,10 @@ impl From<bool> for Literal {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+// f64 doesn't implement Eq; for AST equality purposes NaN == NaN is correct.
+impl Eq for Literal {}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Token {
     pub kind: TokenKind,
@@ -181,7 +186,7 @@ impl Token {
 }
 
 /// Comment kind for AST-stored comments (owned, no source lifetime).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum CommentKind {
     SingleLine,
@@ -189,7 +194,7 @@ pub enum CommentKind {
 }
 
 /// An owned comment extracted from the token stream for storage in AST/HIR nodes.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct CommentToken {
     pub kind: CommentKind,

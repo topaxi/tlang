@@ -12,7 +12,7 @@ use tlang_intern::{Symbol, get as intern_get, intern};
 
 pub use crate::macros::*;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Ident {
     name: Symbol,
@@ -60,14 +60,14 @@ impl Display for Ident {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum Associativity {
     Left,
     Right,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct FunctionParameter {
     pub pattern: Pat,
@@ -103,7 +103,7 @@ pub enum Visibility {
     Public,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ConstDeclaration {
     pub id: NodeId,
@@ -114,7 +114,7 @@ pub struct ConstDeclaration {
     pub span: Span,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct FunctionDeclaration {
     pub id: NodeId,
@@ -149,7 +149,7 @@ impl FunctionDeclaration {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Block {
     pub id: NodeId,
@@ -178,7 +178,7 @@ impl Block {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct CallExpression {
     pub callee: Expr,
@@ -198,21 +198,21 @@ impl CallExpression {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct FieldAccessExpression {
     pub base: Expr,
     pub field: Ident,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct IndexAccessExpression {
     pub base: Expr,
     pub index: Expr,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct IfElseExpression {
     pub condition: Expr,
@@ -220,7 +220,7 @@ pub struct IfElseExpression {
     pub else_branches: Vec<ElseClause>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Expr {
     pub id: NodeId,
@@ -259,14 +259,14 @@ impl Expr {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ElseClause {
     pub condition: Option<Expr>,
     pub consequence: Block,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct BinaryOpExpression {
     pub op: BinaryOpKind,
@@ -274,14 +274,14 @@ pub struct BinaryOpExpression {
     pub rhs: Expr,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct MatchExpression {
     pub expression: Expr,
     pub arms: Vec<MatchArm>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct RangeExpression {
     pub start: Expr,
@@ -289,7 +289,7 @@ pub struct RangeExpression {
     pub inclusive: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ForLoop {
     pub id: NodeId,
@@ -300,7 +300,7 @@ pub struct ForLoop {
     pub else_block: Option<Block>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum ExprKind {
     #[default]
@@ -348,7 +348,7 @@ pub enum Res {
 }
 
 /// AST representation of a path.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Path {
     pub segments: Vec<Ident>,
@@ -403,7 +403,7 @@ impl Path {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Pat {
     pub id: NodeId,
@@ -463,14 +463,14 @@ impl Pat {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct EnumPattern {
     pub path: Path,
     pub elements: Vec<(Ident, Pat)>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum PatKind {
     #[default]
@@ -485,7 +485,7 @@ pub enum PatKind {
     _Self,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct EnumVariant {
     pub id: NodeId,
@@ -495,7 +495,7 @@ pub struct EnumVariant {
     pub span: Span,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct EnumDeclaration {
     pub visibility: Visibility,
@@ -504,7 +504,7 @@ pub struct EnumDeclaration {
     pub consts: Vec<ConstDeclaration>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Stmt {
     pub id: NodeId,
@@ -531,7 +531,7 @@ impl Stmt {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ProtocolDeclaration {
     pub visibility: Visibility,
@@ -541,7 +541,7 @@ pub struct ProtocolDeclaration {
     pub consts: Vec<ConstDeclaration>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ProtocolMethodSignature {
     pub id: NodeId,
@@ -552,7 +552,7 @@ pub struct ProtocolMethodSignature {
     pub span: Span,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ImplBlock {
     pub protocol_name: Path,
@@ -564,7 +564,7 @@ pub struct ImplBlock {
 /// A single import item within a `use` declaration.
 ///
 /// Represents either `name` or `name as alias`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct UseItem {
     pub name: Ident,
@@ -579,7 +579,7 @@ pub struct UseItem {
 /// - `use string::parse::from_char_code as fcc`
 /// - `use string::{from_char_code, char_code_at}`
 /// - `use string::{from_char_code as fcc, char_code_at}`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct UseDeclaration {
     pub path: Vec<Ident>,
@@ -590,7 +590,7 @@ pub struct UseDeclaration {
 /// A `pub mod` declaration for exposing submodules.
 ///
 /// `pub mod parse, utils` exposes the `parse` and `utils` submodules.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ModDeclaration {
     pub visibility: Visibility,
@@ -598,7 +598,7 @@ pub struct ModDeclaration {
     pub span: Span,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum StmtKind {
     #[default]
@@ -618,7 +618,7 @@ pub enum StmtKind {
     ModDeclaration(Box<ModDeclaration>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct LetDeclaration {
     pub pattern: Pat,
@@ -626,7 +626,7 @@ pub struct LetDeclaration {
     pub type_annotation: Option<Ty>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct StructDeclaration {
     pub visibility: Visibility,
@@ -635,7 +635,7 @@ pub struct StructDeclaration {
     pub consts: Vec<ConstDeclaration>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct StructField {
     pub id: NodeId,
@@ -643,7 +643,7 @@ pub struct StructField {
     pub ty: Ty,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum TyKind {
     #[default]
@@ -652,7 +652,7 @@ pub enum TyKind {
     Union(Vec<Path>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Ty {
     pub id: NodeId,
@@ -691,7 +691,7 @@ impl Ty {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct MatchArm {
     pub id: NodeId,
@@ -700,7 +700,7 @@ pub struct MatchArm {
     pub expression: Expr,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Module {
     pub id: NodeId,
@@ -718,7 +718,7 @@ impl Module {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum UnaryOp {
     Minus,
@@ -728,14 +728,14 @@ pub enum UnaryOp {
     Spread,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct OperatorInfo {
     pub precedence: u8,
     pub associativity: Associativity,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum BinaryOpKind {
     Assign,

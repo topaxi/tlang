@@ -5,7 +5,7 @@ pub struct NodeIdTag;
 
 pub type NodeId = Id<NodeIdTag>;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NodeIdAllocator(IdAllocator<NodeIdTag>);
 
 impl NodeIdAllocator {

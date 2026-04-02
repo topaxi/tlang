@@ -107,7 +107,7 @@ impl std::fmt::Debug for Span {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Spanned<T> {
     pub node: T,

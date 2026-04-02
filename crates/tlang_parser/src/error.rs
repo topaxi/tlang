@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 use serde::Serialize;
 use tlang_span::Span;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseError {
     issues: Vec<ParseIssue>,
 }
@@ -36,7 +36,7 @@ impl Display for ParseError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ParseIssue {
     pub msg: String,
@@ -56,7 +56,7 @@ impl Display for ParseIssue {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum ParseIssueKind {
     /// Debug representation of the unexpected token kind.
