@@ -124,10 +124,12 @@ impl<'src> Parser<'src> {
     }
 
     #[inline(never)]
-    #[allow(clippy::needless_pass_by_value)]
-    fn panic_unexpected_token(&mut self, expected: &str, actual: Token) -> ! {
-        self.push_unexpected_token_error(expected, actual);
-        panic!("parse error");
+    fn push_unexpected_expr_error(&mut self, expected: &str, actual: &Expr) {
+        let span = actual.span;
+        let msg = format!("Expected {}, found {:?}", expected, actual.kind);
+        let kind = ParseIssueKind::UnexpectedToken(format!("{:?}", actual.kind));
+
+        self.errors.push(ParseIssue { msg, kind, span });
     }
 
     #[inline(never)]
@@ -145,25 +147,6 @@ impl<'src> Parser<'src> {
         panic!(
             "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
             expected, start_lc.line, start_lc.column, actual.kind, source_line, caret
-        );
-    }
-
-    #[inline(never)]
-    #[allow(clippy::needless_pass_by_value)]
-    fn panic_unexpected_expr(&self, expected: &str, actual: Option<Expr>) -> ! {
-        let node = actual.as_ref().unwrap();
-        let start_lc = node.span.start_lc;
-        let source_line = self
-            .lexer
-            .source()
-            .lines()
-            .nth(start_lc.line as usize)
-            .unwrap_or_default();
-        let caret = " ".repeat(start_lc.column as usize) + "^";
-
-        panic!(
-            "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
-            expected, start_lc.line, start_lc.column, node.kind, source_line, caret
         );
     }
 
@@ -1925,9 +1908,10 @@ impl<'src> Parser<'src> {
                     }
                     _ => {
                         // We found something else, which we can't use as the name of the function.
-                        // Stop parsing function declarations and rewind the lexer and panic.
+                        // Stop parsing function declarations and rewind the lexer.
                         self.restore_state(saved_state);
-                        self.panic_unexpected_token("identifier", self.current_token);
+                        self.push_unexpected_token_error("identifier", self.current_token);
+                        break;
                     }
                 }
             } else if name.is_none() {
@@ -2280,17 +2264,21 @@ impl<'src> Parser<'src> {
         lhs
     }
 
-    fn fn_name_identifier_to_string(&self, identifier: &Expr) -> String {
+    fn fn_name_identifier_to_string(&mut self, identifier: &Expr) -> String {
         match &identifier.kind {
             ExprKind::Path(path) => path.to_string(),
 
             ExprKind::FieldExpression(field) => {
-                self.fn_name_identifier_to_string(&field.base) + "." + field.field.as_str()
+                let base = self.fn_name_identifier_to_string(&field.base.clone());
+                base + "." + field.field.as_str()
             }
-            _ => self.panic_unexpected_expr(
-                "identifier, nested identifier or field expression",
-                Some(identifier.clone()),
-            ),
+            _ => {
+                self.push_unexpected_expr_error(
+                    "identifier, nested identifier or field expression as function name",
+                    identifier,
+                );
+                String::from("<error>")
+            }
         }
     }
 
