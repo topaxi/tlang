@@ -33,6 +33,7 @@ impl ModuleApiFingerprint {
     pub fn from_exports(exports: &[(String, DefKind)]) -> Self {
         let mut sorted = exports.to_vec();
         sorted.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+        sorted.dedup();
         let hash = {
             let mut hasher = std::hash::DefaultHasher::new();
             for (name, kind) in &sorted {
@@ -761,13 +762,19 @@ impl IncrementalCompiler {
                 }
             })?;
 
-        // Commit the new hash only after a successful parse
-        self.source_hashes.insert(module_path.clone(), new_hash);
-
         // Re-resolve imports for the whole graph
         let (imports, import_errors) = ModuleResolver::resolve_imports(&self.graph);
         if !import_errors.is_empty() {
             let sources = self.graph.source_info();
+            // Roll back hash so the next call with fixed source isn't skipped
+            match old_hash {
+                Some(h) => {
+                    self.source_hashes.insert(module_path.clone(), h);
+                }
+                None => {
+                    self.source_hashes.remove(&module_path);
+                }
+            }
             return Err(CompileError::ImportErrors {
                 errors: import_errors,
                 sources,
@@ -794,10 +801,27 @@ impl IncrementalCompiler {
         let to_recompile = if api_changed {
             self.transitive_dependents(&module_path)
         } else {
-            vec![module_path]
+            vec![module_path.clone()]
         };
 
-        self.recompile_modules(&to_recompile)
+        let result = self.recompile_modules(&to_recompile);
+
+        // Only commit the new hash after the full pipeline succeeds
+        match &result {
+            Ok(_) => {
+                self.source_hashes.insert(module_path, new_hash);
+            }
+            Err(_) => match old_hash {
+                Some(h) => {
+                    self.source_hashes.insert(module_path, h);
+                }
+                None => {
+                    self.source_hashes.remove(&module_path);
+                }
+            },
+        }
+
+        result
     }
 
     /// Re-parse a single module and update the graph.
