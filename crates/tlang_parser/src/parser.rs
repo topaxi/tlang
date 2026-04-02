@@ -18,7 +18,7 @@ use log::debug;
 /// Metadata produced alongside the parsed [`Module`] by [`Parser::parse`].
 ///
 /// Mirrors the pattern of [`tlang_hir::LowerResultMeta`] for the lowering phase.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseMeta {
     /// NodeIds of expressions that produce compile-time-constant values
     /// (e.g. tagged string parts lists). Pass these to `lower_to_hir` so they

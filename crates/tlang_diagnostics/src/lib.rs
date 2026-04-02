@@ -13,7 +13,7 @@ use tlang_span::Span;
 use serde::Serialize;
 
 /// The severity of a diagnostic.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum Severity {
     Error,
@@ -30,7 +30,7 @@ impl Display for Severity {
 }
 
 /// A secondary labeled span attached to a [`Diagnostic`].
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct DiagnosticLabel {
     pub message: String,
@@ -39,7 +39,7 @@ pub struct DiagnosticLabel {
 
 /// A structured diagnostic message with severity, primary span, and optional
 /// secondary labeled spans.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Diagnostic {
     /// The message to display to the user.

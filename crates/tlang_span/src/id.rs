@@ -42,7 +42,7 @@ impl<T> std::fmt::Debug for Id<T> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IdAllocator<T: Copy> {
     next_id: Id<T>,
 }
