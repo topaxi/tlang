@@ -2004,7 +2004,10 @@ dependencies = [
  "pretty_assertions",
  "serde",
  "tlang_ast",
+ "tlang_ast_lowering",
  "tlang_defs",
+ "tlang_parser",
+ "tlang_semantics",
  "tlang_span",
 ]
 
