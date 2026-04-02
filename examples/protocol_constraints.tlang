@@ -85,14 +85,14 @@ fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
 
 fn partition([], _) { [[], []] }
 fn partition([x, ...xs], pred) {
-  let [yes, no] = partition(xs, pred);
+  let [yes, no] = xs |> partition(pred);
   if pred(x) { [[x, ...yes], no] }
   else { [yes, [x, ...no]] }
 }
 
 fn sort_by([], _) { [] }
 fn sort_by([pivot, ...rest], cmp) {
-  let [smaller, greater] = partition(rest, fn(x) { cmp(x, pivot) < 0 });
+  let [smaller, greater] = rest |> partition(fn(x) { cmp(x, pivot) < 0 });
   [...sort_by(smaller, cmp), pivot, ...sort_by(greater, cmp)]
 }
 
