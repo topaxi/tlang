@@ -310,7 +310,11 @@ impl ModuleGraph {
     }
 }
 
-/// Compute a hash of the given source bytes for change detection.
+/// Compute a hash of the given source bytes for runtime change detection.
+///
+/// Uses [`std::hash::DefaultHasher`] which is not guaranteed to be stable
+/// across Rust versions. The result should only be used for in-process
+/// comparisons and must not be persisted to disk.
 pub fn hash_source(source: &str) -> u64 {
     let mut hasher = std::hash::DefaultHasher::new();
     source.hash(&mut hasher);
