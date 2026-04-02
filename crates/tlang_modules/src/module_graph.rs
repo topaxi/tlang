@@ -243,8 +243,8 @@ impl ModuleGraph {
     ///
     /// # Panics
     ///
-    /// Panics if a `use` declaration references a module that exists in the graph
-    /// but cannot be found by key lookup (internal inconsistency).
+    /// This method does not panic. Unresolvable `use` targets are silently
+    /// skipped (they will be caught later by import resolution).
     pub fn topological_order(&self) -> Vec<ModulePath> {
         use std::collections::BTreeSet;
 
@@ -260,9 +260,8 @@ impl ModuleGraph {
             for use_decl in &module.use_declarations {
                 if !use_decl.path.is_empty() {
                     let target = ModulePath::new(use_decl.path.clone());
-                    if self.modules.contains_key(&target) {
-                        // path depends on target → target is a prerequisite of path
-                        let target_ref = self.modules.keys().find(|k| **k == target).unwrap();
+                    // path depends on target → target is a prerequisite of path
+                    if let Some((target_ref, _)) = self.modules.get_key_value(&target) {
                         dependents.entry(target_ref).or_default().push(path);
                         *in_degree.entry(path).or_insert(0) += 1;
                     }

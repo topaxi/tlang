@@ -14,7 +14,7 @@ use std::rc::Rc;
 
 pub use tlang_span::{HirId, LineColumn, NodeId, Span};
 
-#[derive(Debug, Default, PartialEq, Eq, Hash, Copy, Clone)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum DefKind {
     Module,

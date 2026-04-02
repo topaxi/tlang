@@ -32,7 +32,7 @@ impl ModuleApiFingerprint {
     /// Compute a fingerprint from a list of exported symbols.
     pub fn from_exports(exports: &[(String, DefKind)]) -> Self {
         let mut sorted = exports.to_vec();
-        sorted.sort_by(|a, b| a.0.cmp(&b.0));
+        sorted.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
         let hash = {
             let mut hasher = std::hash::DefaultHasher::new();
             for (name, kind) in &sorted {
@@ -78,6 +78,11 @@ pub struct MultiModuleCompileResult {
     pub api_fingerprints: HashMap<ModulePath, ModuleApiFingerprint>,
     /// Module paths in topological compilation order (dependencies first).
     pub compilation_order: Vec<ModulePath>,
+    /// Source hashes for each module at the time of compilation.
+    pub source_hashes: HashMap<ModulePath, u64>,
+    /// The module graph used during compilation.
+    /// Stored so that `IncrementalCompiler` can reuse it without rebuilding.
+    pub graph: ModuleGraph,
 }
 
 impl MultiModuleCompileResult {
@@ -193,6 +198,13 @@ pub fn compile_project(
     // Compute topological compilation order (dependencies first)
     let compilation_order = graph.topological_order();
 
+    // Capture source hashes before compilation mutates the graph
+    let source_hashes: HashMap<ModulePath, u64> = graph
+        .modules
+        .iter()
+        .map(|(path, m)| (path.clone(), m.source_hash))
+        .collect();
+
     // Build a map from module path to its lexicographic index for stable HirId assignment.
     let lex_indices: HashMap<ModulePath, usize> = graph
         .modules
@@ -245,6 +257,8 @@ pub fn compile_project(
         reverse_deps,
         api_fingerprints,
         compilation_order,
+        source_hashes,
+        graph,
     })
 }
 
@@ -301,6 +315,13 @@ pub fn compile_project_with_slots<S: AsRef<str>>(
     // Compute topological compilation order (dependencies first)
     let compilation_order = graph.topological_order();
 
+    // Capture source hashes before compilation mutates the graph
+    let source_hashes: HashMap<ModulePath, u64> = graph
+        .modules
+        .iter()
+        .map(|(path, m)| (path.clone(), m.source_hash))
+        .collect();
+
     // Build a map from module path to its lexicographic index for stable HirId assignment.
     let lex_indices: HashMap<ModulePath, usize> = graph
         .modules
@@ -356,6 +377,8 @@ pub fn compile_project_with_slots<S: AsRef<str>>(
         reverse_deps,
         api_fingerprints,
         compilation_order,
+        source_hashes,
+        graph,
     })
 }
 
@@ -664,14 +687,6 @@ impl IncrementalCompiler {
     ) -> Result<Self, CompileError> {
         let result = compile_project(root_dir, builtin_symbols)?;
 
-        // Re-build graph to capture source hashes
-        let graph = ModuleGraph::build(root_dir).map_err(CompileError::ModuleGraphErrors)?;
-        let source_hashes: HashMap<ModulePath, u64> = graph
-            .modules
-            .iter()
-            .map(|(path, m)| (path.clone(), m.source_hash))
-            .collect();
-
         let stored_builtins: Vec<(String, DefKind)> = builtin_symbols
             .iter()
             .map(|(name, kind)| (name.to_string(), *kind))
@@ -679,13 +694,13 @@ impl IncrementalCompiler {
 
         Ok(IncrementalCompiler {
             root_dir: root_dir.to_path_buf(),
-            graph,
+            graph: result.graph,
             cache: result.modules.into_iter().collect(),
             imports: result.imports,
             exported_symbols: result.exported_symbols,
             reverse_deps: result.reverse_deps,
             api_fingerprints: result.api_fingerprints,
-            source_hashes,
+            source_hashes: result.source_hashes,
             builtin_symbols: stored_builtins,
         })
     }
@@ -694,6 +709,10 @@ impl IncrementalCompiler {
     ///
     /// Returns the set of module paths that were recompiled. If the source
     /// is unchanged (same hash), returns an empty set.
+    ///
+    /// The `path` argument must exactly match the `file_path` stored in the
+    /// module graph (typically an absolute path produced by [`ModuleGraph::build`]).
+    /// If no module matches, an empty `Ok(vec![])` is returned.
     ///
     /// # Panics
     ///
@@ -724,10 +743,26 @@ impl IncrementalCompiler {
         {
             return Ok(vec![]);
         }
-        self.source_hashes.insert(module_path.clone(), new_hash);
+
+        // Save old hash so we can roll back on error
+        let old_hash = self.source_hashes.get(&module_path).copied();
 
         // Re-parse and update the graph
-        self.reparse_module(&module_path, path, source, new_hash)?;
+        self.reparse_module(&module_path, path, source, new_hash)
+            .inspect_err(|_| {
+                // Roll back hash so the next call with fixed source isn't skipped
+                match old_hash {
+                    Some(h) => {
+                        self.source_hashes.insert(module_path.clone(), h);
+                    }
+                    None => {
+                        self.source_hashes.remove(&module_path);
+                    }
+                }
+            })?;
+
+        // Commit the new hash only after a successful parse
+        self.source_hashes.insert(module_path.clone(), new_hash);
 
         // Re-resolve imports for the whole graph
         let (imports, import_errors) = ModuleResolver::resolve_imports(&self.graph);
@@ -748,7 +783,7 @@ impl IncrementalCompiler {
         let api_changed = self
             .api_fingerprints
             .get(&module_path)
-            .is_none_or(|old| old.hash != new_fingerprint.hash);
+            .is_none_or(|old| old != &new_fingerprint);
 
         self.exported_symbols = exported_symbols;
         self.api_fingerprints
@@ -1433,11 +1468,12 @@ mod tests {
 
         let graph = ModuleGraph::build(&dir).unwrap();
 
-        // All modules should have non-zero source hashes
+        // All modules should have a source_hash consistent with hash_source(&module.source)
         for (path, module) in &graph.modules {
-            assert_ne!(
-                module.source_hash, 0,
-                "source_hash should be non-zero for module {path}"
+            let recomputed = hash_source(&module.source);
+            assert_eq!(
+                module.source_hash, recomputed,
+                "source_hash should match hash_source(&module.source) for module {path}"
             );
         }
 
