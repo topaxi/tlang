@@ -1,0 +1,196 @@
+// Blog article ranking system
+//
+// Demonstrates protocol constraints: protocols that require other protocols
+// as constraints, with default method implementations that dispatch to methods
+// from those constraints via `self`.
+//
+// Protocol hierarchy:
+//   Eq ──► Comparable (adds default less_than, greater_than, between)
+//                │
+//                └──► Rankable  (adds default is_higher, best)
+
+// ── Protocols ─────────────────────────────────────────────────────────────────
+
+protocol Eq {
+  fn equals(self, other)
+}
+
+// Comparable requires Eq.  Default methods are built on top of `compare`
+// and can also call `equals` because Eq is a constraint.
+// compare returns negative, zero, or positive
+protocol Comparable : Eq {
+  fn compare(self, other)
+
+  fn less_than(self, other) {
+    self.compare(other) < 0
+  }
+
+  fn greater_than(self, other) {
+    self.compare(other) > 0
+  }
+
+  fn between(self, lo, hi) {
+    !(self.less_than(lo)) && !(self.greater_than(hi))
+  }
+}
+
+// Rankable requires Comparable (which in turn requires Eq).
+// Default methods here call into Comparable methods transitively via self.
+protocol Rankable : Comparable {
+  fn is_higher(self, other) {
+    self.greater_than(other)
+  }
+
+  fn best(self, other) {
+    if self.is_higher(other) { self } else { other }
+  }
+}
+
+// ── Domain model ──────────────────────────────────────────────────────────────
+
+struct Article {
+  id:     int,
+  title:  string,
+  author: string,
+  views:  int,
+  score:  int,
+}
+
+impl Eq for Article {
+  fn equals(a, b) { a.id == b.id }
+}
+
+// Articles are ranked primarily by score, then by views as a tie-breaker.
+impl Comparable for Article {
+  fn compare(a, b) {
+    if a.score < b.score { -1 }
+    else if a.score > b.score { 1 }
+    else if a.views < b.views { -1 }
+    else if a.views > b.views { 1 }
+    else { 0 }
+  }
+}
+
+// Empty impl — all Rankable methods are derived from Comparable and Eq above.
+impl Rankable for Article {}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+fn filter([], _) { [] }
+fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
+fn filter([_, ...xs], f) { rec filter(xs, f) }
+
+fn foldl([], acc, _) { acc }
+fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+
+fn partition([], _) { [[], []] }
+fn partition([x, ...xs], pred) {
+  let [yes, no] = partition(xs, pred);
+  if pred(x) { [[x, ...yes], no] }
+  else { [yes, [x, ...no]] }
+}
+
+fn sort_by([], _) { [] }
+fn sort_by([pivot, ...rest], cmp) {
+  let [smaller, greater] = partition(rest, fn(x) { cmp(x, pivot) < 0 });
+  [...sort_by(smaller, cmp), pivot, ...sort_by(greater, cmp)]
+}
+
+fn article_summary(a) {
+  f"[{a.score}★  {a.views} views]  {a.title}  (by {a.author})"
+}
+
+// ── Fake repository ────────────────────────────────────────────────────────────
+
+fn all_articles() {
+  [
+    Article { id: 1, title: "Getting Started with tlang",       author: "Alice", views: 4200, score: 82 },
+    Article { id: 2, title: "Pattern Matching Deep Dive",       author: "Bob",   views: 8100, score: 87 },
+    Article { id: 3, title: "Tail Call Optimization",           author: "Alice", views: 3300, score: 95 },
+    Article { id: 4, title: "WebAssembly Bindings",             author: "Carol", views: 6700, score: 87 },
+    Article { id: 5, title: "Protocols and Constraints",        author: "Bob",   views: 2100, score: 70 },
+    Article { id: 6, title: "Functional Pipelines",             author: "Carol", views: 5500, score: 91 },
+    Article { id: 7, title: "Introduction to Pattern Matching", author: "Alice", views: 9000, score: 82 },
+  ]
+}
+
+fn articles_by_author(author) {
+  all_articles()
+  |> filter(fn(a) { a.author == author })
+}
+
+fn articles_in_score_range(lo_score, hi_score) {
+  // Comparable::between dispatches to less_than and greater_than,
+  // which in turn call compare — all via default implementations.
+  let lo = Article { id: 0, title: "", author: "", views: 0, score: lo_score };
+  let hi = Article { id: 0, title: "", author: "", views: 0, score: hi_score };
+
+  all_articles()
+  |> filter(fn(a) { Comparable::between(a, lo, hi) })
+}
+
+fn find_article_by_id(id) {
+  let sentinel = Article { id: id, title: "", author: "", views: 0, score: 0 };
+  all_articles()
+  |> filter(fn(a) { Eq::equals(a, sentinel) })
+}
+
+// ── Fake controllers ───────────────────────────────────────────────────────────
+
+enum ArticlesFilter {
+  All,
+  ByAuthor(string),
+  ScoreRange(int, int),
+}
+
+fn articles_controller(ArticlesFilter::All) {
+  log("=== All Articles (ranked by score, then views) ===");
+
+  all_articles()
+  |> sort_by(fn(a, b) { Comparable::compare(b, a) })
+  |> map(article_summary)
+  |> log();
+}
+
+fn articles_controller(ArticlesFilter::ByAuthor(author)) {
+  log(f"=== Articles by {author} ===");
+
+  articles_by_author(author)
+  |> sort_by(fn(a, b) { Comparable::compare(b, a) })
+  |> map(article_summary)
+  |> log();
+}
+
+fn articles_controller(ArticlesFilter::ScoreRange(lo, hi)) {
+  log(f"=== Articles with score between {lo} and {hi} ===");
+
+  articles_in_score_range(lo, hi)
+  |> sort_by(fn(a, b) { Comparable::compare(b, a) })
+  |> map(article_summary)
+  |> log();
+}
+
+fn top_article_controller() {
+  log("=== Top Ranked Article ===");
+
+  let articles = all_articles();
+  let first    = articles[0];
+  // Rankable::best uses is_higher, which dispatches to greater_than from Comparable.
+  let top = foldl(articles, first, fn(acc, a) { Rankable::best(acc, a) });
+  top
+  |> article_summary()
+  |> log();
+
+  // Verify we can look it up by identity using Eq
+  log("Looking up by id:");
+  find_article_by_id(top.id)
+  |> map(article_summary)
+  |> log();
+}
+
+// ── Simulate requests ─────────────────────────────────────────────────────────
+
+articles_controller(ArticlesFilter::All);
+articles_controller(ArticlesFilter::ByAuthor("Alice"));
+articles_controller(ArticlesFilter::ScoreRange(85, 92));
+top_article_controller();
