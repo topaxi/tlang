@@ -114,7 +114,7 @@ test.describe('Tlang Playground', () => {
     await page
       .locator('.toolbar__example')
       .locator('select')
-      .selectOption('regex.tlang');
+      .selectOption('regex/example.tlang');
     await page
       .locator('.toolbar__runner')
       .locator('select')
