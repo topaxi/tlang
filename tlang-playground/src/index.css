@@ -1,14 +1,45 @@
 @import url('@catppuccin/palette/css/catppuccin.css');
 
 @font-face {
-  font-family: 'Victor Mono';
+  font-family: 'VictorMono NFM Propo';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('./fonts/VictorMono-Regular.woff2') format('woff2');
+  src: url('./fonts/VictorMonoNerdFontPropo-Medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'VictorMono NFM Propo';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./fonts/VictorMonoNerdFontPropo-SemiBold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'VictorMono NFM';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/VictorMonoNerdFontMono-Medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'VictorMono NFM';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./fonts/VictorMonoNerdFontMono-SemiBold.woff2') format('woff2');
 }
 
 :root {
+  --t-font-family-sans:
+    'VictorMono NFM Propo', 'VictorMono NFM', 'VictorMono', 'Inconsolata',
+    'Consolas', 'Menlo', 'Monaco', monospace;
+  --t-font-family-mono:
+    'VictorMono NFM', 'VictorMono', 'Inconsolata', 'Consolas', 'Menlo',
+    'Monaco', monospace;
+
   --t-background-color: var(--ctp-macchiato-base);
   --t-foreground-color: var(--ctp-macchiato-text);
 
@@ -24,9 +55,7 @@
 
   --t-border-radius: 3px;
 
-  font-family:
-    'VictorMono NFM', 'Victor Mono', Inconsolata, Consolas, Menlo, Monaco,
-    monospace;
+  font-family: var(--t-font-family-sans);
   line-height: 1.5;
   font-weight: 400;
 

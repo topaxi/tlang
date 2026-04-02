@@ -30,7 +30,7 @@ export class TCodeMirror extends LitElement {
 
     /* Added :host to increase specificity */
     :host .cm-scroller {
-      font-family: inherit;
+      font-family: var(--t-font-family-mono, inherit);
     }
   `;
 

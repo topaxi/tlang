@@ -296,7 +296,7 @@ export class TlangPlayground extends LitElement {
     }
 
     pre {
-      font-family: inherit;
+      font-family: var(--t-font-family-mono, inherit);
       margin: 0;
     }
 
@@ -360,6 +360,14 @@ export class TlangPlayground extends LitElement {
   @query('t-console', true)
   private consoleElement!: ConsoleElement;
 
+  @state()
+  hasLigatures = localStorage.getItem('ligatures') !== 'false';
+
+  private toggleLigatures() {
+    this.hasLigatures = !this.hasLigatures;
+    localStorage.setItem('ligatures', String(this.hasLigatures));
+  }
+
   private async run() {
     if (!this.consoleElement.persist) {
       this.tlang.clearConsole();
@@ -401,6 +409,14 @@ export class TlangPlayground extends LitElement {
         (d) => d.severity === 'warning',
       ).length;
       this.consoleMessages = [...this.tlang.consoleMessages];
+    }
+
+    if (changedProperties.has('hasLigatures')) {
+      const on = +this.hasLigatures;
+      this.style.setProperty(
+        'font-feature-settings',
+        `"calt" ${on}, "liga" ${on}`,
+      );
     }
   }
 
@@ -672,6 +688,21 @@ export class TlangPlayground extends LitElement {
             </t-menu>
             ${this.renderExamplesSelect()}
             <t-button @click=${this.share}>Share</t-button>
+            <t-button
+              slot="end"
+              popovertarget="global-settings"
+              aria-label="Global Settings"
+            >
+              <t-icon name="settings"></t-icon>
+            </t-button>
+            <t-menu id="global-settings" popover=${floating()}>
+              <t-menuitem-checkbox
+                @change=${this.toggleLigatures}
+                ?checked=${this.hasLigatures}
+              >
+                Ligatures
+              </t-menuitem-checkbox>
+            </t-menu>
             <t-button
               slot="end"
               @click=${this.showKeyboardShortcuts}

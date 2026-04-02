@@ -22,7 +22,7 @@ export class HirPrettyElement extends LitElement {
     }
 
     pre {
-      font-family: inherit;
+      font-family: var(--t-font-family-mono, inherit);
       margin: 0;
     }
 
