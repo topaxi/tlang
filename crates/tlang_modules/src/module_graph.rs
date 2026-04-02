@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
 use tlang_ast::node::{self, StmtKind, Visibility};
@@ -20,6 +21,8 @@ pub struct ParsedModule {
     pub mod_declarations: Vec<ModDeclInfo>,
     /// Use declarations for import resolution.
     pub use_declarations: Vec<UseDeclInfo>,
+    /// Hash of the source file bytes for change detection.
+    pub source_hash: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -227,6 +230,91 @@ impl ModuleGraph {
             })
             .collect()
     }
+
+    /// Return module paths in topological order (dependencies first).
+    ///
+    /// Uses Kahn's algorithm over the import graph derived from `use` declarations.
+    /// Modules with no imports are emitted first; modules that import from others
+    /// come later. Ties are broken by lexicographic order to keep output deterministic.
+    ///
+    /// Cycles are tolerated (the cycle detection phase has already validated them):
+    /// any modules still in the graph after the main loop are appended in
+    /// lexicographic order.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a `use` declaration references a module that exists in the graph
+    /// but cannot be found by key lookup (internal inconsistency).
+    pub fn topological_order(&self) -> Vec<ModulePath> {
+        use std::collections::BTreeSet;
+
+        // Build adjacency: for each module, which modules does it import from?
+        let mut in_degree: HashMap<&ModulePath, usize> = HashMap::new();
+        let mut dependents: HashMap<&ModulePath, Vec<&ModulePath>> = HashMap::new();
+
+        for path in self.modules.keys() {
+            in_degree.insert(path, 0);
+        }
+
+        for (path, module) in &self.modules {
+            for use_decl in &module.use_declarations {
+                if !use_decl.path.is_empty() {
+                    let target = ModulePath::new(use_decl.path.clone());
+                    if self.modules.contains_key(&target) {
+                        // path depends on target → target is a prerequisite of path
+                        let target_ref = self.modules.keys().find(|k| **k == target).unwrap();
+                        dependents.entry(target_ref).or_default().push(path);
+                        *in_degree.entry(path).or_insert(0) += 1;
+                    }
+                }
+            }
+        }
+
+        // Kahn's algorithm with a BTreeSet as the ready queue for determinism
+        let mut ready: BTreeSet<&ModulePath> = in_degree
+            .iter()
+            .filter(|(_, deg)| **deg == 0)
+            .map(|(&p, _)| p)
+            .collect();
+
+        let mut order = Vec::with_capacity(self.modules.len());
+        let mut visited = HashSet::new();
+
+        while let Some(&path) = ready.iter().next() {
+            ready.remove(path);
+            if !visited.insert(path) {
+                continue;
+            }
+            order.push(path.clone());
+
+            if let Some(deps) = dependents.get(path) {
+                for &dep in deps {
+                    if let Some(deg) = in_degree.get_mut(dep) {
+                        *deg = deg.saturating_sub(1);
+                        if *deg == 0 {
+                            ready.insert(dep);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Append any remaining modules (part of cycles) in lexicographic order
+        for path in self.modules.keys() {
+            if !visited.contains(path) {
+                order.push(path.clone());
+            }
+        }
+
+        order
+    }
+}
+
+/// Compute a hash of the given source bytes for change detection.
+pub fn hash_source(source: &str) -> u64 {
+    let mut hasher = std::hash::DefaultHasher::new();
+    source.hash(&mut hasher);
+    hasher.finish()
 }
 
 fn parse_all_modules(
@@ -252,6 +340,7 @@ fn parse_all_modules(
             }
         };
 
+        let source_hash = hash_source(&source);
         let mut parser = Parser::from_source(&source);
         match parser.parse() {
             Ok((ast, parse_meta)) => {
@@ -266,6 +355,7 @@ fn parse_all_modules(
                         parse_meta,
                         mod_declarations,
                         use_declarations,
+                        source_hash,
                     },
                 );
             }
@@ -285,7 +375,7 @@ fn parse_all_modules(
     }
 }
 
-fn extract_declarations(ast: &node::Module) -> (Vec<ModDeclInfo>, Vec<UseDeclInfo>) {
+pub fn extract_declarations(ast: &node::Module) -> (Vec<ModDeclInfo>, Vec<UseDeclInfo>) {
     let mut mod_decls = Vec::new();
     let mut use_decls = Vec::new();
 
@@ -784,5 +874,93 @@ mod tests {
         ));
         let msg = err.to_string();
         assert!(!msg.is_empty());
+    }
+
+    #[test]
+    fn test_topological_order_dependencies_first() {
+        let dir = std::env::temp_dir().join("tlang_test_topo_graph");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // root imports from b, b imports from a
+        fs::write(
+            src.join("lib.tlang"),
+            "pub mod a;\npub mod b;\nuse b::bar;\nbar() |> log();",
+        )
+        .unwrap();
+        fs::write(src.join("a.tlang"), "pub fn foo() { 1 }").unwrap();
+        fs::write(src.join("b.tlang"), "use a::foo;\npub fn bar() { foo() }").unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let order = graph.topological_order();
+
+        // a has no deps → should be first; b depends on a → should be after a;
+        // root depends on b → should be after b
+        let a_pos = order
+            .iter()
+            .position(|p| p == &ModulePath::from_str_segments(&["a"]))
+            .unwrap();
+        let b_pos = order
+            .iter()
+            .position(|p| p == &ModulePath::from_str_segments(&["b"]))
+            .unwrap();
+        let root_pos = order.iter().position(|p| p == &ModulePath::root()).unwrap();
+
+        assert!(a_pos < b_pos, "a should come before b");
+        assert!(b_pos < root_pos, "b should come before root");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_topological_order_no_deps() {
+        let dir = std::env::temp_dir().join("tlang_test_topo_no_deps");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // No imports, just declarations
+        fs::write(src.join("lib.tlang"), "pub mod a;\npub mod b;").unwrap();
+        fs::write(src.join("a.tlang"), "pub fn foo() { 1 }").unwrap();
+        fs::write(src.join("b.tlang"), "pub fn bar() { 2 }").unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let order = graph.topological_order();
+
+        // All modules should be present
+        assert_eq!(order.len(), 3);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_source_hash_deterministic() {
+        let dir = std::env::temp_dir().join("tlang_test_hash_deterministic");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        fs::write(src.join("lib.tlang"), "pub fn main() { 42 }").unwrap();
+
+        let graph1 = ModuleGraph::build(&dir).unwrap();
+        let hash1 = graph1.modules[&ModulePath::root()].source_hash;
+
+        let graph2 = ModuleGraph::build(&dir).unwrap();
+        let hash2 = graph2.modules[&ModulePath::root()].source_hash;
+
+        assert_eq!(hash1, hash2, "Same source should produce same hash");
+
+        // Now change the source
+        fs::write(src.join("lib.tlang"), "pub fn main() { 43 }").unwrap();
+        let graph3 = ModuleGraph::build(&dir).unwrap();
+        let hash3 = graph3.modules[&ModulePath::root()].source_hash;
+
+        assert_ne!(
+            hash1, hash3,
+            "Different source should produce different hash"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
     }
 }
