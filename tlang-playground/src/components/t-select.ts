@@ -20,8 +20,12 @@ export class SelectElement extends LitElement {
       display: none;
     }
 
-    select {
+    select,
+    ::picker(select) {
       appearance: base-select;
+    }
+
+    select {
       font: inherit;
       color: inherit;
       background-color: var(--t-button-background-color);
@@ -52,6 +56,7 @@ export class SelectElement extends LitElement {
       border-radius: var(--t-border-radius);
       padding: 0;
       scrollbar-width: thin;
+      max-height: 480px;
     }
 
     select::picker-icon {
@@ -76,6 +81,12 @@ export class SelectElement extends LitElement {
     option:checked {
       background-color: var(--t-button-active-background-color);
     }
+
+    optgroup {
+      padding: 0;
+      font-weight: bold;
+      background-color: var(--t-button-hover-background-color);
+    }
   `;
 
   protected internals = this.attachInternals();
@@ -92,8 +103,8 @@ export class SelectElement extends LitElement {
   @query('select')
   private selectEl!: HTMLSelectElement;
 
-  @queryAssignedElements({ selector: 'option' })
-  private slottedOptions!: HTMLOptionElement[];
+  @queryAssignedElements({ selector: 'option,optgroup' })
+  private slottedOptions!: Array<HTMLOptionElement | HTMLOptGroupElement>;
 
   formResetCallback(): void {
     if (this.selectEl) {

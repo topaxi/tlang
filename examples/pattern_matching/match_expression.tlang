@@ -1,0 +1,56 @@
+// Demonstrates match expressions where the matched value is computed
+// within the function body rather than being a raw function argument.
+
+// Collatz sequence step — matches on the computed remainder (n % 2),
+// which cannot be expressed as a simple function argument pattern.
+fn collatz_step(n) {
+    match n % 2 {
+        0 => n / 2,
+        _ => 3 * n + 1,
+    }
+}
+
+fn collatz_steps(1) { 0 }
+fn collatz_steps(n) { 1 + collatz_steps(collatz_step(n)) }
+
+log("Collatz steps to reach 1 from 27:");
+collatz_steps(27) |> log();
+
+// Describe a list by matching on its computed length rather than
+// decomposing the list directly in function arguments.
+fn describe_list(list) {
+    match len(list) {
+        0 => "empty",
+        1 => "singleton",
+        2 => "pair",
+        3 => "triple",
+        _ => "many",
+    }
+}
+
+log("List descriptions:");
+describe_list([]) |> log();
+describe_list([42]) |> log();
+describe_list([1, 2]) |> log();
+describe_list([1, 2, 3]) |> log();
+describe_list([1, 2, 3, 4, 5]) |> log();
+
+// Classify the relationship between two numbers by matching on their GCD —
+// a value that is only available after computing it from both arguments.
+fn gcd(a, 0) { a }
+fn gcd(a, b) { rec gcd(b, a % b) }
+
+fn number_relationship(a, b) {
+    match gcd(a, b) {
+        1 => "coprime",
+        g if g == a => "a is a factor of b",
+        g if g == b => "b is a factor of a",
+        _ => "share a common factor",
+    }
+}
+
+log("Number relationships:");
+number_relationship(9, 4) |> log();
+number_relationship(6, 12) |> log();
+number_relationship(12, 4) |> log();
+number_relationship(12, 8) |> log();

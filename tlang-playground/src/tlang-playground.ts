@@ -538,6 +538,52 @@ export class TlangPlayground extends LitElement {
     );
   }
 
+  private renderExamplesSelect() {
+    const exampleNames = Object.keys(examples);
+
+    const ungroupedExamples = exampleNames.filter(
+      (name) => !name.includes('/'),
+    );
+    const groupedExamples = exampleNames.filter((name) => name.includes('/'));
+    const optGroups = Map.groupBy(
+      groupedExamples,
+      (name) => name.split('/')[0],
+    );
+
+    return html`
+      <t-select
+        class="toolbar__example"
+        @change=${this.handleExampleSelect}
+        .value=${live(this.selectedExample)}
+      >
+        ${repeat(
+          ungroupedExamples,
+          (key) => key,
+          (key) => html`<option>${key}</option>`,
+        )}
+        ${repeat(
+          optGroups.entries(),
+          ([group, _]) => group,
+          ([group, examples]) => {
+            const label = group
+              .split('_')
+              .map((w) => `${w[0].toLocaleUpperCase()}${w.slice(1)}`)
+              .join(' ');
+            return html`<optgroup label=${label}>
+              <legend>${label}</legend>
+              ${repeat(
+                examples,
+                (key) => key,
+                (key) =>
+                  html`<option value=${key}>${key.split('/')[1]}</option>`,
+              )}
+            </optgroup>`;
+          },
+        )}
+      </t-select>
+    `;
+  }
+
   protected override render() {
     return html`
       <t-shortcuts>
@@ -624,17 +670,7 @@ export class TlangPlayground extends LitElement {
                       Return position optimization
                     </t-menuitem-checkbox>`}
             </t-menu>
-            <t-select
-              class="toolbar__example"
-              @change=${this.handleExampleSelect}
-              .value=${live(this.selectedExample)}
-            >
-              ${repeat(
-                Object.keys(examples),
-                (key) => key,
-                (key) => html`<option>${key}</option>`,
-              )}
-            </t-select>
+            ${this.renderExamplesSelect()}
             <t-button @click=${this.share}>Share</t-button>
             <t-button
               slot="end"
