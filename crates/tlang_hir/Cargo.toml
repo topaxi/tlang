@@ -16,6 +16,9 @@ log = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
+tlang_parser = { path = "../tlang_parser" }
+tlang_ast_lowering = { path = "../tlang_ast_lowering" }
+tlang_semantics = { path = "../tlang_semantics" }
 
 [lints]
 workspace = true
