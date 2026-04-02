@@ -23,6 +23,7 @@ test:
 
 test-coverage:
 	cargo llvm-cov clean --profraw-only
+	find target -maxdepth 5 -name incremental -type d -exec rm -rf {} + 2>/dev/null || true
 	cargo llvm-cov nextest --profile=ci --workspace --exclude tlang_bindings_js --exclude tlang_test_runner --exclude tlang_macros --exclude xtask --features tlang_vm/testing --no-report
 	# Quality gate: thresholds represent the current baseline coverage.
 	# Fail if coverage regresses below these values.
