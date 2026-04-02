@@ -4,6 +4,11 @@ description: "Backend: interpreter"
 expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/protocols/protocol_constraints_default_dispatch.tlang
 ---
+true
+false
+true
+false
+
 warning: Unused function `PartialEq::eq/2`
    ┌─ [WORKSPACE_ROOT]/tests/protocols/protocol_constraints_default_dispatch.tlang:26:3
    │
@@ -19,11 +24,3 @@ warning: Unused function `Ord::cmp/2`
 35 │ │     else { 0 }
 36 │ │   }
    │ ╰───^
-
-
-thread 'main' panicked at crates/tlang_core/tlang_memory/src/state.rs:903:9:
-Value does not have a method "eq", []
-  at function neq:109
-  at root 575
-
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
