@@ -59,6 +59,7 @@ This automated setup ensures a consistent development environment and eliminates
 
 **CRITICAL: Node.js version 24.0.2 is required for all tests to pass. Verify with `node --version` before running tests.**
 
+- **Full verification (preferred before commits)**: `make verify` -- runs the full CI pipeline in sequence (fmt, clippy, lint, coverage, integration tests, WASM bindings, playground build, e2e). NEVER CANCEL. Set timeout to 60+ minutes.
 - **Rust tests**: `cargo nextest run --profile=ci` -- takes ~55s. NEVER CANCEL. Set timeout to 30+ minutes.
   - **IMPORTANT**: Always use `cargo nextest` — never `cargo test`. The project uses nextest exclusively.
 - **Integration tests**: `make test` -- takes ~64s. Tests built compiler/interpreter with both backends. **REQUIRES Node.js 24.0.2 exactly** (see package.json volta config). Test failures with different Node.js versions are due to stack trace differences in expected output. NEVER CANCEL. Set timeout to 30+ minutes.
@@ -131,9 +132,28 @@ Common scopes for tlang:
 
 ## Validation
 
+### Preferred: Full Verification with `make verify`
+
+**Before committing or after larger changes, always run `make verify`**. This mirrors the GitHub CI workflow and runs all checks in sequence:
+
+```bash
+make verify   # NEVER CANCEL - runs fmt, clippy, lint, test-coverage, test, test-bindings-js, npm build, e2e tests
+```
+
+`make verify` executes these steps in order:
+1. `cargo fmt` — Rust formatting
+2. `cargo clippy` — Rust linting
+3. `npm ci` — install JS dependencies
+4. `npm run lint` — ESLint and Stylelint
+5. `make test-coverage` — unit tests with coverage enforcement (80% min)
+6. `make test` — integration tests (requires Node.js 24.0.2)
+7. `make test-bindings-js` — WebAssembly bindings tests
+8. `npm run build` — playground build (requires binaryen in PATH)
+9. `npm run test:e2e` — end-to-end tests
+
 ### Mandatory Testing After Changes
 
-ALWAYS manually validate any code changes through complete end-to-end scenarios:
+For targeted validation (e.g. during development), run individual steps as needed:
 
 0. **Run linting and formatting before any commits:**
 
@@ -162,27 +182,27 @@ ALWAYS manually validate any code changes through complete end-to-end scenarios:
    make test-coverage              # NEVER CANCEL - takes ~90s, enforces 80% min for lines/functions/regions
    ```
 
-2. **Test WebAssembly bindings:**
+3. **Test WebAssembly bindings:**
 
    ```bash
    make test-bindings-js           # NEVER CANCEL - takes ~21s
    ```
 
-3. **Test CLI functionality with working example:**
+4. **Test CLI functionality with working example:**
 
    ```bash
    # This should output generated JavaScript and print "120" when executed
    ./target/release/tlang tests/functions/pipeline/pipeline.tlang --output-type js | node
    ```
 
-4. **Test interpreter functionality:**
+5. **Test interpreter functionality:**
 
    ```bash
    # This should print "120"
    ./target/release/tlangdi tests/functions/pipeline/pipeline.tlang
    ```
 
-5. **Test playground build and development server:**
+6. **Test playground build and development server:**
    ```bash
    npm run build     # NEVER CANCEL - takes ~13s, requires binaryen in PATH
    npm run dev       # Should start server on localhost:5173
