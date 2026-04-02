@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use tlang_ast_lowering::lower_to_hir_with_offset;
@@ -8,9 +9,45 @@ use tlang_hir as hir;
 use tlang_semantics::SemanticAnalyzer;
 use tlang_span::HIRS_PER_MODULE;
 
-use crate::module_graph::{ModuleGraphError, ParsedModule};
+use crate::module_graph::{ModuleGraphError, ParsedModule, hash_source};
 use crate::resolver::{ModuleResolver, ResolvedImports};
 use crate::{ModuleGraph, ModulePath};
+
+/// Maps each module to the set of modules that import from it.
+pub type ReverseDeps = HashMap<ModulePath, HashSet<ModulePath>>;
+
+/// Fingerprint of a module's public API for early-cutoff incremental compilation.
+///
+/// If two fingerprints have the same `hash`, the exported symbol sets are considered
+/// identical and downstream modules do not need recompilation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModuleApiFingerprint {
+    /// Sorted list of (name, DefKind) for all pub-visible exports.
+    pub exported_symbols: Vec<(String, DefKind)>,
+    /// Hash of the above for cheap comparison.
+    pub hash: u64,
+}
+
+impl ModuleApiFingerprint {
+    /// Compute a fingerprint from a list of exported symbols.
+    pub fn from_exports(exports: &[(String, DefKind)]) -> Self {
+        let mut sorted = exports.to_vec();
+        sorted.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+        sorted.dedup();
+        let hash = {
+            let mut hasher = std::hash::DefaultHasher::new();
+            for (name, kind) in &sorted {
+                name.hash(&mut hasher);
+                kind.hash(&mut hasher);
+            }
+            hasher.finish()
+        };
+        ModuleApiFingerprint {
+            exported_symbols: sorted,
+            hash,
+        }
+    }
+}
 
 /// Compute the stable HirId block start for a module at the given index.
 ///
@@ -36,6 +73,17 @@ pub struct MultiModuleCompileResult {
     /// Maps (module_path, local_name) to global slot index.
     /// Only populated when compiled with `compile_project_with_slots`.
     pub import_slots: HashMap<(ModulePath, String), usize>,
+    /// Reverse-dependency map: for each module, the set of modules that import from it.
+    pub reverse_deps: ReverseDeps,
+    /// Public-API fingerprints for early-cutoff incremental compilation.
+    pub api_fingerprints: HashMap<ModulePath, ModuleApiFingerprint>,
+    /// Module paths in topological compilation order (dependencies first).
+    pub compilation_order: Vec<ModulePath>,
+    /// Source hashes for each module at the time of compilation.
+    pub source_hashes: HashMap<ModulePath, u64>,
+    /// The module graph used during compilation.
+    /// Stored so that `IncrementalCompiler` can reuse it without rebuilding.
+    pub graph: ModuleGraph,
 }
 
 impl MultiModuleCompileResult {
@@ -144,11 +192,36 @@ pub fn compile_project(
     // Collect exported symbols from all modules first (declaration pass)
     let exported_symbols = collect_exported_symbols(&graph);
 
-    // Compile modules in order (lexicographic by path, which is the BTreeMap order).
-    // Each module receives a *fixed* HirId block so that adding/removing/resizing
-    // an unrelated module does not shift the HirId range of any other module.
-    for (index, (module_path, parsed_module)) in &mut graph.modules.iter_mut().enumerate() {
-        let hir_id_start = hir_id_start_for_index(index);
+    // Build reverse-dependency map and compute API fingerprints
+    let reverse_deps = build_reverse_deps(&imports);
+    let api_fingerprints = compute_api_fingerprints(&exported_symbols);
+
+    // Compute topological compilation order (dependencies first)
+    let compilation_order = graph.topological_order();
+
+    // Capture source hashes before compilation mutates the graph
+    let source_hashes: HashMap<ModulePath, u64> = graph
+        .modules
+        .iter()
+        .map(|(path, m)| (path.clone(), m.source_hash))
+        .collect();
+
+    // Build a map from module path to its lexicographic index for stable HirId assignment.
+    let lex_indices: HashMap<ModulePath, usize> = graph
+        .modules
+        .keys()
+        .enumerate()
+        .map(|(i, p)| (p.clone(), i))
+        .collect();
+
+    // Compile modules in topological order.
+    // Each module receives a *fixed* HirId block based on its lexicographic index
+    // so that adding/removing/resizing an unrelated module does not shift the
+    // HirId range of any other module.
+    for module_path in &compilation_order {
+        let lex_index = lex_indices[module_path];
+        let hir_id_start = hir_id_start_for_index(lex_index);
+        let parsed_module = graph.modules.get_mut(module_path).unwrap();
         let file_path = parsed_module.file_path.clone();
         let source = parsed_module.source.clone();
         let compiled = compile_single_module(
@@ -182,6 +255,11 @@ pub fn compile_project(
         imports,
         exported_symbols,
         import_slots: HashMap::new(),
+        reverse_deps,
+        api_fingerprints,
+        compilation_order,
+        source_hashes,
+        graph,
     })
 }
 
@@ -231,13 +309,38 @@ pub fn compile_project_with_slots<S: AsRef<str>>(
         }
     }
 
-    // Phase 4: Compile each module with slot-aware symbol registration
+    // Build reverse-dependency map and compute API fingerprints
+    let reverse_deps = build_reverse_deps(&imports);
+    let api_fingerprints = compute_api_fingerprints(&exported_symbols);
+
+    // Compute topological compilation order (dependencies first)
+    let compilation_order = graph.topological_order();
+
+    // Capture source hashes before compilation mutates the graph
+    let source_hashes: HashMap<ModulePath, u64> = graph
+        .modules
+        .iter()
+        .map(|(path, m)| (path.clone(), m.source_hash))
+        .collect();
+
+    // Build a map from module path to its lexicographic index for stable HirId assignment.
+    let lex_indices: HashMap<ModulePath, usize> = graph
+        .modules
+        .keys()
+        .enumerate()
+        .map(|(i, p)| (p.clone(), i))
+        .collect();
+
+    // Phase 4: Compile each module in topological order with slot-aware symbol registration
     let mut compiled_modules = BTreeMap::new();
 
-    // Each module receives a *fixed* HirId block so that adding/removing/resizing
-    // an unrelated module does not shift the HirId range of any other module.
-    for (index, (module_path, parsed_module)) in &mut graph.modules.iter_mut().enumerate() {
-        let hir_id_start = hir_id_start_for_index(index);
+    // Each module receives a *fixed* HirId block based on its lexicographic index
+    // so that adding/removing/resizing an unrelated module does not shift the
+    // HirId range of any other module.
+    for module_path in &compilation_order {
+        let lex_index = lex_indices[module_path];
+        let hir_id_start = hir_id_start_for_index(lex_index);
+        let parsed_module = graph.modules.get_mut(module_path).unwrap();
         let file_path = parsed_module.file_path.clone();
         let source = parsed_module.source.clone();
         let compiled = compile_single_module_with_slots(
@@ -272,6 +375,11 @@ pub fn compile_project_with_slots<S: AsRef<str>>(
         imports,
         exported_symbols,
         import_slots,
+        reverse_deps,
+        api_fingerprints,
+        compilation_order,
+        source_hashes,
+        graph,
     })
 }
 
@@ -405,6 +513,34 @@ fn collect_import_symbols(
     import_symbols
 }
 
+/// Build a reverse-dependency map from resolved imports.
+///
+/// For each module that is imported from, records which modules import it.
+fn build_reverse_deps(imports: &HashMap<ModulePath, ResolvedImports>) -> ReverseDeps {
+    let mut reverse_deps: ReverseDeps = HashMap::new();
+
+    for (importer, resolved) in imports {
+        for symbol in resolved.symbols.values() {
+            reverse_deps
+                .entry(symbol.source_module.clone())
+                .or_default()
+                .insert(importer.clone());
+        }
+    }
+
+    reverse_deps
+}
+
+/// Compute API fingerprints for all modules.
+fn compute_api_fingerprints(
+    exported_symbols: &HashMap<ModulePath, Vec<(String, DefKind)>>,
+) -> HashMap<ModulePath, ModuleApiFingerprint> {
+    exported_symbols
+        .iter()
+        .map(|(path, symbols)| (path.clone(), ModuleApiFingerprint::from_exports(symbols)))
+        .collect()
+}
+
 /// Compile a single module with cross-module symbol awareness.
 fn compile_single_module(
     parsed_module: &mut ParsedModule,
@@ -512,6 +648,308 @@ fn compile_single_module_with_slots<S: AsRef<str>>(
         constant_pool_ids: meta.constant_pool_ids.clone(),
         lower_meta: meta,
     })
+}
+
+/// Incremental compiler for multi-module projects.
+///
+/// Caches compiled modules and tracks dependency relationships so that only
+/// affected modules are recompiled when a source file changes.
+///
+/// Uses source fingerprinting to skip re-parsing unchanged files and
+/// public-API fingerprinting for early cutoff: if a module's exported
+/// symbols are unchanged after recompilation, its dependents are not
+/// invalidated.
+pub struct IncrementalCompiler {
+    root_dir: PathBuf,
+    graph: ModuleGraph,
+    cache: HashMap<ModulePath, CompiledModule>,
+    imports: HashMap<ModulePath, ResolvedImports>,
+    exported_symbols: HashMap<ModulePath, Vec<(String, DefKind)>>,
+    reverse_deps: ReverseDeps,
+    api_fingerprints: HashMap<ModulePath, ModuleApiFingerprint>,
+    source_hashes: HashMap<ModulePath, u64>,
+    builtin_symbols: Vec<(String, DefKind)>,
+}
+
+impl std::fmt::Debug for IncrementalCompiler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IncrementalCompiler")
+            .field("root_dir", &self.root_dir)
+            .field("cached_modules", &self.cache.keys().collect::<Vec<_>>())
+            .finish()
+    }
+}
+
+impl IncrementalCompiler {
+    /// Create an incremental compiler by performing an initial full compilation.
+    pub fn from_project(
+        root_dir: &Path,
+        builtin_symbols: &[(&str, DefKind)],
+    ) -> Result<Self, CompileError> {
+        let result = compile_project(root_dir, builtin_symbols)?;
+
+        let stored_builtins: Vec<(String, DefKind)> = builtin_symbols
+            .iter()
+            .map(|(name, kind)| (name.to_string(), *kind))
+            .collect();
+
+        Ok(IncrementalCompiler {
+            root_dir: root_dir.to_path_buf(),
+            graph: result.graph,
+            cache: result.modules.into_iter().collect(),
+            imports: result.imports,
+            exported_symbols: result.exported_symbols,
+            reverse_deps: result.reverse_deps,
+            api_fingerprints: result.api_fingerprints,
+            source_hashes: result.source_hashes,
+            builtin_symbols: stored_builtins,
+        })
+    }
+
+    /// Update a single source file and recompile only affected modules.
+    ///
+    /// Returns the set of module paths that were recompiled. If the source
+    /// is unchanged (same hash), returns an empty set.
+    ///
+    /// The `path` argument must exactly match the `file_path` stored in the
+    /// module graph (typically an absolute path produced by [`ModuleGraph::build`]).
+    /// If no module matches, an empty `Ok(vec![])` is returned.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a module scheduled for recompilation is not present in the
+    /// module graph (this indicates an internal inconsistency).
+    pub fn update_file(
+        &mut self,
+        path: &Path,
+        source: String,
+    ) -> Result<Vec<ModulePath>, CompileError> {
+        // Find which module this file belongs to
+        let module_path = self
+            .graph
+            .modules
+            .iter()
+            .find(|(_, m)| m.file_path == path)
+            .map(|(p, _)| p.clone());
+
+        let module_path = match module_path {
+            Some(p) => p,
+            None => return Ok(vec![]),
+        };
+
+        // Check source hash for change detection
+        let new_hash = hash_source(&source);
+        if let Some(&old_hash) = self.source_hashes.get(&module_path)
+            && old_hash == new_hash
+        {
+            return Ok(vec![]);
+        }
+
+        // Save old hash so we can roll back on error
+        let old_hash = self.source_hashes.get(&module_path).copied();
+
+        // Re-parse and update the graph
+        self.reparse_module(&module_path, path, source, new_hash)
+            .inspect_err(|_| {
+                self.rollback_source_hash(&module_path, old_hash);
+            })?;
+
+        // Re-resolve imports for the whole graph
+        let (imports, import_errors) = ModuleResolver::resolve_imports(&self.graph);
+        if !import_errors.is_empty() {
+            let sources = self.graph.source_info();
+            self.rollback_source_hash(&module_path, old_hash);
+            return Err(CompileError::ImportErrors {
+                errors: import_errors,
+                sources,
+            });
+        }
+        self.imports = imports;
+
+        // Re-collect exported symbols and determine if API changed
+        let exported_symbols = collect_exported_symbols(&self.graph);
+        let new_fingerprint = ModuleApiFingerprint::from_exports(
+            exported_symbols.get(&module_path).map_or(&[], |v| v),
+        );
+        let api_changed = self
+            .api_fingerprints
+            .get(&module_path)
+            .is_none_or(|old| old != &new_fingerprint);
+
+        self.exported_symbols = exported_symbols;
+        self.api_fingerprints
+            .insert(module_path.clone(), new_fingerprint);
+        self.reverse_deps = build_reverse_deps(&self.imports);
+
+        // Determine which modules to recompile
+        let to_recompile = if api_changed {
+            self.transitive_dependents(&module_path)
+        } else {
+            vec![module_path.clone()]
+        };
+
+        let result = self.recompile_modules(&to_recompile);
+
+        // Only commit the new hash after the full pipeline succeeds
+        if result.is_ok() {
+            self.source_hashes.insert(module_path, new_hash);
+        } else {
+            self.rollback_source_hash(&module_path, old_hash);
+        }
+
+        result
+    }
+
+    /// Restore the source hash for a module to its previous value (or remove it).
+    fn rollback_source_hash(&mut self, module_path: &ModulePath, old_hash: Option<u64>) {
+        match old_hash {
+            Some(h) => {
+                self.source_hashes.insert(module_path.clone(), h);
+            }
+            None => {
+                self.source_hashes.remove(module_path);
+            }
+        }
+    }
+
+    /// Re-parse a single module and update the graph.
+    fn reparse_module(
+        &mut self,
+        module_path: &ModulePath,
+        file_path: &Path,
+        source: String,
+        source_hash: u64,
+    ) -> Result<(), CompileError> {
+        let mut parser = tlang_parser::Parser::from_source(&source);
+        let (ast, parse_meta) = parser.parse().map_err(|e| {
+            CompileError::ModuleGraphErrors(vec![ModuleGraphError::ParseError {
+                module_path: module_path.clone(),
+                file_path: file_path.to_path_buf(),
+                source: source.clone(),
+                issues: e.issues().to_vec(),
+            }])
+        })?;
+
+        let (mod_declarations, use_declarations) = crate::module_graph::extract_declarations(&ast);
+
+        self.graph.modules.insert(
+            module_path.clone(),
+            ParsedModule {
+                path: module_path.clone(),
+                file_path: file_path.to_path_buf(),
+                source,
+                ast,
+                parse_meta,
+                mod_declarations,
+                use_declarations,
+                source_hash,
+            },
+        );
+
+        Ok(())
+    }
+
+    /// BFS on reverse deps to find the changed module plus all transitive dependents.
+    fn transitive_dependents(&self, changed: &ModulePath) -> Vec<ModulePath> {
+        let mut to_recompile = vec![changed.clone()];
+        let mut queue = std::collections::VecDeque::new();
+        let mut visited = HashSet::new();
+        visited.insert(changed.clone());
+
+        if let Some(dependents) = self.reverse_deps.get(changed) {
+            for dep in dependents {
+                if visited.insert(dep.clone()) {
+                    queue.push_back(dep.clone());
+                    to_recompile.push(dep.clone());
+                }
+            }
+        }
+
+        while let Some(current) = queue.pop_front() {
+            if let Some(dependents) = self.reverse_deps.get(&current) {
+                for dep in dependents {
+                    if visited.insert(dep.clone()) {
+                        queue.push_back(dep.clone());
+                        to_recompile.push(dep.clone());
+                    }
+                }
+            }
+        }
+
+        to_recompile
+    }
+
+    /// Compile a set of modules in topological order.
+    fn recompile_modules(
+        &mut self,
+        to_recompile: &[ModulePath],
+    ) -> Result<Vec<ModulePath>, CompileError> {
+        let topo_order = self.graph.topological_order();
+        let recompile_set: HashSet<&ModulePath> = to_recompile.iter().collect();
+        let ordered_recompile: Vec<ModulePath> = topo_order
+            .into_iter()
+            .filter(|p| recompile_set.contains(p))
+            .collect();
+
+        let lex_indices: HashMap<ModulePath, usize> = self
+            .graph
+            .modules
+            .keys()
+            .enumerate()
+            .map(|(i, p)| (p.clone(), i))
+            .collect();
+
+        let builtin_refs: Vec<(&str, DefKind)> = self
+            .builtin_symbols
+            .iter()
+            .map(|(name, kind)| (name.as_str(), *kind))
+            .collect();
+
+        for module_path in &ordered_recompile {
+            let lex_index = lex_indices[module_path];
+            let hir_id_start = hir_id_start_for_index(lex_index);
+            let parsed_module = self.graph.modules.get_mut(module_path).unwrap();
+            let file_path = parsed_module.file_path.clone();
+            let source = parsed_module.source.clone();
+            let compiled = compile_single_module(
+                parsed_module,
+                &self.imports,
+                &self.exported_symbols,
+                &builtin_refs,
+                hir_id_start,
+            )
+            .map_err(|diagnostics| CompileError::SemanticError {
+                module_path: module_path.clone(),
+                file_path,
+                source,
+                diagnostics,
+            })?;
+
+            self.cache.insert(module_path.clone(), compiled);
+        }
+
+        Ok(ordered_recompile)
+    }
+
+    /// Get a reference to a compiled module from the cache.
+    pub fn get_module(&self, path: &ModulePath) -> Option<&CompiledModule> {
+        self.cache.get(path)
+    }
+
+    /// Get the current reverse-dependency map.
+    pub fn reverse_deps(&self) -> &ReverseDeps {
+        &self.reverse_deps
+    }
+
+    /// Get the current API fingerprints.
+    pub fn api_fingerprints(&self) -> &HashMap<ModulePath, ModuleApiFingerprint> {
+        &self.api_fingerprints
+    }
+
+    /// Get the current source hashes.
+    pub fn source_hashes(&self) -> &HashMap<ModulePath, u64> {
+        &self.source_hashes
+    }
 }
 
 #[cfg(test)]
@@ -902,5 +1340,228 @@ mod tests {
         }
 
         let _ = fs::remove_dir_all(&dir2);
+    }
+
+    #[test]
+    fn test_topological_compilation_order() {
+        let dir = std::env::temp_dir().join("tlang_test_topo_order");
+        let _ = fs::remove_dir_all(&dir);
+        create_multi_module_project(&dir);
+
+        let builtins: Vec<(&str, DefKind)> = vec![("log", DefKind::Function(u16::MAX))];
+        let result = compile_project(&dir, &builtins).unwrap();
+
+        // utils depends on math, root depends on utils
+        // So topological order should have math before utils, and utils before root
+        let math_pos = result
+            .compilation_order
+            .iter()
+            .position(|p| p == &ModulePath::from_str_segments(&["math"]))
+            .unwrap();
+        let utils_pos = result
+            .compilation_order
+            .iter()
+            .position(|p| p == &ModulePath::from_str_segments(&["utils"]))
+            .unwrap();
+        let root_pos = result
+            .compilation_order
+            .iter()
+            .position(|p| p == &ModulePath::root())
+            .unwrap();
+
+        assert!(
+            math_pos < utils_pos,
+            "math should be compiled before utils (math={math_pos}, utils={utils_pos})"
+        );
+        assert!(
+            utils_pos < root_pos,
+            "utils should be compiled before root (utils={utils_pos}, root={root_pos})"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_reverse_deps() {
+        let dir = std::env::temp_dir().join("tlang_test_reverse_deps");
+        let _ = fs::remove_dir_all(&dir);
+        create_multi_module_project(&dir);
+
+        let builtins: Vec<(&str, DefKind)> = vec![("log", DefKind::Function(u16::MAX))];
+        let result = compile_project(&dir, &builtins).unwrap();
+
+        // math is imported by utils and root
+        let math_deps = result
+            .reverse_deps
+            .get(&ModulePath::from_str_segments(&["math"]))
+            .unwrap();
+        assert!(math_deps.contains(&ModulePath::from_str_segments(&["utils"])));
+
+        // utils is imported by root
+        let utils_deps = result
+            .reverse_deps
+            .get(&ModulePath::from_str_segments(&["utils"]))
+            .unwrap();
+        assert!(utils_deps.contains(&ModulePath::root()));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_api_fingerprints() {
+        let dir = std::env::temp_dir().join("tlang_test_api_fingerprints");
+        let _ = fs::remove_dir_all(&dir);
+        create_multi_module_project(&dir);
+
+        let builtins: Vec<(&str, DefKind)> = vec![("log", DefKind::Function(u16::MAX))];
+        let result = compile_project(&dir, &builtins).unwrap();
+
+        // All modules should have fingerprints
+        assert!(
+            result
+                .api_fingerprints
+                .contains_key(&ModulePath::from_str_segments(&["math"]))
+        );
+        assert!(
+            result
+                .api_fingerprints
+                .contains_key(&ModulePath::from_str_segments(&["utils"]))
+        );
+        assert!(result.api_fingerprints.contains_key(&ModulePath::root()));
+
+        // Math module should export `add`
+        let math_fp = &result.api_fingerprints[&ModulePath::from_str_segments(&["math"])];
+        assert!(
+            math_fp
+                .exported_symbols
+                .iter()
+                .any(|(name, _)| name == "add"),
+            "math module should export `add`"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_api_fingerprint_stability() {
+        // Same exports should produce same hash
+        let exports1 = vec![
+            ("add".to_string(), DefKind::Function(2)),
+            ("mul".to_string(), DefKind::Function(2)),
+        ];
+        let exports2 = vec![
+            ("mul".to_string(), DefKind::Function(2)),
+            ("add".to_string(), DefKind::Function(2)),
+        ];
+        let fp1 = ModuleApiFingerprint::from_exports(&exports1);
+        let fp2 = ModuleApiFingerprint::from_exports(&exports2);
+        assert_eq!(
+            fp1.hash, fp2.hash,
+            "Same exports in different order should produce same hash"
+        );
+
+        // Different exports should produce different hash
+        let exports3 = vec![
+            ("add".to_string(), DefKind::Function(2)),
+            ("sub".to_string(), DefKind::Function(2)),
+        ];
+        let fp3 = ModuleApiFingerprint::from_exports(&exports3);
+        assert_ne!(
+            fp1.hash, fp3.hash,
+            "Different exports should produce different hash"
+        );
+    }
+
+    #[test]
+    fn test_source_hash_populated() {
+        let dir = std::env::temp_dir().join("tlang_test_source_hash");
+        let _ = fs::remove_dir_all(&dir);
+        create_test_project(&dir);
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+
+        // All modules should have a source_hash consistent with hash_source(&module.source)
+        for (path, module) in &graph.modules {
+            let recomputed = hash_source(&module.source);
+            assert_eq!(
+                module.source_hash, recomputed,
+                "source_hash should match hash_source(&module.source) for module {path}"
+            );
+        }
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_incremental_compiler_no_change() {
+        let dir = std::env::temp_dir().join("tlang_test_incr_no_change");
+        let _ = fs::remove_dir_all(&dir);
+        create_test_project(&dir);
+
+        let builtins: Vec<(&str, DefKind)> = vec![("log", DefKind::Function(u16::MAX))];
+        let mut compiler = IncrementalCompiler::from_project(&dir, &builtins).unwrap();
+
+        // Update with the same source — should skip recompilation
+        let math_path = dir.join("src").join("math.tlang");
+        let same_source = std::fs::read_to_string(&math_path).unwrap();
+        let recompiled = compiler.update_file(&math_path, same_source).unwrap();
+
+        assert!(
+            recompiled.is_empty(),
+            "No modules should be recompiled when source is unchanged"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_incremental_compiler_internal_change() {
+        let dir = std::env::temp_dir().join("tlang_test_incr_internal");
+        let _ = fs::remove_dir_all(&dir);
+        create_test_project(&dir);
+
+        let builtins: Vec<(&str, DefKind)> = vec![("log", DefKind::Function(u16::MAX))];
+        let mut compiler = IncrementalCompiler::from_project(&dir, &builtins).unwrap();
+
+        // Change math's internals but keep the same public API
+        let math_path = dir.join("src").join("math.tlang");
+        let new_source = "pub fn add(a, b) { a + b + 0 }".to_string();
+        let recompiled = compiler.update_file(&math_path, new_source).unwrap();
+
+        // Only math should be recompiled — API fingerprint is the same
+        assert_eq!(
+            recompiled.len(),
+            1,
+            "Only the changed module should be recompiled when API is unchanged"
+        );
+        assert_eq!(recompiled[0], ModulePath::from_str_segments(&["math"]),);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_incremental_compiler_api_change() {
+        let dir = std::env::temp_dir().join("tlang_test_incr_api_change");
+        let _ = fs::remove_dir_all(&dir);
+        create_test_project(&dir);
+
+        let builtins: Vec<(&str, DefKind)> = vec![("log", DefKind::Function(u16::MAX))];
+        let mut compiler = IncrementalCompiler::from_project(&dir, &builtins).unwrap();
+
+        // Change math's public API by adding a new export
+        let math_path = dir.join("src").join("math.tlang");
+        let new_source = "pub fn add(a, b) { a + b }\npub fn sub(a, b) { a - b }".to_string();
+        let recompiled = compiler.update_file(&math_path, new_source).unwrap();
+
+        // Both math and root should be recompiled (root imports from math)
+        assert!(
+            recompiled.len() >= 2,
+            "API change should trigger recompilation of dependents, got {} recompiled",
+            recompiled.len()
+        );
+        assert!(recompiled.contains(&ModulePath::from_str_segments(&["math"])));
+        assert!(recompiled.contains(&ModulePath::root()));
+
+        let _ = fs::remove_dir_all(&dir);
     }
 }
