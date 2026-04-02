@@ -211,6 +211,15 @@ impl HirPretty {
                 self.print_visibility(decl.visibility);
                 self.push_str("protocol ");
                 self.push_str(decl.name.as_str());
+                if !decl.constraints.is_empty() {
+                    self.push_str(" : ");
+                    for (i, constraint) in decl.constraints.iter().enumerate() {
+                        if i > 0 {
+                            self.push_str(" + ");
+                        }
+                        self.push_str(&constraint.to_string());
+                    }
+                }
                 self.push_str(" {");
                 self.push_newline();
                 self.inc_indent();

@@ -551,8 +551,15 @@ impl VMState {
         self.program.set_enum_decl(path_name, decl);
     }
 
-    pub fn register_protocol(&mut self, id: ProtocolId, name: String, methods: Vec<String>) {
-        self.program.register_protocol(id, name, methods);
+    pub fn register_protocol(
+        &mut self,
+        id: ProtocolId,
+        name: String,
+        methods: Vec<String>,
+        constraints: Vec<ProtocolId>,
+    ) {
+        self.program
+            .register_protocol(id, name, methods, constraints);
     }
 
     pub fn register_protocol_impl(
@@ -727,6 +734,7 @@ impl VMState {
                 protocol_id,
                 def.name().to_string(),
                 def.methods().iter().map(|(m, _)| m.to_string()).collect(),
+                Vec::new(), // Native protocols have no constraints
             );
         }
 

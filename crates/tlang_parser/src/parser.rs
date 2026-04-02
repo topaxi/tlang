@@ -617,6 +617,20 @@ impl<'src> Parser<'src> {
     fn parse_protocol_declaration(&mut self, visibility: Visibility) -> Stmt {
         self.consume_keyword_token(Keyword::Protocol);
         let name = self.parse_identifier();
+
+        // Parse optional constraint list: `: A + B + C`
+        let constraints = if matches!(self.current_token_kind(), TokenKind::Colon) {
+            self.advance();
+            let mut constraints = vec![self.parse_path()];
+            while matches!(self.current_token_kind(), TokenKind::Plus) {
+                self.advance();
+                constraints.push(self.parse_path());
+            }
+            constraints
+        } else {
+            Vec::new()
+        };
+
         self.consume_token(TokenKind::LBrace);
         let mut methods = Vec::new();
         let mut consts = Vec::new();
@@ -633,6 +647,7 @@ impl<'src> Parser<'src> {
             ProtocolDeclaration(Box::new(ProtocolDeclaration {
                 visibility,
                 name,
+                constraints,
                 methods,
                 consts,
             }))

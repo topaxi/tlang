@@ -23,6 +23,8 @@ pub struct Program {
     pub(crate) globals: HashMap<String, TlangValue>,
     /// Protocol definitions: protocol ID → list of method names
     pub(crate) protocols: HashMap<ProtocolId, Vec<String>>,
+    /// Protocol constraints: protocol ID → list of constraint protocol IDs
+    pub(crate) protocol_constraints: HashMap<ProtocolId, Vec<ProtocolId>>,
     /// Reverse lookup: method_name → protocol ID
     pub(crate) protocol_method_to_protocol: HashMap<String, ProtocolId>,
     /// Protocol implementations: (protocol_id, type_shape_key, method_name) → fn value.
@@ -50,6 +52,7 @@ impl Program {
             global_slot_map: HashMap::new(),
             globals: HashMap::with_capacity(100),
             protocols: HashMap::new(),
+            protocol_constraints: HashMap::new(),
             protocol_method_to_protocol: HashMap::new(),
             protocol_impls: HashMap::new(),
             protocol_name_to_id: HashMap::new(),
@@ -132,11 +135,18 @@ impl Program {
             .chain(self.constant_pool.values().copied())
     }
 
-    pub fn register_protocol(&mut self, id: ProtocolId, name: String, methods: Vec<String>) {
+    pub fn register_protocol(
+        &mut self,
+        id: ProtocolId,
+        name: String,
+        methods: Vec<String>,
+        constraints: Vec<ProtocolId>,
+    ) {
         for method in &methods {
             self.protocol_method_to_protocol.insert(method.clone(), id);
         }
         self.protocols.insert(id, methods);
+        self.protocol_constraints.insert(id, constraints);
         self.protocol_name_to_id.insert(name, id);
     }
 

@@ -949,10 +949,25 @@ impl Interpreter {
     fn eval_protocol_decl(&self, state: &mut VMState, decl: &hir::ProtocolDeclaration) {
         let protocol_id = ProtocolId::Hir(decl.hir_id);
         let protocol_name = decl.name.to_string();
+
+        // Resolve constraint protocol IDs from HIR paths
+        let constraint_ids: Vec<ProtocolId> = decl
+            .constraints
+            .iter()
+            .filter_map(|constraint| {
+                constraint
+                    .res
+                    .hir_id()
+                    .map(ProtocolId::Hir)
+                    .or_else(|| state.protocol_id_by_name(&constraint.to_string()))
+            })
+            .collect();
+
         state.register_protocol(
             protocol_id,
             protocol_name,
             decl.methods.iter().map(|m| m.name.to_string()).collect(),
+            constraint_ids,
         );
 
         // Register default implementations for methods that have bodies

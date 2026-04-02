@@ -1,6 +1,6 @@
 #![feature(box_patterns)]
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::rc::Rc;
 
@@ -14,21 +14,36 @@ use tlang_span::{HirId, HirIdAllocator, NodeId, Span};
 
 /// Context for implicit self-dispatch in protocol default method implementations.
 ///
-/// When lowering a protocol default method body, this context tracks the protocol
-/// name, the set of method names declared in the protocol, and the `NodeId` of the
-/// `self` parameter.  Any `self.method(args…)` call where `method` is in
-/// `method_names` is automatically rewritten to `Protocol::method(self, args…)`.
+/// When lowering a protocol default method body, this context tracks a dispatch
+/// map and the `NodeId` of the `self` parameter.  Any `self.method(args…)` call
+/// where `method` is in `method_dispatch_map` is automatically rewritten to
+/// `OwningProtocol::method(self, args…)`.
+///
+/// The dispatch map includes methods from the protocol itself **and** from all
+/// transitively-reachable constraint protocols, so that default bodies can freely
+/// call `self.eq(other)` when the protocol is `Ord : Eq`, for example.
 #[derive(Debug, Clone)]
 pub(crate) struct ProtocolDispatchContext {
-    /// Name of the protocol being lowered (e.g. `Foldable`).
-    pub(crate) protocol_name: Ident,
-    /// Names of all methods declared in this protocol.  Used to decide whether a
-    /// field-access call on `self` should be rewritten to a qualified dispatch.
-    pub(crate) method_names: HashSet<String>,
+    /// Maps method name → the `Ident` of the protocol that declares that method.
+    /// Includes the current protocol's own methods and all transitively-inherited
+    /// constraint protocol methods (nearest/direct protocol wins on conflict).
+    pub(crate) method_dispatch_map: HashMap<String, Ident>,
     /// The `NodeId` of the `self` parameter's pattern node in the current default
     /// method.  Stored here so that later passes can cross-check the identity of the
     /// `self` receiver without relying on string comparison alone.
     pub(crate) self_param_node_id: NodeId,
+}
+
+/// Pre-scanned information about a protocol declaration, used to build
+/// `ProtocolDispatchContext` dispatch maps that include constraint methods.
+#[derive(Debug, Clone)]
+pub(crate) struct ProtocolRegistryEntry {
+    /// The protocol's name identifier.
+    pub(crate) ident: Ident,
+    /// Names of methods directly declared in this protocol.
+    pub(crate) methods: Vec<String>,
+    /// Names of direct constraint protocols (e.g. `["Eq"]` for `Ord : Eq`).
+    pub(crate) constraints: Vec<String>,
 }
 
 /// Errors that can occur during AST-to-HIR lowering.
@@ -115,6 +130,11 @@ pub struct LoweringContext {
     /// Active protocol self-dispatch context, set while lowering a protocol
     /// default method body.  `None` outside of such bodies.
     pub(crate) protocol_dispatch_ctx: Option<ProtocolDispatchContext>,
+    /// Pre-scanned registry of all protocol declarations in the module being
+    /// lowered.  Populated by `lower_module` before any statement is lowered,
+    /// so that `lower_protocol_decl` can look up constraint protocols' method
+    /// lists when building a `ProtocolDispatchContext`.
+    protocol_registry: HashMap<String, ProtocolRegistryEntry>,
 }
 
 impl LoweringContext {
@@ -133,6 +153,7 @@ impl LoweringContext {
             current_symbol_table: root_symbol_table,
             errors: Vec::new(),
             protocol_dispatch_ctx: None,
+            protocol_registry: HashMap::default(),
         }
     }
 
@@ -347,6 +368,21 @@ impl LoweringContext {
             module.statements.len()
         );
 
+        // Pre-scan all protocol declarations so that `lower_protocol_decl` can
+        // look up constraint protocol methods when building dispatch contexts.
+        for stmt in &module.statements {
+            if let ast::node::StmtKind::ProtocolDeclaration(decl) = &stmt.kind {
+                self.protocol_registry.insert(
+                    decl.name.to_string(),
+                    ProtocolRegistryEntry {
+                        ident: decl.name,
+                        methods: decl.methods.iter().map(|m| m.name.to_string()).collect(),
+                        constraints: decl.constraints.iter().map(|c| c.to_string()).collect(),
+                    },
+                );
+            }
+        }
+
         self.with_scope(module.id, |this| {
             let hir_id = this.lower_node_id(module.id);
 
@@ -361,6 +397,55 @@ impl LoweringContext {
                 span: module.span,
             }
         })
+    }
+
+    /// Builds a method-dispatch map for a protocol that includes methods from
+    /// transitively-reachable constraint protocols.
+    ///
+    /// The map value is the `Ident` of the protocol that *directly* declares the
+    /// method.  When two constraint paths both expose the same method name (diamond
+    /// case), the first one encountered wins (de-duplication via `entry().or_insert`).
+    ///
+    /// The `current_protocol_ident` and `current_protocol_methods` arguments
+    /// represent the protocol being lowered itself — its methods are added first so
+    /// they always take priority over any identically-named constraint method.
+    pub(crate) fn build_protocol_dispatch_map(
+        &self,
+        current_protocol_ident: Ident,
+        current_protocol_methods: &[String],
+        constraints: &[String],
+    ) -> HashMap<String, Ident> {
+        let mut map: HashMap<String, Ident> = HashMap::new();
+
+        // Current protocol's own methods (highest priority).
+        for method_name in current_protocol_methods {
+            map.insert(method_name.clone(), current_protocol_ident);
+        }
+
+        // Transitively add constraint protocol methods using FIFO traversal so
+        // that left-to-right declaration order is preserved.  Because `or_insert`
+        // keeps the first-seen owner, earlier (left-hand) constraints win on
+        // method-name conflicts, which matches the documented priority.
+        let mut to_visit: VecDeque<String> = constraints.iter().cloned().collect();
+        let mut visited: HashSet<String> = HashSet::new();
+
+        while let Some(constraint_name) = to_visit.pop_front() {
+            if !visited.insert(constraint_name.clone()) {
+                continue; // Already processed — handles diamond constraints.
+            }
+            if let Some(entry) = self.protocol_registry.get(&constraint_name) {
+                for method_name in &entry.methods {
+                    // or_insert: current protocol and earlier constraints win.
+                    map.entry(method_name.clone()).or_insert(entry.ident);
+                }
+                // Queue this constraint's own constraints for transitive lookup.
+                for nested in &entry.constraints {
+                    to_visit.push_back(nested.clone());
+                }
+            }
+        }
+
+        map
     }
 
     #[inline(always)]

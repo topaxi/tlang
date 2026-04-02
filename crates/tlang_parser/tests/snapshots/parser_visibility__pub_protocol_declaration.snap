@@ -24,6 +24,7 @@ Module(
             ),
           ),
         ),
+        constraints: [],
         methods: [
           ProtocolMethodSignature(
             id: 5,

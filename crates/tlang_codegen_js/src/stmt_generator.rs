@@ -408,8 +408,25 @@ impl<'a> InnerCodegen<'a> {
         let def_obj = self
             .ast
             .expression_object(SPAN, self.ast.vec_from_iter(props));
-        let protocol_call =
-            self.call_expr(self.ident_expr("$protocol"), vec![Argument::from(def_obj)]);
+
+        // Build arguments for $protocol(def, [constraint1, constraint2, ...])
+        let mut args = vec![Argument::from(def_obj)];
+        if !decl.constraints.is_empty() {
+            let constraint_refs: Vec<ArrayExpressionElement<'a>> = decl
+                .constraints
+                .iter()
+                .map(|constraint| {
+                    let js_name = CodegenJS::protocol_js_name(&constraint.to_string());
+                    ArrayExpressionElement::from(self.ident_expr(&js_name))
+                })
+                .collect();
+            let constraints_array = self
+                .ast
+                .expression_array(SPAN, self.ast.vec_from_iter(constraint_refs));
+            args.push(Argument::from(constraints_array));
+        }
+
+        let protocol_call = self.call_expr(self.ident_expr("$protocol"), args);
 
         vec![self.const_decl(&js_name, protocol_call)]
     }

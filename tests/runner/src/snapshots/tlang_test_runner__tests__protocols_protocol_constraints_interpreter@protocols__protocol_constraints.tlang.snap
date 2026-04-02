@@ -1,0 +1,10 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/protocols/protocol_constraints.tlang
+---
+true
+false
+-1
+1

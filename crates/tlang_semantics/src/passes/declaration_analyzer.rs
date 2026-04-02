@@ -115,6 +115,15 @@ impl DeclarationAnalyzer {
 
     fn visit_impl_block(&mut self, impl_block: &ImplBlock, ctx: &mut SemanticAnalysisContext) {
         let protocol_name = impl_block.protocol_name.to_string();
+        let target_type = impl_block.target_type.to_string();
+
+        // Track this impl for constraint validation (including span for diagnostics)
+        ctx.protocol_impls.push((
+            protocol_name.clone(),
+            target_type,
+            impl_block.protocol_name.span,
+        ));
+
         for method in &impl_block.methods {
             // Register the protocol-qualified path (e.g., Greet::greet)
             let Some(method_name) = method.name() else {
@@ -373,6 +382,12 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     DefKind::Protocol,
                     stmt.span,
                     stmt.span.end_lc.line,
+                );
+
+                // Register protocol constraints for later validation
+                ctx.protocol_constraints.insert(
+                    decl.name.to_string(),
+                    decl.constraints.iter().map(|c| c.to_string()).collect(),
                 );
 
                 // Register protocol const members with qualified names

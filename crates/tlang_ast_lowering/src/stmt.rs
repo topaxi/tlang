@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use log::debug;
 use tlang_ast as ast;
@@ -339,13 +339,20 @@ impl LoweringContext {
         node: &ast::node::Stmt,
         decl: &ast::node::ProtocolDeclaration,
     ) -> hir::Stmt {
-        // Collect all method names declared in this protocol.  These are used by the
-        // implicit self-dispatch rewrite (see `ProtocolDispatchContext`).
-        let protocol_method_names: HashSet<String> = decl
+        // Build the method dispatch map for this protocol.  It maps method name →
+        // the Ident of the protocol that declares it, covering both this protocol's
+        // own methods and all methods from transitively-reachable constraint
+        // protocols.  This is used by the implicit self-dispatch rewrite in
+        // `lower_call_expr` (see `ProtocolDispatchContext`).
+        let current_method_names: Vec<String> = decl
             .methods
             .iter()
             .map(|m| m.name.as_str().to_string())
             .collect();
+        let constraint_names: Vec<String> =
+            decl.constraints.iter().map(|c| c.to_string()).collect();
+        let method_dispatch_map =
+            self.build_protocol_dispatch_map(decl.name, &current_method_names, &constraint_names);
 
         let methods = decl
             .methods
@@ -403,11 +410,11 @@ impl LoweringContext {
                 let body = if let Some(self_param) = self_param {
                     method.body.as_ref().map(|b| {
                         // Set up the dispatch context so that `lower_call_expr` can
-                        // rewrite `self.method(args)` → `Protocol::method(self, args)`.
+                        // rewrite `self.method(args)` → `OwningProtocol::method(self, args)`.
+                        // The map includes methods from constraint protocols too.
                         let previous_ctx = self.protocol_dispatch_ctx.take();
                         self.protocol_dispatch_ctx = Some(ProtocolDispatchContext {
-                            protocol_name: decl.name,
-                            method_names: protocol_method_names.clone(),
+                            method_dispatch_map: method_dispatch_map.clone(),
                             self_param_node_id: self_param.pattern.id,
                         });
 
@@ -447,6 +454,11 @@ impl LoweringContext {
             hir_id: self.lower_node_id(node.id),
             visibility: decl.visibility,
             name: decl.name,
+            constraints: decl
+                .constraints
+                .iter()
+                .map(|c| self.lower_path(c))
+                .collect(),
             methods,
             consts: decl
                 .consts
