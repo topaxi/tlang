@@ -43,8 +43,9 @@ export class $Protocol {
   }
 }
 
-export function $protocol(def, constraints = []) {
-  return new $Protocol(def, constraints);
+export function $protocol(...constraintsAndDef) {
+  const def = constraintsAndDef.pop();
+  return new $Protocol(def, constraintsAndDef);
 }
 
 export function $impl(protocol, Type, methods) {

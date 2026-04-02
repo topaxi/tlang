@@ -384,7 +384,7 @@ impl<'a> InnerCodegen<'a> {
                 let method_name = method.name.as_str();
                 let value = if method.body.is_some() {
                     let fn_decl = self.build_fn_decl_from_protocol_method(method);
-                    self.generate_function_expression(&fn_decl)
+                    self.generate_method_expression(&fn_decl)
                 } else {
                     self.ast.expression_null_literal(SPAN)
                 };
@@ -397,7 +397,7 @@ impl<'a> InnerCodegen<'a> {
                                 .alloc_identifier_name(SPAN, self.alloc_str(method_name)),
                         ),
                         value,
-                        false,
+                        true,
                         false,
                         false,
                     ),
@@ -409,22 +409,16 @@ impl<'a> InnerCodegen<'a> {
             .ast
             .expression_object(SPAN, self.ast.vec_from_iter(props));
 
-        // Build arguments for $protocol(def, [constraint1, constraint2, ...])
-        let mut args = vec![Argument::from(def_obj)];
+        // Build arguments for $protocol(...constraints, def)
+        let mut args = vec![];
         if !decl.constraints.is_empty() {
-            let constraint_refs: Vec<ArrayExpressionElement<'a>> = decl
-                .constraints
-                .iter()
-                .map(|constraint| {
-                    let js_name = CodegenJS::protocol_js_name(&constraint.to_string());
-                    ArrayExpressionElement::from(self.ident_expr(&js_name))
-                })
-                .collect();
-            let constraints_array = self
-                .ast
-                .expression_array(SPAN, self.ast.vec_from_iter(constraint_refs));
-            args.push(Argument::from(constraints_array));
+            for constraint in &decl.constraints {
+                let js_name = CodegenJS::protocol_js_name(&constraint.to_string());
+                args.push(Argument::from(self.ident_expr(&js_name)));
+            }
         }
+
+        args.push(Argument::from(def_obj));
 
         let protocol_call = self.call_expr(self.ident_expr("$protocol"), args);
 
