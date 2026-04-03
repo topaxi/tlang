@@ -57,7 +57,7 @@ impl AnalysisResult {
 
     /// Returns `true` if there are any error-level diagnostics.
     pub fn has_errors(&self) -> bool {
-        !self.parse_issues.is_empty() || self.analyzer.get_errors().iter().any(|d| d.is_error())
+        !self.parse_issues.is_empty() || !self.analyzer.get_errors().is_empty()
     }
 }
 

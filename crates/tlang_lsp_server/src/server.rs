@@ -168,6 +168,10 @@ impl ServerState {
                     .collect();
 
                 // Update caches so unchanged-source republishing works.
+                // `result.module` is `Some` on a successful parse (even when
+                // semantic analysis emits errors) and `None` only when parsing
+                // fails outright; `empty_module()` is only a fallback for the
+                // parse-failure case.
                 if let Some(doc) = self.store.documents_mut().get_mut(uri) {
                     doc.parse_cache = Some(ParseCache {
                         source_hash: doc.source_hash,
@@ -238,13 +242,7 @@ mod tests {
     fn run_diagnostics_on_valid_source() {
         let result = tlang_analysis::analyze_with_js_symbols("fn add(a, b) { a + b }");
         // Valid code should produce no error diagnostics (may have warnings).
-        let errors: Vec<_> = result
-            .analyzer
-            .get_diagnostics()
-            .into_iter()
-            .filter(|d| d.is_error())
-            .collect();
-        assert!(errors.is_empty(), "unexpected errors: {errors:?}");
+        assert!(!result.has_errors(), "unexpected errors");
     }
 
     #[test]
