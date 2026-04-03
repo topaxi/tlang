@@ -210,7 +210,7 @@ fn test_implements_operator() {
 
         fn check(w) { w implements Drawable }
     "});
-    assert!(output.contains("$Drawable.$hasImpl(w)"));
+    assert!(output.contains("$Drawable.$implements(w)"));
 }
 
 // ── Variable declaration with list destructuring (rest pattern) ────────────────

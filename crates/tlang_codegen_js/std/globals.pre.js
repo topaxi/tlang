@@ -26,7 +26,7 @@ export class $Protocol {
     this.#impls.set(Type, methods);
   }
 
-  $hasImpl(value) {
+  $implements(value) {
     const Type = value?.constructor;
     return this.#impls.has(Type);
   }

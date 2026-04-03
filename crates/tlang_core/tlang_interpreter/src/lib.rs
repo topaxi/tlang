@@ -362,15 +362,9 @@ impl Interpreter {
                     .map(ProtocolId::Hir)
                     .or_else(|| state.protocol_id_by_name(&path.to_string()));
                 let result = match protocol_id {
-                    Some(protocol_id) => {
-                        let shape = state.type_shape_key_of(value);
-                        let methods = state.protocol_methods(protocol_id).to_vec();
-                        methods.iter().all(|method| {
-                            state
-                                .get_protocol_impl(protocol_id, shape, method)
-                                .is_some()
-                        })
-                    }
+                    Some(protocol_id) => state
+                        .type_shape_key_of(value)
+                        .is_some_and(|shape| state.has_protocol_impl_for_type(protocol_id, shape)),
                     None => false,
                 };
                 EvalResult::Value(TlangValue::Bool(result))

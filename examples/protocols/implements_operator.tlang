@@ -1,0 +1,55 @@
+protocol Drawable {
+  fn draw(self)
+}
+
+protocol Resizable {
+  fn resize(self, factor)
+}
+
+struct Circle { radius: int }
+struct Square { side: int }
+
+impl Drawable for Circle {
+  fn draw(self) {
+    log("Drawing circle")
+  }
+}
+
+impl Drawable for Square {
+  fn draw(self) {
+    log("Drawing square")
+  }
+}
+
+impl Resizable for Circle {
+  fn resize(Circle { radius }, factor) { Circle { radius: radius * factor } }
+}
+
+fn describe(shape) {
+  if shape implements Drawable {
+    Drawable::draw(shape)
+  }
+}
+
+fn try_resize(shape, factor) {
+  if shape implements Resizable {
+    Resizable::resize(shape, factor)
+  } else {
+    shape
+  }
+}
+
+let circle = Circle { radius: 5 };
+let square = Square { side: 3 };
+
+circle implements Drawable |> log();
+square implements Drawable |> log();
+circle implements Resizable |> log();
+square implements Resizable |> log();
+
+describe(circle);
+describe(square);
+
+let big_circle = try_resize(circle, 2.0);
+big_circle implements Drawable |> log();
+Drawable::draw(big_circle);

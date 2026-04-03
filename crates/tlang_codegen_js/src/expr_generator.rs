@@ -296,7 +296,7 @@ impl<'a> InnerCodegen<'a> {
         let protocol_name = protocol_path.segments.first().unwrap().ident.as_str();
         let protocol_js_name = crate::generator::CodegenJS::protocol_js_name(protocol_name);
         let protocol_obj = self.ident_expr(&protocol_js_name);
-        let has_impl = self.static_member_expr(protocol_obj, "$hasImpl");
+        let has_impl = self.static_member_expr(protocol_obj, "$implements");
         let value = self.generate_expr(value_expr);
         self.call_expr(has_impl, vec![Argument::from(value)])
     }
