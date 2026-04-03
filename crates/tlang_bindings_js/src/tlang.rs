@@ -154,10 +154,10 @@ impl Tlang {
 
         match runner_kind {
             RunnerKind::JavaScript => {
-                analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
+                tlang_analysis::configure_js_analyzer(&mut analyzer);
             }
             RunnerKind::Interpreter => {
-                analyzer.add_builtin_symbols_with_slots(&tlang_core::vm::VM::builtin_symbols());
+                tlang_analysis::configure_interpreter_analyzer(&mut analyzer);
             }
         }
 

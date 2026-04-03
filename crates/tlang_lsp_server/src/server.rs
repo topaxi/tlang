@@ -139,56 +139,57 @@ impl ServerState {
         all
     }
 
-    /// Run the full diagnostic pipeline: parse → semantic analysis → publish.
+    /// Run the full diagnostic pipeline using `tlang_analysis`, then publish.
+    ///
+    /// This replaces the previous manual parse → `SemanticAnalyzer` setup with
+    /// a single call to the shared `tlang_analysis` pipeline, which is also
+    /// used (via `configure_js_analyzer`) by the WASM playground bindings.
     fn run_diagnostics(&mut self, uri: &Url, source: &str) {
-        let mut all_diagnostics = Vec::new();
-
-        // Phase 1: Parse (with panic catch for parser robustness).
-        let parse_result = std::panic::catch_unwind(AssertUnwindSafe(|| {
-            let mut parser = tlang_parser::Parser::from_source(source);
-            parser.parse()
+        // Run the full analysis pipeline (parse + semantic) with panic protection.
+        let analysis = std::panic::catch_unwind(AssertUnwindSafe(|| {
+            tlang_analysis::analyze_with_js_symbols(source)
         }));
 
-        let parsed_module = match parse_result {
-            Ok(Ok((module, _parse_meta))) => {
-                // Cache successful parse with empty diagnostics.
-                if let Some(doc) = self.store.documents_mut().get_mut(uri) {
-                    doc.parse_cache = Some(ParseCache {
-                        source_hash: doc.source_hash,
-                        module: module.clone(),
-                        diagnostics: vec![],
-                    });
-                }
-                Some(module)
-            }
-            Ok(Err(parse_error)) => {
-                let parse_diags: Vec<lsp_types::Diagnostic> = parse_error
-                    .issues()
+        let all_diagnostics = match analysis {
+            Ok(result) => {
+                // Convert parse issues → LSP diagnostics.
+                let parse_diags: Vec<lsp_types::Diagnostic> = result
+                    .parse_issues
                     .iter()
                     .map(diagnostics::from_parse_issue)
                     .collect();
-                all_diagnostics.extend(parse_diags.clone());
 
-                // Cache the parse diagnostics even though parsing failed.
+                // Convert semantic diagnostics → LSP diagnostics.
+                let semantic_diags: Vec<lsp_types::Diagnostic> = result
+                    .analyzer
+                    .get_diagnostics()
+                    .iter()
+                    .map(|d| diagnostics::from_tlang_diagnostic(d, uri))
+                    .collect();
+
+                // Update caches so unchanged-source republishing works.
                 if let Some(doc) = self.store.documents_mut().get_mut(uri) {
                     doc.parse_cache = Some(ParseCache {
                         source_hash: doc.source_hash,
-                        module: empty_module(),
-                        diagnostics: parse_diags,
+                        module: result.module.unwrap_or_else(empty_module),
+                        diagnostics: parse_diags.clone(),
                     });
+                    doc.semantic_cache = Some(semantic_diags.clone());
                 }
-                None
+
+                let mut all = parse_diags;
+                all.extend(semantic_diags);
+                all
             }
             Err(_panic) => {
-                error!("parser panicked for {uri}");
+                error!("analysis panicked for {uri}");
                 let diag = lsp_types::Diagnostic {
                     range: lsp_types::Range::default(),
                     severity: Some(lsp_types::DiagnosticSeverity::ERROR),
                     source: Some("tlang".into()),
-                    message: "Internal error: parser panicked".into(),
+                    message: "Internal error: analysis panicked".into(),
                     ..Default::default()
                 };
-                all_diagnostics.push(diag.clone());
 
                 // Cache the panic diagnostic so it is republished on unchanged
                 // `didChange` requests rather than silently clearing.
@@ -196,51 +197,18 @@ impl ServerState {
                     doc.parse_cache = Some(ParseCache {
                         source_hash: doc.source_hash,
                         module: empty_module(),
-                        diagnostics: vec![diag],
+                        diagnostics: vec![diag.clone()],
                     });
+                    doc.semantic_cache = Some(vec![]);
                 }
-                None
+
+                vec![diag]
             }
         };
 
-        // Phase 2: Semantic analysis (only if parsing succeeded).
-        if let Some(mut module) = parsed_module {
-            let semantic_diags = Self::run_semantic_analysis(&mut module, uri);
-            all_diagnostics.extend(semantic_diags.clone());
-
-            // Cache semantic diagnostics.
-            if let Some(doc) = self.store.documents_mut().get_mut(uri) {
-                doc.semantic_cache = Some(semantic_diags);
-                // Update the cached module with the analyzed version.
-                if let Some(ref mut cache) = doc.parse_cache {
-                    cache.module = module;
-                }
-            }
-        }
-
-        // Phase 3: Publish all collected diagnostics.
+        // Publish all collected diagnostics.
         let version = self.store.get(uri).map(|d| d.version);
         self.publish_diagnostics(uri.clone(), all_diagnostics, version);
-    }
-
-    /// Run semantic analysis on a parsed module, returning LSP diagnostics.
-    fn run_semantic_analysis(
-        module: &mut tlang_ast::node::Module,
-        uri: &Url,
-    ) -> Vec<lsp_types::Diagnostic> {
-        let mut analyzer = tlang_semantics::SemanticAnalyzer::default();
-        analyzer.add_builtin_symbols(
-            tlang_codegen_js::generator::CodegenJS::get_standard_library_symbols(),
-        );
-
-        let _ = analyzer.analyze(module);
-
-        // Collect all diagnostics (errors + warnings).
-        analyzer
-            .get_diagnostics()
-            .iter()
-            .map(|d| diagnostics::from_tlang_diagnostic(d, uri))
-            .collect()
     }
 
     /// Send diagnostics to the client.
@@ -267,31 +235,39 @@ mod tests {
     }
 
     #[test]
-    fn run_semantic_analysis_on_valid_source() {
-        let source = "fn add(a, b) { a + b }";
-        let mut parser = tlang_parser::Parser::from_source(source);
-        let (mut module, _) = parser.parse().unwrap();
-
-        let diags = ServerState::run_semantic_analysis(&mut module, &test_uri());
+    fn run_diagnostics_on_valid_source() {
+        let result = tlang_analysis::analyze_with_js_symbols("fn add(a, b) { a + b }");
         // Valid code should produce no error diagnostics (may have warnings).
-        let errors: Vec<_> = diags
-            .iter()
-            .filter(|d| d.severity == Some(lsp_types::DiagnosticSeverity::ERROR))
+        let errors: Vec<_> = result
+            .analyzer
+            .get_diagnostics()
+            .into_iter()
+            .filter(|d| d.is_error())
             .collect();
         assert!(errors.is_empty(), "unexpected errors: {errors:?}");
     }
 
     #[test]
-    fn run_semantic_analysis_on_source_with_errors() {
+    fn run_diagnostics_on_source_with_errors() {
         // Using an undeclared variable should produce a diagnostic.
-        let source = "fn f() { x }";
-        let mut parser = tlang_parser::Parser::from_source(source);
-        let (mut module, _) = parser.parse().unwrap();
-
-        let diags = ServerState::run_semantic_analysis(&mut module, &test_uri());
+        let result = tlang_analysis::analyze_with_js_symbols("fn f() { x }");
         assert!(
-            !diags.is_empty(),
+            !result.analyzer.get_diagnostics().is_empty(),
             "expected diagnostics for undeclared variable"
         );
+    }
+
+    #[test]
+    fn lsp_diagnostic_conversion_from_analysis_result() {
+        let uri = test_uri();
+        let result = tlang_analysis::analyze_with_js_symbols("fn f() { x }");
+        let lsp_diags: Vec<_> = result
+            .analyzer
+            .get_diagnostics()
+            .iter()
+            .map(|d| diagnostics::from_tlang_diagnostic(d, &uri))
+            .collect();
+        assert!(!lsp_diags.is_empty());
+        assert_eq!(lsp_diags[0].source.as_deref(), Some("tlang"));
     }
 }

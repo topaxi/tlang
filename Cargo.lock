@@ -2094,6 +2094,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tlang_analysis"
+version = "0.1.0"
+dependencies = [
+ "tlang_ast",
+ "tlang_codegen_js",
+ "tlang_core",
+ "tlang_diagnostics",
+ "tlang_parser",
+ "tlang_semantics",
+]
+
+[[package]]
 name = "tlang_ast"
 version = "0.1.0"
 dependencies = [
@@ -2133,6 +2145,7 @@ dependencies = [
  "ron",
  "serde",
  "serde-wasm-bindgen",
+ "tlang_analysis",
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_codegen_js",
@@ -2330,11 +2343,10 @@ dependencies = [
  "async-lsp",
  "futures",
  "lsp-types",
+ "tlang_analysis",
  "tlang_ast",
- "tlang_codegen_js",
  "tlang_diagnostics",
  "tlang_parser",
- "tlang_semantics",
  "tlang_span",
  "tokio",
  "tokio-util",

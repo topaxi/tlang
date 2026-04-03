@@ -17,10 +17,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 tlang_ast = { path = "../tlang_ast" }
-tlang_codegen_js = { path = "../tlang_codegen_js" }
+tlang_analysis = { path = "../tlang_analysis", features = ["js"] }
 tlang_diagnostics = { path = "../tlang_diagnostics" }
 tlang_parser = { path = "../tlang_parser" }
-tlang_semantics = { path = "../tlang_semantics" }
 tlang_span = { path = "../tlang_span" }
 
 [dev-dependencies]
