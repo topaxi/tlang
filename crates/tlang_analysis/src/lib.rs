@@ -15,6 +15,7 @@
 //! | Function | Use case |
 //! |---|---|
 //! | [`analyze`] | Parse + semantic analysis with a custom analyzer setup |
+//! | [`analyze_for_target`] | As above, dispatching on [`CompilationTarget`] |
 //! | [`analyze_with_js_symbols`] | As above, pre-configured for the JS backend (feature `js`) |
 //! | [`analyze_with_interpreter_symbols`] | As above, pre-configured for the interpreter (feature `interpreter`) |
 //! | [`configure_js_analyzer`] | Configure an existing analyzer with JS stdlib symbols (feature `js`) |
@@ -97,6 +98,40 @@ pub fn analyze(source: &str, configure: impl FnOnce(&mut SemanticAnalyzer)) -> A
                 parse_issues: issues,
             }
         }
+    }
+}
+
+/// The compilation target that controls which builtin symbols are registered
+/// during semantic analysis.
+///
+/// Mirrors the two execution backends supported by tlang:
+/// - [`CompilationTarget::Js`] — compiles to JavaScript (default).
+/// - [`CompilationTarget::Interpreter`] — runs in the tlang VM.
+///
+/// The default is [`CompilationTarget::Js`].
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum CompilationTarget {
+    /// Compile to JavaScript.  Registers the JS stdlib builtins.
+    #[default]
+    Js,
+    /// Run in the tlang interpreter VM.  Registers the VM builtin symbols.
+    Interpreter,
+}
+
+/// Run the full analysis pipeline selecting builtins based on `target`.
+///
+/// Requires either the `js` or `interpreter` feature (or both) to be enabled.
+/// When the requested feature is not compiled in, falls back to plain
+/// [`analyze`] with no extra builtins.
+pub fn analyze_for_target(source: &str, target: CompilationTarget) -> AnalysisResult {
+    match target {
+        #[cfg(feature = "js")]
+        CompilationTarget::Js => analyze_with_js_symbols(source),
+        #[cfg(feature = "interpreter")]
+        CompilationTarget::Interpreter => analyze_with_interpreter_symbols(source),
+        // Fallback when the matching feature is not enabled.
+        #[allow(unreachable_patterns)]
+        _ => analyze(source, |_| {}),
     }
 }
 

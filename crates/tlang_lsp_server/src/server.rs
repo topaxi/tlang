@@ -9,7 +9,9 @@ use lsp_types::{
     InitializeParams, InitializeResult, PublishDiagnosticsParams, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, Url,
 };
-use tracing::error;
+use serde::Deserialize;
+use tlang_analysis::CompilationTarget;
+use tracing::{error, warn};
 
 use crate::diagnostics;
 use crate::document_store::{DocumentStore, ParseCache};
@@ -23,10 +25,57 @@ fn empty_module() -> tlang_ast::node::Module {
     )
 }
 
+/// Settings passed by the editor via `initializationOptions` in the LSP
+/// `initialize` request.
+///
+/// Example Neovim (`lspconfig`) config:
+/// ```lua
+/// require('lspconfig').tlang_lsp_server.setup {
+///   init_options = { target = "interpreter" }
+/// }
+/// ```
+///
+/// Example VS Code `settings.json`:
+/// ```json
+/// { "tlang.initializationOptions": { "target": "interpreter" } }
+/// ```
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerSettings {
+    /// The compilation target to use for semantic analysis.
+    ///
+    /// Accepted values: `"js"` (default) or `"interpreter"`.
+    #[serde(default)]
+    pub target: TargetSetting,
+}
+
+/// The `target` field within [`ServerSettings`].
+#[derive(Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum TargetSetting {
+    /// JavaScript code-generation backend (default).
+    #[default]
+    #[serde(rename = "js")]
+    Js,
+    /// tlang interpreter / VM backend.
+    #[serde(rename = "interpreter")]
+    Interpreter,
+}
+
+impl From<TargetSetting> for CompilationTarget {
+    fn from(s: TargetSetting) -> Self {
+        match s {
+            TargetSetting::Js => CompilationTarget::Js,
+            TargetSetting::Interpreter => CompilationTarget::Interpreter,
+        }
+    }
+}
+
 /// The main state of the tlang language server.
 pub struct ServerState {
     client: ClientSocket,
     store: DocumentStore,
+    target: CompilationTarget,
 }
 
 impl ServerState {
@@ -35,6 +84,7 @@ impl ServerState {
         let mut router = Router::new(Self {
             client,
             store: DocumentStore::new(),
+            target: CompilationTarget::default(),
         });
 
         router
@@ -50,10 +100,25 @@ impl ServerState {
     }
 
     fn on_initialize(
-        _state: &mut Self,
-        _params: InitializeParams,
+        state: &mut Self,
+        params: InitializeParams,
     ) -> futures::future::BoxFuture<'static, Result<InitializeResult, async_lsp::ResponseError>>
     {
+        // Parse initializationOptions if provided.
+        let settings: ServerSettings = params
+            .initialization_options
+            .as_ref()
+            .and_then(|v| match serde_json::from_value(v.clone()) {
+                Ok(s) => Some(s),
+                Err(e) => {
+                    warn!("failed to parse initializationOptions: {e}");
+                    None
+                }
+            })
+            .unwrap_or_default();
+
+        state.target = settings.target.into();
+
         Box::pin(async move {
             Ok(InitializeResult {
                 capabilities: ServerCapabilities {
@@ -141,13 +206,16 @@ impl ServerState {
 
     /// Run the full diagnostic pipeline using `tlang_analysis`, then publish.
     ///
-    /// This replaces the previous manual parse → `SemanticAnalyzer` setup with
-    /// a single call to the shared `tlang_analysis` pipeline, which is also
-    /// used (via `configure_js_analyzer`) by the WASM playground bindings.
+    /// The analysis uses the [`CompilationTarget`] that was set during
+    /// `initialize` (from `initializationOptions`).  This selects the correct
+    /// set of builtin symbols — JS stdlib for [`CompilationTarget::Js`] or VM
+    /// builtins for [`CompilationTarget::Interpreter`].
     fn run_diagnostics(&mut self, uri: &Url, source: &str) {
+        let target = self.target;
+
         // Run the full analysis pipeline (parse + semantic) with panic protection.
         let analysis = std::panic::catch_unwind(AssertUnwindSafe(|| {
-            tlang_analysis::analyze_with_js_symbols(source)
+            tlang_analysis::analyze_for_target(source, target)
         }));
 
         let all_diagnostics = match analysis {
@@ -240,7 +308,8 @@ mod tests {
 
     #[test]
     fn run_diagnostics_on_valid_source() {
-        let result = tlang_analysis::analyze_with_js_symbols("fn add(a, b) { a + b }");
+        let result =
+            tlang_analysis::analyze_for_target("fn add(a, b) { a + b }", CompilationTarget::Js);
         // Valid code should produce no error diagnostics (may have warnings).
         assert!(!result.has_errors(), "unexpected errors");
     }
@@ -248,7 +317,7 @@ mod tests {
     #[test]
     fn run_diagnostics_on_source_with_errors() {
         // Using an undeclared variable should produce a diagnostic.
-        let result = tlang_analysis::analyze_with_js_symbols("fn f() { x }");
+        let result = tlang_analysis::analyze_for_target("fn f() { x }", CompilationTarget::Js);
         assert!(
             !result.analyzer.get_diagnostics().is_empty(),
             "expected diagnostics for undeclared variable"
@@ -258,7 +327,7 @@ mod tests {
     #[test]
     fn lsp_diagnostic_conversion_from_analysis_result() {
         let uri = test_uri();
-        let result = tlang_analysis::analyze_with_js_symbols("fn f() { x }");
+        let result = tlang_analysis::analyze_for_target("fn f() { x }", CompilationTarget::Js);
         let lsp_diags: Vec<_> = result
             .analyzer
             .get_diagnostics()
@@ -267,5 +336,56 @@ mod tests {
             .collect();
         assert!(!lsp_diags.is_empty());
         assert_eq!(lsp_diags[0].source.as_deref(), Some("tlang"));
+    }
+
+    #[test]
+    fn server_settings_default_is_js() {
+        let settings = ServerSettings::default();
+        assert_eq!(settings.target, TargetSetting::Js);
+    }
+
+    #[test]
+    fn server_settings_parse_js() {
+        let v = serde_json::json!({ "target": "js" });
+        let s: ServerSettings = serde_json::from_value(v).unwrap();
+        assert_eq!(s.target, TargetSetting::Js);
+    }
+
+    #[test]
+    fn server_settings_parse_interpreter() {
+        let v = serde_json::json!({ "target": "interpreter" });
+        let s: ServerSettings = serde_json::from_value(v).unwrap();
+        assert_eq!(s.target, TargetSetting::Interpreter);
+    }
+
+    #[test]
+    fn server_settings_parse_empty_object_defaults_to_js() {
+        let v = serde_json::json!({});
+        let s: ServerSettings = serde_json::from_value(v).unwrap();
+        assert_eq!(s.target, TargetSetting::Js);
+    }
+
+    #[test]
+    fn compilation_target_from_target_setting() {
+        assert_eq!(
+            CompilationTarget::from(TargetSetting::Js),
+            CompilationTarget::Js
+        );
+        assert_eq!(
+            CompilationTarget::from(TargetSetting::Interpreter),
+            CompilationTarget::Interpreter
+        );
+    }
+
+    #[test]
+    fn run_diagnostics_interpreter_target_valid_source() {
+        let result = tlang_analysis::analyze_for_target(
+            "fn add(a, b) { a + b }",
+            CompilationTarget::Interpreter,
+        );
+        assert!(
+            !result.has_errors(),
+            "unexpected errors for interpreter target"
+        );
     }
 }

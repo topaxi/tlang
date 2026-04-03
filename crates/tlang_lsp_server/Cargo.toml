@@ -11,13 +11,15 @@ path = "src/main.rs"
 async-lsp = { version = "0.2", features = ["tokio"] }
 futures = "0.3"
 lsp-types = "0.95"
+serde = { workspace = true }
+serde_json = "1"
 tokio = { version = "1", features = ["rt", "macros", "io-std"] }
 tower = "0.5"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 tlang_ast = { path = "../tlang_ast" }
-tlang_analysis = { path = "../tlang_analysis", features = ["js"] }
+tlang_analysis = { path = "../tlang_analysis", features = ["js", "interpreter"] }
 tlang_diagnostics = { path = "../tlang_diagnostics" }
 tlang_parser = { path = "../tlang_parser" }
 tlang_span = { path = "../tlang_span" }

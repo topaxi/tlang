@@ -2343,6 +2343,8 @@ dependencies = [
  "async-lsp",
  "futures",
  "lsp-types",
+ "serde",
+ "serde_json",
  "tlang_analysis",
  "tlang_ast",
  "tlang_diagnostics",
