@@ -9,6 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 async-lsp = { version = "0.2", features = ["tokio"] }
+futures = "0.3"
 lsp-types = "0.95"
 tokio = { version = "1", features = ["rt", "macros", "io-std"] }
 tower = "0.5"
@@ -23,6 +24,5 @@ tlang_semantics = { path = "../tlang_semantics" }
 tlang_span = { path = "../tlang_span" }
 
 [dev-dependencies]
-futures = "0.3"
 tokio = { version = "1", features = ["rt", "macros", "io-std", "io-util"] }
 tokio-util = { version = "0.7", features = ["compat"] }

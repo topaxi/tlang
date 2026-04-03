@@ -1,12 +1,12 @@
 use std::ops::ControlFlow;
 
+use async_lsp::LanguageServer;
 use async_lsp::router::Router;
 use async_lsp::server::LifecycleLayer;
-use async_lsp::LanguageClient;
 use futures::{AsyncReadExt, StreamExt};
 use lsp_types::{
-    notification, request, DidOpenTextDocumentParams, InitializeParams, InitializedParams,
-    PublishDiagnosticsParams, TextDocumentIdentifier, TextDocumentItem, Url,
+    DidOpenTextDocumentParams, InitializeParams, InitializedParams, PublishDiagnosticsParams,
+    TextDocumentIdentifier, TextDocumentItem, Url, notification,
 };
 use tlang_lsp_server::server::ServerState;
 use tokio_util::compat::TokioAsyncReadCompatExt;
@@ -21,7 +21,7 @@ struct ClientState {
 #[tokio::test(flavor = "current_thread")]
 async fn smoke_test_diagnostics_on_open() {
     // Set up the server.
-    let (server_main, mut client) = async_lsp::MainLoop::new_server(|client| {
+    let (server_main, _client) = async_lsp::MainLoop::new_server(|client| {
         ServiceBuilder::new()
             .layer(LifecycleLayer::default())
             .service(ServerState::new_router(client))
@@ -62,7 +62,10 @@ async fn smoke_test_diagnostics_on_open() {
     });
 
     // Initialize the server.
-    let init_result = server.initialize(InitializeParams::default()).await.unwrap();
+    let init_result = server
+        .initialize(InitializeParams::default())
+        .await
+        .unwrap();
     assert!(init_result.server_info.is_some());
     assert_eq!(
         init_result.server_info.as_ref().unwrap().name,

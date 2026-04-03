@@ -1,9 +1,9 @@
 use std::ops::ControlFlow;
 use std::panic::AssertUnwindSafe;
 
-use async_lsp::router::Router;
 use async_lsp::ClientSocket;
 use async_lsp::LanguageClient;
+use async_lsp::router::Router;
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     InitializeParams, InitializeResult, PublishDiagnosticsParams, ServerCapabilities,
@@ -13,6 +13,15 @@ use tracing::error;
 
 use crate::diagnostics;
 use crate::document_store::{DocumentStore, ParseCache};
+
+/// Create an empty AST module (used as a placeholder when parsing fails).
+fn empty_module() -> tlang_ast::node::Module {
+    tlang_ast::node::Module::new(
+        tlang_span::NodeId::new(1),
+        vec![],
+        tlang_span::Span::default(),
+    )
+}
 
 /// The main state of the tlang language server.
 pub struct ServerState {
@@ -30,7 +39,9 @@ impl ServerState {
 
         router
             .request::<lsp_types::request::Initialize, _>(Self::on_initialize)
+            .request::<lsp_types::request::Shutdown, _>(|_, _| Box::pin(async { Ok(()) }))
             .notification::<lsp_types::notification::Initialized>(|_, _| ControlFlow::Continue(()))
+            .notification::<lsp_types::notification::Exit>(|_, _| ControlFlow::Break(Ok(())))
             .notification::<lsp_types::notification::DidOpenTextDocument>(Self::on_did_open)
             .notification::<lsp_types::notification::DidChangeTextDocument>(Self::on_did_change)
             .notification::<lsp_types::notification::DidCloseTextDocument>(Self::on_did_close);
@@ -41,10 +52,8 @@ impl ServerState {
     fn on_initialize(
         _state: &mut Self,
         _params: InitializeParams,
-    ) -> futures::future::BoxFuture<
-        'static,
-        Result<InitializeResult, async_lsp::ResponseError>,
-    > {
+    ) -> futures::future::BoxFuture<'static, Result<InitializeResult, async_lsp::ResponseError>>
+    {
         Box::pin(async move {
             Ok(InitializeResult {
                 capabilities: ServerCapabilities {
@@ -164,7 +173,7 @@ impl ServerState {
                 if let Some(doc) = self.store.documents_mut().get_mut(uri) {
                     doc.parse_cache = Some(ParseCache {
                         source_hash: doc.source_hash,
-                        module: tlang_ast::node::Module::default(),
+                        module: empty_module(),
                         diagnostics: parse_diags,
                     });
                 }
@@ -179,14 +188,24 @@ impl ServerState {
                     message: "Internal error: parser panicked".into(),
                     ..Default::default()
                 };
-                all_diagnostics.push(diag);
+                all_diagnostics.push(diag.clone());
+
+                // Cache the panic diagnostic so it is republished on unchanged
+                // `didChange` requests rather than silently clearing.
+                if let Some(doc) = self.store.documents_mut().get_mut(uri) {
+                    doc.parse_cache = Some(ParseCache {
+                        source_hash: doc.source_hash,
+                        module: empty_module(),
+                        diagnostics: vec![diag],
+                    });
+                }
                 None
             }
         };
 
         // Phase 2: Semantic analysis (only if parsing succeeded).
         if let Some(mut module) = parsed_module {
-            let semantic_diags = Self::run_semantic_analysis(&mut module);
+            let semantic_diags = Self::run_semantic_analysis(&mut module, uri);
             all_diagnostics.extend(semantic_diags.clone());
 
             // Cache semantic diagnostics.
@@ -205,33 +224,23 @@ impl ServerState {
     }
 
     /// Run semantic analysis on a parsed module, returning LSP diagnostics.
-    fn run_semantic_analysis(module: &mut tlang_ast::node::Module) -> Vec<lsp_types::Diagnostic> {
+    fn run_semantic_analysis(
+        module: &mut tlang_ast::node::Module,
+        uri: &Url,
+    ) -> Vec<lsp_types::Diagnostic> {
         let mut analyzer = tlang_semantics::SemanticAnalyzer::default();
         analyzer.add_builtin_symbols(
             tlang_codegen_js::generator::CodegenJS::get_standard_library_symbols(),
         );
 
-        let analysis_result = analyzer.analyze(module);
+        let _ = analyzer.analyze(module);
 
         // Collect all diagnostics (errors + warnings).
-        let all_diagnostics = analyzer.get_diagnostics();
-        let mut lsp_diags: Vec<lsp_types::Diagnostic> = all_diagnostics
+        analyzer
+            .get_diagnostics()
             .iter()
-            .map(diagnostics::from_tlang_diagnostic)
-            .collect();
-
-        // If analyze() returned Err, those error diagnostics are already included
-        // in get_diagnostics(). But if it returned Ok, we still want warnings.
-        if let Err(errors) = analysis_result {
-            // Errors from the result that might not be in get_diagnostics().
-            for err in &errors {
-                if !all_diagnostics.iter().any(|d| d.message() == err.message()) {
-                    lsp_diags.push(diagnostics::from_tlang_diagnostic(err));
-                }
-            }
-        }
-
-        lsp_diags
+            .map(|d| diagnostics::from_tlang_diagnostic(d, uri))
+            .collect()
     }
 
     /// Send diagnostics to the client.
@@ -253,13 +262,17 @@ impl ServerState {
 mod tests {
     use super::*;
 
+    fn test_uri() -> Url {
+        Url::parse("file:///test/example.tlang").unwrap()
+    }
+
     #[test]
     fn run_semantic_analysis_on_valid_source() {
         let source = "fn add(a, b) { a + b }";
         let mut parser = tlang_parser::Parser::from_source(source);
         let (mut module, _) = parser.parse().unwrap();
 
-        let diags = ServerState::run_semantic_analysis(&mut module);
+        let diags = ServerState::run_semantic_analysis(&mut module, &test_uri());
         // Valid code should produce no error diagnostics (may have warnings).
         let errors: Vec<_> = diags
             .iter()
@@ -275,7 +288,7 @@ mod tests {
         let mut parser = tlang_parser::Parser::from_source(source);
         let (mut module, _) = parser.parse().unwrap();
 
-        let diags = ServerState::run_semantic_analysis(&mut module);
+        let diags = ServerState::run_semantic_analysis(&mut module, &test_uri());
         assert!(
             !diags.is_empty(),
             "expected diagnostics for undeclared variable"

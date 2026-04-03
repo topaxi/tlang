@@ -1,4 +1,4 @@
-use lsp_types::{DiagnosticSeverity, Position, Range};
+use lsp_types::{DiagnosticSeverity, Position, Range, Url};
 use tlang_diagnostics::Diagnostic;
 use tlang_parser::error::ParseIssue;
 use tlang_span::Span;
@@ -33,7 +33,10 @@ pub fn from_parse_issue(issue: &ParseIssue) -> lsp_types::Diagnostic {
 }
 
 /// Convert a tlang semantic diagnostic into an LSP diagnostic.
-pub fn from_tlang_diagnostic(diagnostic: &Diagnostic) -> lsp_types::Diagnostic {
+///
+/// `uri` is the document URI used for `relatedInformation` locations, since
+/// tlang diagnostic labels reference spans within the same file.
+pub fn from_tlang_diagnostic(diagnostic: &Diagnostic, uri: &Url) -> lsp_types::Diagnostic {
     let severity = match diagnostic.severity() {
         tlang_diagnostics::Severity::Error => DiagnosticSeverity::ERROR,
         tlang_diagnostics::Severity::Warning => DiagnosticSeverity::WARNING,
@@ -48,10 +51,7 @@ pub fn from_tlang_diagnostic(diagnostic: &Diagnostic) -> lsp_types::Diagnostic {
                 .iter()
                 .map(|label| lsp_types::DiagnosticRelatedInformation {
                     location: lsp_types::Location {
-                        // Labels reference the same document; the caller must
-                        // set the URI externally if needed. We use a placeholder
-                        // empty URI here since the LSP spec requires a location.
-                        uri: lsp_types::Url::parse("file:///").unwrap(),
+                        uri: uri.clone(),
                         range: span_to_range(&label.span),
                     },
                     message: label.message.clone(),
@@ -90,6 +90,10 @@ mod tests {
         }
     }
 
+    fn test_uri() -> Url {
+        Url::parse("file:///test/example.tlang").unwrap()
+    }
+
     #[test]
     fn parse_issue_to_lsp_diagnostic() {
         let issue = ParseIssue {
@@ -113,7 +117,7 @@ mod tests {
         let span = make_span(2, 0, 2, 5);
         let diagnostic = Diagnostic::error("undefined variable", span);
 
-        let diag = from_tlang_diagnostic(&diagnostic);
+        let diag = from_tlang_diagnostic(&diagnostic, &test_uri());
         assert_eq!(diag.message, "undefined variable");
         assert_eq!(diag.severity, Some(DiagnosticSeverity::ERROR));
         assert_eq!(diag.range.start.line, 2);
@@ -124,21 +128,23 @@ mod tests {
         let span = make_span(1, 0, 1, 3);
         let diagnostic = Diagnostic::warn("unused variable", span);
 
-        let diag = from_tlang_diagnostic(&diagnostic);
+        let diag = from_tlang_diagnostic(&diagnostic, &test_uri());
         assert_eq!(diag.message, "unused variable");
         assert_eq!(diag.severity, Some(DiagnosticSeverity::WARNING));
     }
 
     #[test]
     fn diagnostic_with_labels_has_related_information() {
+        let uri = test_uri();
         let span = make_span(0, 0, 0, 5);
         let label_span = make_span(1, 0, 1, 5);
         let diagnostic =
             Diagnostic::error("type mismatch", span).with_label("expected here", label_span);
 
-        let diag = from_tlang_diagnostic(&diagnostic);
+        let diag = from_tlang_diagnostic(&diagnostic, &uri);
         let related = diag.related_information.unwrap();
         assert_eq!(related.len(), 1);
         assert_eq!(related[0].message, "expected here");
+        assert_eq!(related[0].location.uri, uri);
     }
 }

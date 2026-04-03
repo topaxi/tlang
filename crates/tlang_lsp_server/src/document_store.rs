@@ -49,13 +49,16 @@ impl DocumentStore {
     /// Open a new document, returning a mutable reference to its state.
     pub fn open(&mut self, uri: Url, version: i32, source: String) -> &mut DocumentState {
         let source_hash = hash_source(&source);
-        self.documents.entry(uri).insert_entry(DocumentState {
-            source,
-            source_hash,
-            version,
-            parse_cache: None,
-            semantic_cache: None,
-        }).into_mut()
+        self.documents
+            .entry(uri)
+            .insert_entry(DocumentState {
+                source,
+                source_hash,
+                version,
+                parse_cache: None,
+                semantic_cache: None,
+            })
+            .into_mut()
     }
 
     /// Update an existing document. Returns `None` if the document is not open.
