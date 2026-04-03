@@ -602,10 +602,6 @@ impl VMState {
         self.program.protocol_id_by_name(name)
     }
 
-    pub fn protocol_methods(&self, id: ProtocolId) -> &[String] {
-        self.program.protocol_methods(id)
-    }
-
     pub fn has_protocol_impl_for_type(&self, protocol: ProtocolId, target_type: ShapeKey) -> bool {
         self.program
             .has_protocol_impl_for_type(protocol, target_type)

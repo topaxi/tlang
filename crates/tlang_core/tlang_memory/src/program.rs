@@ -211,10 +211,6 @@ impl Program {
         self.protocol_name_to_id.get(name).copied()
     }
 
-    pub fn protocol_methods(&self, id: ProtocolId) -> &[String] {
-        self.protocols.get(&id).map(|v| v.as_slice()).unwrap_or(&[])
-    }
-
     pub fn has_protocol_impl_for_type(&self, protocol: ProtocolId, target_type: ShapeKey) -> bool {
         self.protocol_type_impls.contains(&(protocol, target_type))
     }
