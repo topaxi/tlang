@@ -163,6 +163,9 @@ fn check_expr(expr: &hir::Expr, current_fn: Option<HirId>, diagnostics: &mut Vec
                 check_expr(e, current_fn, diagnostics);
             }
         }
+        hir::ExprKind::Implements(inner, _) => {
+            check_expr(inner, current_fn, diagnostics);
+        }
     }
 }
 

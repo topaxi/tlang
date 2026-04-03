@@ -602,6 +602,10 @@ impl VMState {
         self.program.protocol_id_by_name(name)
     }
 
+    pub fn protocol_methods(&self, id: ProtocolId) -> &[String] {
+        self.program.protocol_methods(id)
+    }
+
     pub fn lookup_builtin_shape(&self, name: &str) -> Option<ShapeKey> {
         self.heap.builtin_shapes.lookup(name)
     }

@@ -253,6 +253,10 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(
                 walk_match_arm(visitor, arm, ctx);
             }
         }
+        hir::ExprKind::Implements(expr, path) => {
+            visitor.visit_expr(expr, ctx);
+            visitor.visit_path(path, ctx);
+        }
         hir::ExprKind::Dict(pairs) => {
             for (key, value) in pairs {
                 visitor.visit_expr(key, ctx);

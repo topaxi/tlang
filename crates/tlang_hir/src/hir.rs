@@ -780,6 +780,7 @@ pub enum ExprKind {
     IndexAccess(Box<Expr>, Box<Expr>),
     Literal(Box<Literal>),
     Match(Box<Expr>, Vec<MatchArm>),
+    Implements(Box<Expr>, Path),
     Range(Box<RangeExpression>),
     TaggedString {
         tag: Box<Expr>,

@@ -203,6 +203,10 @@ impl Program {
         self.protocol_name_to_id.get(name).copied()
     }
 
+    pub fn protocol_methods(&self, id: ProtocolId) -> &[String] {
+        self.protocols.get(&id).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+
     pub fn get_protocol_for_method(&self, method_name: &str) -> Option<ProtocolId> {
         self.protocol_method_to_protocol.get(method_name).copied()
     }

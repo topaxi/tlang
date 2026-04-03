@@ -55,6 +55,9 @@ impl<'a> InnerCodegen<'a> {
             }
             hir::ExprKind::Let(..) => self.unsupported_expr("let expressions", expr.span),
             hir::ExprKind::Range(_) => self.unsupported_expr("range expressions", expr.span),
+            hir::ExprKind::Implements(value_expr, protocol_path) => {
+                self.generate_implements_expr(value_expr, protocol_path)
+            }
             hir::ExprKind::TaggedString { tag, parts, exprs } => {
                 self.generate_tagged_string(tag, parts, exprs)
             }
@@ -283,6 +286,19 @@ impl<'a> InnerCodegen<'a> {
             Ok(bin_op) => self.ast.expression_binary(SPAN, left, bin_op, right),
             Err(log_op) => self.ast.expression_logical(SPAN, left, log_op, right),
         }
+    }
+
+    fn generate_implements_expr(
+        &mut self,
+        value_expr: &hir::Expr,
+        protocol_path: &hir::Path,
+    ) -> Expression<'a> {
+        let protocol_name = protocol_path.segments.first().unwrap().ident.as_str();
+        let protocol_js_name = crate::generator::CodegenJS::protocol_js_name(protocol_name);
+        let protocol_obj = self.ident_expr(&protocol_js_name);
+        let has_impl = self.static_member_expr(protocol_obj, "$hasImpl");
+        let value = self.generate_expr(value_expr);
+        self.call_expr(has_impl, vec![Argument::from(value)])
     }
 
     fn generate_unary_op(&mut self, op: &ast::UnaryOp, expr: &hir::Expr) -> Expression<'a> {

@@ -104,7 +104,7 @@ fn test_node_at_offset_path_resolves_to_path_node() {
 
     // `x` on the right-hand side of the second `let` is a resolved Path.
     // Find the second occurrence of 'x' (position of `x` in `let y = x`).
-    let second_x_offset = (offset_of(src, "let y = ") + "let y = ".len() as u32) as u32;
+    let second_x_offset = (offset_of(src, "let y = ") + "let y = ".len() as u32);
     let node = index.node_at_offset(second_x_offset);
     // After semantic analysis the path should resolve and emit a Path node;
     // if it doesn't resolve it falls back to an Expr.

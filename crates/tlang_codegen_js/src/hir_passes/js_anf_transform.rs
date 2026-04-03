@@ -34,6 +34,7 @@ fn is_js_expressible(expr: &hir::Expr) -> bool {
         | hir::ExprKind::Break(..)
         | hir::ExprKind::Continue
         | hir::ExprKind::Match(..) => false,
+        hir::ExprKind::Implements(inner, _) => is_js_expressible(inner),
     }
 }
 
