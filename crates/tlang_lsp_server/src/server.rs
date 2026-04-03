@@ -107,8 +107,7 @@ impl ServerState {
         // Parse initializationOptions if provided.
         let settings: ServerSettings = params
             .initialization_options
-            .as_ref()
-            .and_then(|v| match serde_json::from_value(v.clone()) {
+            .and_then(|v| match serde_json::from_value(v) {
                 Ok(s) => Some(s),
                 Err(e) => {
                     warn!("failed to parse initializationOptions: {e}");

@@ -68,7 +68,7 @@ impl AnalysisResult {
 /// **before** analysis runs, giving the caller a chance to register builtin
 /// symbols (e.g. `analyzer.add_builtin_symbols(…)`).
 ///
-/// ```no_run
+/// ```
 /// use tlang_analysis::analyze;
 ///
 /// let result = analyze("fn add(a, b) { a + b }", |_analyzer| {});
