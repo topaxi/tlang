@@ -120,18 +120,32 @@ pub enum CompilationTarget {
 
 /// Run the full analysis pipeline selecting builtins based on `target`.
 ///
-/// Requires either the `js` or `interpreter` feature (or both) to be enabled.
-/// When the requested feature is not compiled in, falls back to plain
-/// [`analyze`] with no extra builtins.
+/// When the requested backend feature is not compiled in, analysis runs
+/// without any extra builtins and a warning is emitted to stderr.
 pub fn analyze_for_target(source: &str, target: CompilationTarget) -> AnalysisResult {
     match target {
         #[cfg(feature = "js")]
         CompilationTarget::Js => analyze_with_js_symbols(source),
+        #[cfg(not(feature = "js"))]
+        CompilationTarget::Js => {
+            eprintln!(
+                "warning: analyze_for_target requested JavaScript analysis, \
+                 but the `js` feature is not enabled; \
+                 falling back to analysis without JavaScript builtins"
+            );
+            analyze(source, |_| {})
+        }
         #[cfg(feature = "interpreter")]
         CompilationTarget::Interpreter => analyze_with_interpreter_symbols(source),
-        // Fallback when the matching feature is not enabled.
-        #[allow(unreachable_patterns)]
-        _ => analyze(source, |_| {}),
+        #[cfg(not(feature = "interpreter"))]
+        CompilationTarget::Interpreter => {
+            eprintln!(
+                "warning: analyze_for_target requested interpreter analysis, \
+                 but the `interpreter` feature is not enabled; \
+                 falling back to analysis without interpreter builtins"
+            );
+            analyze(source, |_| {})
+        }
     }
 }
 
@@ -149,6 +163,14 @@ pub fn configure_js_analyzer(analyzer: &mut SemanticAnalyzer) {
     );
 }
 
+/// Cached interpreter builtin symbols, computed once and reused across all
+/// diagnostic runs.  `VM::builtin_symbols()` allocates and sorts on every
+/// call, so caching here avoids a per-keystroke allocation in the LSP.
+#[cfg(feature = "interpreter")]
+static INTERPRETER_BUILTINS: std::sync::LazyLock<
+    Vec<(String, tlang_defs::DefKind, Option<usize>)>,
+> = std::sync::LazyLock::new(tlang_core::vm::VM::builtin_symbols);
+
 /// Configure a [`SemanticAnalyzer`] with the interpreter (VM) builtin
 /// symbols (with slot indices).
 ///
@@ -156,7 +178,7 @@ pub fn configure_js_analyzer(analyzer: &mut SemanticAnalyzer) {
 /// the interpreter runner in the WASM bindings.
 #[cfg(feature = "interpreter")]
 pub fn configure_interpreter_analyzer(analyzer: &mut SemanticAnalyzer) {
-    analyzer.add_builtin_symbols_with_slots(&tlang_core::vm::VM::builtin_symbols());
+    analyzer.add_builtin_symbols_with_slots(&*INTERPRETER_BUILTINS);
 }
 
 /// Run analysis with the JavaScript code-generation standard-library symbols

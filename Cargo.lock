@@ -2100,6 +2100,7 @@ dependencies = [
  "tlang_ast",
  "tlang_codegen_js",
  "tlang_core",
+ "tlang_defs",
  "tlang_diagnostics",
  "tlang_parser",
  "tlang_semantics",

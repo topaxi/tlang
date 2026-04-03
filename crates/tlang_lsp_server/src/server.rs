@@ -35,24 +35,24 @@ fn empty_module() -> tlang_ast::node::Module {
 /// }
 /// ```
 ///
-/// Example VS Code `settings.json`:
-/// ```json
-/// { "tlang.initializationOptions": { "target": "interpreter" } }
-/// ```
+/// For VS Code, a client/extension must explicitly forward these values as
+/// LSP `initializationOptions` when starting the language server. VS Code
+/// does not automatically send arbitrary `settings.json` entries as
+/// `initializationOptions`.
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ServerSettings {
+pub(crate) struct ServerSettings {
     /// The compilation target to use for semantic analysis.
     ///
     /// Accepted values: `"js"` (default) or `"interpreter"`.
     #[serde(default)]
-    pub target: TargetSetting,
+    pub(crate) target: TargetSetting,
 }
 
 /// The `target` field within [`ServerSettings`].
 #[derive(Debug, Default, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub enum TargetSetting {
+pub(crate) enum TargetSetting {
     /// JavaScript code-generation backend (default).
     #[default]
     #[serde(rename = "js")]
