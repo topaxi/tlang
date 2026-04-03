@@ -22,6 +22,7 @@ wasm-bindgen = "=0.2.114"
 js-sys = "=0.3.91"
 console_log = { version = "1", features = ["color"] }
 tlang_ast = { path = "../tlang_ast", features = ["serde"] }
+tlang_analysis = { path = "../tlang_analysis", features = ["js", "interpreter"] }
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }
 tlang_hir = { path = "../tlang_hir", features = ["serde"] }
 tlang_hir_opt = { path = "../tlang_hir_opt" }

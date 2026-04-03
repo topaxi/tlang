@@ -9,7 +9,9 @@ use lsp_types::{
     InitializeParams, InitializeResult, PublishDiagnosticsParams, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, Url,
 };
-use tracing::error;
+use serde::Deserialize;
+use tlang_analysis::CompilationTarget;
+use tracing::{error, warn};
 
 use crate::diagnostics;
 use crate::document_store::{DocumentStore, ParseCache};
@@ -23,10 +25,57 @@ fn empty_module() -> tlang_ast::node::Module {
     )
 }
 
+/// Settings passed by the editor via `initializationOptions` in the LSP
+/// `initialize` request.
+///
+/// Example Neovim (`lspconfig`) config:
+/// ```lua
+/// require('lspconfig').tlang_lsp_server.setup {
+///   init_options = { target = "interpreter" }
+/// }
+/// ```
+///
+/// For VS Code, a client/extension must explicitly forward these values as
+/// LSP `initializationOptions` when starting the language server. VS Code
+/// does not automatically send arbitrary `settings.json` entries as
+/// `initializationOptions`.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ServerSettings {
+    /// The compilation target to use for semantic analysis.
+    ///
+    /// Accepted values: `"js"` (default) or `"interpreter"`.
+    #[serde(default)]
+    pub(crate) target: TargetSetting,
+}
+
+/// The `target` field within [`ServerSettings`].
+#[derive(Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum TargetSetting {
+    /// JavaScript code-generation backend (default).
+    #[default]
+    #[serde(rename = "js")]
+    Js,
+    /// tlang interpreter / VM backend.
+    #[serde(rename = "interpreter")]
+    Interpreter,
+}
+
+impl From<TargetSetting> for CompilationTarget {
+    fn from(s: TargetSetting) -> Self {
+        match s {
+            TargetSetting::Js => CompilationTarget::Js,
+            TargetSetting::Interpreter => CompilationTarget::Interpreter,
+        }
+    }
+}
+
 /// The main state of the tlang language server.
 pub struct ServerState {
     client: ClientSocket,
     store: DocumentStore,
+    target: CompilationTarget,
 }
 
 impl ServerState {
@@ -35,6 +84,7 @@ impl ServerState {
         let mut router = Router::new(Self {
             client,
             store: DocumentStore::new(),
+            target: CompilationTarget::default(),
         });
 
         router
@@ -50,10 +100,24 @@ impl ServerState {
     }
 
     fn on_initialize(
-        _state: &mut Self,
-        _params: InitializeParams,
+        state: &mut Self,
+        params: InitializeParams,
     ) -> futures::future::BoxFuture<'static, Result<InitializeResult, async_lsp::ResponseError>>
     {
+        // Parse initializationOptions if provided.
+        let settings: ServerSettings = params
+            .initialization_options
+            .and_then(|v| match serde_json::from_value(v) {
+                Ok(s) => Some(s),
+                Err(e) => {
+                    warn!("failed to parse initializationOptions: {e}");
+                    None
+                }
+            })
+            .unwrap_or_default();
+
+        state.target = settings.target.into();
+
         Box::pin(async move {
             Ok(InitializeResult {
                 capabilities: ServerCapabilities {
@@ -139,56 +203,64 @@ impl ServerState {
         all
     }
 
-    /// Run the full diagnostic pipeline: parse → semantic analysis → publish.
+    /// Run the full diagnostic pipeline using `tlang_analysis`, then publish.
+    ///
+    /// The analysis uses the [`CompilationTarget`] that was set during
+    /// `initialize` (from `initializationOptions`).  This selects the correct
+    /// set of builtin symbols — JS stdlib for [`CompilationTarget::Js`] or VM
+    /// builtins for [`CompilationTarget::Interpreter`].
     fn run_diagnostics(&mut self, uri: &Url, source: &str) {
-        let mut all_diagnostics = Vec::new();
+        let target = self.target;
 
-        // Phase 1: Parse (with panic catch for parser robustness).
-        let parse_result = std::panic::catch_unwind(AssertUnwindSafe(|| {
-            let mut parser = tlang_parser::Parser::from_source(source);
-            parser.parse()
+        // Run the full analysis pipeline (parse + semantic) with panic protection.
+        let analysis = std::panic::catch_unwind(AssertUnwindSafe(|| {
+            tlang_analysis::analyze_for_target(source, target)
         }));
 
-        let parsed_module = match parse_result {
-            Ok(Ok((module, _parse_meta))) => {
-                // Cache successful parse with empty diagnostics.
-                if let Some(doc) = self.store.documents_mut().get_mut(uri) {
-                    doc.parse_cache = Some(ParseCache {
-                        source_hash: doc.source_hash,
-                        module: module.clone(),
-                        diagnostics: vec![],
-                    });
-                }
-                Some(module)
-            }
-            Ok(Err(parse_error)) => {
-                let parse_diags: Vec<lsp_types::Diagnostic> = parse_error
-                    .issues()
+        let all_diagnostics = match analysis {
+            Ok(result) => {
+                // Convert parse issues → LSP diagnostics.
+                let parse_diags: Vec<lsp_types::Diagnostic> = result
+                    .parse_issues
                     .iter()
                     .map(diagnostics::from_parse_issue)
                     .collect();
-                all_diagnostics.extend(parse_diags.clone());
 
-                // Cache the parse diagnostics even though parsing failed.
+                // Convert semantic diagnostics → LSP diagnostics.
+                let semantic_diags: Vec<lsp_types::Diagnostic> = result
+                    .analyzer
+                    .get_diagnostics()
+                    .iter()
+                    .map(|d| diagnostics::from_tlang_diagnostic(d, uri))
+                    .collect();
+
+                // Update caches so unchanged-source republishing works.
+                // `result.module` is `Some` on a successful parse (even when
+                // semantic analysis emits errors) and `None` only when parsing
+                // fails outright; `empty_module()` is only a fallback for the
+                // parse-failure case.
                 if let Some(doc) = self.store.documents_mut().get_mut(uri) {
                     doc.parse_cache = Some(ParseCache {
                         source_hash: doc.source_hash,
-                        module: empty_module(),
-                        diagnostics: parse_diags,
+                        module: result.module.unwrap_or_else(empty_module),
+                        diagnostics: parse_diags.clone(),
                     });
+                    doc.semantic_cache = Some(semantic_diags.clone());
                 }
-                None
+
+                let mut all = parse_diags;
+                all.extend(semantic_diags);
+                all
             }
             Err(_panic) => {
-                error!("parser panicked for {uri}");
+                error!("analysis panicked for {uri}");
                 let diag = lsp_types::Diagnostic {
                     range: lsp_types::Range::default(),
                     severity: Some(lsp_types::DiagnosticSeverity::ERROR),
                     source: Some("tlang".into()),
-                    message: "Internal error: parser panicked".into(),
+                    message: "Internal error: analysis panicked".into(),
                     ..Default::default()
                 };
-                all_diagnostics.push(diag.clone());
 
                 // Cache the panic diagnostic so it is republished on unchanged
                 // `didChange` requests rather than silently clearing.
@@ -196,51 +268,18 @@ impl ServerState {
                     doc.parse_cache = Some(ParseCache {
                         source_hash: doc.source_hash,
                         module: empty_module(),
-                        diagnostics: vec![diag],
+                        diagnostics: vec![diag.clone()],
                     });
+                    doc.semantic_cache = Some(vec![]);
                 }
-                None
+
+                vec![diag]
             }
         };
 
-        // Phase 2: Semantic analysis (only if parsing succeeded).
-        if let Some(mut module) = parsed_module {
-            let semantic_diags = Self::run_semantic_analysis(&mut module, uri);
-            all_diagnostics.extend(semantic_diags.clone());
-
-            // Cache semantic diagnostics.
-            if let Some(doc) = self.store.documents_mut().get_mut(uri) {
-                doc.semantic_cache = Some(semantic_diags);
-                // Update the cached module with the analyzed version.
-                if let Some(ref mut cache) = doc.parse_cache {
-                    cache.module = module;
-                }
-            }
-        }
-
-        // Phase 3: Publish all collected diagnostics.
+        // Publish all collected diagnostics.
         let version = self.store.get(uri).map(|d| d.version);
         self.publish_diagnostics(uri.clone(), all_diagnostics, version);
-    }
-
-    /// Run semantic analysis on a parsed module, returning LSP diagnostics.
-    fn run_semantic_analysis(
-        module: &mut tlang_ast::node::Module,
-        uri: &Url,
-    ) -> Vec<lsp_types::Diagnostic> {
-        let mut analyzer = tlang_semantics::SemanticAnalyzer::default();
-        analyzer.add_builtin_symbols(
-            tlang_codegen_js::generator::CodegenJS::get_standard_library_symbols(),
-        );
-
-        let _ = analyzer.analyze(module);
-
-        // Collect all diagnostics (errors + warnings).
-        analyzer
-            .get_diagnostics()
-            .iter()
-            .map(|d| diagnostics::from_tlang_diagnostic(d, uri))
-            .collect()
     }
 
     /// Send diagnostics to the client.
@@ -267,31 +306,85 @@ mod tests {
     }
 
     #[test]
-    fn run_semantic_analysis_on_valid_source() {
-        let source = "fn add(a, b) { a + b }";
-        let mut parser = tlang_parser::Parser::from_source(source);
-        let (mut module, _) = parser.parse().unwrap();
-
-        let diags = ServerState::run_semantic_analysis(&mut module, &test_uri());
+    fn run_diagnostics_on_valid_source() {
+        let result =
+            tlang_analysis::analyze_for_target("fn add(a, b) { a + b }", CompilationTarget::Js);
         // Valid code should produce no error diagnostics (may have warnings).
-        let errors: Vec<_> = diags
-            .iter()
-            .filter(|d| d.severity == Some(lsp_types::DiagnosticSeverity::ERROR))
-            .collect();
-        assert!(errors.is_empty(), "unexpected errors: {errors:?}");
+        assert!(!result.has_errors(), "unexpected errors");
     }
 
     #[test]
-    fn run_semantic_analysis_on_source_with_errors() {
+    fn run_diagnostics_on_source_with_errors() {
         // Using an undeclared variable should produce a diagnostic.
-        let source = "fn f() { x }";
-        let mut parser = tlang_parser::Parser::from_source(source);
-        let (mut module, _) = parser.parse().unwrap();
-
-        let diags = ServerState::run_semantic_analysis(&mut module, &test_uri());
+        let result = tlang_analysis::analyze_for_target("fn f() { x }", CompilationTarget::Js);
         assert!(
-            !diags.is_empty(),
+            !result.analyzer.get_diagnostics().is_empty(),
             "expected diagnostics for undeclared variable"
+        );
+    }
+
+    #[test]
+    fn lsp_diagnostic_conversion_from_analysis_result() {
+        let uri = test_uri();
+        let result = tlang_analysis::analyze_for_target("fn f() { x }", CompilationTarget::Js);
+        let lsp_diags: Vec<_> = result
+            .analyzer
+            .get_diagnostics()
+            .iter()
+            .map(|d| diagnostics::from_tlang_diagnostic(d, &uri))
+            .collect();
+        assert!(!lsp_diags.is_empty());
+        assert_eq!(lsp_diags[0].source.as_deref(), Some("tlang"));
+    }
+
+    #[test]
+    fn server_settings_default_is_js() {
+        let settings = ServerSettings::default();
+        assert_eq!(settings.target, TargetSetting::Js);
+    }
+
+    #[test]
+    fn server_settings_parse_js() {
+        let v = serde_json::json!({ "target": "js" });
+        let s: ServerSettings = serde_json::from_value(v).unwrap();
+        assert_eq!(s.target, TargetSetting::Js);
+    }
+
+    #[test]
+    fn server_settings_parse_interpreter() {
+        let v = serde_json::json!({ "target": "interpreter" });
+        let s: ServerSettings = serde_json::from_value(v).unwrap();
+        assert_eq!(s.target, TargetSetting::Interpreter);
+    }
+
+    #[test]
+    fn server_settings_parse_empty_object_defaults_to_js() {
+        let v = serde_json::json!({});
+        let s: ServerSettings = serde_json::from_value(v).unwrap();
+        assert_eq!(s.target, TargetSetting::Js);
+    }
+
+    #[test]
+    fn compilation_target_from_target_setting() {
+        assert_eq!(
+            CompilationTarget::from(TargetSetting::Js),
+            CompilationTarget::Js
+        );
+        assert_eq!(
+            CompilationTarget::from(TargetSetting::Interpreter),
+            CompilationTarget::Interpreter
+        );
+    }
+
+    #[test]
+    fn run_diagnostics_interpreter_target_valid_source() {
+        let result = tlang_analysis::analyze_for_target(
+            "fn add(a, b) { a + b }",
+            CompilationTarget::Interpreter,
+        );
+        assert!(
+            !result.has_errors(),
+            "unexpected errors for interpreter target"
         );
     }
 }
