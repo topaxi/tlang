@@ -61,7 +61,7 @@ export class $TlangRegex {
 }
 
 $impl($Match, $TlangRegex, {
-  matches(self, value) {
+  test(self, value) {
     return self.test(value);
   },
 });

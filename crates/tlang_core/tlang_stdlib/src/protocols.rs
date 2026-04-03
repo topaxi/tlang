@@ -9,7 +9,7 @@ tlang_macros::define_protocol! {
         fn map(this, f);
     }
     Match {
-        fn matches(this, value);
+        fn test(this, value);
     }
     Iterable {
         fn iter(this);

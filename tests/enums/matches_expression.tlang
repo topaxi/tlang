@@ -1,0 +1,37 @@
+enum Shape {
+    Circle(radius),
+    Rectangle(width, height),
+    Triangle(base, height),
+}
+
+let circle = Shape::Circle(5.0);
+let rect = Shape::Rectangle(3.0, 4.0);
+
+// Basic enum variant check
+let is_circle = circle matches Shape::Circle(_);
+let is_rect = rect matches Shape::Circle(_);
+is_circle |> log();
+is_rect |> log();
+
+// In conditionals
+if circle matches Shape::Circle(_) {
+    log("it is a circle");
+}
+
+// Option enum
+let some_val = Option::Some(42);
+let none_val = Option::None;
+
+(some_val matches Option::Some(_)) |> log();
+(none_val matches Option::Some(_)) |> log();
+(none_val matches Option::None) |> log();
+
+// Literal pattern
+let x = 5;
+(x matches 5) |> log();
+(x matches 0) |> log();
+
+// Negation with not
+if not (rect matches Shape::Circle(_)) {
+    log("not a circle");
+}

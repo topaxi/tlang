@@ -2236,6 +2236,25 @@ impl<'src> Parser<'src> {
                     let path = self.parse_path();
                     lhs = node::expr!(self.unique_id(), Implements(Box::new(lhs), Box::new(path)));
                 }
+                TokenKind::Keyword(Keyword::Matches) => {
+                    // `matches` has comparison precedence (6), left-associative
+                    let matches_info = OperatorInfo {
+                        precedence: 6,
+                        associativity: Associativity::Left,
+                    };
+                    if Self::compare_precedence(
+                        &OperatorInfo {
+                            precedence,
+                            associativity,
+                        },
+                        &matches_info,
+                    ) {
+                        break;
+                    }
+                    self.advance();
+                    let pat = self.parse_pattern();
+                    lhs = node::expr!(self.unique_id(), Matches(Box::new(lhs), pat));
+                }
                 token if Self::is_binary_op(token) => {
                     let operator = Self::map_binary_op(token);
                     let operator_info = Self::map_operator_info(&operator);

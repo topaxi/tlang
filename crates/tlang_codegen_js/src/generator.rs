@@ -242,7 +242,7 @@ impl CodegenJS {
             ("Functor", DefKind::Protocol),
             ("Functor::map", DefKind::ProtocolMethod(2)),
             ("Match", DefKind::Protocol),
-            ("Match::matches", DefKind::ProtocolMethod(2)),
+            ("Match::test", DefKind::ProtocolMethod(2)),
             ("Regex", DefKind::Struct),
             ("Iterable", DefKind::Protocol),
             ("Iterable::iter", DefKind::ProtocolMethod(1)),

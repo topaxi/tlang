@@ -15,7 +15,7 @@ impl Functor for Result {
 }
 
 pub protocol Match {
-  fn matches(self, value)
+  fn test(self, value)
 }
 
 pub protocol Iterable {
