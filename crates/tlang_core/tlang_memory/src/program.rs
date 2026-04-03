@@ -31,6 +31,10 @@ pub struct Program {
     /// `ShapeKey::Wildcard` represents a default implementation that applies to all types
     /// without a more specific implementation registered.
     pub(crate) protocol_impls: HashMap<(ProtocolId, ShapeKey, String), TlangValue>,
+    /// Registry of (protocol_id, shape_key) pairs that have been explicitly registered
+    /// via `impl Protocol for Type`. Used for O(1) `implements` checks without
+    /// iterating over method-level entries.
+    pub(crate) protocol_type_impls: HashSet<(ProtocolId, ShapeKey)>,
     /// Name-based index for looking up protocol IDs by name at call sites
     pub(crate) protocol_name_to_id: HashMap<String, ProtocolId>,
     /// HirIds of expressions whose values are compile-time constants (e.g. tagged
@@ -55,6 +59,7 @@ impl Program {
             protocol_constraints: HashMap::new(),
             protocol_method_to_protocol: HashMap::new(),
             protocol_impls: HashMap::new(),
+            protocol_type_impls: HashSet::new(),
             protocol_name_to_id: HashMap::new(),
             constant_pool_ids: HashSet::new(),
             constant_pool: HashMap::new(),
@@ -157,6 +162,9 @@ impl Program {
         method: &str,
         fn_value: TlangValue,
     ) {
+        if !matches!(target_type, ShapeKey::Wildcard) {
+            self.protocol_type_impls.insert((protocol, target_type));
+        }
         self.protocol_impls
             .insert((protocol, target_type, method.to_string()), fn_value);
     }
@@ -201,6 +209,10 @@ impl Program {
 
     pub fn protocol_id_by_name(&self, name: &str) -> Option<ProtocolId> {
         self.protocol_name_to_id.get(name).copied()
+    }
+
+    pub fn has_protocol_impl_for_type(&self, protocol: ProtocolId, target_type: ShapeKey) -> bool {
+        self.protocol_type_impls.contains(&(protocol, target_type))
     }
 
     pub fn get_protocol_for_method(&self, method_name: &str) -> Option<ProtocolId> {

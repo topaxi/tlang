@@ -26,6 +26,11 @@ export class $Protocol {
     this.#impls.set(Type, methods);
   }
 
+  $implements(value) {
+    const Type = value?.constructor;
+    return this.#impls.has(Type);
+  }
+
   $getConstraints() {
     return this.#constraints;
   }

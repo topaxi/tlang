@@ -354,6 +354,21 @@ impl Interpreter {
                 EvalResult::Value(state.new_closure(fn_decl))
             }
             hir::ExprKind::Match(expr, arms) => self.eval_match(state, expr, arms),
+            hir::ExprKind::Implements(expr, path) => {
+                let value = eval_value!(state, self.eval_expr(state, expr));
+                let protocol_id = path
+                    .res
+                    .hir_id()
+                    .map(ProtocolId::Hir)
+                    .or_else(|| state.protocol_id_by_name(&path.to_string()));
+                let result = match protocol_id {
+                    Some(protocol_id) => state
+                        .type_shape_key_of(value)
+                        .is_some_and(|shape| state.has_protocol_impl_for_type(protocol_id, shape)),
+                    None => false,
+                };
+                EvalResult::Value(TlangValue::Bool(result))
+            }
             hir::ExprKind::Range(..) => todo!("eval_expr: Range"),
             hir::ExprKind::TaggedString { tag, parts, exprs } => {
                 let tag_fn = eval_value!(state, self.eval_expr(state, tag));

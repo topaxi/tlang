@@ -36,6 +36,8 @@ define_keywords! {
 
     Const => "const",
 
+    Implements => "implements",
+
     // Reserved keywords, unused at the moment
     SelfUpper => "Self",
     While => "while"

@@ -231,6 +231,9 @@ pub fn fold_expr<F: Folder>(folder: &mut F, expr: hir::Expr) -> hir::Expr {
                 })
                 .collect(),
         ),
+        hir::ExprKind::Implements(expr, path) => {
+            hir::ExprKind::Implements(Box::new(folder.fold_expr(*expr)), path)
+        }
         hir::ExprKind::Range(range) => hir::ExprKind::Range(Box::new(hir::RangeExpression {
             start: folder.fold_expr(range.start),
             end: folder.fold_expr(range.end),

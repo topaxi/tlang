@@ -201,6 +201,18 @@ fn test_protocol_used_as_value() {
     assert!(output.contains("let p = $Printable.print;"));
 }
 
+#[test]
+fn test_implements_operator() {
+    let output = compile!(indoc! {"
+        protocol Drawable {
+            fn draw(self)
+        }
+
+        fn check(w) { w implements Drawable }
+    "});
+    assert!(output.contains("$Drawable.$implements(w)"));
+}
+
 // ── Variable declaration with list destructuring (rest pattern) ────────────────
 
 #[test]

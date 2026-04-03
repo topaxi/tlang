@@ -2217,6 +2217,25 @@ impl<'src> Parser<'src> {
                     }
                     lhs = self.parse_call_expression(lhs);
                 }
+                TokenKind::Keyword(Keyword::Implements) => {
+                    // `implements` has comparison precedence (6), left-associative
+                    let implements_info = OperatorInfo {
+                        precedence: 6,
+                        associativity: Associativity::Left,
+                    };
+                    if Self::compare_precedence(
+                        &OperatorInfo {
+                            precedence,
+                            associativity,
+                        },
+                        &implements_info,
+                    ) {
+                        break;
+                    }
+                    self.advance();
+                    let path = self.parse_path();
+                    lhs = node::expr!(self.unique_id(), Implements(Box::new(lhs), Box::new(path)));
+                }
                 token if Self::is_binary_op(token) => {
                     let operator = Self::map_binary_op(token);
                     let operator_info = Self::map_operator_info(&operator);

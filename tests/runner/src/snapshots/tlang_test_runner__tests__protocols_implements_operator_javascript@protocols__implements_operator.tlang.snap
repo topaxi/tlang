@@ -1,0 +1,29 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: javascript"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/protocols/implements_operator.tlang
+---
+true
+true
+false
+
+warning: Unused protocol `Farewell`, if this is intentional, prefix the name with an underscore: `_Farewell`
+  ┌─ [WORKSPACE_ROOT]/tests/protocols/implements_operator.tlang:5:1
+  │  
+5 │ ╭ protocol Farewell {
+6 │ │   fn farewell(self)
+7 │ │ }
+  │ ╰─^
+
+warning: Unused function `Greet::greet/1`
+   ┌─ [WORKSPACE_ROOT]/tests/protocols/implements_operator.tlang:15:3
+   │
+15 │   fn greet(Animal::Dog(name)) { "Woof! I'm " + name }
+   │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: Unused function `Greet::greet/1`
+   ┌─ [WORKSPACE_ROOT]/tests/protocols/implements_operator.tlang:16:3
+   │
+16 │   fn greet(Animal::Cat(name)) { "Meow! I'm " + name }
+   │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

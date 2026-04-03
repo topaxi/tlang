@@ -602,6 +602,11 @@ impl VMState {
         self.program.protocol_id_by_name(name)
     }
 
+    pub fn has_protocol_impl_for_type(&self, protocol: ProtocolId, target_type: ShapeKey) -> bool {
+        self.program
+            .has_protocol_impl_for_type(protocol, target_type)
+    }
+
     pub fn lookup_builtin_shape(&self, name: &str) -> Option<ShapeKey> {
         self.heap.builtin_shapes.lookup(name)
     }

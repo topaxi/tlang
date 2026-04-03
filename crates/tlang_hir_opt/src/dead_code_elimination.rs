@@ -144,6 +144,7 @@ fn expr_has_side_effects(expr: &hir::Expr) -> bool {
         ExprKind::Range(range) => {
             expr_has_side_effects(&range.start) || expr_has_side_effects(&range.end)
         }
+        ExprKind::Implements(expr, _) => expr_has_side_effects(expr),
     }
 }
 

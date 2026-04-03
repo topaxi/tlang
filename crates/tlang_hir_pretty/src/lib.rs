@@ -418,28 +418,38 @@ impl HirPretty {
                 self.push_char(']');
             }
             hir::ExprKind::Literal(literal) => self.print_literal(literal),
+            hir::ExprKind::Implements(expr, path) => self.print_implements_expr(expr, path),
             hir::ExprKind::Match(expr, arms) => self.print_match_expr(expr, arms),
             hir::ExprKind::Path(path) => self.print_path(path),
             hir::ExprKind::Range(range_expr) => self.print_range_expr(range_expr),
             hir::ExprKind::Wildcard => self.push_char('_'),
             hir::ExprKind::TaggedString { tag, parts, exprs } => {
-                self.print_expr(tag);
-                self.push_char('`');
-                for (i, part) in parts.iter().enumerate() {
-                    self.push_str(part);
-                    if i < exprs.len() {
-                        self.push_str("${");
-                        self.print_expr(&exprs[i]);
-                        self.push_char('}');
-                    }
-                }
-                self.push_char('`');
+                self.print_tagged_string_expr(tag, parts, exprs);
             }
         }
     }
 
     fn print_range_expr(&mut self, _range_expr: &hir::RangeExpression) {
         todo!("print_range_expr")
+    }
+
+    fn print_tagged_string_expr(
+        &mut self,
+        tag: &hir::Expr,
+        parts: &[Box<str>],
+        exprs: &[hir::Expr],
+    ) {
+        self.print_expr(tag);
+        self.push_char('`');
+        for (i, part) in parts.iter().enumerate() {
+            self.push_str(part);
+            if i < exprs.len() {
+                self.push_str("${");
+                self.print_expr(&exprs[i]);
+                self.push_char('}');
+            }
+        }
+        self.push_char('`');
     }
 
     fn print_dict(&mut self, kvs: &[(hir::Expr, hir::Expr)]) {
@@ -453,6 +463,12 @@ impl HirPretty {
             self.print_expr(value);
         }
         self.push_str("}");
+    }
+
+    fn print_implements_expr(&mut self, expr: &hir::Expr, path: &hir::Path) {
+        self.print_expr(expr);
+        self.push_str(" implements ");
+        self.print_path(path);
     }
 
     fn print_match_expr(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) {
