@@ -3,6 +3,20 @@ use tlang_parser::error::ParseIssue;
 use tlang_semantics::diagnostic::{Diagnostic, Severity};
 use tsify::Tsify;
 
+/// Convert a byte offset in `source` to a UTF-16 code unit count from the
+/// start of `source`. CodeMirror 6 positions are UTF-16 code unit indices
+/// (JavaScript string positions), while tlang's `Span::start`/`end` are byte
+/// offsets. For ASCII-only sources these are identical, but multi-byte UTF-8
+/// characters (e.g. `•`, `—`, `─`) in comments would otherwise shift the
+/// highlighted range by the difference in byte length vs UTF-16 length.
+fn byte_offset_to_utf16(source: &str, byte_offset: u32) -> u32 {
+    let byte_offset = (byte_offset as usize).min(source.len());
+    source[..byte_offset]
+        .chars()
+        .map(|c| c.len_utf16() as u32)
+        .sum()
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, Tsify)]
 #[serde(rename_all = "lowercase")]
 pub enum CodemirrorSeverity {
@@ -26,9 +40,9 @@ impl From<Severity> for CodemirrorSeverity {
 pub struct CodemirrorDiagnostic {
     pub message: String,
     pub severity: CodemirrorSeverity,
-    /// Relative position in the document, our diagnostics are line/column based
+    /// UTF-16 code unit offset (JavaScript string position) of the start of this diagnostic.
     pub from: u32,
-    /// Relative position in the document, our diagnostics are line/column based
+    /// UTF-16 code unit offset (JavaScript string position) of the end of this diagnostic.
     pub to: u32,
 }
 
@@ -43,20 +57,20 @@ impl CodemirrorDiagnostic {
     }
 }
 
-pub fn from_parse_issue(error: &ParseIssue) -> CodemirrorDiagnostic {
+pub fn from_parse_issue(error: &ParseIssue, source: &str) -> CodemirrorDiagnostic {
     CodemirrorDiagnostic::new(
         &error.msg,
         CodemirrorSeverity::Error,
-        error.span.start,
-        error.span.end,
+        byte_offset_to_utf16(source, error.span.start),
+        byte_offset_to_utf16(source, error.span.end),
     )
 }
 
-pub fn from_tlang_diagnostic(diagnostic: &Diagnostic) -> CodemirrorDiagnostic {
+pub fn from_tlang_diagnostic(diagnostic: &Diagnostic, source: &str) -> CodemirrorDiagnostic {
     CodemirrorDiagnostic::new(
         diagnostic.message(),
         diagnostic.severity().into(),
-        diagnostic.span().start,
-        diagnostic.span().end,
+        byte_offset_to_utf16(source, diagnostic.span().start),
+        byte_offset_to_utf16(source, diagnostic.span().end),
     )
 }

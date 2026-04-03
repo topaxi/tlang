@@ -593,14 +593,20 @@ impl Tlang {
     pub fn codemirror_diagnostics(
         &mut self,
     ) -> Result<JsCodemirrorDiagnosticArray, serde_wasm_bindgen::Error> {
+        // Collect parse issues first so we can borrow `self.source` afterwards.
+        let parse_issues = self.parse_issues().to_vec();
+
+        let source = &self.source;
         let diagnostics = self
             .analyzer
             .get_diagnostics()
             .iter()
             .chain(self.build.hir_opt_diagnostics.iter())
-            .map(codemirror::from_tlang_diagnostic)
+            .map(|d| codemirror::from_tlang_diagnostic(d, source))
             .collect::<Vec<_>>();
-        let parse_errors = self.parse_issues().iter().map(codemirror::from_parse_issue);
+        let parse_errors = parse_issues
+            .iter()
+            .map(|issue| codemirror::from_parse_issue(issue, source));
 
         let all: Vec<_> = parse_errors.chain(diagnostics).collect();
         Ok(serde_wasm_bindgen::to_value(&all)?.unchecked_into())
