@@ -47,7 +47,8 @@ impl IdentifierResolver {
         });
 
         let symbol_info = symbol_table
-            .borrow()
+            .read()
+            .unwrap()
             .get_by_name(&name)
             .into_iter()
             .filter(|s| s.declared)
@@ -103,7 +104,8 @@ impl IdentifierResolver {
 
         let path_string = path.to_string();
         let symbol_info = symbol_table
-            .borrow()
+            .read()
+            .unwrap()
             // TODO: Also match function names with explicit arity in their name
             .get_closest_by_name(&path_string, path.span)
             .or_else(|| {
@@ -116,7 +118,8 @@ impl IdentifierResolver {
                         .expect("Arity should be a valid usize");
 
                     symbol_table
-                        .borrow()
+                        .read()
+                        .unwrap()
                         .get_by_name_and_arity(name, arity)
                         .first()
                         .cloned()
@@ -159,7 +162,7 @@ impl IdentifierResolver {
                 "No symbols found for path '{}' on line {}. Available symbols: {:#?}",
                 path,
                 path.span.start,
-                symbol_table.borrow().get_all_declared_symbols()
+                symbol_table.read().unwrap().get_all_declared_symbols()
             );
         }
     }

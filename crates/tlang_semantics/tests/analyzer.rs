@@ -110,7 +110,7 @@ fn test_should_allow_shadowing_of_single_variable() {
         .clone();
 
     assert_eq!(
-        program_symbols.borrow().get_by_name("a"),
+        program_symbols.read().unwrap().get_by_name("a"),
         vec![
             Def {
                 node_id: Some(NodeId::new(3)),
@@ -158,7 +158,8 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
 
     assert_eq!(
         program_symbols
-            .borrow()
+            .read()
+            .unwrap()
             .get_by_name("a")
             .iter()
             .find(|s| s.id == DefId::new(1))
@@ -180,7 +181,8 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
     );
     assert_eq!(
         program_symbols
-            .borrow()
+            .read()
+            .unwrap()
             .get_by_name("a")
             .iter()
             .find(|s| s.id == DefId::new(2))

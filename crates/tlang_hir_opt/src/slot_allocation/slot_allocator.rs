@@ -61,7 +61,8 @@ impl SlotAllocator {
         }
 
         let slot = symbol_table
-            .borrow()
+            .read()
+            .unwrap()
             .get_slot(|s| s.hir_id == path.res.hir_id());
 
         if let Some(slot) = slot {
@@ -76,7 +77,8 @@ impl SlotAllocator {
                 path.span.start,
                 ctx.current_scope,
                 symbol_table
-                    .borrow()
+                    .read()
+                    .unwrap()
                     .get_all_declared_symbols()
                     .iter()
                     // built-in symbols use global slots assigned at compile time

@@ -1,6 +1,5 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use serde::{Deserialize, Serialize};
 use tlang_ast::node::{self as ast};
@@ -278,11 +277,11 @@ impl Tlang {
             // (e.g. via `DefScope::shift()`) without corrupting the analyzer's
             // state across multiple lowering invocations (e.g. when toggling
             // optimisation options).
-            let symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>> = self
+            let symbol_tables: HashMap<NodeId, Arc<RwLock<DefScope>>> = self
                 .analyzer
                 .symbol_tables()
                 .iter()
-                .map(|(&k, v)| (k, Rc::new(RefCell::new(v.borrow().clone()))))
+                .map(|(&k, v)| (k, Arc::new(RwLock::new(v.read().unwrap().clone()))))
                 .collect();
             let root_symbol_table = symbol_tables
                 .get(&NodeId::new(1))

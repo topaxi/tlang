@@ -1,7 +1,8 @@
 use log::debug;
-use std::cell::RefCell;
+use std::sync::{Arc, RwLock};
+
 use std::collections::HashMap;
-use std::rc::Rc;
+
 use tlang_ast::keyword::kw;
 use tlang_ast::node::{
     ConstDeclaration, EnumDeclaration, Expr, ExprKind, FunctionDeclaration, FunctionParameter,
@@ -18,12 +19,12 @@ use crate::diagnostic;
 /// The declaration analyzer is responsible for collecting all the declarations in a module.
 #[derive(Default)]
 pub struct DeclarationAnalyzer {
-    symbol_table_stack: Vec<Rc<RefCell<DefScope>>>,
+    symbol_table_stack: Vec<Arc<RwLock<DefScope>>>,
     symbol_type_context: Vec<DefKind>,
 }
 
 impl DeclarationAnalyzer {
-    fn current_symbol_table(&self) -> &Rc<RefCell<DefScope>> {
+    fn current_symbol_table(&self) -> &Arc<RwLock<DefScope>> {
         self.symbol_table_stack.last().unwrap()
     }
 
@@ -31,7 +32,7 @@ impl DeclarationAnalyzer {
         &mut self,
         node_id: NodeId,
         ctx: &mut SemanticAnalysisContext,
-    ) -> Rc<RefCell<DefScope>> {
+    ) -> Arc<RwLock<DefScope>> {
         self.push_symbol_table_inner(node_id, ctx, false)
     }
 
@@ -39,7 +40,7 @@ impl DeclarationAnalyzer {
         &mut self,
         node_id: NodeId,
         ctx: &mut SemanticAnalysisContext,
-    ) -> Rc<RefCell<DefScope>> {
+    ) -> Arc<RwLock<DefScope>> {
         self.push_symbol_table_inner(node_id, ctx, true)
     }
 
@@ -48,14 +49,14 @@ impl DeclarationAnalyzer {
         node_id: NodeId,
         ctx: &mut SemanticAnalysisContext,
         is_function_scope: bool,
-    ) -> Rc<RefCell<DefScope>> {
+    ) -> Arc<RwLock<DefScope>> {
         debug!("Entering new scope for node: {node_id} (function_scope={is_function_scope})");
 
         let parent = self.current_symbol_table().clone();
         let new_symbol_table = if is_function_scope {
-            Rc::new(RefCell::new(DefScope::new_function_scope(parent)))
+            Arc::new(RwLock::new(DefScope::new_function_scope(parent)))
         } else {
-            Rc::new(RefCell::new(DefScope::new(parent)))
+            Arc::new(RwLock::new(DefScope::new(parent)))
         };
         ctx.symbol_tables.insert(node_id, new_symbol_table.clone());
         self.symbol_table_stack.push(new_symbol_table.clone());
@@ -70,7 +71,7 @@ impl DeclarationAnalyzer {
     /// `push_symbol_table`).  The distinction between function and
     /// non-function scopes is encoded in the `DefScope::is_function_scope`
     /// flag, not in the push/pop path.
-    fn pop_symbol_table(&mut self) -> Rc<RefCell<DefScope>> {
+    fn pop_symbol_table(&mut self) -> Arc<RwLock<DefScope>> {
         debug!("Leaving scope");
 
         self.symbol_table_stack.pop().unwrap()
@@ -91,7 +92,10 @@ impl DeclarationAnalyzer {
 
         debug!("Declaring symbol: {symbol_info:#?}");
 
-        self.current_symbol_table().borrow_mut().insert(symbol_info);
+        self.current_symbol_table()
+            .write()
+            .unwrap()
+            .insert(symbol_info);
     }
 
     fn register_type_const_items(

@@ -7,10 +7,9 @@
 use log::debug;
 #[cfg(feature = "serde")]
 use serde::Serialize;
-use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt::Display;
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 pub use tlang_span::{HirId, LineColumn, NodeId, Span};
 
@@ -172,11 +171,11 @@ impl Def {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct DefScope {
     #[cfg_attr(feature = "serde", serde(skip_serializing))]
-    parent: Option<Rc<RefCell<DefScope>>>,
+    parent: Option<Arc<RwLock<DefScope>>>,
     symbols: Vec<Def>,
     /// When `true`, this scope represents a function boundary (function
     /// declaration, function expression, or impl-block method).  Walking
@@ -187,9 +186,15 @@ pub struct DefScope {
     is_function_scope: bool,
 }
 
+impl PartialEq for DefScope {
+    fn eq(&self, other: &Self) -> bool {
+        self.symbols == other.symbols && self.is_function_scope == other.is_function_scope
+    }
+}
+
 // TODO: Should we keep track of the symbol id within the symbol table?
 impl DefScope {
-    pub fn new(parent: Rc<RefCell<DefScope>>) -> Self {
+    pub fn new(parent: Arc<RwLock<DefScope>>) -> Self {
         DefScope {
             parent: Some(parent),
             ..Default::default()
@@ -198,7 +203,7 @@ impl DefScope {
 
     /// Create a new scope that represents a function boundary (function
     /// declaration, function expression, or impl-block method).
-    pub fn new_function_scope(parent: Rc<RefCell<DefScope>>) -> Self {
+    pub fn new_function_scope(parent: Arc<RwLock<DefScope>>) -> Self {
         DefScope {
             parent: Some(parent),
             is_function_scope: true,
@@ -215,11 +220,11 @@ impl DefScope {
         self.is_function_scope
     }
 
-    pub fn parent(&self) -> Option<Rc<RefCell<DefScope>>> {
+    pub fn parent(&self) -> Option<Arc<RwLock<DefScope>>> {
         self.parent.clone()
     }
 
-    pub fn set_parent(&mut self, parent: Rc<RefCell<DefScope>>) {
+    pub fn set_parent(&mut self, parent: Arc<RwLock<DefScope>>) {
         self.parent = Some(parent);
     }
 
@@ -261,7 +266,7 @@ impl DefScope {
         let mut crossed_function = self.is_function_scope;
 
         while let Some(t) = table {
-            let t = t.borrow();
+            let t = t.read().unwrap();
 
             if let Some(index) = self.get_slot_index(&t.symbols, &predicate) {
                 return Some((index, scope_index, crossed_function));
@@ -318,7 +323,7 @@ impl DefScope {
         }
 
         if let Some(parent) = &self.parent {
-            parent.borrow().get_by_name(name)
+            parent.read().unwrap().get_by_name(name)
         } else {
             vec![]
         }
@@ -349,7 +354,7 @@ impl DefScope {
         }
 
         if let Some(parent) = &self.parent {
-            parent.borrow().get_by_name_and_arity(name, arity)
+            parent.read().unwrap().get_by_name_and_arity(name, arity)
         } else {
             vec![]
         }
@@ -456,7 +461,7 @@ impl DefScope {
 
             symbol_info.used = true;
         } else if let Some(parent) = &self.parent {
-            parent.borrow_mut().mark_as_used(id);
+            parent.write().unwrap().mark_as_used(id);
         }
     }
 
@@ -475,7 +480,7 @@ impl DefScope {
     pub fn get_all_declared_symbols(&self) -> Vec<Def> {
         let mut names = self.get_all_declared_local_symbols().collect::<Vec<_>>();
         if let Some(parent) = &self.parent {
-            names.extend(parent.borrow().get_all_declared_symbols());
+            names.extend(parent.read().unwrap().get_all_declared_symbols());
         }
         names
     }

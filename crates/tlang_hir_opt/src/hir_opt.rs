@@ -1,6 +1,5 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use log::debug;
 use tlang_defs::DefScope;
@@ -34,14 +33,14 @@ impl std::error::Error for HirOptError {}
 
 #[derive(Debug)]
 pub struct HirOptContext {
-    pub symbols: HashMap<HirId, Rc<RefCell<DefScope>>>,
+    pub symbols: HashMap<HirId, Arc<RwLock<DefScope>>>,
     pub hir_id_allocator: HirIdAllocator,
     pub current_scope: HirId,
     pub diagnostics: Vec<Diagnostic>,
 }
 
 impl HirOptContext {
-    pub fn current_symbol_table(&self) -> Option<Rc<RefCell<DefScope>>> {
+    pub fn current_symbol_table(&self) -> Option<Arc<RwLock<DefScope>>> {
         self.symbols.get(&self.current_scope).cloned()
     }
 }

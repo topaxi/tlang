@@ -1,4 +1,7 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use log::debug;
 use tlang_ast::node::{Module, StructDeclaration};
@@ -16,9 +19,9 @@ use crate::{
 /// Context for semantic analysis, containing shared state needed
 /// across all semantic analysis passes.
 pub struct SemanticAnalysisContext {
-    pub symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>>,
+    pub symbol_tables: HashMap<NodeId, Arc<RwLock<DefScope>>>,
     pub symbol_id_allocator: DefIdAllocator,
-    pub root_symbol_table: Rc<RefCell<DefScope>>,
+    pub root_symbol_table: Arc<RwLock<DefScope>>,
     pub struct_declarations: HashMap<String, StructDeclaration>,
     pub diagnostics: Vec<Diagnostic>,
     /// Maps protocol name → list of direct constraint protocol names.
@@ -30,7 +33,7 @@ pub struct SemanticAnalysisContext {
 
 impl SemanticAnalysisContext {
     pub fn new() -> Self {
-        let root_symbol_table = Rc::new(RefCell::new(DefScope::default()));
+        let root_symbol_table = Arc::new(RwLock::new(DefScope::default()));
         SemanticAnalysisContext {
             symbol_tables: HashMap::from([(NodeId::new(1), root_symbol_table.clone())]),
             symbol_id_allocator: DefIdAllocator::default(),
@@ -42,7 +45,7 @@ impl SemanticAnalysisContext {
         }
     }
 
-    pub fn get_symbol_table(&self, id: NodeId) -> Option<Rc<RefCell<DefScope>>> {
+    pub fn get_symbol_table(&self, id: NodeId) -> Option<Arc<RwLock<DefScope>>> {
         self.symbol_tables.get(&id).cloned()
     }
 
@@ -54,6 +57,9 @@ impl SemanticAnalysisContext {
         &self.diagnostics
     }
 
+    /// # Panics
+    ///
+    /// Panics if the internal symbol table lock is poisoned.
     pub fn add_builtin_symbols<'a, S, I>(&mut self, symbols: I)
     where
         S: AsRef<str> + 'a,
@@ -68,10 +74,13 @@ impl SemanticAnalysisContext {
                 *kind,
                 None,
             );
-            self.root_symbol_table.borrow_mut().insert(symbol_info);
+            self.root_symbol_table.write().unwrap().insert(symbol_info);
         }
     }
 
+    /// # Panics
+    ///
+    /// Panics if the internal symbol table lock is poisoned.
     pub fn add_builtin_symbols_with_slots<'a, S, I>(&mut self, symbols: I)
     where
         S: AsRef<str> + 'a,
@@ -86,7 +95,7 @@ impl SemanticAnalysisContext {
                 *kind,
                 *global_slot,
             );
-            self.root_symbol_table.borrow_mut().insert(symbol_info);
+            self.root_symbol_table.write().unwrap().insert(symbol_info);
         }
     }
 }
@@ -192,19 +201,19 @@ impl SemanticAnalyzer {
     #[inline(always)]
     /// # Panics
     /// Panics if analysis has not been run first.
-    pub fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<DefScope>>> {
+    pub fn symbol_tables(&self) -> &HashMap<NodeId, Arc<RwLock<DefScope>>> {
         let ctx = self.context.as_ref().expect("Analysis must be run first");
         &ctx.symbol_tables
     }
 
     #[inline(always)]
-    pub fn get_symbol_table(&self, id: NodeId) -> Option<Rc<RefCell<DefScope>>> {
+    pub fn get_symbol_table(&self, id: NodeId) -> Option<Arc<RwLock<DefScope>>> {
         self.symbol_tables().get(&id).cloned()
     }
 
     /// # Panics
     /// Panics if analysis has not been run first.
-    pub fn root_symbol_table(&self) -> Rc<RefCell<DefScope>> {
+    pub fn root_symbol_table(&self) -> Arc<RwLock<DefScope>> {
         let ctx = self.context.as_ref().expect("Analysis must be run first");
         ctx.root_symbol_table.clone()
     }
@@ -270,10 +279,14 @@ impl SemanticAnalyzer {
     }
 
     /// Returns true if a symbol with the given name is already registered as a builtin.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal symbol table lock is poisoned.
     pub fn has_builtin_symbol(&self, name: &str) -> bool {
         self.context
             .as_ref()
-            .map(|ctx| ctx.root_symbol_table.borrow().has_name(name))
+            .map(|ctx| ctx.root_symbol_table.read().unwrap().has_name(name))
             .unwrap_or(false)
     }
 
