@@ -395,7 +395,8 @@ impl HirPass for DeadCodeElimination {
         if !removed_ids.is_empty() {
             for symbol_table in ctx.symbols.values() {
                 symbol_table
-                    .borrow_mut()
+                    .write()
+                    .unwrap()
                     .remove_symbols_by_hir_ids(&removed_ids);
             }
         }

@@ -3,7 +3,8 @@ use crate::{
     diagnostic::{self, Diagnostic},
 };
 use log::debug;
-use std::{cell::RefCell, rc::Rc};
+use std::sync::{Arc, RwLock};
+
 use tlang_ast::{
     node::{
         BinaryOpKind, Expr, ExprKind, FunctionDeclaration, LetDeclaration, Module, Pat, PatKind,
@@ -18,19 +19,19 @@ use tlang_span::{NodeId, Span};
 /// and undeclared variable references.
 #[derive(Default)]
 pub struct VariableUsageValidator {
-    symbol_table_stack: Vec<Rc<RefCell<DefScope>>>,
+    symbol_table_stack: Vec<Arc<RwLock<DefScope>>>,
 }
 
 impl VariableUsageValidator {
-    fn current_symbol_table(&self) -> Rc<RefCell<DefScope>> {
+    fn current_symbol_table(&self) -> Arc<RwLock<DefScope>> {
         self.symbol_table_stack.last().cloned().unwrap()
     }
 
-    fn push_symbol_table(&mut self, symbol_table: &Rc<RefCell<DefScope>>) {
+    fn push_symbol_table(&mut self, symbol_table: &Arc<RwLock<DefScope>>) {
         self.symbol_table_stack.push(symbol_table.clone());
     }
 
-    fn pop_symbol_table(&mut self) -> Rc<RefCell<DefScope>> {
+    fn pop_symbol_table(&mut self) -> Arc<RwLock<DefScope>> {
         self.symbol_table_stack.pop().unwrap()
     }
 
@@ -44,10 +45,10 @@ impl VariableUsageValidator {
     /// Report unused symbols in the given symbol table
     pub fn report_unused_symbols(
         &mut self,
-        symbol_table: &Rc<RefCell<DefScope>>,
+        symbol_table: &Arc<RwLock<DefScope>>,
         ctx: &mut SemanticAnalysisContext,
     ) {
-        let symbol_table = symbol_table.borrow();
+        let symbol_table = symbol_table.read().unwrap();
         let unused_symbols = symbol_table
             .get_all_declared_local_symbols()
             .filter(|symbol| !symbol.used)
@@ -91,7 +92,8 @@ impl VariableUsageValidator {
     fn mark_as_used_by_name(&mut self, name: &str, span: Span, ctx: &mut SemanticAnalysisContext) {
         let symbol_info = self
             .current_symbol_table()
-            .borrow()
+            .read()
+            .unwrap()
             .get_closest_by_name(name, span);
         if let Some(symbol_info) = symbol_info {
             // When a multi-arity function is referenced via a plain path (not a direct call),
@@ -101,17 +103,22 @@ impl VariableUsageValidator {
             if symbol_info.is_any_fn() {
                 let all_ids: Vec<_> = self
                     .current_symbol_table()
-                    .borrow()
+                    .read()
+                    .unwrap()
                     .get_by_name(name)
                     .into_iter()
                     .map(|s| s.id)
                     .collect();
                 for id in all_ids {
-                    self.current_symbol_table().borrow_mut().mark_as_used(id);
+                    self.current_symbol_table()
+                        .write()
+                        .unwrap()
+                        .mark_as_used(id);
                 }
             } else {
                 self.current_symbol_table()
-                    .borrow_mut()
+                    .write()
+                    .unwrap()
                     .mark_as_used(symbol_info.id);
             }
         } else {
@@ -128,7 +135,8 @@ impl VariableUsageValidator {
     ) {
         let symbol_info_ids: Vec<_> = self
             .current_symbol_table()
-            .borrow()
+            .read()
+            .unwrap()
             .get_by_name_and_arity(name, arity)
             .iter()
             .map(|s| s.id)
@@ -144,7 +152,8 @@ impl VariableUsageValidator {
             //       Maybe we should mark it in the collection pass?
             //       Or keep track of the current id in case the name is being shadowed?
             self.current_symbol_table()
-                .borrow_mut()
+                .write()
+                .unwrap()
                 .mark_as_used(symbol_id);
         }
     }
@@ -199,7 +208,8 @@ impl VariableUsageValidator {
             .iter()
             .filter_map(|id| {
                 self.current_symbol_table()
-                    .borrow_mut()
+                    .write()
+                    .unwrap()
                     .get_local(|s| s.node_id == Some(*id))
                     .map(|s| s.id)
             })
@@ -207,7 +217,8 @@ impl VariableUsageValidator {
 
         for symbol_id in &pattern_symbols {
             self.current_symbol_table()
-                .borrow_mut()
+                .write()
+                .unwrap()
                 .set_declared(*symbol_id, false);
         }
 
@@ -215,7 +226,8 @@ impl VariableUsageValidator {
 
         for symbol_id in &pattern_symbols {
             self.current_symbol_table()
-                .borrow_mut()
+                .write()
+                .unwrap()
                 .set_declared(*symbol_id, true);
         }
     }
@@ -244,10 +256,13 @@ impl VariableUsageValidator {
         &mut self,
         name: &str,
         span: Span,
-        symbol_table: &Rc<RefCell<DefScope>>,
+        symbol_table: &Arc<RwLock<DefScope>>,
         ctx: &mut SemanticAnalysisContext,
     ) {
-        let did_you_mean = did_you_mean(name, &symbol_table.borrow().get_all_declared_symbols());
+        let did_you_mean = did_you_mean(
+            name,
+            &symbol_table.read().unwrap().get_all_declared_symbols(),
+        );
 
         if let Some(suggestion) = did_you_mean {
             ctx.add_diagnostic(
@@ -276,10 +291,13 @@ impl VariableUsageValidator {
         name: &str,
         arity: usize,
         span: Span,
-        symbol_table: &Rc<RefCell<DefScope>>,
+        symbol_table: &Arc<RwLock<DefScope>>,
         ctx: &mut SemanticAnalysisContext,
     ) {
-        let did_you_mean = did_you_mean(name, &symbol_table.borrow().get_all_declared_symbols());
+        let did_you_mean = did_you_mean(
+            name,
+            &symbol_table.read().unwrap().get_all_declared_symbols(),
+        );
 
         if let Some(suggestion) = did_you_mean {
             ctx.add_diagnostic(
