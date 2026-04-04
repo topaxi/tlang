@@ -401,6 +401,7 @@ export class TlangPlayground extends LitElement {
       this.tlang.updateTlang(this.source, this.runner);
       const codemirrorDiagnostics = this.tlang.analyze();
       this.codemirror.diagnostics = codemirrorDiagnostics;
+      this.codemirror.completionItems = this.tlang.getCompletionItems();
       this.diagnosticMessages = [...this.tlang.diagnosticMessages];
       this.diagnosticErrorCount = codemirrorDiagnostics.filter(
         (d) => d.severity === 'error',

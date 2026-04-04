@@ -1,5 +1,6 @@
 import {
   CodemirrorDiagnostic,
+  type CodemirrorCompletion,
   getStandardLibraryCompiled,
   Tlang,
   type JsHirPrettyOptions,
@@ -131,6 +132,10 @@ export class TlangController {
     }
 
     return this.tlang.getCodemirrorDiagnostics();
+  }
+
+  getCompletionItems(): CodemirrorCompletion[] {
+    return this.tlang.getCompletionItems();
   }
 
   async run(runner: Runner) {

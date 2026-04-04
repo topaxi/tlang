@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
 use serde::{Deserialize, Serialize};
@@ -33,6 +33,9 @@ extern "C" {
 
     #[wasm_bindgen(typescript_type = "CodemirrorDiagnostic[]")]
     pub type JsCodemirrorDiagnosticArray;
+
+    #[wasm_bindgen(typescript_type = "CodemirrorCompletion[]")]
+    pub type JsCodemirrorCompletionArray;
 
     #[wasm_bindgen(typescript_type = "unknown")]
     pub type JsUnknown;
@@ -609,5 +612,41 @@ impl Tlang {
 
         let all: Vec<_> = parse_errors.chain(diagnostics).collect();
         Ok(serde_wasm_bindgen::to_value(&all)?.unchecked_into())
+    }
+
+    /// Return completion items derived from the semantic analyzer's symbol tables.
+    ///
+    /// This reuses the same analysis pipeline as the LSP server's `SymbolIndex`
+    /// but runs inside the WASM playground, giving CodeMirror context-aware
+    /// completions (user-defined functions, variables, enums, structs, etc.).
+    #[wasm_bindgen(js_name = "getCompletionItems")]
+    pub fn completion_items(
+        &mut self,
+    ) -> Result<JsCodemirrorCompletionArray, serde_wasm_bindgen::Error> {
+        if !self.build.analyzed {
+            self.analyze();
+        }
+
+        let mut seen = HashSet::new();
+        let mut items = Vec::new();
+
+        for scope_rc in self.analyzer.symbol_tables().values() {
+            let scope = scope_rc.read().unwrap();
+            for def in scope
+                .get_all_local_symbols()
+                .iter()
+                .filter(|d| d.declared && !d.temp && !d.builtin)
+            {
+                if seen.insert(def.name.clone()) {
+                    items.push(codemirror::CodemirrorCompletion {
+                        label: def.name.to_string(),
+                        completion_type: codemirror::completion_type_from_def_kind(def.kind),
+                        detail: codemirror::completion_detail_from_def_kind(def.kind),
+                    });
+                }
+            }
+        }
+
+        Ok(serde_wasm_bindgen::to_value(&items)?.unchecked_into())
     }
 }

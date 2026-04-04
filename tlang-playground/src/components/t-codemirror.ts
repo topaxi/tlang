@@ -1,7 +1,11 @@
 import { basicSetup } from 'codemirror';
 import { EditorView, keymap } from '@codemirror/view';
-import { EditorState, Prec } from '@codemirror/state';
+import { Compartment, EditorState, Prec } from '@codemirror/state';
 import { Diagnostic, linter, lintGutter } from '@codemirror/lint';
+import {
+  type Completion,
+  completeFromList,
+} from '@codemirror/autocomplete';
 import { catppuccin } from 'codemirror-theme-catppuccin';
 import { tlangLanguageSupport } from 'codemirror-lang-tlang';
 import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
@@ -35,6 +39,7 @@ export class TCodeMirror extends LitElement {
   `;
 
   private view: EditorView | null = null;
+  private completionCompartment = new Compartment();
 
   @property()
   source: string | undefined = '';
@@ -50,6 +55,9 @@ export class TCodeMirror extends LitElement {
 
   @property({ type: Array })
   diagnostics: Diagnostic[] = [];
+
+  @property({ type: Array })
+  completionItems: Completion[] = [];
 
   @hostListener('keyup')
   handleKeyUp(event: KeyboardEvent) {
@@ -72,6 +80,13 @@ export class TCodeMirror extends LitElement {
       catppuccin('macchiato'),
       // We currently use Ctrl+Enter to run the code.
       Prec.highest(keymap.of([{ key: 'Ctrl-Enter', run: () => true }])),
+      this.completionCompartment.of(
+        this.completionItems.length > 0
+          ? EditorState.languageData.of(() => [
+              { autocomplete: completeFromList(this.completionItems) },
+            ])
+          : [],
+      ),
     ];
 
     switch (this.language) {
@@ -139,6 +154,18 @@ export class TCodeMirror extends LitElement {
             to: this.view.state.doc.length,
             insert: this.source,
           },
+        });
+      }
+
+      if (changedProperties.has('completionItems')) {
+        this.view.dispatch({
+          effects: this.completionCompartment.reconfigure(
+            this.completionItems.length > 0
+              ? EditorState.languageData.of(() => [
+                  { autocomplete: completeFromList(this.completionItems) },
+                ])
+              : [],
+          ),
         });
       }
     }
