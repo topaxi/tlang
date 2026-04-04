@@ -57,6 +57,9 @@ impl SemanticAnalysisContext {
         &self.diagnostics
     }
 
+    /// # Panics
+    ///
+    /// Panics if the internal symbol table lock is poisoned.
     pub fn add_builtin_symbols<'a, S, I>(&mut self, symbols: I)
     where
         S: AsRef<str> + 'a,
@@ -75,6 +78,9 @@ impl SemanticAnalysisContext {
         }
     }
 
+    /// # Panics
+    ///
+    /// Panics if the internal symbol table lock is poisoned.
     pub fn add_builtin_symbols_with_slots<'a, S, I>(&mut self, symbols: I)
     where
         S: AsRef<str> + 'a,
@@ -273,6 +279,10 @@ impl SemanticAnalyzer {
     }
 
     /// Returns true if a symbol with the given name is already registered as a builtin.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal symbol table lock is poisoned.
     pub fn has_builtin_symbol(&self, name: &str) -> bool {
         self.context
             .as_ref()

@@ -156,6 +156,9 @@ impl LoweringContext {
         }
     }
 
+    /// # Panics
+    ///
+    /// Panics if any symbol table lock is poisoned.
     pub fn symbol_tables(&self) -> HashMap<HirId, Arc<RwLock<DefScope>>> {
         debug!("Translating symbol tables to HirIds");
 

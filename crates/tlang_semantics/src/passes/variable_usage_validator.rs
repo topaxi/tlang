@@ -43,6 +43,10 @@ impl VariableUsageValidator {
     }
 
     /// Report unused symbols in the given symbol table
+    ///
+    /// # Panics
+    ///
+    /// Panics if the symbol table lock is poisoned.
     pub fn report_unused_symbols(
         &mut self,
         symbol_table: &Arc<RwLock<DefScope>>,
@@ -252,6 +256,10 @@ impl VariableUsageValidator {
     }
 
     /// Report an undeclared variable reference
+    ///
+    /// # Panics
+    ///
+    /// Panics if the symbol table lock is poisoned.
     pub fn report_undeclared_variable(
         &mut self,
         name: &str,
@@ -286,6 +294,10 @@ impl VariableUsageValidator {
     }
 
     /// Report an undeclared function reference
+    ///
+    /// # Panics
+    ///
+    /// Panics if the symbol table lock is poisoned.
     pub fn report_undeclared_function(
         &mut self,
         name: &str,
