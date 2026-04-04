@@ -8,7 +8,7 @@ use tlang_span::Span;
 /// `Span.start_lc` / `end_lc` are 0-indexed line+column. The LSP protocol
 /// uses 0-indexed line + UTF-16 character offset. For ASCII-only identifiers
 /// and keywords (the common case) these are identical.
-fn span_to_range(span: &Span) -> Range {
+pub fn span_to_range(span: &Span) -> Range {
     Range {
         start: Position {
             line: span.start_lc.line,
