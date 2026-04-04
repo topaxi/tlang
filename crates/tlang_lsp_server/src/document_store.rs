@@ -27,10 +27,10 @@ pub struct SymbolEntry {
     pub builtin: bool,
 }
 
-/// Send-safe symbol index extracted from the semantic analyzer.
+/// Lightweight symbol index extracted from the semantic analyzer.
 ///
-/// Replaces caching the full [`SemanticAnalyzer`] (which contains
-/// `Rc<RefCell<DefScope>>` and is not `Send`).
+/// Instead of caching the full [`SemanticAnalyzer`], we extract only the
+/// symbol entries and parent links we need for hover/goto lookups.
 #[derive(Debug, Default)]
 pub struct SymbolIndex {
     /// Maps each scope [`NodeId`] to the symbols declared directly in that
@@ -48,7 +48,7 @@ impl SymbolIndex {
         let tables = analyzer.symbol_tables();
 
         for (&node_id, scope_rc) in tables {
-            let scope = scope_rc.borrow();
+            let scope = scope_rc.read().unwrap();
             let entries: Vec<SymbolEntry> = scope
                 .get_all_local_symbols()
                 .iter()
@@ -75,13 +75,13 @@ impl SymbolIndex {
         parents: &mut HashMap<NodeId, NodeId>,
         child_id: NodeId,
         scope: &DefScope,
-        tables: &HashMap<NodeId, std::rc::Rc<std::cell::RefCell<DefScope>>>,
+        tables: &HashMap<NodeId, std::sync::Arc<std::sync::RwLock<DefScope>>>,
     ) {
-        if let Some(parent_rc) = scope.parent() {
-            // Find which NodeId corresponds to this parent Rc.
-            let parent_ptr = std::rc::Rc::as_ptr(&parent_rc) as usize;
-            for (&nid, rc) in tables {
-                if std::rc::Rc::as_ptr(rc) as usize == parent_ptr {
+        if let Some(parent_arc) = scope.parent() {
+            // Find which NodeId corresponds to this parent Arc.
+            let parent_ptr = std::sync::Arc::as_ptr(&parent_arc) as usize;
+            for (&nid, arc) in tables {
+                if std::sync::Arc::as_ptr(arc) as usize == parent_ptr {
                     parents.insert(child_id, nid);
                     return;
                 }
