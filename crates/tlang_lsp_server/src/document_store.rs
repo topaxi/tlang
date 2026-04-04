@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::sync::Arc;
 
 use lsp_types::Url;
 use tlang_ast::node as ast;
@@ -51,7 +52,7 @@ impl SymbolIndex {
         // parent lookups are O(1) instead of a linear scan per scope.
         let ptr_to_node: HashMap<*const std::sync::RwLock<DefScope>, NodeId> = tables
             .iter()
-            .map(|(&node_id, arc)| (std::sync::Arc::as_ptr(arc), node_id))
+            .map(|(&node_id, arc)| (Arc::as_ptr(arc), node_id))
             .collect();
 
         for (&node_id, scope_rc) in tables {
@@ -72,7 +73,7 @@ impl SymbolIndex {
 
             // Record parent link via the precomputed pointer→NodeId map.
             if let Some(parent_arc) = scope.parent() {
-                let parent_ptr = std::sync::Arc::as_ptr(&parent_arc);
+                let parent_ptr = Arc::as_ptr(&parent_arc);
                 if let Some(&parent_id) = ptr_to_node.get(&parent_ptr) {
                     index.parents.insert(node_id, parent_id);
                 }
