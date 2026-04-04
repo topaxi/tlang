@@ -33,9 +33,11 @@ pub struct SymbolEntry {
 /// `Rc<RefCell<DefScope>>` and is not `Send`).
 #[derive(Debug, Default)]
 pub struct SymbolIndex {
-    /// Local symbols for each scope.
+    /// Maps each scope [`NodeId`] to the symbols declared directly in that
+    /// scope (not inherited from parent scopes).
     scopes: HashMap<NodeId, Vec<SymbolEntry>>,
-    /// Parent scope link: child → parent.
+    /// Maps a child scope [`NodeId`] to its parent scope [`NodeId`], enabling
+    /// upward scope-chain walks during symbol lookup.
     parents: HashMap<NodeId, NodeId>,
 }
 

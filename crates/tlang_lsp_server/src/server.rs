@@ -222,7 +222,13 @@ impl ServerState {
         Box::pin(async move { Ok(result.and_then(|info| info.to_goto_definition(&uri))) })
     }
 
-    /// Given a cursor position, find and resolve the symbol under the cursor.
+    /// Resolve the symbol under the cursor for a given document and position.
+    ///
+    /// Walks the cached AST to find the identifier at `pos`, then looks it up
+    /// in the cached [`SymbolIndex`] to obtain its definition metadata.
+    ///
+    /// Returns `None` when the document is unknown, has no cached analysis, the
+    /// cursor is not on an identifier, or the identifier cannot be resolved.
     fn resolve_symbol(state: &Self, uri: &Url, pos: lsp_types::Position) -> Option<ResolvedSymbol> {
         let doc = state.store.get(uri)?;
         let cache = doc.parse_cache.as_ref()?;

@@ -185,8 +185,10 @@ mod tests {
 
     #[test]
     fn find_multiline() {
-        // After newlines the lexer's column starts at 1 (not 0).
-        // `x` on line 2 of `"fn f() {\n  let x = 1;\n  x\n}"` is at col 3.
+        // The lexer resets `current_column` to 1 (not 0) after a newline,
+        // so every column on lines after the first is offset by +1
+        // compared to a 0-indexed column.  `x` at two-space indent on
+        // line 2 is reported at column 3 by the lexer.
         let source = "fn f() {\n  let x = 1;\n  x\n}";
         let found = parse_and_find(source, 2, 3);
         assert!(found.is_some(), "should find 'x' at (2,3)");
