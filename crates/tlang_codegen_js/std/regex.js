@@ -62,6 +62,7 @@ export class $TlangRegex {
 
 $impl($Accepts, $TlangRegex, {
   accepts(self, value) {
+    $assert(typeof value === 'string', 'Accepts::accepts expected a string');
     return self.test(value);
   },
 });
