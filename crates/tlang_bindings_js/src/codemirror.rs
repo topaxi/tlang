@@ -109,9 +109,7 @@ pub fn completion_type_from_def_kind(kind: DefKind) -> String {
 /// Build an optional detail string for a completion item.
 pub fn completion_detail_from_def_kind(kind: DefKind) -> Option<String> {
     match kind {
-        DefKind::Function(arity) | DefKind::FunctionSelfRef(arity) => {
-            Some(format!("fn({arity})"))
-        }
+        DefKind::Function(arity) | DefKind::FunctionSelfRef(arity) => Some(format!("fn({arity})")),
         DefKind::EnumVariant(arity) if arity > 0 => Some(format!("variant({arity})")),
         DefKind::ProtocolMethod(arity) | DefKind::StructMethod(arity) => {
             Some(format!("method({arity})"))

@@ -2,15 +2,9 @@ import { basicSetup } from 'codemirror';
 import { EditorView, keymap } from '@codemirror/view';
 import { Compartment, EditorState, Prec } from '@codemirror/state';
 import { Diagnostic, linter, lintGutter } from '@codemirror/lint';
-import {
-  type Completion,
-  completeFromList,
-} from '@codemirror/autocomplete';
+import { type Completion, completeFromList } from '@codemirror/autocomplete';
 import { catppuccin } from 'codemirror-theme-catppuccin';
-import {
-  tlangLanguage,
-  tlangLanguageSupport,
-} from 'codemirror-lang-tlang';
+import { tlangLanguage, tlangLanguageSupport } from 'codemirror-lang-tlang';
 import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
 import { json, jsonLanguage } from '@codemirror/lang-json';
 import { htmlLanguage } from '@codemirror/lang-html';
