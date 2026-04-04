@@ -44,13 +44,12 @@ impl LoweringContext {
             ast::node::ExprKind::Path(path) => hir::ExprKind::Path(Box::new(self.lower_path(path))),
             ast::node::ExprKind::FunctionExpression(decl) => self.lower_fn_expr(decl),
             ast::node::ExprKind::List(exprs) => hir::ExprKind::List(self.lower_exprs(exprs)),
-            ast::node::ExprKind::Dict(entries) => {
-                let entries = entries
+            ast::node::ExprKind::Dict(entries) => hir::ExprKind::Dict(
+                entries
                     .iter()
                     .map(|(key, value)| (self.lower_expr(key), self.lower_expr(value)))
-                    .collect();
-                hir::ExprKind::Dict(entries)
-            }
+                    .collect(),
+            ),
             ast::node::ExprKind::Let(pat, expr) => {
                 let expression = self.lower_expr(expr);
                 let pattern = self.lower_pat(pat);

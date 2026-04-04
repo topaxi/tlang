@@ -2217,9 +2217,9 @@ impl<'src> Parser<'src> {
                     }
                     lhs = self.parse_call_expression(lhs);
                 }
-                TokenKind::Keyword(Keyword::Implements) => {
-                    // `implements` has comparison precedence (6), left-associative
-                    let implements_info = OperatorInfo {
+                TokenKind::Keyword(Keyword::Implements | Keyword::Matches) => {
+                    // Both keywords have comparison precedence (6), left-associative
+                    let op_info = OperatorInfo {
                         precedence: 6,
                         associativity: Associativity::Left,
                     };
@@ -2228,32 +2228,19 @@ impl<'src> Parser<'src> {
                             precedence,
                             associativity,
                         },
-                        &implements_info,
+                        &op_info,
                     ) {
                         break;
                     }
+                    let keyword = self.current_token_kind();
                     self.advance();
-                    let path = self.parse_path();
-                    lhs = node::expr!(self.unique_id(), Implements(Box::new(lhs), Box::new(path)));
-                }
-                TokenKind::Keyword(Keyword::Matches) => {
-                    // `matches` has comparison precedence (6), left-associative
-                    let matches_info = OperatorInfo {
-                        precedence: 6,
-                        associativity: Associativity::Left,
+                    lhs = if matches!(keyword, TokenKind::Keyword(Keyword::Implements)) {
+                        let path = self.parse_path();
+                        node::expr!(self.unique_id(), Implements(Box::new(lhs), Box::new(path)))
+                    } else {
+                        let pat = self.parse_pattern();
+                        node::expr!(self.unique_id(), Matches(Box::new(lhs), pat))
                     };
-                    if Self::compare_precedence(
-                        &OperatorInfo {
-                            precedence,
-                            associativity,
-                        },
-                        &matches_info,
-                    ) {
-                        break;
-                    }
-                    self.advance();
-                    let pat = self.parse_pattern();
-                    lhs = node::expr!(self.unique_id(), Matches(Box::new(lhs), pat));
                 }
                 token if Self::is_binary_op(token) => {
                     let operator = Self::map_binary_op(token);
