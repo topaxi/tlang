@@ -548,9 +548,6 @@ test.describe('Code Completion', () => {
     await page.keyboard.press('Control+End');
     await page.keyboard.press('Enter');
 
-    // Wait a moment for the analysis to process the newline change
-    await page.waitForTimeout(500);
-
     // Type 'ev' to trigger completion popup with dynamic items
     await page.keyboard.type('ev', { delay: 50 });
 

@@ -38,6 +38,14 @@ export class TCodeMirror extends LitElement {
   private view: EditorView | null = null;
   private completionCompartment = new Compartment();
 
+  private getCompletionConfig() {
+    return this.completionItems.length > 0
+      ? tlangLanguage.data.of({
+          autocomplete: completeFromList(this.completionItems),
+        })
+      : [];
+  }
+
   @property()
   source: string | undefined = '';
 
@@ -77,13 +85,7 @@ export class TCodeMirror extends LitElement {
       catppuccin('macchiato'),
       // We currently use Ctrl+Enter to run the code.
       Prec.highest(keymap.of([{ key: 'Ctrl-Enter', run: () => true }])),
-      this.completionCompartment.of(
-        this.completionItems.length > 0
-          ? tlangLanguage.data.of({
-              autocomplete: completeFromList(this.completionItems),
-            })
-          : [],
-      ),
+      this.completionCompartment.of(this.getCompletionConfig()),
     ];
 
     switch (this.language) {
@@ -157,11 +159,7 @@ export class TCodeMirror extends LitElement {
       if (changedProperties.has('completionItems')) {
         this.view.dispatch({
           effects: this.completionCompartment.reconfigure(
-            this.completionItems.length > 0
-              ? tlangLanguage.data.of({
-                  autocomplete: completeFromList(this.completionItems),
-                })
-              : [],
+            this.getCompletionConfig(),
           ),
         });
       }
