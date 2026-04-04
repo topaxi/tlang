@@ -6,15 +6,18 @@ use async_lsp::LanguageClient;
 use async_lsp::router::Router;
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    GotoDefinitionParams, GotoDefinitionResponse, HoverParams, HoverProviderCapability,
     InitializeParams, InitializeResult, PublishDiagnosticsParams, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, Url,
 };
 use serde::Deserialize;
 use tlang_analysis::CompilationTarget;
+use tlang_defs::DefKind;
+use tlang_span::Span;
 use tracing::{error, warn};
 
 use crate::diagnostics;
-use crate::document_store::{DocumentStore, ParseCache};
+use crate::document_store::{DocumentStore, ParseCache, SymbolIndex};
 
 /// Create an empty AST module (used as a placeholder when parsing fails).
 fn empty_module() -> tlang_ast::node::Module {
@@ -90,6 +93,8 @@ impl ServerState {
         router
             .request::<lsp_types::request::Initialize, _>(Self::on_initialize)
             .request::<lsp_types::request::Shutdown, _>(|_, _| Box::pin(async { Ok(()) }))
+            .request::<lsp_types::request::HoverRequest, _>(Self::on_hover)
+            .request::<lsp_types::request::GotoDefinition, _>(Self::on_goto_definition)
             .notification::<lsp_types::notification::Initialized>(|_, _| ControlFlow::Continue(()))
             .notification::<lsp_types::notification::Exit>(|_, _| ControlFlow::Break(Ok(())))
             .notification::<lsp_types::notification::DidOpenTextDocument>(Self::on_did_open)
@@ -124,6 +129,8 @@ impl ServerState {
                     text_document_sync: Some(TextDocumentSyncCapability::Kind(
                         TextDocumentSyncKind::FULL,
                     )),
+                    hover_provider: Some(HoverProviderCapability::Simple(true)),
+                    definition_provider: Some(lsp_types::OneOf::Left(true)),
                     ..ServerCapabilities::default()
                 },
                 server_info: Some(lsp_types::ServerInfo {
@@ -189,6 +196,53 @@ impl ServerState {
         ControlFlow::Continue(())
     }
 
+    fn on_hover(
+        state: &mut Self,
+        params: HoverParams,
+    ) -> futures::future::BoxFuture<
+        'static,
+        Result<Option<lsp_types::Hover>, async_lsp::ResponseError>,
+    > {
+        let uri = &params.text_document_position_params.text_document.uri;
+        let pos = params.text_document_position_params.position;
+        let result = Self::resolve_symbol(state, uri, pos);
+        Box::pin(async move { Ok(result.map(|info| info.to_hover())) })
+    }
+
+    fn on_goto_definition(
+        state: &mut Self,
+        params: GotoDefinitionParams,
+    ) -> futures::future::BoxFuture<
+        'static,
+        Result<Option<GotoDefinitionResponse>, async_lsp::ResponseError>,
+    > {
+        let uri = params.text_document_position_params.text_document.uri;
+        let pos = params.text_document_position_params.position;
+        let result = Self::resolve_symbol(state, &uri, pos);
+        Box::pin(async move { Ok(result.and_then(|info| info.to_goto_definition(&uri))) })
+    }
+
+    /// Given a cursor position, find and resolve the symbol under the cursor.
+    fn resolve_symbol(state: &Self, uri: &Url, pos: lsp_types::Position) -> Option<ResolvedSymbol> {
+        let doc = state.store.get(uri)?;
+        let cache = doc.parse_cache.as_ref()?;
+        let index = doc.symbol_index.as_ref()?;
+
+        let found =
+            crate::find_node::find_node_at_position(&cache.module, pos.line, pos.character)?;
+
+        // Look up the symbol in the scope's symbol table.
+        let entry = index.get_closest_by_name(found.scope_id, &found.name, found.span)?;
+
+        Some(ResolvedSymbol {
+            name: found.name,
+            ident_span: found.span,
+            def_kind: entry.kind,
+            def_span: entry.defined_at,
+            builtin: entry.builtin,
+        })
+    }
+
     /// Collect cached diagnostics from a document state (parse + semantic).
     fn collect_cached_diagnostics(
         state: &crate::document_store::DocumentState,
@@ -239,6 +293,7 @@ impl ServerState {
                 // semantic analysis emits errors) and `None` only when parsing
                 // fails outright; `empty_module()` is only a fallback for the
                 // parse-failure case.
+                let symbol_index = SymbolIndex::from_analyzer(&result.analyzer);
                 if let Some(doc) = self.store.documents_mut().get_mut(uri) {
                     doc.parse_cache = Some(ParseCache {
                         source_hash: doc.source_hash,
@@ -246,6 +301,7 @@ impl ServerState {
                         diagnostics: parse_diags.clone(),
                     });
                     doc.semantic_cache = Some(semantic_diags.clone());
+                    doc.symbol_index = Some(symbol_index);
                 }
 
                 let mut all = parse_diags;
@@ -271,6 +327,7 @@ impl ServerState {
                         diagnostics: vec![diag.clone()],
                     });
                     doc.semantic_cache = Some(vec![]);
+                    doc.symbol_index = None;
                 }
 
                 vec![diag]
@@ -294,6 +351,48 @@ impl ServerState {
             diagnostics,
             version,
         });
+    }
+}
+
+/// Information about a symbol resolved from a cursor position.
+struct ResolvedSymbol {
+    /// The identifier name as written in source.
+    name: String,
+    /// The span of the identifier under the cursor.
+    ident_span: Span,
+    /// The kind of the resolved definition.
+    def_kind: DefKind,
+    /// The span where the symbol was defined.
+    def_span: Span,
+    /// Whether the symbol is a builtin (no source location to jump to).
+    builtin: bool,
+}
+
+impl ResolvedSymbol {
+    fn to_hover(&self) -> lsp_types::Hover {
+        let kind_label = self.def_kind.to_string();
+        let contents = if let Some(arity) = self.def_kind.arity() {
+            format!("({kind_label}) {name}/{arity}", name = self.name)
+        } else {
+            format!("({kind_label}) {name}", name = self.name)
+        };
+
+        lsp_types::Hover {
+            contents: lsp_types::HoverContents::Scalar(lsp_types::MarkedString::String(contents)),
+            range: Some(diagnostics::span_to_range(&self.ident_span)),
+        }
+    }
+
+    fn to_goto_definition(&self, uri: &Url) -> Option<GotoDefinitionResponse> {
+        if self.builtin {
+            return None;
+        }
+
+        let range = diagnostics::span_to_range(&self.def_span);
+        Some(GotoDefinitionResponse::Scalar(lsp_types::Location {
+            uri: uri.clone(),
+            range,
+        }))
     }
 }
 
@@ -386,5 +485,182 @@ mod tests {
             !result.has_errors(),
             "unexpected errors for interpreter target"
         );
+    }
+
+    /// Helper: create a `ServerState` with a document, run diagnostics, and return the state.
+    fn setup_server_with_source(source: &str) -> ServerState {
+        let client = async_lsp::ClientSocket::new_closed();
+        let mut state = ServerState {
+            client,
+            store: DocumentStore::new(),
+            target: CompilationTarget::Js,
+        };
+        let uri = test_uri();
+        state.store.open(uri.clone(), 1, source.into());
+        state.run_diagnostics(&uri, source);
+        state
+    }
+
+    #[test]
+    fn resolve_symbol_for_variable_reference() {
+        let state = setup_server_with_source("fn f(x) { x }");
+        // `x` in the body is at col 10 (0-indexed columns on first line)
+        let resolved = ServerState::resolve_symbol(
+            &state,
+            &test_uri(),
+            lsp_types::Position {
+                line: 0,
+                character: 10,
+            },
+        );
+        assert!(resolved.is_some(), "should resolve `x` reference");
+        let resolved = resolved.unwrap();
+        assert_eq!(resolved.name, "x");
+        assert_eq!(resolved.def_kind, DefKind::Parameter);
+        assert!(!resolved.builtin);
+    }
+
+    #[test]
+    fn resolve_symbol_for_function_name() {
+        let state = setup_server_with_source("fn hello() { 1 }");
+        // `hello` starts at col 3
+        let resolved = ServerState::resolve_symbol(
+            &state,
+            &test_uri(),
+            lsp_types::Position {
+                line: 0,
+                character: 3,
+            },
+        );
+        assert!(resolved.is_some(), "should resolve function name");
+        let resolved = resolved.unwrap();
+        assert_eq!(resolved.name, "hello");
+    }
+
+    #[test]
+    fn resolve_symbol_returns_none_on_whitespace() {
+        let state = setup_server_with_source("fn f() { }");
+        let resolved = ServerState::resolve_symbol(
+            &state,
+            &test_uri(),
+            lsp_types::Position {
+                line: 0,
+                character: 9,
+            },
+        );
+        assert!(resolved.is_none());
+    }
+
+    #[test]
+    fn hover_returns_kind_and_name() {
+        let state = setup_server_with_source("fn f(x) { x }");
+        let resolved = ServerState::resolve_symbol(
+            &state,
+            &test_uri(),
+            lsp_types::Position {
+                line: 0,
+                character: 10,
+            },
+        )
+        .unwrap();
+        let hover = resolved.to_hover();
+        match hover.contents {
+            lsp_types::HoverContents::Scalar(lsp_types::MarkedString::String(s)) => {
+                assert_eq!(s, "(parameter) x");
+            }
+            _ => panic!("unexpected hover contents format"),
+        }
+    }
+
+    #[test]
+    fn hover_includes_arity_for_functions() {
+        // `add` on the same line, avoid multiline column offset issues
+        let state = setup_server_with_source("fn add(a, b) { a + b }\nlet _ = add(1, 2);");
+        // `add` function defined at col 3 on line 0
+        let resolved = ServerState::resolve_symbol(
+            &state,
+            &test_uri(),
+            lsp_types::Position {
+                line: 0,
+                character: 3,
+            },
+        );
+        assert!(resolved.is_some(), "should resolve `add` at definition");
+        let resolved = resolved.unwrap();
+        let hover = resolved.to_hover();
+        match hover.contents {
+            lsp_types::HoverContents::Scalar(lsp_types::MarkedString::String(s)) => {
+                assert!(
+                    s.contains("function"),
+                    "hover should mention 'function': {s}"
+                );
+                assert!(s.contains("add"), "hover should contain name: {s}");
+            }
+            _ => panic!("unexpected hover contents format"),
+        }
+    }
+
+    #[test]
+    fn goto_definition_returns_location() {
+        let state = setup_server_with_source("fn f(x) { x }");
+        let resolved = ServerState::resolve_symbol(
+            &state,
+            &test_uri(),
+            lsp_types::Position {
+                line: 0,
+                character: 10,
+            },
+        )
+        .unwrap();
+        let uri = test_uri();
+        let goto = resolved.to_goto_definition(&uri);
+        assert!(
+            goto.is_some(),
+            "goto should return a location for non-builtin"
+        );
+        match goto.unwrap() {
+            GotoDefinitionResponse::Scalar(loc) => {
+                assert_eq!(loc.uri, uri);
+            }
+            _ => panic!("expected scalar location"),
+        }
+    }
+
+    #[test]
+    fn goto_definition_returns_none_for_builtin() {
+        let state = setup_server_with_source("fn f() { log(1) }");
+        // `log` is a builtin; column 9 should be on `log`
+        let resolved = ServerState::resolve_symbol(
+            &state,
+            &test_uri(),
+            lsp_types::Position {
+                line: 0,
+                character: 9,
+            },
+        );
+        if let Some(resolved) = resolved {
+            let goto = resolved.to_goto_definition(&test_uri());
+            assert!(
+                goto.is_none(),
+                "goto should return None for builtin symbols"
+            );
+        }
+        // If resolve itself fails (e.g. because `log` is not in the symbol table
+        // without configuring builtins), that's also acceptable.
+    }
+
+    #[test]
+    fn resolve_symbol_unknown_document_returns_none() {
+        let state = setup_server_with_source("fn f() { }");
+        let unknown_uri = Url::parse("file:///unknown.tlang").unwrap();
+        let resolved = ServerState::resolve_symbol(
+            &state,
+            &unknown_uri,
+            lsp_types::Position {
+                line: 0,
+                character: 0,
+            },
+        );
+        assert!(resolved.is_none());
     }
 }

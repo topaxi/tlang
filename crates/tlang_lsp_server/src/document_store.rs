@@ -3,6 +3,9 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use lsp_types::Url;
 use tlang_ast::node as ast;
+use tlang_defs::{DefKind, DefScope};
+use tlang_semantics::SemanticAnalyzer;
+use tlang_span::{NodeId, Span};
 
 /// Cached parse result for a document.
 pub struct ParseCache {
@@ -12,6 +15,126 @@ pub struct ParseCache {
     pub module: ast::Module,
     /// Parse diagnostics converted to LSP format.
     pub diagnostics: Vec<lsp_types::Diagnostic>,
+}
+
+/// A single symbol entry extracted from the semantic analyzer.
+#[derive(Debug, Clone)]
+pub struct SymbolEntry {
+    pub name: Box<str>,
+    pub kind: DefKind,
+    pub defined_at: Span,
+    pub scope_start: u32,
+    pub builtin: bool,
+}
+
+/// Send-safe symbol index extracted from the semantic analyzer.
+///
+/// Replaces caching the full [`SemanticAnalyzer`] (which contains
+/// `Rc<RefCell<DefScope>>` and is not `Send`).
+#[derive(Debug, Default)]
+pub struct SymbolIndex {
+    /// Local symbols for each scope.
+    scopes: HashMap<NodeId, Vec<SymbolEntry>>,
+    /// Parent scope link: child → parent.
+    parents: HashMap<NodeId, NodeId>,
+}
+
+impl SymbolIndex {
+    /// Build a `SymbolIndex` from the semantic analyzer's symbol tables.
+    pub fn from_analyzer(analyzer: &SemanticAnalyzer) -> Self {
+        let mut index = SymbolIndex::default();
+        let tables = analyzer.symbol_tables();
+
+        for (&node_id, scope_rc) in tables {
+            let scope = scope_rc.borrow();
+            let entries: Vec<SymbolEntry> = scope
+                .get_all_local_symbols()
+                .iter()
+                .filter(|d| d.declared)
+                .map(|d| SymbolEntry {
+                    name: d.name.clone(),
+                    kind: d.kind,
+                    defined_at: d.defined_at,
+                    scope_start: d.scope_start,
+                    builtin: d.builtin,
+                })
+                .collect();
+            index.scopes.insert(node_id, entries);
+
+            // Record parent link by checking if this scope's parent matches
+            // another known scope.
+            Self::record_parent(&mut index.parents, node_id, &scope, tables);
+        }
+
+        index
+    }
+
+    fn record_parent(
+        parents: &mut HashMap<NodeId, NodeId>,
+        child_id: NodeId,
+        scope: &DefScope,
+        tables: &HashMap<NodeId, std::rc::Rc<std::cell::RefCell<DefScope>>>,
+    ) {
+        if let Some(parent_rc) = scope.parent() {
+            // Find which NodeId corresponds to this parent Rc.
+            let parent_ptr = std::rc::Rc::as_ptr(&parent_rc) as usize;
+            for (&nid, rc) in tables {
+                if std::rc::Rc::as_ptr(rc) as usize == parent_ptr {
+                    parents.insert(child_id, nid);
+                    return;
+                }
+            }
+        }
+    }
+
+    /// Look up the closest matching symbol by name, mimicking
+    /// `DefScope::get_closest_by_name` by walking up the parent chain.
+    pub fn get_closest_by_name(
+        &self,
+        scope_id: NodeId,
+        name: &str,
+        span: Span,
+    ) -> Option<SymbolEntry> {
+        let mut current = Some(scope_id);
+
+        while let Some(sid) = current {
+            if let Some(entries) = self.scopes.get(&sid) {
+                let by_name: Vec<&SymbolEntry> =
+                    entries.iter().filter(|e| *e.name == *name).collect();
+
+                if !by_name.is_empty() {
+                    // Try scope_start < line first.
+                    let closest = by_name
+                        .iter()
+                        .rev()
+                        .find(|e| e.scope_start < span.start_lc.line)
+                        .cloned();
+                    if let Some(entry) = closest {
+                        return Some(entry.clone());
+                    }
+
+                    // Fallback: defined_at < cursor, or is a function / builtin.
+                    let fallback = by_name
+                        .iter()
+                        .rev()
+                        .find(|e| {
+                            e.defined_at.start_lc < span.start_lc
+                                || e.kind.arity().is_some()
+                                || e.builtin
+                        })
+                        .cloned();
+                    if let Some(entry) = fallback {
+                        return Some(entry.clone());
+                    }
+                }
+            }
+
+            // Walk up to the parent scope.
+            current = self.parents.get(&sid).copied();
+        }
+
+        None
+    }
 }
 
 /// Per-document state tracked by the LSP server.
@@ -26,6 +149,8 @@ pub struct DocumentState {
     pub parse_cache: Option<ParseCache>,
     /// Cached semantic diagnostics.
     pub semantic_cache: Option<Vec<lsp_types::Diagnostic>>,
+    /// Cached symbol index for hover/goto (extracted from analyzer).
+    pub symbol_index: Option<SymbolIndex>,
 }
 
 /// Simple HashMap-based document cache.
@@ -57,6 +182,7 @@ impl DocumentStore {
                 version,
                 parse_cache: None,
                 semantic_cache: None,
+                symbol_index: None,
             })
             .into_mut()
     }
@@ -81,6 +207,7 @@ impl DocumentStore {
         if changed {
             state.parse_cache = None;
             state.semantic_cache = None;
+            state.symbol_index = None;
         }
 
         Some((state, changed))
