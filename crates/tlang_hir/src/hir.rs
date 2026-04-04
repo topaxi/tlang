@@ -1,7 +1,6 @@
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -1036,7 +1035,7 @@ pub enum BinaryOpKind {
 #[derive(Debug, Clone)]
 pub struct LowerResultMeta {
     pub root_symbol_table: HirId,
-    pub symbol_tables: HashMap<HirId, Rc<RefCell<DefScope>>>,
+    pub symbol_tables: HashMap<HirId, Arc<RwLock<DefScope>>>,
     pub hir_id_allocator: HirIdAllocator,
     pub symbol_id_allocator: DefIdAllocator,
     /// HirIds of expressions that produce compile-time-constant values

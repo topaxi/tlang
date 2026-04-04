@@ -18,7 +18,7 @@ impl<'hir> Visitor<'hir> for ScopeDataUpdater {
 
         // Update the block's scope data with locals count
         if let Some(symbol_table) = ctx.symbols.get(&block.hir_id) {
-            let locals_count = symbol_table.borrow().locals();
+            let locals_count = symbol_table.read().unwrap().locals();
             debug!(
                 "Setting block {:?} locals count to {}",
                 block.hir_id, locals_count
@@ -33,7 +33,7 @@ impl<'hir> Visitor<'hir> for ScopeDataUpdater {
 
         // Update the module's scope data with locals count
         if let Some(symbol_table) = ctx.symbols.get(&module.hir_id) {
-            let locals_count = symbol_table.borrow().locals();
+            let locals_count = symbol_table.read().unwrap().locals();
             debug!(
                 "Setting module {:?} locals count to {}",
                 module.hir_id, locals_count
@@ -42,7 +42,7 @@ impl<'hir> Visitor<'hir> for ScopeDataUpdater {
         } else {
             // Fallback: use current scope if module HIR ID doesn't have symbol table
             if let Some(symbol_table) = ctx.symbols.get(&ctx.current_scope) {
-                let locals_count = symbol_table.borrow().locals();
+                let locals_count = symbol_table.read().unwrap().locals();
                 debug!(
                     "Using current scope {:?} for module {:?}, locals count: {}",
                     ctx.current_scope, module.hir_id, locals_count
@@ -63,7 +63,7 @@ impl<'hir> Visitor<'hir> for ScopeDataUpdater {
 
                 // Update the function's scope data with locals count
                 if let Some(symbol_table) = ctx.symbols.get(&function_hir_id) {
-                    let locals_count = symbol_table.borrow().locals();
+                    let locals_count = symbol_table.read().unwrap().locals();
                     debug!("Setting function {function_hir_id:?} locals count to {locals_count}");
                     if let hir::StmtKind::FunctionDeclaration(decl) = &mut stmt.kind {
                         decl.set_locals(locals_count);
@@ -88,7 +88,7 @@ impl<'hir> Visitor<'hir> for ScopeDataUpdater {
 
                 // Update the function expression's scope data with locals count
                 if let Some(symbol_table) = ctx.symbols.get(&function_hir_id) {
-                    let locals_count = symbol_table.borrow().locals();
+                    let locals_count = symbol_table.read().unwrap().locals();
                     debug!(
                         "Setting lambda function {function_hir_id:?} locals count to {locals_count}"
                     );
@@ -109,7 +109,7 @@ impl<'hir> Visitor<'hir> for ScopeDataUpdater {
                         if arm.hir_id != arm.block.hir_id
                             && let Some(symbol_table) = ctx.symbols.get(&arm.hir_id)
                         {
-                            let pat_locals = symbol_table.borrow().locals();
+                            let pat_locals = symbol_table.read().unwrap().locals();
                             debug!("Setting arm {:?} pat_locals to {}", arm.hir_id, pat_locals);
                             arm.pat_locals = pat_locals;
                         }

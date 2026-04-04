@@ -1,8 +1,7 @@
 #![feature(box_patterns)]
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use log::debug;
 use tlang_ast as ast;
@@ -123,9 +122,9 @@ pub struct LoweringContext {
     fn_node_id_to_hir_id: HashMap<NodeId, HirId>,
     hir_id_allocator: HirIdAllocator,
     symbol_id_allocator: DefIdAllocator,
-    symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>>,
-    new_symbol_tables: HashMap<HirId, Rc<RefCell<DefScope>>>,
-    current_symbol_table: Rc<RefCell<DefScope>>,
+    symbol_tables: HashMap<NodeId, Arc<RwLock<DefScope>>>,
+    new_symbol_tables: HashMap<HirId, Arc<RwLock<DefScope>>>,
+    current_symbol_table: Arc<RwLock<DefScope>>,
     errors: Vec<LoweringError>,
     /// Active protocol self-dispatch context, set while lowering a protocol
     /// default method body.  `None` outside of such bodies.
@@ -140,8 +139,8 @@ pub struct LoweringContext {
 impl LoweringContext {
     pub fn new(
         symbol_id_allocator: DefIdAllocator,
-        root_symbol_table: Rc<RefCell<DefScope>>,
-        symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>>,
+        root_symbol_table: Arc<RwLock<DefScope>>,
+        symbol_tables: HashMap<NodeId, Arc<RwLock<DefScope>>>,
     ) -> Self {
         Self {
             hir_id_allocator: HirIdAllocator::default(),
@@ -157,7 +156,10 @@ impl LoweringContext {
         }
     }
 
-    pub fn symbol_tables(&self) -> HashMap<HirId, Rc<RefCell<DefScope>>> {
+    /// # Panics
+    ///
+    /// Panics if any symbol table lock is poisoned.
+    pub fn symbol_tables(&self) -> HashMap<HirId, Arc<RwLock<DefScope>>> {
         debug!("Translating symbol tables to HirIds");
 
         let mut symbol_tables = self.new_symbol_tables.clone();
@@ -170,7 +172,8 @@ impl LoweringContext {
                 let node_id_to_hir_id = &self.node_id_to_hir_id;
 
                 symbol_table
-                    .borrow_mut()
+                    .write()
+                    .unwrap()
                     .get_all_local_symbols_mut()
                     .iter_mut()
                     .for_each(|symbol| {
@@ -210,7 +213,7 @@ impl LoweringContext {
     }
 
     #[inline(always)]
-    pub(crate) fn scope(&self) -> Rc<RefCell<DefScope>> {
+    pub(crate) fn scope(&self) -> Arc<RwLock<DefScope>> {
         self.current_symbol_table.clone()
     }
 
@@ -228,7 +231,7 @@ impl LoweringContext {
     }
 
     fn has_multi_arity_fn(&self, name: &str, arity: usize) -> bool {
-        self.scope().borrow().has_multi_arity_fn(name, arity)
+        self.scope().read().unwrap().has_multi_arity_fn(name, arity)
     }
 
     pub(crate) fn with_scope<F, R>(&mut self, node_id: NodeId, f: F) -> R
@@ -244,7 +247,8 @@ impl LoweringContext {
             // Reparent the current symbol table to the previous one, in case we created a new
             // scope while lowering.
             self.current_symbol_table
-                .borrow_mut()
+                .write()
+                .unwrap()
                 .set_parent(previous_symbol_table.clone());
         }
 
@@ -260,12 +264,12 @@ impl LoweringContext {
 
     pub(crate) fn with_new_scope<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&mut Self, Rc<RefCell<DefScope>>) -> (HirId, R),
+        F: FnOnce(&mut Self, Arc<RwLock<DefScope>>) -> (HirId, R),
         R: hir::HirScope,
     {
         let previous_symbol_table = self.current_symbol_table.clone();
         self.current_symbol_table =
-            Rc::new(RefCell::new(DefScope::new(previous_symbol_table.clone())));
+            Arc::new(RwLock::new(DefScope::new(previous_symbol_table.clone())));
         let (hir_id, result) = f(self, self.current_symbol_table.clone());
         self.new_symbol_tables
             .insert(hir_id, self.current_symbol_table.clone());
@@ -294,7 +298,7 @@ impl LoweringContext {
         .with_hir_id(hir_id)
         .as_temp();
 
-        self.scope().borrow_mut().insert(symbol_info);
+        self.scope().write().unwrap().insert(symbol_info);
     }
 
     pub(crate) fn define_symbol_at(
@@ -315,7 +319,7 @@ impl LoweringContext {
         .with_hir_id(hir_id)
         .as_temp();
 
-        self.scope().borrow_mut().insert_at(index, symbol_info);
+        self.scope().write().unwrap().insert_at(index, symbol_info);
     }
 
     pub(crate) fn define_symbol_after(
@@ -337,7 +341,8 @@ impl LoweringContext {
         .as_temp();
 
         self.scope()
-            .borrow_mut()
+            .write()
+            .unwrap()
             .insert_after(symbol_info, predicate);
     }
 
@@ -654,8 +659,8 @@ pub fn lower_to_hir(
     tlang_ast: &ast::node::Module,
     constant_pool_node_ids: &[NodeId],
     symbol_id_allocator: DefIdAllocator,
-    root_symbol_table: Rc<RefCell<DefScope>>,
-    symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>>,
+    root_symbol_table: Arc<RwLock<DefScope>>,
+    symbol_tables: HashMap<NodeId, Arc<RwLock<DefScope>>>,
 ) -> Result<hir::LowerResult, Vec<LoweringError>> {
     lower(
         &mut LoweringContext::new(symbol_id_allocator, root_symbol_table, symbol_tables),
@@ -670,8 +675,8 @@ pub fn lower_to_hir_with_offset(
     tlang_ast: &ast::node::Module,
     constant_pool_node_ids: &[NodeId],
     symbol_id_allocator: DefIdAllocator,
-    root_symbol_table: Rc<RefCell<DefScope>>,
-    symbol_tables: HashMap<NodeId, Rc<RefCell<DefScope>>>,
+    root_symbol_table: Arc<RwLock<DefScope>>,
+    symbol_tables: HashMap<NodeId, Arc<RwLock<DefScope>>>,
     hir_id_start: usize,
 ) -> Result<hir::LowerResult, Vec<LoweringError>> {
     let mut ctx = LoweringContext::new(symbol_id_allocator, root_symbol_table, symbol_tables);

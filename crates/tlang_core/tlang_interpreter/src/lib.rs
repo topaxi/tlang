@@ -3461,7 +3461,7 @@ mod tests {
             .expect("semantic analysis failed");
 
         let root = semantic_analyzer.root_symbol_table();
-        let root = root.borrow();
+        let root = root.read().unwrap();
         let add_syms: Vec<_> = root
             .get_all_local_symbols()
             .iter()

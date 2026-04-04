@@ -784,7 +784,7 @@ impl LoweringContext {
             // Remove the first declaration within the current scope, as in the AST
             // this was the function refering to itself, but we are here in a match arm
             // now.
-            this.current_symbol_table.borrow_mut().shift();
+            this.current_symbol_table.write().unwrap().shift();
 
             // Mapping argument pattern and signature guard into a match arm.
             // Propagate any type annotations inferred by FnParamTypeInference

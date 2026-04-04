@@ -28,7 +28,8 @@ fn test_analyze_variable_declaration() {
     let symbol_info = analyzer
         .get_symbol_table(ast.id)
         .unwrap()
-        .borrow()
+        .read()
+        .unwrap()
         .get_by_name("a");
 
     assert_eq!(
@@ -74,7 +75,7 @@ fn test_block_scope() {
         .clone();
 
     assert_eq!(
-        program_symbols.borrow().get_by_name("a"),
+        program_symbols.read().unwrap().get_by_name("a"),
         vec![Def {
             node_id: Some(NodeId::new(3)),
             hir_id: None,
@@ -99,8 +100,8 @@ fn test_block_scope() {
             global_slot: None,
         }]
     );
-    assert!(program_symbols.borrow().get_by_name("b").is_empty());
-    assert!(program_symbols.borrow().get_by_name("c").is_empty());
+    assert!(program_symbols.read().unwrap().get_by_name("b").is_empty());
+    assert!(program_symbols.read().unwrap().get_by_name("c").is_empty());
 
     let block1 = match ast.statements[1].kind {
         StmtKind::Expr(ref expr) => match &expr.kind {
@@ -116,7 +117,7 @@ fn test_block_scope() {
         .clone();
 
     assert_eq!(
-        block1_symbols.borrow().get_by_name("a"),
+        block1_symbols.read().unwrap().get_by_name("a"),
         vec![Def {
             node_id: Some(NodeId::new(3)),
             hir_id: None,
@@ -142,7 +143,7 @@ fn test_block_scope() {
         }]
     );
     assert_eq!(
-        block1_symbols.borrow().get_by_name("b"),
+        block1_symbols.read().unwrap().get_by_name("b"),
         vec![Def {
             node_id: Some(NodeId::new(8)),
             hir_id: None,
@@ -167,7 +168,7 @@ fn test_block_scope() {
             global_slot: None,
         }]
     );
-    assert!(block1_symbols.borrow().get_by_name("c").is_empty());
+    assert!(block1_symbols.read().unwrap().get_by_name("c").is_empty());
 
     let block2 = match block1.statements[1].kind {
         StmtKind::Expr(ref expr) => match &expr.kind {
@@ -186,7 +187,7 @@ fn test_block_scope() {
         .clone();
 
     assert_eq!(
-        block2_symbols.borrow().get_by_name("a"),
+        block2_symbols.read().unwrap().get_by_name("a"),
         vec![Def {
             node_id: Some(NodeId::new(3)),
             hir_id: None,
@@ -212,7 +213,7 @@ fn test_block_scope() {
         }]
     );
     assert_eq!(
-        block2_symbols.borrow().get_by_name("b"),
+        block2_symbols.read().unwrap().get_by_name("b"),
         vec![Def {
             node_id: Some(NodeId::new(8)),
             hir_id: None,
@@ -238,7 +239,7 @@ fn test_block_scope() {
         }]
     );
     assert_eq!(
-        block2_symbols.borrow().get_by_name("c"),
+        block2_symbols.read().unwrap().get_by_name("c"),
         vec![Def {
             node_id: Some(NodeId::new(13)),
             hir_id: None,
@@ -279,7 +280,7 @@ fn test_should_collect_function_definitions() {
         .clone();
 
     assert_eq!(
-        program_symbols.borrow().get_by_name("add"),
+        program_symbols.read().unwrap().get_by_name("add"),
         vec![Def {
             node_id: Some(NodeId::new(11)),
             hir_id: None,
@@ -314,7 +315,7 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
         .clone();
 
     assert_eq!(
-        program_symbols.borrow().get_by_name("add"),
+        program_symbols.read().unwrap().get_by_name("add"),
         vec![Def {
             node_id: Some(NodeId::new(12)),
             hir_id: None,
@@ -349,7 +350,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
         .clone();
 
     assert_eq!(
-        program_symbols.borrow().get_by_name("sum"),
+        program_symbols.read().unwrap().get_by_name("sum"),
         vec![Def {
             node_id: Some(NodeId::new(15)),
             hir_id: None,
@@ -383,7 +384,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
         .clone();
 
     assert_eq!(
-        program_symbols.borrow().get_by_name("factorial"),
+        program_symbols.read().unwrap().get_by_name("factorial"),
         vec![
             Def {
                 node_id: Some(NodeId::new(9)),
@@ -447,7 +448,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
         .clone();
 
     assert_eq!(
-        program_symbols.borrow().get_by_name("unwrap"),
+        program_symbols.read().unwrap().get_by_name("unwrap"),
         vec![
             Def {
                 node_id: Some(NodeId::new(15)),
@@ -508,7 +509,7 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
         .clone();
 
     assert_eq!(
-        program_symbols.borrow().get_by_name("used_fn"),
+        program_symbols.read().unwrap().get_by_name("used_fn"),
         vec![
             Def {
                 node_id: Some(NodeId::new(5)),
