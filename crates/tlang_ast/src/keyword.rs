@@ -37,6 +37,7 @@ define_keywords! {
     Const => "const",
 
     Implements => "implements",
+    Matches => "matches",
 
     // Reserved keywords, unused at the moment
     SelfUpper => "Self",

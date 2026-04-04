@@ -151,12 +151,12 @@ define_struct! {
         }
     }
 
-    impl Match for Regex {
-        fn matches(this, haystack_val) {
+    impl Accepts for Regex {
+        fn accepts(this, haystack_val) {
             let haystack = vm
                 .get_object(haystack_val)
                 .and_then(|o| o.as_str())
-                .unwrap_or_else(|| vm.panic("Match::matches expects a string as second argument".to_string()))
+                .unwrap_or_else(|| vm.panic("Accepts::accepts expects a string as second argument".to_string()))
                 .to_string();
             TlangValue::Bool(regex_match(vm, this, &haystack))
         }

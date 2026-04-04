@@ -536,6 +536,10 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(
             visitor.visit_expr(expr, ctx);
             visitor.visit_path(path, ctx);
         }
+        node::ExprKind::Matches(expr, pat) => {
+            visitor.visit_expr(expr, ctx);
+            visitor.visit_pat(pat, ctx);
+        }
         node::ExprKind::Path(path) => {
             visitor.visit_path(path, ctx);
         }

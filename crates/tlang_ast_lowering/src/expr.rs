@@ -44,13 +44,12 @@ impl LoweringContext {
             ast::node::ExprKind::Path(path) => hir::ExprKind::Path(Box::new(self.lower_path(path))),
             ast::node::ExprKind::FunctionExpression(decl) => self.lower_fn_expr(decl),
             ast::node::ExprKind::List(exprs) => hir::ExprKind::List(self.lower_exprs(exprs)),
-            ast::node::ExprKind::Dict(entries) => {
-                let entries = entries
+            ast::node::ExprKind::Dict(entries) => hir::ExprKind::Dict(
+                entries
                     .iter()
                     .map(|(key, value)| (self.lower_expr(key), self.lower_expr(value)))
-                    .collect();
-                hir::ExprKind::Dict(entries)
-            }
+                    .collect(),
+            ),
             ast::node::ExprKind::Let(pat, expr) => {
                 let expression = self.lower_expr(expr);
                 let pattern = self.lower_pat(pat);
@@ -85,6 +84,7 @@ impl LoweringContext {
             ast::node::ExprKind::Implements(expr, path) => {
                 hir::ExprKind::Implements(Box::new(self.lower_expr(expr)), self.lower_path(path))
             }
+            ast::node::ExprKind::Matches(expr, pat) => self.lower_matches(expr, pat, node.span),
             ast::node::ExprKind::Match(match_expr) => self.lower_match(match_expr),
             ast::node::ExprKind::Range(box ast::node::RangeExpression {
                 start,
@@ -171,6 +171,69 @@ impl LoweringContext {
             })
             .collect();
         hir::ExprKind::Match(Box::new(expr), arms)
+    }
+
+    /// Lowers `expr matches pat` into a synthetic `match expr { pat => true, _ => false }`.
+    fn lower_matches(
+        &mut self,
+        expr: &ast::node::Expr,
+        pat: &ast::node::Pat,
+        span: tlang_span::Span,
+    ) -> hir::ExprKind {
+        let lowered_expr = self.lower_expr(expr);
+
+        // Arm 1: `pat => true`
+        let true_arm_hir_id = self.unique_id();
+        let lowered_pat = self.lower_pat(pat);
+        let true_block = hir::Block::new(
+            true_arm_hir_id,
+            vec![],
+            Some(hir::Expr {
+                hir_id: self.unique_id(),
+                kind: hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Boolean(true))),
+                ty: hir::Ty::unknown(),
+                span,
+            }),
+            span,
+        );
+        let true_arm = hir::MatchArm {
+            hir_id: true_arm_hir_id,
+            pat: lowered_pat,
+            guard: None,
+            block: true_block,
+            pat_locals: 0,
+            leading_comments: vec![],
+            trailing_comments: vec![],
+        };
+
+        // Arm 2: `_ => false`
+        let false_arm_hir_id = self.unique_id();
+        let false_block = hir::Block::new(
+            false_arm_hir_id,
+            vec![],
+            Some(hir::Expr {
+                hir_id: self.unique_id(),
+                kind: hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Boolean(false))),
+                ty: hir::Ty::unknown(),
+                span,
+            }),
+            span,
+        );
+        let false_arm = hir::MatchArm {
+            hir_id: false_arm_hir_id,
+            pat: hir::Pat {
+                kind: hir::PatKind::Wildcard,
+                ty: hir::Ty::unknown(),
+                span,
+            },
+            guard: None,
+            block: false_block,
+            pat_locals: 0,
+            leading_comments: vec![],
+            trailing_comments: vec![],
+        };
+
+        hir::ExprKind::Match(Box::new(lowered_expr), vec![true_arm, false_arm])
     }
 
     fn lower_if_else(&mut self, if_else_expr: &ast::node::IfElseExpression) -> hir::ExprKind {
@@ -442,8 +505,8 @@ impl LoweringContext {
         }
     }
 
-    // a =~ b  →  Match::matches(b, a)   (RHS = pattern = self)
-    // a !~ b  →  !Match::matches(b, a)
+    // a =~ b  →  Accepts::accepts(b, a)   (RHS = pattern = self)
+    // a !~ b  →  !Accepts::accepts(b, a)
     fn lower_match_operator(&mut self, node: &BinaryOpExpression) -> hir::ExprKind {
         let span = node.lhs.span;
         let lhs = self.lower_expr(&node.lhs);
@@ -451,8 +514,8 @@ impl LoweringContext {
 
         let callee_path = hir::Path::new(
             vec![
-                hir::PathSegment::from_str("Match", span),
-                hir::PathSegment::from_str("matches", span),
+                hir::PathSegment::from_str("Accepts", span),
+                hir::PathSegment::from_str("accepts", span),
             ],
             span,
         )

@@ -8,8 +8,8 @@ tlang_macros::define_protocol! {
     Functor {
         fn map(this, f);
     }
-    Match {
-        fn matches(this, value);
+    Accepts {
+        fn accepts(this, value);
     }
     Iterable {
         fn iter(this);

@@ -14,8 +14,8 @@ impl Functor for Result {
   fn map(Result::Err(e), _) { Result::Err(e) }
 }
 
-pub protocol Match {
-  fn matches(self, value)
+pub protocol Accepts {
+  fn accepts(self, value)
 }
 
 pub protocol Iterable {

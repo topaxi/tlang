@@ -325,6 +325,7 @@ pub enum ExprKind {
     UnaryOp(UnaryOp, Box<Expr>),
     BinaryOp(Box<BinaryOpExpression>),
     Implements(Box<Expr>, Box<Path>),
+    Matches(Box<Expr>, Pat),
     Match(Box<MatchExpression>),
     RecursiveCall(Box<CallExpression>),
     Range(Box<RangeExpression>),

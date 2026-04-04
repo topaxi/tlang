@@ -1,5 +1,5 @@
 import { Option } from './option.tlang.js';
-import { $Match } from './protocols.tlang.js';
+import { $Accepts } from './protocols.tlang.js';
 
 export const re = (parts, values) => {
   let source = parts[0];
@@ -60,8 +60,9 @@ export class $TlangRegex {
   }
 }
 
-$impl($Match, $TlangRegex, {
-  matches(self, value) {
+$impl($Accepts, $TlangRegex, {
+  accepts(self, value) {
+    $assert(typeof value === 'string', 'Accepts::accepts expected a string');
     return self.test(value);
   },
 });
