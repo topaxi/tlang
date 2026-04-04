@@ -79,9 +79,8 @@ impl SymbolIndex {
     ) {
         if let Some(parent_arc) = scope.parent() {
             // Find which NodeId corresponds to this parent Arc.
-            let parent_ptr = std::sync::Arc::as_ptr(&parent_arc) as usize;
             for (&nid, arc) in tables {
-                if std::sync::Arc::as_ptr(arc) as usize == parent_ptr {
+                if std::sync::Arc::ptr_eq(arc, &parent_arc) {
                     parents.insert(child_id, nid);
                     return;
                 }
