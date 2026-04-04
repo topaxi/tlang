@@ -506,8 +506,8 @@ impl LoweringContext {
         }
     }
 
-    // a =~ b  →  Match::test(b, a)   (RHS = pattern = self)
-    // a !~ b  →  !Match::test(b, a)
+    // a =~ b  →  Accepts::accepts(b, a)   (RHS = pattern = self)
+    // a !~ b  →  !Accepts::accepts(b, a)
     fn lower_match_operator(&mut self, node: &BinaryOpExpression) -> hir::ExprKind {
         let span = node.lhs.span;
         let lhs = self.lower_expr(&node.lhs);
@@ -515,8 +515,8 @@ impl LoweringContext {
 
         let callee_path = hir::Path::new(
             vec![
-                hir::PathSegment::from_str("Match", span),
-                hir::PathSegment::from_str("test", span),
+                hir::PathSegment::from_str("Accepts", span),
+                hir::PathSegment::from_str("accepts", span),
             ],
             span,
         )
