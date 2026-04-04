@@ -234,8 +234,18 @@ impl ServerState {
         let cache = doc.parse_cache.as_ref()?;
         let index = doc.symbol_index.as_ref()?;
 
-        let found =
-            crate::find_node::find_node_at_position(&cache.module, pos.line, pos.character)?;
+        let found = crate::find_node::find_node_at_position(
+            &cache.module,
+            pos.line,
+            // The lexer uses 0-based columns on line 0 but 1-based columns on
+            // subsequent lines (current_column resets to 1 after '\n').  LSP
+            // Position.character is always 0-based, so adjust here.
+            if pos.line > 0 {
+                pos.character + 1
+            } else {
+                pos.character
+            },
+        )?;
 
         // Look up the symbol in the scope's symbol table.
         let entry = index.get_closest_by_name(found.scope_id, &found.name, found.span)?;
@@ -555,6 +565,27 @@ mod tests {
             },
         );
         assert!(resolved.is_none());
+    }
+
+    #[test]
+    fn resolve_symbol_multiline_uses_lsp_positions() {
+        // LSP Position.character is 0-based; the lexer uses 1-based columns
+        // after the first line.  resolve_symbol must translate correctly.
+        let state = setup_server_with_source("fn f() {\n  let x = 1;\n  x\n}");
+        // `x` on line 2 at 2-space indent → LSP character=2 (0-based)
+        let resolved = ServerState::resolve_symbol(
+            &state,
+            &test_uri(),
+            lsp_types::Position {
+                line: 2,
+                character: 2,
+            },
+        );
+        assert!(
+            resolved.is_some(),
+            "should resolve `x` on line 2 with LSP 0-based column"
+        );
+        assert_eq!(resolved.unwrap().name, "x");
     }
 
     #[test]

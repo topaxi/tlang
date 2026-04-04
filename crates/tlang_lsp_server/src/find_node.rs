@@ -23,6 +23,12 @@ pub struct FoundNode {
 
 /// Walk the AST to find the identifier at the given `(line, column)` position.
 ///
+/// **Coordinate system**: `line` and `column` must be in the **lexer's**
+/// coordinate system where line 0 uses 0-based columns but lines after the
+/// first use 1-based columns (the lexer resets `current_column` to 1 after
+/// each newline).  Callers converting from LSP `Position` (which is always
+/// 0-based) should add 1 to `character` when `line > 0`.
+///
 /// Returns `Some(FoundNode)` when the cursor is on a recognized identifier,
 /// or `None` when the position is on whitespace / punctuation / literal.
 pub fn find_node_at_position(module: &Module, line: u32, column: u32) -> Option<FoundNode> {
@@ -93,8 +99,10 @@ impl<'ast> Visitor<'ast> for NodeFinder {
     }
 
     fn visit_path(&mut self, path: &'ast node::Path, ctx: &mut ()) {
-        // Record the full path name if the cursor is on the whole path span,
-        // but also walk individual segments so the most-specific match wins.
+        // Record the full qualified path name (e.g. "Enum::Variant") so that
+        // hover/goto resolves against the semantic declaration name.
+        self.record_ident(&path.to_string(), &path.span);
+        // Also walk individual segments so the most-specific match wins.
         visit::walk_path(self, path, ctx);
     }
 

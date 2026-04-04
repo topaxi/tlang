@@ -47,6 +47,13 @@ impl SymbolIndex {
         let mut index = SymbolIndex::default();
         let tables = analyzer.symbol_tables();
 
+        // Pre-compute a reverse map from Arc pointer identity to NodeId so that
+        // parent lookups are O(1) instead of a linear scan per scope.
+        let ptr_to_node: HashMap<*const std::sync::RwLock<DefScope>, NodeId> = tables
+            .iter()
+            .map(|(&node_id, arc)| (std::sync::Arc::as_ptr(arc), node_id))
+            .collect();
+
         for (&node_id, scope_rc) in tables {
             let scope = scope_rc.read().unwrap();
             let entries: Vec<SymbolEntry> = scope
@@ -63,29 +70,16 @@ impl SymbolIndex {
                 .collect();
             index.scopes.insert(node_id, entries);
 
-            // Record parent link by checking if this scope's parent matches
-            // another known scope.
-            Self::record_parent(&mut index.parents, node_id, &scope, tables);
-        }
-
-        index
-    }
-
-    fn record_parent(
-        parents: &mut HashMap<NodeId, NodeId>,
-        child_id: NodeId,
-        scope: &DefScope,
-        tables: &HashMap<NodeId, std::sync::Arc<std::sync::RwLock<DefScope>>>,
-    ) {
-        if let Some(parent_arc) = scope.parent() {
-            // Find which NodeId corresponds to this parent Arc.
-            for (&nid, arc) in tables {
-                if std::sync::Arc::ptr_eq(arc, &parent_arc) {
-                    parents.insert(child_id, nid);
-                    return;
+            // Record parent link via the precomputed pointer→NodeId map.
+            if let Some(parent_arc) = scope.parent() {
+                let parent_ptr = std::sync::Arc::as_ptr(&parent_arc);
+                if let Some(&parent_id) = ptr_to_node.get(&parent_ptr) {
+                    index.parents.insert(node_id, parent_id);
                 }
             }
         }
+
+        index
     }
 
     /// Look up the closest matching symbol by name, mimicking
