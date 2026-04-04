@@ -7,7 +7,10 @@ import {
   completeFromList,
 } from '@codemirror/autocomplete';
 import { catppuccin } from 'codemirror-theme-catppuccin';
-import { tlangLanguageSupport } from 'codemirror-lang-tlang';
+import {
+  tlangLanguage,
+  tlangLanguageSupport,
+} from 'codemirror-lang-tlang';
 import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
 import { json, jsonLanguage } from '@codemirror/lang-json';
 import { htmlLanguage } from '@codemirror/lang-html';
@@ -82,9 +85,9 @@ export class TCodeMirror extends LitElement {
       Prec.highest(keymap.of([{ key: 'Ctrl-Enter', run: () => true }])),
       this.completionCompartment.of(
         this.completionItems.length > 0
-          ? EditorState.languageData.of(() => [
-              { autocomplete: completeFromList(this.completionItems) },
-            ])
+          ? tlangLanguage.data.of({
+              autocomplete: completeFromList(this.completionItems),
+            })
           : [],
       ),
     ];
@@ -161,9 +164,9 @@ export class TCodeMirror extends LitElement {
         this.view.dispatch({
           effects: this.completionCompartment.reconfigure(
             this.completionItems.length > 0
-              ? EditorState.languageData.of(() => [
-                  { autocomplete: completeFromList(this.completionItems) },
-                ])
+              ? tlangLanguage.data.of({
+                  autocomplete: completeFromList(this.completionItems),
+                })
               : [],
           ),
         });

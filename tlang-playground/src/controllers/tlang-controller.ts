@@ -48,6 +48,7 @@ export class TlangController {
   private cachedJS: string | null = null;
   private cachedJSAST: string | null = null;
   private cachedSourceMap: ParsedSourceMap | null = null;
+  private cachedCompletionItems: CodemirrorCompletion[] = [];
   private optimizationOptions: JsOptimizationOptions = {
     constantFolding: true,
     anfTransform: undefined,
@@ -135,7 +136,13 @@ export class TlangController {
   }
 
   getCompletionItems(): CodemirrorCompletion[] {
-    return this.tlang.getCompletionItems();
+    const items = this.tlang.getCompletionItems();
+
+    if (items.length > 0) {
+      this.cachedCompletionItems = items;
+    }
+
+    return this.cachedCompletionItems;
   }
 
   async run(runner: Runner) {
