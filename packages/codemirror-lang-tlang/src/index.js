@@ -223,7 +223,7 @@ function tlangGotoDefinition(provider) {
       if (!event.ctrlKey && !event.metaKey) return false;
 
       const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-      if (pos == null) return false;
+      if (pos === null || pos === undefined) return false;
 
       const def = provider(pos);
       if (!def) return false;

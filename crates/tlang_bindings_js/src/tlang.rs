@@ -126,6 +126,8 @@ pub struct BuildArtifacts {
     hir: Option<hir::Module>,
     hir_opt_diagnostics: Vec<tlang_diagnostics::Diagnostic>,
     analyzed: bool,
+    /// Symbol index built from the semantic analyzer after [`Tlang::analyze`]
+    /// is called.  `None` before analysis or when parsing fails.
     symbol_index: Option<SymbolIndex>,
 }
 
