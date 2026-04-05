@@ -533,6 +533,11 @@ test.describe('Hover tooltip', () => {
    * Helper: get the pixel coordinates of a character at the given CodeMirror
    * document offset.  Traverses through the tlang-playground → t-codemirror
    * shadow DOM hierarchy to reach the underlying EditorView.
+   *
+   * NOTE: This relies on CodeMirror 6 internals (`cmTile` property on content
+   * DOM nodes) which may change in future versions.  If this breaks after a
+   * CodeMirror upgrade, check the `Tile.get()` implementation in
+   * `@codemirror/view` for the current property name.
    */
   async function coordsAtPos(page: Page, pos: number) {
     const result = await page.evaluate((p) => {
