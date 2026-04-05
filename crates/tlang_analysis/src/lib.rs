@@ -21,6 +21,10 @@
 //! | [`configure_js_analyzer`] | Configure an existing analyzer with JS stdlib symbols (feature `js`) |
 //! | [`configure_interpreter_analyzer`] | Configure an existing analyzer with VM symbols (feature `interpreter`) |
 
+pub mod find_node;
+pub mod query;
+pub mod symbol_index;
+
 use tlang_ast::node::Module;
 use tlang_diagnostics::Diagnostic;
 use tlang_parser::error::ParseIssue;

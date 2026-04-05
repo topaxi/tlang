@@ -6,16 +6,17 @@ edition.workspace = true
 [features]
 default = []
 js = ["dep:tlang_codegen_js"]
-interpreter = ["dep:tlang_core", "dep:tlang_defs"]
+interpreter = ["dep:tlang_core"]
 
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
 tlang_codegen_js = { path = "../tlang_codegen_js", optional = true }
 tlang_core = { path = "../tlang_core", optional = true }
-tlang_defs = { path = "../tlang_defs", optional = true }
+tlang_defs = { path = "../tlang_defs" }
 tlang_diagnostics = { path = "../tlang_diagnostics" }
 tlang_parser = { path = "../tlang_parser" }
 tlang_semantics = { path = "../tlang_semantics" }
+tlang_span = { path = "../tlang_span" }
 
 [lints]
 workspace = true
