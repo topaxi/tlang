@@ -368,13 +368,11 @@ export class TlangPlayground extends LitElement {
     localStorage.setItem('ligatures', String(this.hasLigatures));
   }
 
-  private getHoverProvider() {
-    return (pos: number) => this.tlang.getHoverInfo(pos);
-  }
+  private readonly hoverProvider = (pos: number) =>
+    this.tlang.getHoverInfo(pos);
 
-  private getGotoDefinitionProvider() {
-    return (pos: number) => this.tlang.getDefinitionLocation(pos);
-  }
+  private readonly gotoDefinitionProvider = (pos: number) =>
+    this.tlang.getDefinitionLocation(pos);
 
   private async run() {
     if (!this.consoleElement.persist) {
@@ -732,8 +730,8 @@ export class TlangPlayground extends LitElement {
               <t-codemirror
                 class="editor"
                 with-diagnostics
-                .hoverProvider=${this.getHoverProvider()}
-                .gotoDefinitionProvider=${this.getGotoDefinitionProvider()}
+                .hoverProvider=${this.hoverProvider}
+                .gotoDefinitionProvider=${this.gotoDefinitionProvider}
                 @source-change=${this.handleSourceChange}
               ></t-codemirror>
               <t-diagnostics

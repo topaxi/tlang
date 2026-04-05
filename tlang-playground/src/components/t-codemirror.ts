@@ -1,6 +1,6 @@
 import { basicSetup } from 'codemirror';
 import { EditorView, keymap } from '@codemirror/view';
-import { EditorState, Prec } from '@codemirror/state';
+import { Compartment, EditorState, Prec } from '@codemirror/state';
 import { Diagnostic, linter, lintGutter } from '@codemirror/lint';
 import { catppuccin } from 'codemirror-theme-catppuccin';
 import {
@@ -46,6 +46,12 @@ export class TCodeMirror extends LitElement {
 
   private view: EditorView | null = null;
 
+  /**
+   * Compartment for the tlang language extension so that hover/goto providers
+   * can be reconfigured after the initial editor creation.
+   */
+  private readonly tlangLangCompartment = new Compartment();
+
   @property()
   source: string | undefined = '';
 
@@ -82,6 +88,19 @@ export class TCodeMirror extends LitElement {
     );
   }
 
+  private makeTlangLangExtension() {
+    return tlangLanguageSupport({
+      htmlLanguage,
+      cssLanguage,
+      sqlLanguage: StandardSQL.language,
+      jsonLanguage,
+      jsLanguage: javascriptLanguage,
+      markdownLanguage,
+      hoverProvider: this.hoverProvider,
+      gotoDefinitionProvider: this.gotoDefinitionProvider,
+    });
+  }
+
   private getEditorExtensions() {
     let extensions = [
       basicSetup,
@@ -93,16 +112,7 @@ export class TCodeMirror extends LitElement {
     switch (this.language) {
       case 'tlang':
         extensions.push(
-          tlangLanguageSupport({
-            htmlLanguage,
-            cssLanguage,
-            sqlLanguage: StandardSQL.language,
-            jsonLanguage,
-            jsLanguage: javascriptLanguage,
-            markdownLanguage,
-            hoverProvider: this.hoverProvider,
-            gotoDefinitionProvider: this.gotoDefinitionProvider,
-          }),
+          this.tlangLangCompartment.of(this.makeTlangLangExtension()),
         );
         break;
 
@@ -157,6 +167,18 @@ export class TCodeMirror extends LitElement {
             to: this.view.state.doc.length,
             insert: this.source,
           },
+        });
+      }
+
+      if (
+        this.language === 'tlang' &&
+        (changedProperties.has('hoverProvider') ||
+          changedProperties.has('gotoDefinitionProvider'))
+      ) {
+        this.view.dispatch({
+          effects: this.tlangLangCompartment.reconfigure(
+            this.makeTlangLangExtension(),
+          ),
         });
       }
     }

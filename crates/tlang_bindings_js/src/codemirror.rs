@@ -53,7 +53,7 @@ pub(crate) fn byte_offset_to_line_column(source: &str, byte_offset: u32) -> (u32
             line += 1;
             col = 0;
         } else {
-            col += 1;
+            col += ch.len_utf16() as u32;
         }
     }
 
