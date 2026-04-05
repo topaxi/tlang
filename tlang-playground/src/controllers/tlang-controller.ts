@@ -138,9 +138,15 @@ export class TlangController {
   getCompletionItems(): CodemirrorCompletion[] {
     const items = this.tlang.getCompletionItems();
 
-    if (items.length > 0) {
-      this.cachedCompletionItems = items;
+    const hasAnalysisFailures = Boolean(
+      this.tlang.renderParseErrors() || this.tlang.renderErrorDiagnostics(),
+    );
+
+    if (hasAnalysisFailures) {
+      return this.cachedCompletionItems;
     }
+
+    this.cachedCompletionItems = items;
 
     return this.cachedCompletionItems;
   }

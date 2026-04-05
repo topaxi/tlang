@@ -620,6 +620,7 @@ impl Tlang {
     /// but runs inside the WASM playground, giving CodeMirror context-aware
     /// completions (user-defined functions, variables, enums, structs, etc.).
     #[wasm_bindgen(js_name = "getCompletionItems")]
+    #[allow(clippy::missing_panics_doc)]
     pub fn completion_items(
         &mut self,
     ) -> Result<JsCodemirrorCompletionArray, serde_wasm_bindgen::Error> {
@@ -637,15 +638,29 @@ impl Tlang {
                 .iter()
                 .filter(|d| d.declared && !d.temp && !d.builtin)
             {
-                if seen.insert(def.name.clone()) {
-                    items.push(codemirror::CodemirrorCompletion {
-                        label: def.name.to_string(),
-                        completion_type: codemirror::completion_type_from_def_kind(def.kind),
-                        detail: codemirror::completion_detail_from_def_kind(def.kind),
-                    });
+                let item = codemirror::CodemirrorCompletion {
+                    label: def.name.to_string(),
+                    completion_type: codemirror::completion_type_from_def_kind(def.kind),
+                    detail: codemirror::completion_detail_from_def_kind(def.kind),
+                };
+                let key = (
+                    item.label.clone(),
+                    item.completion_type.clone(),
+                    item.detail.clone(),
+                );
+
+                if seen.insert(key) {
+                    items.push(item);
                 }
             }
         }
+
+        items.sort_by(|a, b| {
+            a.label
+                .cmp(&b.label)
+                .then_with(|| a.detail.cmp(&b.detail))
+                .then_with(|| a.completion_type.cmp(&b.completion_type))
+        });
 
         Ok(serde_wasm_bindgen::to_value(&items)?.unchecked_into())
     }
