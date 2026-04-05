@@ -10,12 +10,55 @@ use tsify::Tsify;
 /// offsets. For ASCII-only sources these are identical, but multi-byte UTF-8
 /// characters (e.g. `•`, `—`, `─`) in comments would otherwise shift the
 /// highlighted range by the difference in byte length vs UTF-16 length.
-fn byte_offset_to_utf16(source: &str, byte_offset: u32) -> u32 {
+pub(crate) fn byte_offset_to_utf16(source: &str, byte_offset: u32) -> u32 {
     let byte_offset = (byte_offset as usize).min(source.len());
     source[..byte_offset]
         .chars()
         .map(|c| c.len_utf16() as u32)
         .sum()
+}
+
+/// Convert a UTF-16 code unit offset to a byte offset in `source`.
+///
+/// This is the inverse of [`byte_offset_to_utf16`].
+pub(crate) fn utf16_to_byte_offset(source: &str, utf16_offset: u32) -> u32 {
+    let mut utf16_count = 0u32;
+    let mut byte_pos = 0usize;
+
+    for ch in source.chars() {
+        if utf16_count >= utf16_offset {
+            break;
+        }
+        utf16_count += ch.len_utf16() as u32;
+        byte_pos += ch.len_utf8();
+    }
+
+    byte_pos as u32
+}
+
+/// Convert a byte offset in `source` to a 0-based `(line, column)` pair.
+///
+/// Both `line` and `column` are 0-based.  This is the common editor convention
+/// (LSP, CodeMirror).  Callers that need the lexer's coordinate system should
+/// use [`tlang_analysis::query::resolve_symbol`] which adjusts internally.
+pub(crate) fn byte_offset_to_line_column(source: &str, byte_offset: u32) -> (u32, u32) {
+    let byte_offset = (byte_offset as usize).min(source.len());
+    let mut line = 0u32;
+    let mut col = 0u32;
+
+    for (i, ch) in source.char_indices() {
+        if i >= byte_offset {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            col = 0;
+        } else {
+            col += ch.len_utf16() as u32;
+        }
+    }
+
+    (line, col)
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Tsify)]
@@ -116,4 +159,30 @@ pub fn completion_detail_from_def_kind(kind: DefKind) -> Option<String> {
         }
         _ => None,
     }
+}
+
+/// Hover information formatted for CodeMirror 6.
+///
+/// Positions are UTF-16 code unit offsets matching JavaScript string positions.
+#[derive(Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi)]
+pub struct CodemirrorHoverInfo {
+    /// The hover text to display (e.g. `"(function) add/2"`).
+    pub text: String,
+    /// UTF-16 code unit offset of the start of the hovered identifier.
+    pub from: u32,
+    /// UTF-16 code unit offset of the end of the hovered identifier.
+    pub to: u32,
+}
+
+/// Definition location formatted for CodeMirror 6.
+///
+/// Positions are UTF-16 code unit offsets matching JavaScript string positions.
+#[derive(Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi)]
+pub struct CodemirrorDefinitionLocation {
+    /// UTF-16 code unit offset of the start of the definition.
+    pub from: u32,
+    /// UTF-16 code unit offset of the end of the definition.
+    pub to: u32,
 }

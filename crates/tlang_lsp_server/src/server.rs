@@ -12,8 +12,7 @@ use lsp_types::{
 };
 use serde::Deserialize;
 use tlang_analysis::CompilationTarget;
-use tlang_defs::DefKind;
-use tlang_span::Span;
+use tlang_analysis::query::ResolvedSymbol;
 use tracing::{error, warn};
 
 use crate::diagnostics;
@@ -224,8 +223,8 @@ impl ServerState {
 
     /// Resolve the symbol under the cursor for a given document and position.
     ///
-    /// Walks the cached AST to find the identifier at `pos`, then looks it up
-    /// in the cached [`SymbolIndex`] to obtain its definition metadata.
+    /// Delegates to [`tlang_analysis::query::resolve_symbol`] which is shared
+    /// between the LSP server and the WASM playground bindings.
     ///
     /// Returns `None` when the document is unknown, has no cached analysis, the
     /// cursor is not on an identifier, or the identifier cannot be resolved.
@@ -234,29 +233,7 @@ impl ServerState {
         let cache = doc.parse_cache.as_ref()?;
         let index = doc.symbol_index.as_ref()?;
 
-        let found = crate::find_node::find_node_at_position(
-            &cache.module,
-            pos.line,
-            // The lexer uses 0-based columns on line 0 but 1-based columns on
-            // subsequent lines (current_column resets to 1 after '\n').  LSP
-            // Position.character is always 0-based, so adjust here.
-            if pos.line > 0 {
-                pos.character + 1
-            } else {
-                pos.character
-            },
-        )?;
-
-        // Look up the symbol in the scope's symbol table.
-        let entry = index.get_closest_by_name(found.scope_id, &found.name, found.span)?;
-
-        Some(ResolvedSymbol {
-            name: found.name,
-            ident_span: found.span,
-            def_kind: entry.kind,
-            def_span: entry.defined_at,
-            builtin: entry.builtin,
-        })
+        tlang_analysis::query::resolve_symbol(&cache.module, index, pos.line, pos.character)
     }
 
     /// Collect cached diagnostics from a document state (parse + semantic).
@@ -370,31 +347,18 @@ impl ServerState {
     }
 }
 
-/// Information about a symbol resolved from a cursor position.
-struct ResolvedSymbol {
-    /// The identifier name as written in source.
-    name: String,
-    /// The span of the identifier under the cursor.
-    ident_span: Span,
-    /// The kind of the resolved definition.
-    def_kind: DefKind,
-    /// The span where the symbol was defined.
-    def_span: Span,
-    /// Whether the symbol is a builtin (no source location to jump to).
-    builtin: bool,
+/// LSP-specific extension methods for [`ResolvedSymbol`].
+trait ResolvedSymbolLspExt {
+    fn to_hover(&self) -> lsp_types::Hover;
+    fn to_goto_definition(&self, uri: &Url) -> Option<GotoDefinitionResponse>;
 }
 
-impl ResolvedSymbol {
+impl ResolvedSymbolLspExt for ResolvedSymbol {
     fn to_hover(&self) -> lsp_types::Hover {
-        let kind_label = self.def_kind.to_string();
-        let contents = if let Some(arity) = self.def_kind.arity() {
-            format!("({kind_label}) {name}/{arity}", name = self.name)
-        } else {
-            format!("({kind_label}) {name}", name = self.name)
-        };
-
         lsp_types::Hover {
-            contents: lsp_types::HoverContents::Scalar(lsp_types::MarkedString::String(contents)),
+            contents: lsp_types::HoverContents::Scalar(lsp_types::MarkedString::String(
+                self.hover_text(),
+            )),
             range: Some(diagnostics::span_to_range(&self.ident_span)),
         }
     }
@@ -415,6 +379,7 @@ impl ResolvedSymbol {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tlang_defs::DefKind;
 
     fn test_uri() -> Url {
         Url::parse("file:///test/example.tlang").unwrap()

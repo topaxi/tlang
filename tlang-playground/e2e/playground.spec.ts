@@ -562,3 +562,82 @@ test.describe('Code Completion', () => {
     ).toBeVisible();
   });
 });
+
+test.describe('Hover tooltip', () => {
+  /**
+   * Helper: get the pixel coordinates of a character at the given CodeMirror
+   * document offset.  Traverses through the tlang-playground → t-codemirror
+   * shadow DOM hierarchy to reach the underlying EditorView.
+   *
+   * NOTE: This relies on CodeMirror 6 internals (`cmTile` property on content
+   * DOM nodes) which may change in future versions.  If this breaks after a
+   * CodeMirror upgrade, check the `Tile.get()` implementation in
+   * `@codemirror/view` for the current property name.
+   */
+  async function coordsAtPos(page: Page, pos: number) {
+    const result = await page.evaluate((p) => {
+      const playground = document.querySelector('tlang-playground');
+      if (!playground?.shadowRoot) return { error: 'no playground shadowRoot' };
+      const codemirror = playground.shadowRoot.querySelector('t-codemirror');
+      if (!codemirror?.shadowRoot) return { error: 'no codemirror shadowRoot' };
+      const cmEl = codemirror.shadowRoot.querySelector('.cm-editor');
+      if (!cmEl) return { error: 'no .cm-editor element' };
+      const content = cmEl.querySelector('.cm-content');
+      if (!content) return { error: 'no .cm-content element' };
+      // CodeMirror 6 stores a Tile reference on .cm-content via `cmTile`.
+      // Walking `.root.view` gives us the EditorView instance.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const view = (content as any).cmTile?.root?.view;
+      if (!view?.coordsAtPos) return { error: 'no EditorView' };
+      const c = view.coordsAtPos(p);
+      if (!c) return { error: `coordsAtPos(${p}) returned null` };
+      return { left: c.left, top: c.top, bottom: c.bottom };
+    }, pos);
+    if ('error' in result) {
+      throw new Error(`coordsAtPos failed: ${result.error}`);
+    }
+    return result as { left: number; top: number; bottom: number };
+  }
+
+  test('hovering over a function name shows a hover tooltip', async ({
+    page,
+  }) => {
+    // Source: `fn add(a, b) { a + b }`
+    await gotoPlayground(page, '#source=GYOwBAhgJlAUEBowCMCUYDekwGoVgF8g');
+
+    const editor = page.locator('.cm-content').first();
+    await expect(editor).toBeVisible();
+
+    // Offset 4 = middle of "add" in "fn add(a, b) { a + b }"
+    const coords = await coordsAtPos(page, 4);
+    await page.mouse.move(coords.left, (coords.top + coords.bottom) / 2);
+
+    const tooltip = page.locator('.cm-tooltip-hover');
+    await expect(tooltip).toBeVisible({ timeout: 5000 });
+
+    const hoverContent = tooltip.locator('.cm-tlang-hover');
+    await expect(hoverContent).toBeVisible();
+
+    const text = await hoverContent.textContent();
+    expect(text).toContain('function');
+    expect(text).toContain('add');
+  });
+
+  test('hover tooltip disappears when moving away', async ({ page }) => {
+    // Source: `fn add(a, b) { a + b }`
+    await gotoPlayground(page, '#source=GYOwBAhgJlAUEBowCMCUYDekwGoVgF8g');
+
+    const editor = page.locator('.cm-content').first();
+    await expect(editor).toBeVisible();
+
+    const coords = await coordsAtPos(page, 4);
+    await page.mouse.move(coords.left, (coords.top + coords.bottom) / 2);
+
+    const tooltip = page.locator('.cm-tooltip-hover');
+    await expect(tooltip).toBeVisible({ timeout: 5000 });
+
+    // Move away from the editor content entirely
+    await page.mouse.move(0, 0);
+    await expect(tooltip).not.toBeVisible({ timeout: 5000 });
+  });
+});
