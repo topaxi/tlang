@@ -6,6 +6,7 @@ await init();
 export {
   Tlang,
   type CodemirrorDiagnostic,
+  type CodemirrorCompletion,
   type Runner,
   type JsHirPrettyOptions,
   type JsOptimizationOptions,

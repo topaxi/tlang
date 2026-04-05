@@ -2,8 +2,10 @@ import { basicSetup } from 'codemirror';
 import { EditorView, keymap } from '@codemirror/view';
 import { Compartment, EditorState, Prec } from '@codemirror/state';
 import { Diagnostic, linter, lintGutter } from '@codemirror/lint';
+import { type Completion, completeFromList } from '@codemirror/autocomplete';
 import { catppuccin } from 'codemirror-theme-catppuccin';
 import {
+  tlangLanguage,
   tlangLanguageSupport,
   type HoverProvider,
   type GotoDefinitionProvider,
@@ -45,6 +47,15 @@ export class TCodeMirror extends LitElement {
   `;
 
   private view: EditorView | null = null;
+  private completionCompartment = new Compartment();
+
+  private getCompletionConfig() {
+    return this.completionItems.length > 0
+      ? tlangLanguage.data.of({
+          autocomplete: completeFromList(this.completionItems),
+        })
+      : [];
+  }
 
   /**
    * Compartment for the tlang language extension so that hover/goto providers
@@ -66,6 +77,9 @@ export class TCodeMirror extends LitElement {
 
   @property({ type: Array })
   diagnostics: Diagnostic[] = [];
+
+  @property({ type: Array })
+  completionItems: Completion[] = [];
 
   @property({ attribute: false })
   hoverProvider?: HoverProvider;
@@ -107,6 +121,7 @@ export class TCodeMirror extends LitElement {
       catppuccin('macchiato'),
       // We currently use Ctrl+Enter to run the code.
       Prec.highest(keymap.of([{ key: 'Ctrl-Enter', run: () => true }])),
+      this.completionCompartment.of(this.getCompletionConfig()),
     ];
 
     switch (this.language) {
@@ -167,6 +182,14 @@ export class TCodeMirror extends LitElement {
             to: this.view.state.doc.length,
             insert: this.source,
           },
+        });
+      }
+
+      if (changedProperties.has('completionItems')) {
+        this.view.dispatch({
+          effects: this.completionCompartment.reconfigure(
+            this.getCompletionConfig(),
+          ),
         });
       }
 

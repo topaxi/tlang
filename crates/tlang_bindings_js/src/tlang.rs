@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
 use serde::{Deserialize, Serialize};
@@ -35,6 +35,9 @@ extern "C" {
 
     #[wasm_bindgen(typescript_type = "CodemirrorDiagnostic[]")]
     pub type JsCodemirrorDiagnosticArray;
+
+    #[wasm_bindgen(typescript_type = "CodemirrorCompletion[]")]
+    pub type JsCodemirrorCompletionArray;
 
     #[wasm_bindgen(typescript_type = "unknown")]
     pub type JsUnknown;
@@ -679,5 +682,56 @@ impl Tlang {
 
         let all: Vec<_> = parse_errors.chain(diagnostics).collect();
         Ok(serde_wasm_bindgen::to_value(&all)?.unchecked_into())
+    }
+
+    /// Return completion items derived from the semantic analyzer's symbol tables.
+    ///
+    /// This reuses the same analysis pipeline as the LSP server's `SymbolIndex`
+    /// but runs inside the WASM playground, giving CodeMirror context-aware
+    /// completions (user-defined functions, variables, enums, structs, etc.).
+    #[wasm_bindgen(js_name = "getCompletionItems")]
+    #[allow(clippy::missing_panics_doc)]
+    pub fn completion_items(
+        &mut self,
+    ) -> Result<JsCodemirrorCompletionArray, serde_wasm_bindgen::Error> {
+        if !self.build.analyzed {
+            self.analyze();
+        }
+
+        let mut seen = HashSet::new();
+        let mut items = Vec::new();
+
+        for scope_rc in self.analyzer.symbol_tables().values() {
+            let scope = scope_rc.read().unwrap();
+            for def in scope
+                .get_all_local_symbols()
+                .iter()
+                .filter(|d| d.declared && !d.temp && !d.builtin)
+            {
+                let item = codemirror::CodemirrorCompletion {
+                    label: def.name.to_string(),
+                    completion_type: codemirror::completion_type_from_def_kind(def.kind),
+                    detail: codemirror::completion_detail_from_def_kind(def.kind),
+                };
+                let key = (
+                    item.label.clone(),
+                    item.completion_type.clone(),
+                    item.detail.clone(),
+                );
+
+                if seen.insert(key) {
+                    items.push(item);
+                }
+            }
+        }
+
+        items.sort_by(|a, b| {
+            a.label
+                .cmp(&b.label)
+                .then_with(|| a.detail.cmp(&b.detail))
+                .then_with(|| a.completion_type.cmp(&b.completion_type))
+        });
+
+        Ok(serde_wasm_bindgen::to_value(&items)?.unchecked_into())
     }
 }

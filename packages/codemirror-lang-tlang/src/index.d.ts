@@ -1,4 +1,6 @@
-import { Language, LanguageSupport } from '@codemirror/language';
+import { Language, LanguageSupport, LRLanguage } from '@codemirror/language';
+
+export const tlangLanguage: LRLanguage;
 
 export interface HoverInfo {
   text: string;
