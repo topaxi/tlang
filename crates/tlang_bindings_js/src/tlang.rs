@@ -3,6 +3,7 @@ use std::sync::{Arc, RwLock};
 
 use serde::{Deserialize, Serialize};
 use tlang_ast::node::{self as ast};
+use tlang_analysis::symbol_index::SymbolIndex;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_codegen_js::{
     JsAnfReturnOpt, JsAnfTransform, JsHirOptimizer, TailCallSelfReferenceValidation,
@@ -21,6 +22,7 @@ use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
 use crate::codemirror;
+use crate::codemirror::{CodemirrorDefinitionLocation, CodemirrorHoverInfo};
 use crate::ts_types::{JsDiagnostic, JsParseIssue};
 
 #[wasm_bindgen]
@@ -124,6 +126,7 @@ pub struct BuildArtifacts {
     hir: Option<hir::Module>,
     hir_opt_diagnostics: Vec<tlang_diagnostics::Diagnostic>,
     analyzed: bool,
+    symbol_index: Option<SymbolIndex>,
 }
 
 #[wasm_bindgen]
@@ -257,6 +260,77 @@ impl Tlang {
         if let Some(Ok(ast)) = &mut self.build.parse_result {
             let _ = self.analyzer.analyze(ast);
             self.build.analyzed = true;
+            self.build.symbol_index = Some(SymbolIndex::from_analyzer(&self.analyzer));
+        }
+    }
+
+    /// Get hover information for the symbol at the given UTF-16 position.
+    ///
+    /// Returns `None` when analysis has not been run, the position is not on
+    /// an identifier, or the identifier cannot be resolved.
+    #[wasm_bindgen(js_name = "getHoverInfo")]
+    pub fn get_hover_info(
+        &self,
+        pos: u32,
+    ) -> Result<JsValue, serde_wasm_bindgen::Error> {
+        let ast = match self.ast() {
+            Some(ast) => ast,
+            None => return Ok(JsValue::NULL),
+        };
+        let index = match &self.build.symbol_index {
+            Some(idx) => idx,
+            None => return Ok(JsValue::NULL),
+        };
+
+        let byte_pos = codemirror::utf16_to_byte_offset(&self.source, pos);
+        let (line, column) = codemirror::byte_offset_to_line_column(&self.source, byte_pos);
+
+        let resolved = tlang_analysis::query::resolve_symbol(ast, index, line, column);
+        match resolved {
+            Some(sym) => {
+                let info = CodemirrorHoverInfo {
+                    text: sym.hover_text(),
+                    from: codemirror::byte_offset_to_utf16(&self.source, sym.ident_span.start),
+                    to: codemirror::byte_offset_to_utf16(&self.source, sym.ident_span.end),
+                };
+                serde_wasm_bindgen::to_value(&info)
+            }
+            None => Ok(JsValue::NULL),
+        }
+    }
+
+    /// Get the definition location for the symbol at the given UTF-16 position.
+    ///
+    /// Returns `None` when the symbol is a builtin (no source location),
+    /// analysis has not been run, or the position is not on a resolvable
+    /// identifier.
+    #[wasm_bindgen(js_name = "getDefinitionLocation")]
+    pub fn get_definition_location(
+        &self,
+        pos: u32,
+    ) -> Result<JsValue, serde_wasm_bindgen::Error> {
+        let ast = match self.ast() {
+            Some(ast) => ast,
+            None => return Ok(JsValue::NULL),
+        };
+        let index = match &self.build.symbol_index {
+            Some(idx) => idx,
+            None => return Ok(JsValue::NULL),
+        };
+
+        let byte_pos = codemirror::utf16_to_byte_offset(&self.source, pos);
+        let (line, column) = codemirror::byte_offset_to_line_column(&self.source, byte_pos);
+
+        let resolved = tlang_analysis::query::resolve_symbol(ast, index, line, column);
+        match resolved {
+            Some(sym) if !sym.builtin => {
+                let loc = CodemirrorDefinitionLocation {
+                    from: codemirror::byte_offset_to_utf16(&self.source, sym.def_span.start),
+                    to: codemirror::byte_offset_to_utf16(&self.source, sym.def_span.end),
+                };
+                serde_wasm_bindgen::to_value(&loc)
+            }
+            _ => Ok(JsValue::NULL),
         }
     }
 
