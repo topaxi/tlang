@@ -270,4 +270,12 @@ export class TlangController {
   getOptimizations(): JsOptimizationOptions {
     return this.optimizationOptions;
   }
+
+  getHoverInfo(pos: number): { text: string; from: number; to: number } | null {
+    return this.tlang.getHoverInfo(pos) ?? null;
+  }
+
+  getDefinitionLocation(pos: number): { from: number; to: number } | null {
+    return this.tlang.getDefinitionLocation(pos) ?? null;
+  }
 }

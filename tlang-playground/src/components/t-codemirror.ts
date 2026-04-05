@@ -3,7 +3,11 @@ import { EditorView, keymap } from '@codemirror/view';
 import { EditorState, Prec } from '@codemirror/state';
 import { Diagnostic, linter, lintGutter } from '@codemirror/lint';
 import { catppuccin } from 'codemirror-theme-catppuccin';
-import { tlangLanguageSupport } from 'codemirror-lang-tlang';
+import {
+  tlangLanguageSupport,
+  type HoverProvider,
+  type GotoDefinitionProvider,
+} from 'codemirror-lang-tlang';
 import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
 import { json, jsonLanguage } from '@codemirror/lang-json';
 import { htmlLanguage } from '@codemirror/lang-html';
@@ -32,6 +36,12 @@ export class TCodeMirror extends LitElement {
     :host .cm-scroller {
       font-family: var(--t-font-family-mono, inherit);
     }
+
+    .cm-tlang-hover {
+      font-family: var(--t-font-family-mono, monospace);
+      font-size: 0.85em;
+      padding: 4px 8px;
+    }
   `;
 
   private view: EditorView | null = null;
@@ -50,6 +60,12 @@ export class TCodeMirror extends LitElement {
 
   @property({ type: Array })
   diagnostics: Diagnostic[] = [];
+
+  @property({ attribute: false })
+  hoverProvider?: HoverProvider;
+
+  @property({ attribute: false })
+  gotoDefinitionProvider?: GotoDefinitionProvider;
 
   @hostListener('keyup')
   handleKeyUp(event: KeyboardEvent) {
@@ -84,6 +100,8 @@ export class TCodeMirror extends LitElement {
             jsonLanguage,
             jsLanguage: javascriptLanguage,
             markdownLanguage,
+            hoverProvider: this.hoverProvider,
+            gotoDefinitionProvider: this.gotoDefinitionProvider,
           }),
         );
         break;

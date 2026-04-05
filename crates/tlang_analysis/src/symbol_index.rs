@@ -38,6 +38,10 @@ pub struct SymbolIndex {
 
 impl SymbolIndex {
     /// Build a `SymbolIndex` from the semantic analyzer's symbol tables.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any scope `RwLock` is poisoned.
     pub fn from_analyzer(analyzer: &SemanticAnalyzer) -> Self {
         let mut index = SymbolIndex::default();
         let tables = analyzer.symbol_tables();

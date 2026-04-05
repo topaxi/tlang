@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use serde::{Deserialize, Serialize};
-use tlang_ast::node::{self as ast};
 use tlang_analysis::symbol_index::SymbolIndex;
+use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_codegen_js::{
     JsAnfReturnOpt, JsAnfTransform, JsHirOptimizer, TailCallSelfReferenceValidation,
@@ -269,10 +269,7 @@ impl Tlang {
     /// Returns `None` when analysis has not been run, the position is not on
     /// an identifier, or the identifier cannot be resolved.
     #[wasm_bindgen(js_name = "getHoverInfo")]
-    pub fn get_hover_info(
-        &self,
-        pos: u32,
-    ) -> Result<JsValue, serde_wasm_bindgen::Error> {
+    pub fn get_hover_info(&self, pos: u32) -> Result<JsValue, serde_wasm_bindgen::Error> {
         let ast = match self.ast() {
             Some(ast) => ast,
             None => return Ok(JsValue::NULL),
@@ -305,10 +302,7 @@ impl Tlang {
     /// analysis has not been run, or the position is not on a resolvable
     /// identifier.
     #[wasm_bindgen(js_name = "getDefinitionLocation")]
-    pub fn get_definition_location(
-        &self,
-        pos: u32,
-    ) -> Result<JsValue, serde_wasm_bindgen::Error> {
+    pub fn get_definition_location(&self, pos: u32) -> Result<JsValue, serde_wasm_bindgen::Error> {
         let ast = match self.ast() {
             Some(ast) => ast,
             None => return Ok(JsValue::NULL),

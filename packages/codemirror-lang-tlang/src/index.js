@@ -1,7 +1,15 @@
 import { parser } from './parser.js';
-import { foldNodeProp, foldInside, indentNodeProp } from '@codemirror/language';
+import {
+  foldNodeProp,
+  foldInside,
+  indentNodeProp,
+  LRLanguage,
+  LanguageSupport,
+} from '@codemirror/language';
 import { styleTags, tags as t } from '@lezer/highlight';
 import { parseMixed } from '@lezer/common';
+import { completeFromList } from '@codemirror/autocomplete';
+import { hoverTooltip, EditorView } from '@codemirror/view';
 
 let parserWithMetadata = parser.configure({
   props: [
@@ -75,8 +83,6 @@ let parserWithMetadata = parser.configure({
   ],
 });
 
-import { LRLanguage } from '@codemirror/language';
-
 export const tlangLanguage = LRLanguage.define({
   name: 'tlang',
   parser: parserWithMetadata,
@@ -84,8 +90,6 @@ export const tlangLanguage = LRLanguage.define({
     commentTokens: { line: '//' },
   },
 });
-
-import { completeFromList } from '@codemirror/autocomplete';
 
 export const tlangCompletion = tlangLanguage.data.of({
   autocomplete: completeFromList([
@@ -138,7 +142,101 @@ export const tlangCompletion = tlangLanguage.data.of({
   ]),
 });
 
-import { LanguageSupport } from '@codemirror/language';
+/**
+ * @typedef {{
+ *   text: string,
+ *   from: number,
+ *   to: number,
+ * }} HoverInfo
+ *
+ * @typedef {{
+ *   from: number,
+ *   to: number,
+ * }} DefinitionLocation
+ *
+ * @typedef {(pos: number) => HoverInfo | null} HoverProvider
+ * @typedef {(pos: number) => DefinitionLocation | null} GotoDefinitionProvider
+ */
+
+/**
+ * @param {{
+ *   reLanguage?: import('@codemirror/language').Language,
+ *   htmlLanguage?: import('@codemirror/language').Language,
+ *   cssLanguage?: import('@codemirror/language').Language,
+ *   sqlLanguage?: import('@codemirror/language').Language,
+ *   jsonLanguage?: import('@codemirror/language').Language,
+ *   jsLanguage?: import('@codemirror/language').Language,
+ *   markdownLanguage?: import('@codemirror/language').Language,
+ *   hoverProvider?: HoverProvider,
+ *   gotoDefinitionProvider?: GotoDefinitionProvider,
+ * }} [options]
+ */
+export function tlangLanguageSupport(options = {}) {
+  const wrap = makeTaggedStringWrap(options);
+  const lang = wrap ? tlangLanguage.configure({ wrap }) : tlangLanguage;
+
+  /** @type {import('@codemirror/state').Extension[]} */
+  const extensions = [tlangCompletion];
+
+  if (options.hoverProvider) {
+    extensions.push(tlangHoverTooltip(options.hoverProvider));
+  }
+
+  if (options.gotoDefinitionProvider) {
+    extensions.push(tlangGotoDefinition(options.gotoDefinitionProvider));
+  }
+
+  return new LanguageSupport(lang, extensions);
+}
+
+/**
+ * Create a CodeMirror hover tooltip extension using the given provider.
+ *
+ * @param {HoverProvider} provider
+ */
+function tlangHoverTooltip(provider) {
+  return hoverTooltip((_view, pos, _side) => {
+    const info = provider(pos);
+    if (!info) return null;
+
+    return {
+      pos: info.from,
+      end: info.to,
+      create: () => {
+        const dom = document.createElement('div');
+        dom.className = 'cm-tlang-hover';
+        dom.textContent = info.text;
+        return { dom };
+      },
+    };
+  });
+}
+
+/**
+ * Create a CodeMirror goto-definition extension (Ctrl/Cmd+Click).
+ *
+ * @param {GotoDefinitionProvider} provider
+ */
+function tlangGotoDefinition(provider) {
+  return EditorView.domEventHandlers({
+    click: (event, view) => {
+      if (!event.ctrlKey && !event.metaKey) return false;
+
+      const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+      if (pos == null) return false;
+
+      const def = provider(pos);
+      if (!def) return false;
+
+      event.preventDefault();
+      view.dispatch({
+        selection: { anchor: def.from },
+        scrollIntoView: true,
+      });
+      return true;
+    },
+  });
+}
 
 /**
  * @param {{
@@ -199,21 +297,4 @@ function makeTaggedStringWrap(languages) {
 
     return { parser, overlay };
   });
-}
-
-/**
- * @param {{
- *   reLanguage?: import('@codemirror/language').Language,
- *   htmlLanguage?: import('@codemirror/language').Language,
- *   cssLanguage?: import('@codemirror/language').Language,
- *   sqlLanguage?: import('@codemirror/language').Language,
- *   jsonLanguage?: import('@codemirror/language').Language,
- *   jsLanguage?: import('@codemirror/language').Language,
- *   markdownLanguage?: import('@codemirror/language').Language,
- * }} [options]
- */
-export function tlangLanguageSupport(options = {}) {
-  const wrap = makeTaggedStringWrap(options);
-  const lang = wrap ? tlangLanguage.configure({ wrap }) : tlangLanguage;
-  return new LanguageSupport(lang, [tlangCompletion]);
 }
