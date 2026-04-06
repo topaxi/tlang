@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use serde::{Deserialize, Serialize};
@@ -686,9 +686,9 @@ impl Tlang {
 
     /// Return completion items derived from the semantic analyzer's symbol tables.
     ///
-    /// This reuses the same analysis pipeline as the LSP server's `SymbolIndex`
-    /// but runs inside the WASM playground, giving CodeMirror context-aware
-    /// completions (user-defined functions, variables, enums, structs, etc.).
+    /// This delegates to [`SymbolIndex::collect_completion_items`] — the
+    /// canonical implementation shared with the LSP server — and converts
+    /// the protocol-agnostic items into CodeMirror-compatible format.
     #[wasm_bindgen(js_name = "getCompletionItems")]
     #[allow(clippy::missing_panics_doc)]
     pub fn completion_items(
@@ -698,39 +698,19 @@ impl Tlang {
             self.analyze();
         }
 
-        let mut seen = HashSet::new();
-        let mut items = Vec::new();
+        let analysis_items = match &self.build.symbol_index {
+            Some(index) => index.collect_completion_items(),
+            None => vec![],
+        };
 
-        for scope_rc in self.analyzer.symbol_tables().values() {
-            let scope = scope_rc.read().unwrap();
-            for def in scope
-                .get_all_local_symbols()
-                .iter()
-                .filter(|d| d.declared && !d.temp && !d.builtin)
-            {
-                let item = codemirror::CodemirrorCompletion {
-                    label: def.name.to_string(),
-                    completion_type: codemirror::completion_type_from_def_kind(def.kind),
-                    detail: codemirror::completion_detail_from_def_kind(def.kind),
-                };
-                let key = (
-                    item.label.clone(),
-                    item.completion_type.clone(),
-                    item.detail.clone(),
-                );
-
-                if seen.insert(key) {
-                    items.push(item);
-                }
-            }
-        }
-
-        items.sort_by(|a, b| {
-            a.label
-                .cmp(&b.label)
-                .then_with(|| a.detail.cmp(&b.detail))
-                .then_with(|| a.completion_type.cmp(&b.completion_type))
-        });
+        let items: Vec<codemirror::CodemirrorCompletion> = analysis_items
+            .into_iter()
+            .map(|item| codemirror::CodemirrorCompletion {
+                label: item.label,
+                completion_type: codemirror::completion_type_from_def_kind(item.kind),
+                detail: item.detail,
+            })
+            .collect();
 
         Ok(serde_wasm_bindgen::to_value(&items)?.unchecked_into())
     }
