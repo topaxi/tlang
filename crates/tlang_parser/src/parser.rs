@@ -309,7 +309,7 @@ impl<'src> Parser<'src> {
             Visibility::Private
         };
         let mut node = match self.current_token.kind {
-            TokenKind::Keyword(Keyword::Use) => self.parse_use_declaration(),
+            TokenKind::Keyword(Keyword::Use) => self.parse_use_declaration(visibility),
             TokenKind::Keyword(Keyword::Mod) => self.parse_mod_declaration(visibility),
             TokenKind::Keyword(Keyword::Let) => self.parse_variable_declaration(),
             TokenKind::Keyword(Keyword::Const) => self.parse_const_declaration(visibility),
@@ -734,7 +734,7 @@ impl<'src> Parser<'src> {
     /// - `use string::parse::from_char_code as alias`
     /// - `use string::{from_char_code, char_code_at}`
     /// - `use string::{from_char_code as fcc, char_code_at}`
-    fn parse_use_declaration(&mut self) -> Stmt {
+    fn parse_use_declaration(&mut self, visibility: Visibility) -> Stmt {
         self.consume_keyword_token(Keyword::Use);
 
         let mut path_segments = Vec::new();
@@ -779,6 +779,7 @@ impl<'src> Parser<'src> {
                 return node::stmt!(
                     self.unique_id(),
                     UseDeclaration(Box::new(UseDeclaration {
+                        visibility,
                         path: path_segments,
                         items,
                         span: Span::default(),
@@ -815,6 +816,7 @@ impl<'src> Parser<'src> {
         node::stmt!(
             self.unique_id(),
             UseDeclaration(Box::new(UseDeclaration {
+                visibility,
                 path: path_segments,
                 items: vec![UseItem {
                     name: last,

@@ -190,7 +190,10 @@ pub fn compile_project(
     let mut compiled_modules = BTreeMap::new();
 
     // Collect exported symbols from all modules first (declaration pass)
-    let exported_symbols = collect_exported_symbols(&graph);
+    let mut exported_symbols = collect_exported_symbols(&graph);
+
+    // Enrich exports with re-exports from `pub use` declarations
+    enrich_exports_with_re_exports(&mut exported_symbols, &imports);
 
     // Build reverse-dependency map and compute API fingerprints
     let reverse_deps = build_reverse_deps(&imports);
@@ -298,7 +301,11 @@ pub fn compile_project_with_slots<S: AsRef<str>>(
         .map(|m| m + 1)
         .unwrap_or(0);
 
-    let exported_symbols = collect_exported_symbols(&graph);
+    let mut exported_symbols = collect_exported_symbols(&graph);
+
+    // Enrich exports with re-exports from `pub use` declarations
+    enrich_exports_with_re_exports(&mut exported_symbols, &imports);
+
     let mut next_slot = max_builtin_slot;
     let mut import_slots: HashMap<(ModulePath, String), usize> = HashMap::new();
 
@@ -474,6 +481,59 @@ fn collect_exported_symbols(graph: &ModuleGraph) -> HashMap<ModulePath, Vec<(Str
     }
 
     exports
+}
+
+/// Enrich exported symbols with re-exports from `pub use` declarations.
+///
+/// For each module that has re-exports, look up the original symbol's DefKind
+/// in the source module's exported symbols and add it to the re-exporting
+/// module's exports under the re-exported name (including child symbols for
+/// enums, structs, protocols).
+fn enrich_exports_with_re_exports(
+    exports: &mut HashMap<ModulePath, Vec<(String, DefKind)>>,
+    imports: &HashMap<ModulePath, ResolvedImports>,
+) {
+    // Collect the additions first to avoid borrowing conflicts
+    let mut additions: HashMap<ModulePath, Vec<(String, DefKind)>> = HashMap::new();
+
+    for (module_path, resolved) in imports {
+        for (exported_name, re_export) in &resolved.re_exports {
+            if let Some(source_exports) = exports.get(&re_export.source_module) {
+                for (name, kind) in source_exports {
+                    if name == &re_export.original_name {
+                        additions
+                            .entry(module_path.clone())
+                            .or_default()
+                            .push((exported_name.clone(), *kind));
+
+                        // Also re-export child symbols (enum variants, protocol methods, etc.)
+                        if matches!(kind, DefKind::Enum | DefKind::Protocol | DefKind::Struct) {
+                            let prefix = format!("{}::", re_export.original_name);
+                            for (child_name, child_kind) in source_exports {
+                                if child_name.starts_with(&prefix) {
+                                    let re_exported_child = format!(
+                                        "{}::{}",
+                                        exported_name,
+                                        &child_name[prefix.len()..]
+                                    );
+                                    additions
+                                        .entry(module_path.clone())
+                                        .or_default()
+                                        .push((re_exported_child, *child_kind));
+                                }
+                            }
+                        }
+
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    for (module_path, symbols) in additions {
+        exports.entry(module_path).or_default().extend(symbols);
+    }
 }
 
 /// Collect import symbols for a module, including auto-imported children
@@ -767,7 +827,8 @@ impl IncrementalCompiler {
         self.imports = imports;
 
         // Re-collect exported symbols and determine if API changed
-        let exported_symbols = collect_exported_symbols(&self.graph);
+        let mut exported_symbols = collect_exported_symbols(&self.graph);
+        enrich_exports_with_re_exports(&mut exported_symbols, &self.imports);
         let new_fingerprint = ModuleApiFingerprint::from_exports(
             exported_symbols.get(&module_path).map_or(&[], |v| v),
         );

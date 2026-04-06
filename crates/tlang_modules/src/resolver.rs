@@ -10,6 +10,9 @@ use crate::{ModuleGraph, ModulePath};
 pub struct ResolvedImports {
     /// Map from local name to (source module path, original symbol name).
     pub symbols: HashMap<String, ResolvedSymbol>,
+    /// Symbols re-exported via `pub use`. Map from exported name to the
+    /// resolved symbol pointing at the original defining module.
+    pub re_exports: HashMap<String, ResolvedSymbol>,
 }
 
 #[derive(Debug, Clone)]
@@ -31,17 +34,34 @@ impl ModuleResolver {
     ///
     /// Returns a map from module path to its resolved imports,
     /// and a list of errors for any unresolvable imports.
+    ///
+    /// Modules are resolved in topological order so that re-exports
+    /// (`pub use`) from dependencies are available when resolving
+    /// downstream modules.
     pub fn resolve_imports(
         graph: &ModuleGraph,
     ) -> (HashMap<ModulePath, ResolvedImports>, Vec<ModuleGraphError>) {
-        let mut all_imports = HashMap::new();
+        let mut all_imports: HashMap<ModulePath, ResolvedImports> = HashMap::new();
         let mut errors = Vec::new();
 
-        for (module_path, module) in &graph.modules {
+        let order = graph.topological_order();
+
+        for module_path in &order {
+            let module = match graph.modules.get(module_path) {
+                Some(m) => m,
+                None => continue,
+            };
             let mut resolved = ResolvedImports::default();
 
             for use_decl in &module.use_declarations {
-                Self::resolve_use_decl(graph, module_path, use_decl, &mut resolved, &mut errors);
+                Self::resolve_use_decl(
+                    graph,
+                    module_path,
+                    use_decl,
+                    &mut resolved,
+                    &all_imports,
+                    &mut errors,
+                );
             }
 
             all_imports.insert(module_path.clone(), resolved);
@@ -55,6 +75,7 @@ impl ModuleResolver {
         from_module: &ModulePath,
         use_decl: &UseDeclInfo,
         resolved: &mut ResolvedImports,
+        all_imports: &HashMap<ModulePath, ResolvedImports>,
         errors: &mut Vec<ModuleGraphError>,
     ) {
         // Resolve the module path
@@ -96,6 +117,11 @@ impl ModuleResolver {
             return;
         }
 
+        // Collect the target module's re-exports for lookup
+        let target_re_exports = all_imports
+            .get(&target_module_path)
+            .map(|ri| &ri.re_exports);
+
         // Resolve each imported item
         for item in &use_decl.items {
             let local_name = item.alias.as_ref().unwrap_or(&item.name).clone();
@@ -111,9 +137,14 @@ impl ModuleResolver {
                 continue;
             }
 
-            // Check that the symbol exists and is declared as `pub` in the target module
+            // Check that the symbol exists and is declared as `pub` in the target module,
+            // or is re-exported via `pub use` in the target module.
             if let Some(target) = graph.modules.get(&target_module_path) {
-                if !is_symbol_declared(&target.ast, &item.name) {
+                let declared = is_symbol_declared(&target.ast, &item.name);
+                let is_re_export = target_re_exports
+                    .is_some_and(|re| re.contains_key(&item.name));
+
+                if !declared && !is_re_export {
                     errors.push(ModuleGraphError::ImportError {
                         module_path: from_module.clone(),
                         symbol_name: item.name.clone(),
@@ -125,7 +156,8 @@ impl ModuleResolver {
                     });
                     continue;
                 }
-                if !is_symbol_public(&target.ast, &item.name) {
+
+                if declared && !is_symbol_public(&target.ast, &item.name) {
                     errors.push(ModuleGraphError::ImportError {
                         module_path: from_module.clone(),
                         symbol_name: item.name.clone(),
@@ -137,6 +169,35 @@ impl ModuleResolver {
                     });
                     continue;
                 }
+
+                // If the symbol is a re-export, resolve to the original source module
+                if is_re_export && !declared {
+                    let re_export = &target_re_exports.unwrap()[&item.name];
+                    resolved.symbols.insert(
+                        local_name.clone(),
+                        ResolvedSymbol {
+                            source_module: re_export.source_module.clone(),
+                            original_name: re_export.original_name.clone(),
+                            local_name: local_name.clone(),
+                            span: item.span,
+                        },
+                    );
+
+                    // If this is also a `pub use`, propagate the re-export
+                    if use_decl.visibility == Visibility::Public {
+                        resolved.re_exports.insert(
+                            local_name.clone(),
+                            ResolvedSymbol {
+                                source_module: re_export.source_module.clone(),
+                                original_name: re_export.original_name.clone(),
+                                local_name: local_name.clone(),
+                                span: item.span,
+                            },
+                        );
+                    }
+
+                    continue;
+                }
             }
 
             resolved.symbols.insert(
@@ -144,10 +205,23 @@ impl ModuleResolver {
                 ResolvedSymbol {
                     source_module: target_module_path.clone(),
                     original_name: item.name.clone(),
-                    local_name,
+                    local_name: local_name.clone(),
                     span: item.span,
                 },
             );
+
+            // If this is a `pub use`, also record as a re-export
+            if use_decl.visibility == Visibility::Public {
+                resolved.re_exports.insert(
+                    local_name.clone(),
+                    ResolvedSymbol {
+                        source_module: target_module_path.clone(),
+                        original_name: item.name.clone(),
+                        local_name: local_name.clone(),
+                        span: item.span,
+                    },
+                );
+            }
         }
     }
 

@@ -8,6 +8,7 @@ Module(
     Stmt(
       id: 3,
       kind: UseDeclaration(UseDeclaration(
+        visibility: Private,
         path: [
           Ident(
             name: "a",

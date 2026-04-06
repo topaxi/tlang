@@ -581,9 +581,13 @@ pub struct UseItem {
 /// - `use string::parse::from_char_code as fcc`
 /// - `use string::{from_char_code, char_code_at}`
 /// - `use string::{from_char_code as fcc, char_code_at}`
+/// - `pub use math::add` (re-export)
+/// - `pub use math::{add, subtract}` (grouped re-export)
+/// - `pub use math::add as sum` (re-export with alias)
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct UseDeclaration {
+    pub visibility: Visibility,
     pub path: Vec<Ident>,
     pub items: Vec<UseItem>,
     pub span: Span,

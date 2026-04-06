@@ -34,6 +34,8 @@ pub struct ModDeclInfo {
 
 #[derive(Debug, Clone)]
 pub struct UseDeclInfo {
+    /// The visibility of this `use` declaration. `Public` means it is a re-export (`pub use`).
+    pub visibility: Visibility,
     /// The path prefix (e.g., `["string", "parse"]` in `use string::parse::foo`).
     pub path: Vec<String>,
     /// The imported items.
@@ -395,6 +397,7 @@ pub fn extract_declarations(ast: &node::Module) -> (Vec<ModDeclInfo>, Vec<UseDec
             }
             StmtKind::UseDeclaration(decl) => {
                 use_decls.push(UseDeclInfo {
+                    visibility: decl.visibility,
                     path: decl.path.iter().map(|id| id.as_str().to_string()).collect(),
                     items: decl
                         .items

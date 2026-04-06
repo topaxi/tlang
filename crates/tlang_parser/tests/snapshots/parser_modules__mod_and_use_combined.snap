@@ -57,6 +57,7 @@ Module(
     Stmt(
       id: 4,
       kind: UseDeclaration(UseDeclaration(
+        visibility: Private,
         path: [
           Ident(
             name: "string",
