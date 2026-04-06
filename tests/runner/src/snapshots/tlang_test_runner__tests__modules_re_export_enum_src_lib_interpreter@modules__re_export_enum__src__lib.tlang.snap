@@ -1,0 +1,15 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/modules/re_export_enum/src/lib.tlang
+---
+circle(5)
+75
+rect(3,4)
+12
+
+[TIMESTAMP] WARN  tlang_hir_opt::slot_allocation::slot_allocator] Unable to assign slot for path 'Shape::Circle' on line 78, as it has not been resolved
+[TIMESTAMP] WARN  tlang_hir_opt::slot_allocation::slot_allocator] Unable to assign slot for path 'Shape::Rectangle' on line 104, as it has not been resolved
+[TIMESTAMP] WARN  tlang_hir_opt::slot_allocation::slot_allocator] Unable to assign slot for path 'Shape::Circle' on line 78, as it has not been resolved
+[TIMESTAMP] WARN  tlang_hir_opt::slot_allocation::slot_allocator] Unable to assign slot for path 'Shape::Rectangle' on line 104, as it has not been resolved
