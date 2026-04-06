@@ -72,3 +72,33 @@ fn test_mod_and_use_combined() {
         pub fn main() { from_char_code(65) }
     "});
 }
+
+// === pub use (re-exports) ===
+
+#[test]
+fn test_pub_use_single_import() {
+    assert_parser_snapshot!("pub use math::add;");
+}
+
+#[test]
+fn test_pub_use_single_import_with_alias() {
+    assert_parser_snapshot!("pub use math::add as sum;");
+}
+
+#[test]
+fn test_pub_use_grouped_imports() {
+    assert_parser_snapshot!("pub use math::{add, subtract};");
+}
+
+#[test]
+fn test_pub_use_deep_path() {
+    assert_parser_snapshot!("pub use a::b::c::add;");
+}
+
+#[test]
+fn test_pub_use_combined_with_mod() {
+    assert_parser_snapshot!(indoc! {"
+        pub mod math;
+        pub use math::add;
+    "});
+}

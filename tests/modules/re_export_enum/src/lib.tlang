@@ -1,0 +1,11 @@
+pub mod shapes;
+pub mod facade;
+use facade::{Shape, describe, area};
+
+let c = Shape::Circle(5);
+let r = Shape::Rectangle(3, 4);
+
+describe(c) |> log();
+area(c) |> log();
+describe(r) |> log();
+area(r) |> log();

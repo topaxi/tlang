@@ -96,11 +96,16 @@ pub fn handle_build(options: &BuildOptions) -> bool {
     }
 
     // Generate import alias bindings (e.g., `const mul = multiply;`)
+    // Deduplicated — re-exports can cause identical bindings from multiple modules.
     let mut alias_bindings = Vec::new();
+    let mut seen_aliases = std::collections::HashSet::new();
     for resolved in result.imports.values() {
         for sym in resolved.symbols.values() {
             if sym.local_name != sym.original_name {
-                alias_bindings.push(format!("const {} = {};", sym.local_name, sym.original_name));
+                let binding = format!("const {} = {};", sym.local_name, sym.original_name);
+                if seen_aliases.insert(binding.clone()) {
+                    alias_bindings.push(binding);
+                }
             }
         }
     }

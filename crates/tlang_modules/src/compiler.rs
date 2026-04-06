@@ -190,7 +190,10 @@ pub fn compile_project(
     let mut compiled_modules = BTreeMap::new();
 
     // Collect exported symbols from all modules first (declaration pass)
-    let exported_symbols = collect_exported_symbols(&graph);
+    let mut exported_symbols = collect_exported_symbols(&graph);
+
+    // Enrich exports with re-exports from `pub use` declarations
+    enrich_exports_with_re_exports(&mut exported_symbols, &imports);
 
     // Build reverse-dependency map and compute API fingerprints
     let reverse_deps = build_reverse_deps(&imports);
@@ -298,7 +301,11 @@ pub fn compile_project_with_slots<S: AsRef<str>>(
         .map(|m| m + 1)
         .unwrap_or(0);
 
-    let exported_symbols = collect_exported_symbols(&graph);
+    let mut exported_symbols = collect_exported_symbols(&graph);
+
+    // Enrich exports with re-exports from `pub use` declarations
+    enrich_exports_with_re_exports(&mut exported_symbols, &imports);
+
     let mut next_slot = max_builtin_slot;
     let mut import_slots: HashMap<(ModulePath, String), usize> = HashMap::new();
 
@@ -476,6 +483,59 @@ fn collect_exported_symbols(graph: &ModuleGraph) -> HashMap<ModulePath, Vec<(Str
     exports
 }
 
+/// Enrich exported symbols with re-exports from `pub use` declarations.
+///
+/// For each module that has re-exports, look up the original symbol's DefKind
+/// in the source module's exported symbols and add it to the re-exporting
+/// module's exports under the re-exported name (including child symbols for
+/// enums, structs, protocols).
+fn enrich_exports_with_re_exports(
+    exports: &mut HashMap<ModulePath, Vec<(String, DefKind)>>,
+    imports: &HashMap<ModulePath, ResolvedImports>,
+) {
+    // Collect the additions first to avoid borrowing conflicts
+    let mut additions: HashMap<ModulePath, Vec<(String, DefKind)>> = HashMap::new();
+
+    for (module_path, resolved) in imports {
+        for (exported_name, re_export) in &resolved.re_exports {
+            if let Some(source_exports) = exports.get(&re_export.source_module) {
+                for (name, kind) in source_exports {
+                    if name == &re_export.original_name {
+                        additions
+                            .entry(module_path.clone())
+                            .or_default()
+                            .push((exported_name.clone(), *kind));
+
+                        // Also re-export child symbols (enum variants, protocol methods, etc.)
+                        if matches!(kind, DefKind::Enum | DefKind::Protocol | DefKind::Struct) {
+                            let prefix = format!("{}::", re_export.original_name);
+                            for (child_name, child_kind) in source_exports {
+                                if child_name.starts_with(&prefix) {
+                                    let re_exported_child = format!(
+                                        "{}::{}",
+                                        exported_name,
+                                        &child_name[prefix.len()..]
+                                    );
+                                    additions
+                                        .entry(module_path.clone())
+                                        .or_default()
+                                        .push((re_exported_child, *child_kind));
+                                }
+                            }
+                        }
+
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    for (module_path, symbols) in additions {
+        exports.entry(module_path).or_default().extend(symbols);
+    }
+}
+
 /// Collect import symbols for a module, including auto-imported children
 /// (enum variants when an enum is imported, protocol methods when a protocol is imported).
 fn collect_import_symbols(
@@ -521,8 +581,12 @@ fn build_reverse_deps(imports: &HashMap<ModulePath, ResolvedImports>) -> Reverse
 
     for (importer, resolved) in imports {
         for symbol in resolved.symbols.values() {
+            // Use provider_module (the immediate module from the `use` path)
+            // rather than source_module (the original definer) so that editing
+            // a re-exporting facade correctly triggers recompilation of its
+            // consumers.
             reverse_deps
-                .entry(symbol.source_module.clone())
+                .entry(symbol.provider_module.clone())
                 .or_default()
                 .insert(importer.clone());
         }
@@ -767,7 +831,8 @@ impl IncrementalCompiler {
         self.imports = imports;
 
         // Re-collect exported symbols and determine if API changed
-        let exported_symbols = collect_exported_symbols(&self.graph);
+        let mut exported_symbols = collect_exported_symbols(&self.graph);
+        enrich_exports_with_re_exports(&mut exported_symbols, &self.imports);
         let new_fingerprint = ModuleApiFingerprint::from_exports(
             exported_symbols.get(&module_path).map_or(&[], |v| v),
         );
@@ -1561,6 +1626,50 @@ mod tests {
         );
         assert!(recompiled.contains(&ModulePath::from_str_segments(&["math"])));
         assert!(recompiled.contains(&ModulePath::root()));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_reverse_deps_track_provider_module_for_re_exports() {
+        // When root does `use facade::add` and facade does `pub use math::add`,
+        // the reverse deps must record root as depending on facade (the provider),
+        // not on math (the original definer), so that changes to facade trigger
+        // recompilation of root.
+        let dir = std::env::temp_dir().join("tlang_test_reverse_deps_reexport");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        fs::write(
+            src.join("lib.tlang"),
+            "pub mod math;\npub mod facade;\nuse facade::add;\nadd(1, 2) |> log();",
+        )
+        .unwrap();
+        fs::write(src.join("math.tlang"), "pub fn add(a, b) { a + b }").unwrap();
+        fs::write(src.join("facade.tlang"), "pub use math::add;").unwrap();
+
+        let builtins: Vec<(&str, DefKind)> = vec![("log", DefKind::Function(u16::MAX))];
+        let result = compile_project(&dir, &builtins).unwrap();
+
+        let facade_path = ModulePath::from_str_segments(&["facade"]);
+        let math_path = ModulePath::from_str_segments(&["math"]);
+
+        // Root depends on facade (the provider), not on math (the definer)
+        let facade_dependents = result.reverse_deps.get(&facade_path);
+        assert!(
+            facade_dependents.is_some_and(|d| d.contains(&ModulePath::root())),
+            "root should be recorded as depending on facade, got: {:?}",
+            result.reverse_deps
+        );
+
+        // facade depends on math (since it does `pub use math::add`)
+        let math_dependents = result.reverse_deps.get(&math_path);
+        assert!(
+            math_dependents.is_some_and(|d| d.contains(&facade_path)),
+            "facade should be recorded as depending on math, got: {:?}",
+            result.reverse_deps
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }

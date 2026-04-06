@@ -62,12 +62,17 @@ fn compile_project_to_js(project_name: &str) -> String {
         }
     }
 
-    // Alias bindings
+    // Alias bindings (deduplicated — re-exports can cause identical bindings
+    // from multiple modules)
     let mut aliases = Vec::new();
+    let mut seen_aliases = std::collections::HashSet::new();
     for resolved in result.imports.values() {
         for sym in resolved.symbols.values() {
             if sym.local_name != sym.original_name {
-                aliases.push(format!("const {} = {};", sym.local_name, sym.original_name));
+                let binding = format!("const {} = {};", sym.local_name, sym.original_name);
+                if seen_aliases.insert(binding.clone()) {
+                    aliases.push(binding);
+                }
             }
         }
     }
@@ -210,4 +215,34 @@ fn test_multi_module_composition() {
     let js = compile_project_to_js("multi_module_composition");
     let output = run_js(&js);
     assert_eq!(output.trim(), "42\n42\nababab\n30");
+}
+
+// === pub use re-export tests ===
+
+#[test]
+fn test_re_export_basic() {
+    let js = compile_project_to_js("re_export_basic");
+    let output = run_js(&js);
+    assert_eq!(output.trim(), "5");
+}
+
+#[test]
+fn test_re_export_grouped() {
+    let js = compile_project_to_js("re_export_grouped");
+    let output = run_js(&js);
+    assert_eq!(output.trim(), "5\n20");
+}
+
+#[test]
+fn test_re_export_chain() {
+    let js = compile_project_to_js("re_export_chain");
+    let output = run_js(&js);
+    assert_eq!(output.trim(), "30");
+}
+
+#[test]
+fn test_re_export_enum() {
+    let js = compile_project_to_js("re_export_enum");
+    let output = run_js(&js);
+    assert_eq!(output.trim(), "circle(5)\n75\nrect(3,4)\n12");
 }

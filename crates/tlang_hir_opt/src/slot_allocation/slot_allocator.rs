@@ -51,6 +51,18 @@ impl SlotAllocator {
             return;
         }
 
+        // Imported enum variant constructors are registered as builtins without
+        // an hir_id.  They don't need a slot – the interpreter resolves them via
+        // `is_enum_variant_def()` or the globals name map directly.
+        if path.res.binding_kind() == hir::BindingKind::Variant && path.res.hir_id().is_none() {
+            debug!(
+                "Path '{}' on line {} is an imported enum variant, skipping slot assignment.",
+                path, path.span.start,
+            );
+
+            return;
+        }
+
         if path.res.hir_id().is_none() {
             warn!(
                 "Unable to assign slot for path '{}' on line {}, as it has not been resolved",

@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser_modules.rs
-expression: "parse! (\"use string::parse::from_char_code;\")"
+expression: "parse! (\"pub use math::add;\")"
 ---
 Module(
   id: 2,
@@ -8,35 +8,20 @@ Module(
     Stmt(
       id: 3,
       kind: UseDeclaration(UseDeclaration(
-        visibility: Private,
+        visibility: Public,
         path: [
           Ident(
-            name: "string",
+            name: "math",
             span: Span(
-              start: 4,
-              end: 10,
+              start: 8,
+              end: 12,
               start_lc: LineColumn(
                 line: 0,
-                column: 4,
+                column: 8,
               ),
               end_lc: LineColumn(
-                line: 0,
-                column: 10,
-              ),
-            ),
-          ),
-          Ident(
-            name: "parse",
-            span: Span(
-              start: 12,
-              end: 17,
-              start_lc: LineColumn(
                 line: 0,
                 column: 12,
-              ),
-              end_lc: LineColumn(
-                line: 0,
-                column: 17,
               ),
             ),
           ),
@@ -44,31 +29,31 @@ Module(
         items: [
           UseItem(
             name: Ident(
-              name: "from_char_code",
+              name: "add",
               span: Span(
-                start: 19,
-                end: 33,
+                start: 14,
+                end: 17,
                 start_lc: LineColumn(
                   line: 0,
-                  column: 19,
+                  column: 14,
                 ),
                 end_lc: LineColumn(
                   line: 0,
-                  column: 33,
+                  column: 17,
                 ),
               ),
             ),
             alias: None,
             span: Span(
-              start: 19,
-              end: 33,
+              start: 14,
+              end: 17,
               start_lc: LineColumn(
                 line: 0,
-                column: 19,
+                column: 14,
               ),
               end_lc: LineColumn(
                 line: 0,
-                column: 33,
+                column: 17,
               ),
             ),
           ),
@@ -88,14 +73,14 @@ Module(
       )),
       span: Span(
         start: 0,
-        end: 34,
+        end: 18,
         start_lc: LineColumn(
           line: 0,
           column: 0,
         ),
         end_lc: LineColumn(
           line: 0,
-          column: 34,
+          column: 18,
         ),
       ),
       leading_comments: [],
@@ -104,14 +89,14 @@ Module(
   ],
   span: Span(
     start: 0,
-    end: 34,
+    end: 18,
     start_lc: LineColumn(
       line: 0,
       column: 0,
     ),
     end_lc: LineColumn(
       line: 0,
-      column: 34,
+      column: 18,
     ),
   ),
 )
