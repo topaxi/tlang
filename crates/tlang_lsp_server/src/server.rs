@@ -5,6 +5,7 @@ use async_lsp::ClientSocket;
 use async_lsp::LanguageClient;
 use async_lsp::router::Router;
 use lsp_types::{
+    CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     GotoDefinitionParams, GotoDefinitionResponse, HoverParams, HoverProviderCapability,
     InitializeParams, InitializeResult, PublishDiagnosticsParams, ServerCapabilities,
@@ -13,6 +14,7 @@ use lsp_types::{
 use serde::Deserialize;
 use tlang_analysis::CompilationTarget;
 use tlang_analysis::query::ResolvedSymbol;
+use tlang_defs::DefKind;
 use tracing::{error, warn};
 
 use crate::diagnostics;
@@ -94,6 +96,7 @@ impl ServerState {
             .request::<lsp_types::request::Shutdown, _>(|_, _| Box::pin(async { Ok(()) }))
             .request::<lsp_types::request::HoverRequest, _>(Self::on_hover)
             .request::<lsp_types::request::GotoDefinition, _>(Self::on_goto_definition)
+            .request::<lsp_types::request::Completion, _>(Self::on_completion)
             .notification::<lsp_types::notification::Initialized>(|_, _| ControlFlow::Continue(()))
             .notification::<lsp_types::notification::Exit>(|_, _| ControlFlow::Break(Ok(())))
             .notification::<lsp_types::notification::DidOpenTextDocument>(Self::on_did_open)
@@ -130,6 +133,7 @@ impl ServerState {
                     )),
                     hover_provider: Some(HoverProviderCapability::Simple(true)),
                     definition_provider: Some(lsp_types::OneOf::Left(true)),
+                    completion_provider: Some(CompletionOptions::default()),
                     ..ServerCapabilities::default()
                 },
                 server_info: Some(lsp_types::ServerInfo {
@@ -219,6 +223,43 @@ impl ServerState {
         let pos = params.text_document_position_params.position;
         let result = Self::resolve_symbol(state, &uri, pos);
         Box::pin(async move { Ok(result.and_then(|info| info.to_goto_definition(&uri))) })
+    }
+
+    fn on_completion(
+        state: &mut Self,
+        params: CompletionParams,
+    ) -> futures::future::BoxFuture<
+        'static,
+        Result<Option<CompletionResponse>, async_lsp::ResponseError>,
+    > {
+        let uri = &params.text_document_position.text_document.uri;
+        let items = Self::collect_completions(state, uri);
+        Box::pin(async move { Ok(Some(CompletionResponse::Array(items))) })
+    }
+
+    /// Collect LSP completion items for a document.
+    ///
+    /// Delegates to [`SymbolIndex::collect_completion_items`] — the canonical
+    /// implementation shared with the WASM playground — and converts each
+    /// protocol-agnostic item into an [`lsp_types::CompletionItem`].
+    fn collect_completions(state: &Self, uri: &Url) -> Vec<CompletionItem> {
+        let Some(doc) = state.store.get(uri) else {
+            return vec![];
+        };
+        let Some(index) = doc.symbol_index.as_ref() else {
+            return vec![];
+        };
+
+        index
+            .collect_completion_items()
+            .into_iter()
+            .map(|item| CompletionItem {
+                label: item.label,
+                kind: Some(def_kind_to_completion_item_kind(item.kind)),
+                detail: item.detail,
+                ..CompletionItem::default()
+            })
+            .collect()
     }
 
     /// Resolve the symbol under the cursor for a given document and position.
@@ -373,6 +414,27 @@ impl ResolvedSymbolLspExt for ResolvedSymbol {
             uri: uri.clone(),
             range,
         }))
+    }
+}
+
+/// Map a [`DefKind`] to an LSP [`CompletionItemKind`].
+///
+/// Tagged enum variants with arity > 0 are mapped to `FUNCTION` because they
+/// are callable constructors (e.g. `Some(value)`), while zero-arity variants
+/// are plain values mapped to `ENUM_MEMBER`.
+fn def_kind_to_completion_item_kind(kind: DefKind) -> CompletionItemKind {
+    match kind {
+        DefKind::Function(_) | DefKind::FunctionSelfRef(_) => CompletionItemKind::FUNCTION,
+        DefKind::Variable => CompletionItemKind::VARIABLE,
+        DefKind::Const => CompletionItemKind::CONSTANT,
+        DefKind::Parameter => CompletionItemKind::VARIABLE,
+        DefKind::Enum => CompletionItemKind::ENUM,
+        DefKind::EnumVariant(0) => CompletionItemKind::ENUM_MEMBER,
+        DefKind::EnumVariant(_) => CompletionItemKind::FUNCTION,
+        DefKind::Struct => CompletionItemKind::STRUCT,
+        DefKind::Protocol => CompletionItemKind::INTERFACE,
+        DefKind::ProtocolMethod(_) | DefKind::StructMethod(_) => CompletionItemKind::METHOD,
+        DefKind::Module => CompletionItemKind::MODULE,
     }
 }
 
@@ -664,5 +726,89 @@ mod tests {
             },
         );
         assert!(resolved.is_none());
+    }
+
+    #[test]
+    fn completion_returns_user_defined_functions() {
+        let state = setup_server_with_source("fn add(a, b) { a + b }");
+        let items = ServerState::collect_completions(&state, &test_uri());
+        assert!(
+            items.iter().any(|i| i.label == "add"),
+            "completions should include `add`, got: {items:?}"
+        );
+    }
+
+    #[test]
+    fn completion_items_have_correct_kind() {
+        let state = setup_server_with_source("fn add(a, b) { a + b }");
+        let items = ServerState::collect_completions(&state, &test_uri());
+        let add = items.iter().find(|i| i.label == "add").unwrap();
+        assert_eq!(add.kind, Some(CompletionItemKind::FUNCTION));
+    }
+
+    #[test]
+    fn completion_items_have_detail() {
+        let state = setup_server_with_source("fn add(a, b) { a + b }");
+        let items = ServerState::collect_completions(&state, &test_uri());
+        let add = items.iter().find(|i| i.label == "add").unwrap();
+        assert_eq!(add.detail.as_deref(), Some("fn(2)"));
+    }
+
+    #[test]
+    fn completion_returns_empty_for_unknown_document() {
+        let state = setup_server_with_source("fn f() { }");
+        let unknown_uri = Url::parse("file:///unknown.tlang").unwrap();
+        let items = ServerState::collect_completions(&state, &unknown_uri);
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn completion_includes_enums() {
+        let state = setup_server_with_source("enum Color { Red, Green, Blue }");
+        let items = ServerState::collect_completions(&state, &test_uri());
+        assert!(
+            items.iter().any(|i| i.label == "Color"),
+            "completions should include enum `Color`, got: {items:?}"
+        );
+    }
+
+    #[test]
+    fn def_kind_to_completion_kind_mapping() {
+        assert_eq!(
+            def_kind_to_completion_item_kind(DefKind::Function(2)),
+            CompletionItemKind::FUNCTION
+        );
+        assert_eq!(
+            def_kind_to_completion_item_kind(DefKind::Variable),
+            CompletionItemKind::VARIABLE
+        );
+        assert_eq!(
+            def_kind_to_completion_item_kind(DefKind::Const),
+            CompletionItemKind::CONSTANT
+        );
+        assert_eq!(
+            def_kind_to_completion_item_kind(DefKind::Enum),
+            CompletionItemKind::ENUM
+        );
+        assert_eq!(
+            def_kind_to_completion_item_kind(DefKind::EnumVariant(0)),
+            CompletionItemKind::ENUM_MEMBER
+        );
+        assert_eq!(
+            def_kind_to_completion_item_kind(DefKind::Struct),
+            CompletionItemKind::STRUCT
+        );
+        assert_eq!(
+            def_kind_to_completion_item_kind(DefKind::Protocol),
+            CompletionItemKind::INTERFACE
+        );
+        assert_eq!(
+            def_kind_to_completion_item_kind(DefKind::Module),
+            CompletionItemKind::MODULE
+        );
+        assert_eq!(
+            def_kind_to_completion_item_kind(DefKind::ProtocolMethod(1)),
+            CompletionItemKind::METHOD
+        );
     }
 }

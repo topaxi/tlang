@@ -528,6 +528,41 @@ test.describe('Optimization options URL persistence', () => {
   });
 });
 
+test.describe('Code Completion', () => {
+  test('shows dynamic completion items from semantic analysis', async ({
+    page,
+  }) => {
+    await gotoPlayground(page, '#example=enums%2Fsimple.tlang');
+
+    // Wait for the editor and analysis to complete
+    const editor = page.locator('.cm-content').first();
+    await expect(editor).toBeVisible();
+
+    // Wait for HIR output to appear (signals analysis is complete)
+    await expect(
+      page.locator('.cm-editor').nth(1).locator('.cm-content'),
+    ).not.toBeEmpty();
+
+    // Click at the end of the editor and type to trigger completion
+    await editor.click();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.press('Enter');
+
+    // Type 'ev' to trigger completion popup with dynamic items
+    await page.keyboard.type('ev', { delay: 50 });
+
+    // The completion popup should appear with the 'evaluate' function
+    // from the semantic analysis of the simple.tlang example
+    const completions = page.getByRole('listbox', { name: 'Completions' });
+    await expect(completions).toBeVisible();
+
+    // Verify that 'evaluate' (a user-defined function) appears in completions
+    await expect(
+      completions.getByRole('option', { name: /evaluate/ }),
+    ).toBeVisible();
+  });
+});
+
 test.describe('Hover tooltip', () => {
   /**
    * Helper: get the pixel coordinates of a character at the given CodeMirror

@@ -5,7 +5,7 @@
 //! LSP server and the WASM playground bindings share this implementation to
 //! ensure consistent symbol resolution behaviour.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use tlang_defs::{DefKind, DefScope};
@@ -20,6 +20,8 @@ pub struct SymbolEntry {
     pub defined_at: Span,
     pub scope_start: u32,
     pub builtin: bool,
+    /// Whether this is a compiler-generated temporary.
+    pub temp: bool,
 }
 
 /// Lightweight symbol index extracted from the semantic analyzer.
@@ -65,6 +67,7 @@ impl SymbolIndex {
                     defined_at: d.defined_at,
                     scope_start: d.scope_start,
                     builtin: d.builtin,
+                    temp: d.temp,
                 })
                 .collect();
             index.scopes.insert(node_id, entries);
@@ -128,5 +131,165 @@ impl SymbolIndex {
         }
 
         None
+    }
+
+    /// Collect all user-defined completion items from every scope.
+    ///
+    /// Items are deduplicated by `(label, detail)` and sorted
+    /// alphabetically.  Temporary and builtin symbols are excluded.
+    ///
+    /// This is the canonical implementation shared by both the LSP server
+    /// and the WASM playground bindings.
+    pub fn collect_completion_items(&self) -> Vec<CompletionItem> {
+        let mut seen = HashSet::new();
+        let mut items = Vec::new();
+
+        for entries in self.scopes.values() {
+            for entry in entries.iter().filter(|e| !e.builtin && !e.temp) {
+                let item = CompletionItem::from_symbol_entry(entry);
+                let key = (item.label.clone(), item.detail.clone());
+
+                if seen.insert(key) {
+                    items.push(item);
+                }
+            }
+        }
+
+        items.sort_by(|a, b| {
+            a.label
+                .cmp(&b.label)
+                .then_with(|| a.detail.cmp(&b.detail))
+                .then_with(|| a.kind.cmp(&b.kind))
+        });
+
+        items
+    }
+}
+
+/// A protocol-agnostic completion item produced by the analysis layer.
+///
+/// Both the LSP server and the WASM playground bindings map this into their
+/// own wire format (`lsp_types::CompletionItem` or `CodemirrorCompletion`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompletionItem {
+    /// The completion label shown to the user.
+    pub label: String,
+    /// The kind of symbol this completion represents.
+    pub kind: DefKind,
+    /// Optional detail string (e.g. `"fn(2)"` for a binary function).
+    pub detail: Option<String>,
+}
+
+impl CompletionItem {
+    /// Build a completion item from a [`SymbolEntry`].
+    pub fn from_symbol_entry(entry: &SymbolEntry) -> Self {
+        Self {
+            label: entry.name.to_string(),
+            kind: entry.kind,
+            detail: completion_detail(entry.kind),
+        }
+    }
+}
+
+/// Build an optional detail string for a completion item based on its
+/// [`DefKind`].
+///
+/// This is the canonical source of truth — both the LSP server and the WASM
+/// playground bindings should use this (or delegate to
+/// [`CompletionItem::from_symbol_entry`]).
+pub fn completion_detail(kind: DefKind) -> Option<String> {
+    match kind {
+        DefKind::Function(arity) | DefKind::FunctionSelfRef(arity) => Some(format!("fn({arity})")),
+        DefKind::EnumVariant(arity) if arity > 0 => Some(format!("variant({arity})")),
+        DefKind::ProtocolMethod(arity) | DefKind::StructMethod(arity) => {
+            Some(format!("method({arity})"))
+        }
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: analyse `source` and return a `SymbolIndex`.
+    fn index_for(source: &str) -> SymbolIndex {
+        let result = crate::analyze(source, |_| {});
+        SymbolIndex::from_analyzer(&result.analyzer)
+    }
+
+    #[test]
+    fn completion_items_include_user_defined_functions() {
+        let index = index_for("fn add(a, b) { a + b }");
+        let items = index.collect_completion_items();
+        assert!(
+            items.iter().any(|i| i.label == "add"),
+            "should include user-defined function `add`, got: {items:?}"
+        );
+    }
+
+    #[test]
+    fn completion_items_include_variables() {
+        let index = index_for("let x = 42;");
+        let items = index.collect_completion_items();
+        assert!(
+            items.iter().any(|i| i.label == "x"),
+            "should include variable `x`, got: {items:?}"
+        );
+    }
+
+    #[test]
+    fn completion_items_include_enum_names() {
+        let index = index_for("enum Color { Red, Green, Blue }");
+        let items = index.collect_completion_items();
+        assert!(
+            items.iter().any(|i| i.label == "Color"),
+            "should include enum `Color`, got: {items:?}"
+        );
+    }
+
+    #[test]
+    fn completion_items_are_sorted() {
+        let index = index_for("fn zebra() { 0 }\nfn alpha() { 0 }");
+        let items = index.collect_completion_items();
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        let mut sorted = labels.clone();
+        sorted.sort();
+        assert_eq!(labels, sorted, "items should be sorted alphabetically");
+    }
+
+    #[test]
+    fn completion_items_are_deduplicated() {
+        // Multiple clauses of the same function should produce one completion.
+        let index = index_for("fn f(0) { 0 }\nfn f(n) { n }");
+        let items = index.collect_completion_items();
+        let count = items.iter().filter(|i| i.label == "f").count();
+        assert_eq!(count, 1, "duplicate function `f` should be deduplicated");
+    }
+
+    #[test]
+    fn completion_detail_for_function() {
+        assert_eq!(
+            completion_detail(DefKind::Function(2)),
+            Some("fn(2)".into())
+        );
+    }
+
+    #[test]
+    fn completion_detail_for_simple_enum_variant() {
+        assert_eq!(completion_detail(DefKind::EnumVariant(0)), None);
+    }
+
+    #[test]
+    fn completion_detail_for_tagged_enum_variant() {
+        assert_eq!(
+            completion_detail(DefKind::EnumVariant(1)),
+            Some("variant(1)".into())
+        );
+    }
+
+    #[test]
+    fn completion_detail_for_variable() {
+        assert_eq!(completion_detail(DefKind::Variable), None);
     }
 }

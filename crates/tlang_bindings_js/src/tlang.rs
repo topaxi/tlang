@@ -36,6 +36,9 @@ extern "C" {
     #[wasm_bindgen(typescript_type = "CodemirrorDiagnostic[]")]
     pub type JsCodemirrorDiagnosticArray;
 
+    #[wasm_bindgen(typescript_type = "CodemirrorCompletion[]")]
+    pub type JsCodemirrorCompletionArray;
+
     #[wasm_bindgen(typescript_type = "unknown")]
     pub type JsUnknown;
 }
@@ -679,5 +682,36 @@ impl Tlang {
 
         let all: Vec<_> = parse_errors.chain(diagnostics).collect();
         Ok(serde_wasm_bindgen::to_value(&all)?.unchecked_into())
+    }
+
+    /// Return completion items derived from the semantic analyzer's symbol tables.
+    ///
+    /// This delegates to [`SymbolIndex::collect_completion_items`] — the
+    /// canonical implementation shared with the LSP server — and converts
+    /// the protocol-agnostic items into CodeMirror-compatible format.
+    #[wasm_bindgen(js_name = "getCompletionItems")]
+    #[allow(clippy::missing_panics_doc)]
+    pub fn completion_items(
+        &mut self,
+    ) -> Result<JsCodemirrorCompletionArray, serde_wasm_bindgen::Error> {
+        if !self.build.analyzed {
+            self.analyze();
+        }
+
+        let analysis_items = match &self.build.symbol_index {
+            Some(index) => index.collect_completion_items(),
+            None => vec![],
+        };
+
+        let items: Vec<codemirror::CodemirrorCompletion> = analysis_items
+            .into_iter()
+            .map(|item| codemirror::CodemirrorCompletion {
+                label: item.label,
+                completion_type: codemirror::completion_type_from_def_kind(item.kind),
+                detail: item.detail,
+            })
+            .collect();
+
+        Ok(serde_wasm_bindgen::to_value(&items)?.unchecked_into())
     }
 }

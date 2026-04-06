@@ -1,5 +1,6 @@
 import {
   CodemirrorDiagnostic,
+  type CodemirrorCompletion,
   getStandardLibraryCompiled,
   Tlang,
   type JsHirPrettyOptions,
@@ -47,6 +48,7 @@ export class TlangController {
   private cachedJS: string | null = null;
   private cachedJSAST: string | null = null;
   private cachedSourceMap: ParsedSourceMap | null = null;
+  private cachedCompletionItems: CodemirrorCompletion[] = [];
   private optimizationOptions: JsOptimizationOptions = {
     constantFolding: true,
     anfTransform: undefined,
@@ -131,6 +133,22 @@ export class TlangController {
     }
 
     return this.tlang.getCodemirrorDiagnostics();
+  }
+
+  getCompletionItems(): CodemirrorCompletion[] {
+    const items = this.tlang.getCompletionItems();
+
+    const hasAnalysisFailures = Boolean(
+      this.tlang.renderParseErrors() || this.tlang.renderErrorDiagnostics(),
+    );
+
+    if (hasAnalysisFailures) {
+      return this.cachedCompletionItems;
+    }
+
+    this.cachedCompletionItems = items;
+
+    return this.cachedCompletionItems;
   }
 
   async run(runner: Runner) {
