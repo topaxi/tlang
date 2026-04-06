@@ -418,6 +418,10 @@ impl ResolvedSymbolLspExt for ResolvedSymbol {
 }
 
 /// Map a [`DefKind`] to an LSP [`CompletionItemKind`].
+///
+/// Tagged enum variants with arity > 0 are mapped to `FUNCTION` because they
+/// are callable constructors (e.g. `Some(value)`), while zero-arity variants
+/// are plain values mapped to `ENUM_MEMBER`.
 fn def_kind_to_completion_item_kind(kind: DefKind) -> CompletionItemKind {
     match kind {
         DefKind::Function(_) | DefKind::FunctionSelfRef(_) => CompletionItemKind::FUNCTION,

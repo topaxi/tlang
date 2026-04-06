@@ -20,6 +20,8 @@ pub struct SymbolEntry {
     pub defined_at: Span,
     pub scope_start: u32,
     pub builtin: bool,
+    /// Whether this is a compiler-generated temporary.
+    pub temp: bool,
 }
 
 /// Lightweight symbol index extracted from the semantic analyzer.
@@ -65,6 +67,7 @@ impl SymbolIndex {
                     defined_at: d.defined_at,
                     scope_start: d.scope_start,
                     builtin: d.builtin,
+                    temp: d.temp,
                 })
                 .collect();
             index.scopes.insert(node_id, entries);
@@ -142,7 +145,7 @@ impl SymbolIndex {
         let mut items = Vec::new();
 
         for entries in self.scopes.values() {
-            for entry in entries.iter().filter(|e| !e.builtin) {
+            for entry in entries.iter().filter(|e| !e.builtin && !e.temp) {
                 let item = CompletionItem::from_symbol_entry(entry);
                 let key = (item.label.clone(), item.detail.clone());
 
