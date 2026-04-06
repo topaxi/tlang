@@ -78,14 +78,8 @@ impl ModuleResolver {
         all_imports: &HashMap<ModulePath, ResolvedImports>,
         errors: &mut Vec<ModuleGraphError>,
     ) {
-        // Resolve the module path
-        // `use a::b::c` means import `c` from module `a::b`
-        // `use a::b::{c, d}` means import `c` and `d` from module `a::b`
-
         // Find the target module by exact match on the full path.
-        let target_module_path = Self::resolve_module_path(graph, &use_decl.path);
-
-        let target_module_path = match target_module_path {
+        let target_module_path = match Self::resolve_module_path(graph, &use_decl.path) {
             Some(p) => p,
             None => {
                 let full_path: Vec<String> = use_decl
@@ -124,56 +118,91 @@ impl ModuleResolver {
 
         // Resolve each imported item
         for item in &use_decl.items {
-            let local_name = item.alias.as_ref().unwrap_or(&item.name).clone();
+            Self::resolve_use_item(
+                graph,
+                from_module,
+                use_decl,
+                item,
+                &target_module_path,
+                target_re_exports,
+                resolved,
+                errors,
+            );
+        }
+    }
 
-            // Check for name collisions
-            if let Some(existing) = resolved.symbols.get(&local_name) {
-                errors.push(ModuleGraphError::NameCollision {
+    #[allow(clippy::too_many_arguments)]
+    fn resolve_use_item(
+        graph: &ModuleGraph,
+        from_module: &ModulePath,
+        use_decl: &UseDeclInfo,
+        item: &crate::module_graph::UseItemInfo,
+        target_module_path: &ModulePath,
+        target_re_exports: Option<&HashMap<String, ResolvedSymbol>>,
+        resolved: &mut ResolvedImports,
+        errors: &mut Vec<ModuleGraphError>,
+    ) {
+        let local_name = item.alias.as_ref().unwrap_or(&item.name).clone();
+
+        // Check for name collisions
+        if let Some(existing) = resolved.symbols.get(&local_name) {
+            errors.push(ModuleGraphError::NameCollision {
+                module_path: from_module.clone(),
+                name: local_name.clone(),
+                first_span: existing.span,
+                second_span: item.span,
+            });
+            return;
+        }
+
+        // Check that the symbol exists and is declared as `pub` in the target module,
+        // or is re-exported via `pub use` in the target module.
+        if let Some(target) = graph.modules.get(target_module_path) {
+            let declared = is_symbol_declared(&target.ast, &item.name);
+            let is_re_export = target_re_exports.is_some_and(|re| re.contains_key(&item.name));
+
+            if !declared && !is_re_export {
+                errors.push(ModuleGraphError::ImportError {
                     module_path: from_module.clone(),
-                    name: local_name.clone(),
-                    first_span: existing.span,
-                    second_span: item.span,
+                    symbol_name: item.name.clone(),
+                    reason: format!(
+                        "`{}` is not declared in module `{}`",
+                        item.name, target_module_path
+                    ),
+                    span: item.span,
                 });
-                continue;
+                return;
             }
 
-            // Check that the symbol exists and is declared as `pub` in the target module,
-            // or is re-exported via `pub use` in the target module.
-            if let Some(target) = graph.modules.get(&target_module_path) {
-                let declared = is_symbol_declared(&target.ast, &item.name);
-                let is_re_export = target_re_exports
-                    .is_some_and(|re| re.contains_key(&item.name));
+            if declared && !is_symbol_public(&target.ast, &item.name) {
+                errors.push(ModuleGraphError::ImportError {
+                    module_path: from_module.clone(),
+                    symbol_name: item.name.clone(),
+                    reason: format!(
+                        "`{}` is not declared as `pub` in module `{}`",
+                        item.name, target_module_path
+                    ),
+                    span: item.span,
+                });
+                return;
+            }
 
-                if !declared && !is_re_export {
-                    errors.push(ModuleGraphError::ImportError {
-                        module_path: from_module.clone(),
-                        symbol_name: item.name.clone(),
-                        reason: format!(
-                            "`{}` is not declared in module `{}`",
-                            item.name, target_module_path
-                        ),
+            // If the symbol is a re-export, resolve to the original source module
+            if is_re_export && !declared {
+                let re_export = &target_re_exports.unwrap()[&item.name];
+                resolved.symbols.insert(
+                    local_name.clone(),
+                    ResolvedSymbol {
+                        source_module: re_export.source_module.clone(),
+                        original_name: re_export.original_name.clone(),
+                        local_name: local_name.clone(),
                         span: item.span,
-                    });
-                    continue;
-                }
+                    },
+                );
 
-                if declared && !is_symbol_public(&target.ast, &item.name) {
-                    errors.push(ModuleGraphError::ImportError {
-                        module_path: from_module.clone(),
-                        symbol_name: item.name.clone(),
-                        reason: format!(
-                            "`{}` is not declared as `pub` in module `{}`",
-                            item.name, target_module_path
-                        ),
-                        span: item.span,
-                    });
-                    continue;
-                }
-
-                // If the symbol is a re-export, resolve to the original source module
-                if is_re_export && !declared {
-                    let re_export = &target_re_exports.unwrap()[&item.name];
-                    resolved.symbols.insert(
+                // If this is also a `pub use`, propagate the re-export
+                if use_decl.visibility == Visibility::Public {
+                    resolved.re_exports.insert(
                         local_name.clone(),
                         ResolvedSymbol {
                             source_module: re_export.source_module.clone(),
@@ -182,25 +211,25 @@ impl ModuleResolver {
                             span: item.span,
                         },
                     );
-
-                    // If this is also a `pub use`, propagate the re-export
-                    if use_decl.visibility == Visibility::Public {
-                        resolved.re_exports.insert(
-                            local_name.clone(),
-                            ResolvedSymbol {
-                                source_module: re_export.source_module.clone(),
-                                original_name: re_export.original_name.clone(),
-                                local_name: local_name.clone(),
-                                span: item.span,
-                            },
-                        );
-                    }
-
-                    continue;
                 }
-            }
 
-            resolved.symbols.insert(
+                return;
+            }
+        }
+
+        resolved.symbols.insert(
+            local_name.clone(),
+            ResolvedSymbol {
+                source_module: target_module_path.clone(),
+                original_name: item.name.clone(),
+                local_name: local_name.clone(),
+                span: item.span,
+            },
+        );
+
+        // If this is a `pub use`, also record as a re-export
+        if use_decl.visibility == Visibility::Public {
+            resolved.re_exports.insert(
                 local_name.clone(),
                 ResolvedSymbol {
                     source_module: target_module_path.clone(),
@@ -209,19 +238,6 @@ impl ModuleResolver {
                     span: item.span,
                 },
             );
-
-            // If this is a `pub use`, also record as a re-export
-            if use_decl.visibility == Visibility::Public {
-                resolved.re_exports.insert(
-                    local_name.clone(),
-                    ResolvedSymbol {
-                        source_module: target_module_path.clone(),
-                        original_name: item.name.clone(),
-                        local_name: local_name.clone(),
-                        span: item.span,
-                    },
-                );
-            }
         }
     }
 
@@ -683,11 +699,7 @@ mod tests {
             "pub fn add(a, b) { a + b }\npub fn sub(a, b) { a - b }",
         )
         .unwrap();
-        fs::write(
-            src.join("facade.tlang"),
-            "pub use math::{add, sub};",
-        )
-        .unwrap();
+        fs::write(src.join("facade.tlang"), "pub use math::{add, sub};").unwrap();
 
         let graph = ModuleGraph::build(&dir).unwrap();
         let (imports, errors) = ModuleResolver::resolve_imports(&graph);
