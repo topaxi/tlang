@@ -581,8 +581,12 @@ fn build_reverse_deps(imports: &HashMap<ModulePath, ResolvedImports>) -> Reverse
 
     for (importer, resolved) in imports {
         for symbol in resolved.symbols.values() {
+            // Use provider_module (the immediate module from the `use` path)
+            // rather than source_module (the original definer) so that editing
+            // a re-exporting facade correctly triggers recompilation of its
+            // consumers.
             reverse_deps
-                .entry(symbol.source_module.clone())
+                .entry(symbol.provider_module.clone())
                 .or_default()
                 .insert(importer.clone());
         }
@@ -1622,6 +1626,50 @@ mod tests {
         );
         assert!(recompiled.contains(&ModulePath::from_str_segments(&["math"])));
         assert!(recompiled.contains(&ModulePath::root()));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_reverse_deps_track_provider_module_for_re_exports() {
+        // When root does `use facade::add` and facade does `pub use math::add`,
+        // the reverse deps must record root as depending on facade (the provider),
+        // not on math (the original definer), so that changes to facade trigger
+        // recompilation of root.
+        let dir = std::env::temp_dir().join("tlang_test_reverse_deps_reexport");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        fs::write(
+            src.join("lib.tlang"),
+            "pub mod math;\npub mod facade;\nuse facade::add;\nadd(1, 2) |> log();",
+        )
+        .unwrap();
+        fs::write(src.join("math.tlang"), "pub fn add(a, b) { a + b }").unwrap();
+        fs::write(src.join("facade.tlang"), "pub use math::add;").unwrap();
+
+        let builtins: Vec<(&str, DefKind)> = vec![("log", DefKind::Function(u16::MAX))];
+        let result = compile_project(&dir, &builtins).unwrap();
+
+        let facade_path = ModulePath::from_str_segments(&["facade"]);
+        let math_path = ModulePath::from_str_segments(&["math"]);
+
+        // Root depends on facade (the provider), not on math (the definer)
+        let facade_dependents = result.reverse_deps.get(&facade_path);
+        assert!(
+            facade_dependents.is_some_and(|d| d.contains(&ModulePath::root())),
+            "root should be recorded as depending on facade, got: {:?}",
+            result.reverse_deps
+        );
+
+        // facade depends on math (since it does `pub use math::add`)
+        let math_dependents = result.reverse_deps.get(&math_path);
+        assert!(
+            math_dependents.is_some_and(|d| d.contains(&facade_path)),
+            "facade should be recorded as depending on math, got: {:?}",
+            result.reverse_deps
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }

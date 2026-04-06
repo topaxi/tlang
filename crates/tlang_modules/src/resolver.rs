@@ -17,8 +17,14 @@ pub struct ResolvedImports {
 
 #[derive(Debug, Clone)]
 pub struct ResolvedSymbol {
-    /// The module where the symbol is defined.
+    /// The module where the symbol is originally defined.
+    /// For re-exports this points through the chain to the defining module.
     pub source_module: ModulePath,
+    /// The immediate module that provides the symbol (the module named in
+    /// the `use` path). For direct imports this equals `source_module`.
+    /// Used by `build_reverse_deps` so that editing a facade module
+    /// correctly triggers recompilation of its consumers.
+    pub provider_module: ModulePath,
     /// The original name of the symbol in the source module.
     pub original_name: String,
     /// The local alias (same as original_name if no alias).
@@ -194,6 +200,7 @@ impl ModuleResolver {
                     local_name.clone(),
                     ResolvedSymbol {
                         source_module: re_export.source_module.clone(),
+                        provider_module: target_module_path.clone(),
                         original_name: re_export.original_name.clone(),
                         local_name: local_name.clone(),
                         span: item.span,
@@ -206,6 +213,7 @@ impl ModuleResolver {
                         local_name.clone(),
                         ResolvedSymbol {
                             source_module: re_export.source_module.clone(),
+                            provider_module: target_module_path.clone(),
                             original_name: re_export.original_name.clone(),
                             local_name: local_name.clone(),
                             span: item.span,
@@ -221,6 +229,7 @@ impl ModuleResolver {
             local_name.clone(),
             ResolvedSymbol {
                 source_module: target_module_path.clone(),
+                provider_module: target_module_path.clone(),
                 original_name: item.name.clone(),
                 local_name: local_name.clone(),
                 span: item.span,
@@ -233,6 +242,7 @@ impl ModuleResolver {
                 local_name.clone(),
                 ResolvedSymbol {
                     source_module: target_module_path.clone(),
+                    provider_module: target_module_path.clone(),
                     original_name: item.name.clone(),
                     local_name: local_name.clone(),
                     span: item.span,
