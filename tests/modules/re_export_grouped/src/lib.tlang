@@ -1,0 +1,7 @@
+pub mod math;
+pub mod facade;
+
+use facade::{add, mul};
+
+add(2, 3) |> log();
+mul(4, 5) |> log();

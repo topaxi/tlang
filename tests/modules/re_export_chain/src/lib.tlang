@@ -1,0 +1,7 @@
+pub mod math;
+pub mod inner;
+pub mod facade;
+
+use facade::add;
+
+add(10, 20) |> log();

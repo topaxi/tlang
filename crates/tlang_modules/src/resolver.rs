@@ -516,4 +516,193 @@ mod tests {
 
         let _ = fs::remove_dir_all(&dir);
     }
+
+    // === pub use re-export tests ===
+
+    #[test]
+    fn test_pub_use_re_export_basic() {
+        let dir = std::env::temp_dir().join("tlang_test_pub_use_basic");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // `facade` re-exports `add` from sibling `math`
+        fs::write(
+            src.join("lib.tlang"),
+            "pub mod math;\npub mod facade;\nuse facade::add;",
+        )
+        .unwrap();
+        fs::write(src.join("math.tlang"), "pub fn add(a, b) { a + b }").unwrap();
+        fs::write(src.join("facade.tlang"), "pub use math::add;").unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let (imports, errors) = ModuleResolver::resolve_imports(&graph);
+
+        assert!(errors.is_empty(), "errors: {errors:?}");
+
+        // The facade module should have `add` as both an import and a re-export
+        let facade_imports = imports
+            .get(&ModulePath::from_str_segments(&["facade"]))
+            .unwrap();
+        assert!(facade_imports.symbols.contains_key("add"));
+        assert!(facade_imports.re_exports.contains_key("add"));
+
+        // The root should be able to import `add` from the facade
+        let root_imports = imports.get(&ModulePath::root()).unwrap();
+        assert!(root_imports.symbols.contains_key("add"));
+
+        // The import should resolve to the original source module (math), not the facade
+        let add = &root_imports.symbols["add"];
+        assert_eq!(add.source_module, ModulePath::from_str_segments(&["math"]));
+        assert_eq!(add.original_name, "add");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_pub_use_re_export_with_alias() {
+        let dir = std::env::temp_dir().join("tlang_test_pub_use_alias");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // `facade` re-exports `add` as `sum` from `math`
+        fs::write(
+            src.join("lib.tlang"),
+            "pub mod math;\npub mod facade;\nuse facade::sum;",
+        )
+        .unwrap();
+        fs::write(src.join("math.tlang"), "pub fn add(a, b) { a + b }").unwrap();
+        fs::write(src.join("facade.tlang"), "pub use math::add as sum;").unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let (imports, errors) = ModuleResolver::resolve_imports(&graph);
+
+        assert!(errors.is_empty(), "errors: {errors:?}");
+
+        // The facade should re-export under the alias "sum"
+        let facade_imports = imports
+            .get(&ModulePath::from_str_segments(&["facade"]))
+            .unwrap();
+        assert!(facade_imports.re_exports.contains_key("sum"));
+        assert!(!facade_imports.re_exports.contains_key("add"));
+
+        // Root imports "sum" from facade, which resolves to math::add
+        let root_imports = imports.get(&ModulePath::root()).unwrap();
+        assert!(root_imports.symbols.contains_key("sum"));
+
+        let sum = &root_imports.symbols["sum"];
+        assert_eq!(sum.source_module, ModulePath::from_str_segments(&["math"]));
+        assert_eq!(sum.original_name, "add");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_pub_use_chained_re_export() {
+        let dir = std::env::temp_dir().join("tlang_test_pub_use_chain");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // Chain: root -> facade -> inner -> math
+        // All modules are at root level (siblings)
+        fs::write(
+            src.join("lib.tlang"),
+            "pub mod math;\npub mod inner;\npub mod facade;\nuse facade::add;",
+        )
+        .unwrap();
+        fs::write(src.join("math.tlang"), "pub fn add(a, b) { a + b }").unwrap();
+        fs::write(src.join("inner.tlang"), "pub use math::add;").unwrap();
+        fs::write(src.join("facade.tlang"), "pub use inner::add;").unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let (imports, errors) = ModuleResolver::resolve_imports(&graph);
+
+        assert!(errors.is_empty(), "errors: {errors:?}");
+
+        // Root should resolve `add` through the chain to the original math module
+        let root_imports = imports.get(&ModulePath::root()).unwrap();
+        assert!(root_imports.symbols.contains_key("add"));
+
+        let add = &root_imports.symbols["add"];
+        assert_eq!(add.source_module, ModulePath::from_str_segments(&["math"]));
+        assert_eq!(add.original_name, "add");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_pub_use_does_not_expose_private_use() {
+        let dir = std::env::temp_dir().join("tlang_test_pub_use_private");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // `facade` imports `add` privately (no pub), so root cannot access it via facade
+        fs::write(
+            src.join("lib.tlang"),
+            "pub mod math;\npub mod facade;\nuse facade::add;",
+        )
+        .unwrap();
+        fs::write(src.join("math.tlang"), "pub fn add(a, b) { a + b }").unwrap();
+        fs::write(src.join("facade.tlang"), "use math::add;").unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let (_, errors) = ModuleResolver::resolve_imports(&graph);
+
+        // Should get an error because `add` is not publicly available in `facade`
+        assert!(
+            !errors.is_empty(),
+            "expected import error for private use, got none"
+        );
+        assert!(errors.iter().any(|e| matches!(
+            e,
+            ModuleGraphError::ImportError { symbol_name, .. }
+                if symbol_name == "add"
+        )));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_pub_use_grouped_re_exports() {
+        let dir = std::env::temp_dir().join("tlang_test_pub_use_grouped");
+        let _ = fs::remove_dir_all(&dir);
+        let src = dir.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // `facade` re-exports multiple symbols from `math`
+        fs::write(
+            src.join("lib.tlang"),
+            "pub mod math;\npub mod facade;\nuse facade::{add, sub};",
+        )
+        .unwrap();
+        fs::write(
+            src.join("math.tlang"),
+            "pub fn add(a, b) { a + b }\npub fn sub(a, b) { a - b }",
+        )
+        .unwrap();
+        fs::write(
+            src.join("facade.tlang"),
+            "pub use math::{add, sub};",
+        )
+        .unwrap();
+
+        let graph = ModuleGraph::build(&dir).unwrap();
+        let (imports, errors) = ModuleResolver::resolve_imports(&graph);
+
+        assert!(errors.is_empty(), "errors: {errors:?}");
+
+        let root_imports = imports.get(&ModulePath::root()).unwrap();
+        assert!(root_imports.symbols.contains_key("add"));
+        assert!(root_imports.symbols.contains_key("sub"));
+
+        let add = &root_imports.symbols["add"];
+        assert_eq!(add.source_module, ModulePath::from_str_segments(&["math"]));
+        let sub = &root_imports.symbols["sub"];
+        assert_eq!(sub.source_module, ModulePath::from_str_segments(&["math"]));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
