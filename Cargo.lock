@@ -2471,9 +2471,14 @@ name = "tlang_typeck"
 version = "0.1.0"
 dependencies = [
  "pretty_assertions",
+ "tlang_ast",
+ "tlang_ast_lowering",
+ "tlang_defs",
  "tlang_diagnostics",
  "tlang_hir",
  "tlang_hir_opt",
+ "tlang_parser",
+ "tlang_semantics",
  "tlang_span",
 ]
 
