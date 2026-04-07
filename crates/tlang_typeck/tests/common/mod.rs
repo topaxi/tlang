@@ -15,6 +15,9 @@ fn compile(source: &str) -> hir::LowerResult {
     semantic_analyzer.add_builtin_symbols(&[
         ("println", DefKind::Function(u16::MAX)),
         ("log", DefKind::Function(u16::MAX)),
+        ("math", DefKind::Module),
+        ("math::min", DefKind::Function(u16::MAX)),
+        ("math::max", DefKind::Function(u16::MAX)),
     ]);
     semantic_analyzer.analyze(&mut ast).unwrap();
     lower_to_hir(

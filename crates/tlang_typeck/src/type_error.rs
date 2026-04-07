@@ -130,7 +130,7 @@ impl TypeError {
                 expected, actual, ..
             } => {
                 format!(
-                    "return type mismatch: function declares `→ {expected}`, but body returns `{actual}`"
+                    "return type mismatch: function declares `→ {expected}`, but returns `{actual}`"
                 )
             }
         }

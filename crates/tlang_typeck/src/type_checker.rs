@@ -24,6 +24,10 @@ pub struct TypeChecker {
     context_stack: Vec<TypingContext>,
     /// Stack of enclosing function return types for return-statement checking.
     return_type_stack: Vec<TyKind>,
+    /// Stack of observed return-expression types collected during function
+    /// body traversal.  Used to infer the return type when no annotation
+    /// and no trailing expression are present (e.g. `fn f() { return 42; }`).
+    observed_return_types: Vec<Vec<TyKind>>,
 }
 
 impl TypeChecker {
@@ -408,24 +412,51 @@ impl TypeChecker {
                 }
 
                 // Check each argument type.
-                for (i, (arg, param_ty)) in call.arguments.iter().zip(param_tys.iter()).enumerate()
-                {
-                    if matches!(param_ty.kind, TyKind::Unknown)
-                        || matches!(arg.ty.kind, TyKind::Unknown)
-                    {
-                        continue;
+                // For variadic builtins, validate every argument against the
+                // (single) parameter type; for normal calls, zip 1:1.
+                if is_variadic {
+                    if let Some(param_ty) = param_tys.first() {
+                        for (i, arg) in call.arguments.iter().enumerate() {
+                            if matches!(param_ty.kind, TyKind::Unknown)
+                                || matches!(arg.ty.kind, TyKind::Unknown)
+                            {
+                                continue;
+                            }
+                            if arg.ty.kind != param_ty.kind {
+                                let param_name = callee_name
+                                    .as_deref()
+                                    .map(|n| format!("arg{i} of `{n}`"))
+                                    .unwrap_or_else(|| format!("arg{i}"));
+                                self.errors.push(TypeError::ArgumentTypeMismatch {
+                                    param_name,
+                                    expected: param_ty.kind.to_string(),
+                                    actual: arg.ty.kind.to_string(),
+                                    span: arg.span,
+                                });
+                            }
+                        }
                     }
-                    if arg.ty.kind != param_ty.kind {
-                        let param_name = callee_name
-                            .as_deref()
-                            .map(|n| format!("arg{i} of `{n}`"))
-                            .unwrap_or_else(|| format!("arg{i}"));
-                        self.errors.push(TypeError::ArgumentTypeMismatch {
-                            param_name,
-                            expected: param_ty.kind.to_string(),
-                            actual: arg.ty.kind.to_string(),
-                            span: arg.span,
-                        });
+                } else {
+                    for (i, (arg, param_ty)) in
+                        call.arguments.iter().zip(param_tys.iter()).enumerate()
+                    {
+                        if matches!(param_ty.kind, TyKind::Unknown)
+                            || matches!(arg.ty.kind, TyKind::Unknown)
+                        {
+                            continue;
+                        }
+                        if arg.ty.kind != param_ty.kind {
+                            let param_name = callee_name
+                                .as_deref()
+                                .map(|n| format!("arg{i} of `{n}`"))
+                                .unwrap_or_else(|| format!("arg{i}"));
+                            self.errors.push(TypeError::ArgumentTypeMismatch {
+                                param_name,
+                                expected: param_ty.kind.to_string(),
+                                actual: arg.ty.kind.to_string(),
+                                span: arg.span,
+                            });
+                        }
                     }
                 }
 
@@ -467,6 +498,15 @@ impl TypeChecker {
     // ── Return statement checking ────────────────────────────────────
 
     fn check_return_type(&mut self, return_expr: Option<&hir::Expr>, span: tlang_span::Span) {
+        let actual = return_expr
+            .map(|e| &e.ty.kind)
+            .unwrap_or(&TyKind::Primitive(PrimTy::Nil));
+
+        // Record the observed return type for later inference.
+        if let Some(observed) = self.observed_return_types.last_mut() {
+            observed.push(actual.clone());
+        }
+
         let expected = match self.return_type_stack.last() {
             Some(ty) => ty,
             None => return, // top-level, no function context
@@ -475,10 +515,6 @@ impl TypeChecker {
         if matches!(expected, TyKind::Unknown) {
             return; // No declared return type — nothing to check.
         }
-
-        let actual = return_expr
-            .map(|e| &e.ty.kind)
-            .unwrap_or(&TyKind::Primitive(PrimTy::Nil));
 
         if matches!(actual, TyKind::Unknown) {
             return; // Unknown value — skip.
@@ -491,6 +527,26 @@ impl TypeChecker {
                 span,
             });
         }
+    }
+
+    /// Infer a return type from observed `return` statements during the
+    /// current function's body traversal.  If all observed returns agree
+    /// on a single concrete (non-unknown) type, return that type; otherwise
+    /// return `None`.
+    fn infer_return_type_from_observed(&self) -> Option<TyKind> {
+        let observed = self.observed_return_types.last()?;
+        let mut inferred: Option<&TyKind> = None;
+        for ty in observed {
+            if matches!(ty, TyKind::Unknown) {
+                continue;
+            }
+            match inferred {
+                None => inferred = Some(ty),
+                Some(prev) if prev == ty => {}
+                Some(_) => return None, // conflicting types
+            }
+        }
+        inferred.cloned()
     }
 
     // ── Pattern binding registration ─────────────────────────────────
@@ -584,14 +640,19 @@ impl TypeChecker {
         }
 
         self.return_type_stack.push(decl.return_type.kind.clone());
+        self.observed_return_types.push(Vec::new());
         self.visit_block(&mut decl.body, &mut ());
+
+        // Check that the closure body type matches the declared return type.
+        self.check_function_body_return(decl);
 
         let body_ret = decl
             .body
             .expr
             .as_ref()
             .map(|e| e.ty.kind.clone())
-            .unwrap_or(TyKind::Primitive(PrimTy::Nil));
+            .or_else(|| self.infer_return_type_from_observed())
+            .unwrap_or_else(|| decl.return_type.kind.clone());
         let ret_ty = if matches!(decl.return_type.kind, TyKind::Unknown) {
             body_ret
         } else {
@@ -605,6 +666,7 @@ impl TypeChecker {
             .collect();
         expr_ty.kind = Self::make_fn_ty(param_tys, ret_ty);
 
+        self.observed_return_types.pop();
         self.return_type_stack.pop();
         self.pop_context();
     }
@@ -706,8 +768,10 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     );
                 }
 
-                // Push the declared return type for return-statement checking.
+                // Push the declared return type for return-statement checking
+                // and start tracking observed return types.
                 self.return_type_stack.push(decl.return_type.kind.clone());
+                self.observed_return_types.push(Vec::new());
 
                 self.visit_block(&mut decl.body, ctx);
 
@@ -717,12 +781,15 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 // Update the function signature with the inferred return type
                 // if the declared return type was unknown.
                 if matches!(decl.return_type.kind, TyKind::Unknown) {
+                    // Prefer trailing expression type, then fall back to the
+                    // type inferred from `return` statements, then keep unknown.
                     let body_ty = decl
                         .body
                         .expr
                         .as_ref()
                         .map(|e| e.ty.kind.clone())
-                        .unwrap_or(TyKind::Primitive(PrimTy::Nil));
+                        .or_else(|| self.infer_return_type_from_observed())
+                        .unwrap_or_else(|| decl.return_type.kind.clone());
                     let param_tys: Vec<Ty> = decl
                         .parameters
                         .iter()
@@ -740,6 +807,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     );
                 }
 
+                self.observed_return_types.pop();
                 self.return_type_stack.pop();
                 self.pop_context();
             }

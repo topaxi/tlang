@@ -329,14 +329,12 @@ fn multiple_type_errors() {
 
 #[test]
 fn function_signature_registered_in_type_table() {
-    let (tc, _) = common::typecheck(
+    common::typecheck_ok(
         r#"
         fn add(a: i64, b: i64) -> i64 { a + b }
+        let result = add(1, 2);
         "#,
     );
-    // The function should have an Fn type in the type table.
-    // We verify indirectly: calling it should type-check.
-    let _ = tc;
 }
 
 #[test]
@@ -476,6 +474,16 @@ fn return_mismatched_type_error() {
 }
 
 #[test]
+fn infer_return_type_from_return_statement_without_trailing_expression() {
+    common::typecheck_ok(
+        r#"
+        fn foo() { return 42; }
+        let x: i64 = foo();
+        "#,
+    );
+}
+
+#[test]
 fn bare_return_in_nil_function_ok() {
     common::typecheck_ok(
         r#"
@@ -517,6 +525,29 @@ fn call_builtin_log_ok() {
         log(42);
         log("hello");
         "#,
+    );
+}
+
+#[test]
+fn call_builtin_math_min_variadic_ok() {
+    common::typecheck_ok(
+        r#"
+        let x = math::min(1.0, 2.0, 3.0);
+        "#,
+    );
+}
+
+#[test]
+fn call_builtin_math_min_variadic_type_mismatch_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        let x = math::min(1.0, "x");
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("type mismatch") || e.contains("argument")),
+        "expected variadic builtin argument type error, got: {errs:?}"
     );
 }
 
@@ -582,5 +613,18 @@ fn closure_call_result_type_propagates() {
         let f = fn(x: i64) -> i64 { x + 1 };
         let y: i64 = f(42);
         "#,
+    );
+}
+
+#[test]
+fn closure_body_return_type_mismatch() {
+    let errs = common::typecheck_errors(
+        r#"
+        let f = fn(x: i64) -> i64 { "hello" };
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("return type mismatch")),
+        "expected return type mismatch for closure, got: {errs:?}"
     );
 }

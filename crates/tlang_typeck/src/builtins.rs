@@ -6,7 +6,8 @@ pub struct BuiltinSignature {
     pub name: &'static str,
     pub params: &'static [TyKind],
     pub ret: TyKind,
-    /// If `true`, the function accepts any number of arguments of any type.
+    /// If `true`, the function accepts a variable number of arguments.
+    /// Argument types are still constrained by `params`.
     pub variadic: bool,
 }
 
@@ -49,7 +50,7 @@ static BUILTIN_SIGNATURES: &[BuiltinSignature] = &[
         ret: TyKind::Primitive(PrimTy::Nil),
         variadic: true,
     },
-    // len(unknown[]) → i64
+    // len(unknown) → i64
     BuiltinSignature {
         name: "len",
         params: &[TyKind::Unknown],
