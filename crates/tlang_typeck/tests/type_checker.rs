@@ -546,7 +546,7 @@ fn call_builtin_math_min_variadic_type_mismatch_error() {
     );
     assert!(
         errs.iter()
-            .any(|e| e.contains("type mismatch") || e.contains("argument")),
+            .any(|e| e.contains("argument type mismatch") && e.contains("math::min")),
         "expected variadic builtin argument type error, got: {errs:?}"
     );
 }
