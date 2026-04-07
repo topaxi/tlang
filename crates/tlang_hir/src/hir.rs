@@ -836,6 +836,58 @@ pub enum PrimTy {
     Nil,
 }
 
+impl PrimTy {
+    /// Returns `true` for any numeric type (signed/unsigned integers and floats).
+    pub fn is_numeric(self) -> bool {
+        self.is_integer() || self.is_float()
+    }
+
+    /// Returns `true` for integer types (signed, unsigned, and pointer-sized).
+    pub fn is_integer(self) -> bool {
+        matches!(
+            self,
+            PrimTy::I8
+                | PrimTy::I16
+                | PrimTy::I32
+                | PrimTy::I64
+                | PrimTy::Isize
+                | PrimTy::U8
+                | PrimTy::U16
+                | PrimTy::U32
+                | PrimTy::U64
+                | PrimTy::Usize
+        )
+    }
+
+    /// Returns `true` for floating-point types.
+    pub fn is_float(self) -> bool {
+        matches!(self, PrimTy::F32 | PrimTy::F64)
+    }
+}
+
+impl Display for PrimTy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PrimTy::Bool => write!(f, "bool"),
+            PrimTy::I8 => write!(f, "i8"),
+            PrimTy::I16 => write!(f, "i16"),
+            PrimTy::I32 => write!(f, "i32"),
+            PrimTy::I64 => write!(f, "i64"),
+            PrimTy::Isize => write!(f, "isize"),
+            PrimTy::U8 => write!(f, "u8"),
+            PrimTy::U16 => write!(f, "u16"),
+            PrimTy::U32 => write!(f, "u32"),
+            PrimTy::U64 => write!(f, "u64"),
+            PrimTy::Usize => write!(f, "usize"),
+            PrimTy::F32 => write!(f, "f32"),
+            PrimTy::F64 => write!(f, "f64"),
+            PrimTy::Char => write!(f, "char"),
+            PrimTy::String => write!(f, "String"),
+            PrimTy::Nil => write!(f, "nil"),
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum TyKind {
@@ -857,6 +909,39 @@ pub enum TyKind {
     Path(Path),
     /// Union of multiple types.
     Union(Vec<Ty>),
+}
+
+impl Display for TyKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TyKind::Unknown => write!(f, "unknown"),
+            TyKind::Primitive(p) => write!(f, "{p}"),
+            TyKind::Fn(params, ret) => {
+                write!(f, "fn(")?;
+                for (i, p) in params.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", p.kind)?;
+                }
+                write!(f, ") -> {}", ret.kind)
+            }
+            TyKind::Slice(inner) => write!(f, "{}[]", inner.kind),
+            TyKind::Dict(k, v) => write!(f, "dict[{}, {}]", k.kind, v.kind),
+            TyKind::Never => write!(f, "never"),
+            TyKind::Var(id) => write!(f, "?{id}"),
+            TyKind::Path(path) => write!(f, "{path}"),
+            TyKind::Union(tys) => {
+                for (i, ty) in tys.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, " | ")?;
+                    }
+                    write!(f, "{}", ty.kind)?;
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1069,6 +1154,33 @@ pub enum BinaryOpKind {
     BitwiseXor,
     LeftShift,
     RightShift,
+}
+
+impl Display for BinaryOpKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BinaryOpKind::Assign => write!(f, "="),
+            BinaryOpKind::Add => write!(f, "+"),
+            BinaryOpKind::Sub => write!(f, "-"),
+            BinaryOpKind::Mul => write!(f, "*"),
+            BinaryOpKind::Div => write!(f, "/"),
+            BinaryOpKind::Mod => write!(f, "%"),
+            BinaryOpKind::Exp => write!(f, "**"),
+            BinaryOpKind::Eq => write!(f, "=="),
+            BinaryOpKind::NotEq => write!(f, "!="),
+            BinaryOpKind::Less => write!(f, "<"),
+            BinaryOpKind::LessEq => write!(f, "<="),
+            BinaryOpKind::Greater => write!(f, ">"),
+            BinaryOpKind::GreaterEq => write!(f, ">="),
+            BinaryOpKind::And => write!(f, "&&"),
+            BinaryOpKind::Or => write!(f, "||"),
+            BinaryOpKind::BitwiseAnd => write!(f, "&"),
+            BinaryOpKind::BitwiseOr => write!(f, "|"),
+            BinaryOpKind::BitwiseXor => write!(f, "^"),
+            BinaryOpKind::LeftShift => write!(f, "<<"),
+            BinaryOpKind::RightShift => write!(f, ">>"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

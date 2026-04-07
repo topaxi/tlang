@@ -21,6 +21,27 @@ pub enum TypeError {
         to_ty: String,
         span: Span,
     },
+    /// Cannot apply the given binary operator to the provided operand types.
+    InvalidBinaryOp {
+        op: String,
+        lhs: String,
+        rhs: String,
+        span: Span,
+    },
+    /// Cannot apply the given unary operator to the provided operand type.
+    InvalidUnaryOp {
+        op: String,
+        operand: String,
+        span: Span,
+    },
+    /// `unknown` value used in a strict (fully typed) context.
+    UnknownInStrictContext { op: String, span: Span },
+    /// Type mismatch in a let/const binding with an explicit type annotation.
+    BindingTypeMismatch {
+        declared: String,
+        actual: String,
+        span: Span,
+    },
 }
 
 impl TypeError {
@@ -29,7 +50,11 @@ impl TypeError {
         match self {
             TypeError::TypeMismatch { span, .. }
             | TypeError::CastOnUnknown { span }
-            | TypeError::NoFromImpl { span, .. } => *span,
+            | TypeError::NoFromImpl { span, .. }
+            | TypeError::InvalidBinaryOp { span, .. }
+            | TypeError::InvalidUnaryOp { span, .. }
+            | TypeError::UnknownInStrictContext { span, .. }
+            | TypeError::BindingTypeMismatch { span, .. } => *span,
         }
     }
 
@@ -44,6 +69,25 @@ impl TypeError {
             }
             TypeError::NoFromImpl { from_ty, to_ty, .. } => {
                 format!("no `From<{from_ty}>` implementation for `{to_ty}`")
+            }
+            TypeError::InvalidBinaryOp { op, lhs, rhs, .. } => {
+                format!("cannot apply operator `{op}` to types `{lhs}` and `{rhs}`")
+            }
+            TypeError::InvalidUnaryOp { op, operand, .. } => {
+                format!("cannot apply operator `{op}` to type `{operand}`")
+            }
+            TypeError::UnknownInStrictContext { op, .. } => {
+                format!(
+                    "cannot use `unknown` value in operator `{op}` in fully typed function \
+                     — convert with `as?` first"
+                )
+            }
+            TypeError::BindingTypeMismatch {
+                declared, actual, ..
+            } => {
+                format!(
+                    "type mismatch in binding: declared `{declared}`, but expression has type `{actual}`"
+                )
             }
         }
     }
