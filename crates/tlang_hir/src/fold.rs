@@ -187,6 +187,10 @@ pub fn fold_expr<F: Folder>(folder: &mut F, expr: hir::Expr) -> hir::Expr {
             Box::new(folder.fold_expr(*inner)),
             Box::new(folder.fold_ty(*ty)),
         ),
+        hir::ExprKind::TryCast(inner, ty) => hir::ExprKind::TryCast(
+            Box::new(folder.fold_expr(*inner)),
+            Box::new(folder.fold_ty(*ty)),
+        ),
         hir::ExprKind::FieldAccess(base, ident) => {
             hir::ExprKind::FieldAccess(Box::new(folder.fold_expr(*base)), ident)
         }

@@ -633,10 +633,20 @@ impl LoweringContext {
 
         if let Some(node) = node {
             let kind = match &node.kind {
-                ast::node::TyKind::Path(path) => hir::TyKind::Path(self.lower_path(path)),
-                ast::node::TyKind::Union(paths) => {
-                    hir::TyKind::Union(paths.iter().map(|p| self.lower_path(p)).collect())
-                }
+                ast::node::TyKind::Path(path) => self.lower_ty_path(path),
+                ast::node::TyKind::Union(paths) => hir::TyKind::Union(
+                    paths
+                        .iter()
+                        .map(|p| {
+                            let kind = self.lower_ty_path(p);
+                            hir::Ty {
+                                res: None,
+                                kind,
+                                span: Span::default(),
+                            }
+                        })
+                        .collect(),
+                ),
                 ast::node::TyKind::Unknown => hir::TyKind::Unknown,
             };
             let res = self.node_id_to_hir_id.get(&node.id).copied();
@@ -651,6 +661,39 @@ impl LoweringContext {
                 kind: hir::TyKind::Unknown,
                 span: tlang_span::Span::default(),
             }
+        }
+    }
+
+    /// Lower a type path, mapping known primitive names to `TyKind::Primitive`.
+    fn lower_ty_path(&mut self, path: &ast::node::Path) -> hir::TyKind {
+        if path.segments.len() == 1 {
+            let name = path.segments[0].as_str();
+            if let Some(prim) = Self::name_to_prim_ty(name) {
+                return hir::TyKind::Primitive(prim);
+            }
+        }
+        hir::TyKind::Path(self.lower_path(path))
+    }
+
+    fn name_to_prim_ty(name: &str) -> Option<hir::PrimTy> {
+        match name {
+            "bool" => Some(hir::PrimTy::Bool),
+            "i8" => Some(hir::PrimTy::I8),
+            "i16" => Some(hir::PrimTy::I16),
+            "i32" => Some(hir::PrimTy::I32),
+            "i64" => Some(hir::PrimTy::I64),
+            "isize" => Some(hir::PrimTy::Isize),
+            "u8" => Some(hir::PrimTy::U8),
+            "u16" => Some(hir::PrimTy::U16),
+            "u32" => Some(hir::PrimTy::U32),
+            "u64" => Some(hir::PrimTy::U64),
+            "usize" => Some(hir::PrimTy::Usize),
+            "f32" => Some(hir::PrimTy::F32),
+            "f64" => Some(hir::PrimTy::F64),
+            "char" => Some(hir::PrimTy::Char),
+            "String" => Some(hir::PrimTy::String),
+            "nil" => Some(hir::PrimTy::Nil),
+            _ => None,
         }
     }
 }

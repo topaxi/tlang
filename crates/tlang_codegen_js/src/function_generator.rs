@@ -621,6 +621,7 @@ fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
         hir::ExprKind::Unary(_, inner) => expr_can_render_as_js_expr(inner),
         hir::ExprKind::Call(call) => call.arguments.iter().all(expr_can_render_as_js_expr),
         hir::ExprKind::Cast(inner, _) => expr_can_render_as_js_expr(inner),
+        hir::ExprKind::TryCast(inner, _) => expr_can_render_as_js_expr(inner),
         hir::ExprKind::FieldAccess(base, _) => expr_can_render_as_js_expr(base),
         hir::ExprKind::IndexAccess(base, index) => {
             expr_can_render_as_js_expr(base) && expr_can_render_as_js_expr(index)

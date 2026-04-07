@@ -216,12 +216,26 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
     fn visit_ty(&mut self, ty: &'hir mut hir::Ty, ctx: &mut Self::Context) {
         match &mut ty.kind {
             hir::TyKind::Path(path) => self.resolve_ty_path(path, ctx),
-            hir::TyKind::Union(paths) => {
-                for path in paths {
-                    self.resolve_ty_path(path, ctx);
+            hir::TyKind::Union(tys) => {
+                for inner_ty in tys {
+                    self.visit_ty(inner_ty, ctx);
                 }
             }
-            hir::TyKind::Unknown => {}
+            hir::TyKind::Fn(param_tys, ret_ty) => {
+                for param_ty in param_tys {
+                    self.visit_ty(param_ty, ctx);
+                }
+                self.visit_ty(ret_ty, ctx);
+            }
+            hir::TyKind::Slice(inner) => self.visit_ty(inner, ctx),
+            hir::TyKind::Dict(key_ty, val_ty) => {
+                self.visit_ty(key_ty, ctx);
+                self.visit_ty(val_ty, ctx);
+            }
+            hir::TyKind::Unknown
+            | hir::TyKind::Primitive(_)
+            | hir::TyKind::Never
+            | hir::TyKind::Var(_) => {}
         }
     }
 }

@@ -343,6 +343,11 @@ impl HirPretty {
                 self.push_str(" as ");
                 self.print_ty(ty);
             }
+            hir::ExprKind::TryCast(expr, ty) => {
+                self.print_expr(expr);
+                self.push_str(" as? ");
+                self.print_ty(ty);
+            }
             hir::ExprKind::Binary(op, lhs, rhs) => {
                 self.print_binary_expr(op, lhs, rhs);
             }
@@ -670,13 +675,58 @@ impl HirPretty {
     fn print_ty(&mut self, ty: &hir::Ty) {
         match &ty.kind {
             hir::TyKind::Unknown => self.push_str("unknown"),
+            hir::TyKind::Primitive(prim) => self.push_str(match prim {
+                hir::PrimTy::Bool => "bool",
+                hir::PrimTy::I8 => "i8",
+                hir::PrimTy::I16 => "i16",
+                hir::PrimTy::I32 => "i32",
+                hir::PrimTy::I64 => "i64",
+                hir::PrimTy::Isize => "isize",
+                hir::PrimTy::U8 => "u8",
+                hir::PrimTy::U16 => "u16",
+                hir::PrimTy::U32 => "u32",
+                hir::PrimTy::U64 => "u64",
+                hir::PrimTy::Usize => "usize",
+                hir::PrimTy::F32 => "f32",
+                hir::PrimTy::F64 => "f64",
+                hir::PrimTy::Char => "char",
+                hir::PrimTy::String => "String",
+                hir::PrimTy::Nil => "nil",
+            }),
+            hir::TyKind::Fn(params, ret) => {
+                self.push_str("fn(");
+                for (i, param) in params.iter().enumerate() {
+                    if i > 0 {
+                        self.push_str(", ");
+                    }
+                    self.print_ty(param);
+                }
+                self.push_str(") -> ");
+                self.print_ty(ret);
+            }
+            hir::TyKind::Slice(inner) => {
+                self.print_ty(inner);
+                self.push_str("[]");
+            }
+            hir::TyKind::Dict(key, val) => {
+                self.push_str("{");
+                self.print_ty(key);
+                self.push_str(": ");
+                self.print_ty(val);
+                self.push_str("}");
+            }
+            hir::TyKind::Never => self.push_str("!"),
+            hir::TyKind::Var(id) => {
+                self.push_str("?T");
+                self.push_string(id.as_usize().to_string());
+            }
             hir::TyKind::Path(path) => self.print_path(path),
-            hir::TyKind::Union(paths) => {
-                for (i, path) in paths.iter().enumerate() {
+            hir::TyKind::Union(tys) => {
+                for (i, inner_ty) in tys.iter().enumerate() {
                     if i > 0 {
                         self.push_str(" | ");
                     }
-                    self.print_path(path);
+                    self.print_ty(inner_ty);
                 }
             }
         }

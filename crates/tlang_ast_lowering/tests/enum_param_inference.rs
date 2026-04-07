@@ -1,5 +1,5 @@
 use insta::assert_snapshot;
-use tlang_hir::{ExprKind, PatKind, StmtKind, TyKind};
+use tlang_hir::{ExprKind, PatKind, PrimTy, StmtKind, TyKind};
 
 mod common;
 
@@ -137,11 +137,8 @@ fn test_literal_param_type_propagated_to_match_arm_patterns() {
     // Arms with literal/identifier patterns should carry the inferred i64 type.
     for (i, arm) in arms.iter().enumerate() {
         match &arm.pat.ty.kind {
-            TyKind::Path(path) => {
-                let name = path.segments.last().unwrap().ident.to_string();
-                assert_eq!(name, "i64", "arm {i}: expected i64, got {name}");
-            }
-            other => panic!("arm {i}: expected TyKind::Path, got {other:?}"),
+            TyKind::Primitive(PrimTy::I64) => {}
+            other => panic!("arm {i}: expected TyKind::Primitive(I64), got {other:?}"),
         }
     }
 }
@@ -170,11 +167,10 @@ fn test_multi_param_type_propagated_to_inner_patterns() {
         assert_eq!(inner.len(), 2, "arm {i}: expected 2 inner patterns");
         for (j, pat) in inner.iter().enumerate() {
             match &pat.ty.kind {
-                TyKind::Path(path) => {
-                    let name = path.segments.last().unwrap().ident.to_string();
-                    assert_eq!(name, "i64", "arm {i}, param {j}: expected i64, got {name}");
+                TyKind::Primitive(PrimTy::I64) => {}
+                other => {
+                    panic!("arm {i}, param {j}: expected TyKind::Primitive(I64), got {other:?}")
                 }
-                other => panic!("arm {i}, param {j}: expected TyKind::Path, got {other:?}"),
             }
         }
     }

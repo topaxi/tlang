@@ -2252,6 +2252,34 @@ impl<'src> Parser<'src> {
                         node::expr!(self.unique_id(), Matches(Box::new(lhs), pat))
                     };
                 }
+                TokenKind::Keyword(Keyword::As) => {
+                    // `as` / `as?` have comparison precedence (6), left-associative
+                    let op_info = OperatorInfo {
+                        precedence: 6,
+                        associativity: Associativity::Left,
+                    };
+                    if Self::compare_precedence(
+                        &OperatorInfo {
+                            precedence,
+                            associativity,
+                        },
+                        &op_info,
+                    ) {
+                        break;
+                    }
+                    self.advance();
+                    // Check for `as?` (try-cast) vs `as` (cast)
+                    let is_try_cast = matches!(self.current_token_kind(), TokenKind::QuestionMark);
+                    if is_try_cast {
+                        self.advance();
+                    }
+                    let ty = self.parse_type_annotation();
+                    lhs = if is_try_cast {
+                        node::expr!(self.unique_id(), TryCast(Box::new(lhs), Box::new(ty)))
+                    } else {
+                        node::expr!(self.unique_id(), Cast(Box::new(lhs), Box::new(ty)))
+                    };
+                }
                 token if Self::is_binary_op(token) => {
                     let operator = Self::map_binary_op(token);
                     let operator_info = Self::map_operator_info(&operator);

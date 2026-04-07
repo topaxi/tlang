@@ -346,6 +346,7 @@ impl Interpreter {
             hir::ExprKind::Call(call_expr) => self.eval_call(state, call_expr),
             hir::ExprKind::TailCall(call_expr) => self.eval_tail_call(state, call_expr),
             hir::ExprKind::Cast(_expr, _ty) => todo!("eval_expr: Cast"),
+            hir::ExprKind::TryCast(_expr, _ty) => todo!("eval_expr: TryCast"),
             hir::ExprKind::Unary(op, expr) => self.eval_unary(state, *op, expr),
             hir::ExprKind::IfElse(condition, consequence, else_clauses) => {
                 self.eval_if_else(state, condition, consequence, else_clauses)

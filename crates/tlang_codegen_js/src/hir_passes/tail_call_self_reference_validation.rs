@@ -131,7 +131,7 @@ fn check_expr(expr: &hir::Expr, current_fn: Option<HirId>, diagnostics: &mut Vec
             check_expr(base, current_fn, diagnostics);
             check_expr(index, current_fn, diagnostics);
         }
-        hir::ExprKind::Cast(inner, _) => {
+        hir::ExprKind::Cast(inner, _) | hir::ExprKind::TryCast(inner, _) => {
             check_expr(inner, current_fn, diagnostics);
         }
         hir::ExprKind::Let(_, inner) => {

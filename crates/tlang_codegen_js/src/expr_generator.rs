@@ -26,6 +26,7 @@ impl<'a> InnerCodegen<'a> {
                 self.generate_call_expression(call_expr)
             }
             hir::ExprKind::Cast(inner, _) => self.generate_expr(inner),
+            hir::ExprKind::TryCast(inner, _) => self.generate_expr(inner),
             hir::ExprKind::FieldAccess(base, field) => {
                 self.generate_field_access_expression(base, field)
             }

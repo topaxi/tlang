@@ -112,7 +112,9 @@ impl BooleanReturnSimplification {
                 self.visit_expr(lhs);
                 self.visit_expr(rhs);
             }
-            hir::ExprKind::Unary(_, inner) | hir::ExprKind::Cast(inner, _) => {
+            hir::ExprKind::Unary(_, inner)
+            | hir::ExprKind::Cast(inner, _)
+            | hir::ExprKind::TryCast(inner, _) => {
                 self.visit_expr(inner);
             }
             hir::ExprKind::FieldAccess(base, _) => self.visit_expr(base),

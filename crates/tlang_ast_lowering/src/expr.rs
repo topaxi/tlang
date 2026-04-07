@@ -38,6 +38,11 @@ impl LoweringContext {
                 let ty = self.lower_ty(Some(ty));
                 hir::ExprKind::Cast(Box::new(expr), Box::new(ty))
             }
+            ast::node::ExprKind::TryCast(box expr, box ty) => {
+                let expr = self.lower_expr(expr);
+                let ty = self.lower_ty(Some(ty));
+                hir::ExprKind::TryCast(Box::new(expr), Box::new(ty))
+            }
             ast::node::ExprKind::UnaryOp(op, expr) => {
                 hir::ExprKind::Unary(*op, Box::new(self.lower_expr(expr)))
             }
