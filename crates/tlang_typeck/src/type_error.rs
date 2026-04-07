@@ -42,6 +42,25 @@ pub enum TypeError {
         actual: String,
         span: Span,
     },
+    /// Wrong number of arguments in a function call.
+    ArgumentCountMismatch {
+        expected: usize,
+        actual: usize,
+        span: Span,
+    },
+    /// Argument type does not match the corresponding parameter type.
+    ArgumentTypeMismatch {
+        param_name: String,
+        expected: String,
+        actual: String,
+        span: Span,
+    },
+    /// Return type does not match the function's declared/inferred return type.
+    ReturnTypeMismatch {
+        expected: String,
+        actual: String,
+        span: Span,
+    },
 }
 
 impl TypeError {
@@ -54,7 +73,10 @@ impl TypeError {
             | TypeError::InvalidBinaryOp { span, .. }
             | TypeError::InvalidUnaryOp { span, .. }
             | TypeError::UnknownInStrictContext { span, .. }
-            | TypeError::BindingTypeMismatch { span, .. } => *span,
+            | TypeError::BindingTypeMismatch { span, .. }
+            | TypeError::ArgumentCountMismatch { span, .. }
+            | TypeError::ArgumentTypeMismatch { span, .. }
+            | TypeError::ReturnTypeMismatch { span, .. } => *span,
         }
     }
 
@@ -87,6 +109,28 @@ impl TypeError {
             } => {
                 format!(
                     "type mismatch in binding: declared `{declared}`, but expression has type `{actual}`"
+                )
+            }
+            TypeError::ArgumentCountMismatch {
+                expected, actual, ..
+            } => {
+                format!("expected {expected} arguments, found {actual}")
+            }
+            TypeError::ArgumentTypeMismatch {
+                param_name,
+                expected,
+                actual,
+                ..
+            } => {
+                format!(
+                    "argument type mismatch: parameter `{param_name}` expects `{expected}`, got `{actual}`"
+                )
+            }
+            TypeError::ReturnTypeMismatch {
+                expected, actual, ..
+            } => {
+                format!(
+                    "return type mismatch: function declares `→ {expected}`, but body returns `{actual}`"
                 )
             }
         }

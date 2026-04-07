@@ -12,7 +12,10 @@ use tlang_typeck::TypeChecker;
 fn compile(source: &str) -> hir::LowerResult {
     let (mut ast, parse_meta) = Parser::from_source(source).parse().unwrap();
     let mut semantic_analyzer = SemanticAnalyzer::default();
-    semantic_analyzer.add_builtin_symbols(&[("println", DefKind::Function(u16::MAX))]);
+    semantic_analyzer.add_builtin_symbols(&[
+        ("println", DefKind::Function(u16::MAX)),
+        ("log", DefKind::Function(u16::MAX)),
+    ]);
     semantic_analyzer.analyze(&mut ast).unwrap();
     lower_to_hir(
         &ast,
