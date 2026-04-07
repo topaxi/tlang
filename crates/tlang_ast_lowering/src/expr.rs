@@ -452,6 +452,8 @@ impl LoweringContext {
             BinaryOpKind::BitwiseAnd => hir::BinaryOpKind::BitwiseAnd,
             BinaryOpKind::BitwiseOr => hir::BinaryOpKind::BitwiseOr,
             BinaryOpKind::BitwiseXor => hir::BinaryOpKind::BitwiseXor,
+            BinaryOpKind::LeftShift => hir::BinaryOpKind::LeftShift,
+            BinaryOpKind::RightShift => hir::BinaryOpKind::RightShift,
             BinaryOpKind::Pipeline => return self.lower_pipeline_operator(node),
             BinaryOpKind::Match | BinaryOpKind::NotMatch => return self.lower_match_operator(node),
         };

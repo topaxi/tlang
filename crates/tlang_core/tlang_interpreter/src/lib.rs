@@ -635,6 +635,13 @@ impl Interpreter {
                 self.eval_bitwise_op(lhs, rhs, |a, b| a ^ b, |a, b| a ^ b)
             }
 
+            hir::BinaryOpKind::LeftShift => {
+                self.eval_bitwise_op(lhs, rhs, |a, b| a << (b & 63), |a, b| a << (b & 63))
+            }
+            hir::BinaryOpKind::RightShift => {
+                self.eval_bitwise_op(lhs, rhs, |a, b| a >> (b & 63), |a, b| a >> (b & 63))
+            }
+
             hir::BinaryOpKind::Assign | hir::BinaryOpKind::And | hir::BinaryOpKind::Or => {
                 unreachable!("{:?} should be handled before", op)
             }

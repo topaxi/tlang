@@ -762,6 +762,8 @@ pub enum BinaryOpKind {
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
+    LeftShift,
+    RightShift,
     Pipeline,
     Match,
     NotMatch,

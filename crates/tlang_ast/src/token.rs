@@ -24,6 +24,8 @@ pub enum TokenKind {
     LessThanOrEqual,
     DoubleAmpersand,
     DoublePipe,
+    LeftShift,
+    RightShift,
 
     // Tokens for special characters
     Ampersand,

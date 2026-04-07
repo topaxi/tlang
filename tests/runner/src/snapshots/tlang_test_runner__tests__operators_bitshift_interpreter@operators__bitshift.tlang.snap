@@ -1,0 +1,13 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/operators/bitshift.tlang
+---
+16
+8
+16
+16
+32
+8
+4080

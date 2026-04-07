@@ -1,0 +1,16 @@
+// Left shift
+log(1 << 4);
+log(0b0001 << 3);
+
+// Right shift
+log(256 >> 4);
+log(0b10000000 >> 3);
+
+// Chained shifts (left-associative)
+log(1 << 2 << 3);
+
+// Shift with arithmetic (shift has lower precedence than +)
+log(1 << 2 + 1);
+
+// Combining shifts and bitwise AND
+log((0xFF << 4) & 0xFFFF);
