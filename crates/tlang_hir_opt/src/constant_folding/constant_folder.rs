@@ -156,28 +156,22 @@ impl ConstantFolder {
             (BinaryOpKind::BitwiseXor, Literal::Integer(l), Literal::Integer(r)) => {
                 Some(Literal::Integer(l ^ r))
             }
-            (BinaryOpKind::LeftShift, Literal::Integer(l), Literal::Integer(r))
-                if *r >= 0 && *r < 64 =>
-            {
-                Some(Literal::Integer(l << r))
+            (BinaryOpKind::LeftShift, Literal::Integer(l), Literal::Integer(r)) if *r >= 0 => {
+                l.checked_shl(*r as u32).map(Literal::Integer)
             }
-            (BinaryOpKind::RightShift, Literal::Integer(l), Literal::Integer(r))
-                if *r >= 0 && *r < 64 =>
-            {
-                Some(Literal::Integer(l >> r))
+            (BinaryOpKind::RightShift, Literal::Integer(l), Literal::Integer(r)) if *r >= 0 => {
+                l.checked_shr(*r as u32).map(Literal::Integer)
             }
 
             // Unsigned integer bitwise shifts
-            (BinaryOpKind::LeftShift, Literal::UnsignedInteger(l), Literal::UnsignedInteger(r))
-                if *r < 64 =>
-            {
-                Some(Literal::UnsignedInteger(l << r))
+            (BinaryOpKind::LeftShift, Literal::UnsignedInteger(l), Literal::UnsignedInteger(r)) => {
+                l.checked_shl(*r as u32).map(Literal::UnsignedInteger)
             }
             (
                 BinaryOpKind::RightShift,
                 Literal::UnsignedInteger(l),
                 Literal::UnsignedInteger(r),
-            ) if *r < 64 => Some(Literal::UnsignedInteger(l >> r)),
+            ) => l.checked_shr(*r as u32).map(Literal::UnsignedInteger),
 
             // Float arithmetic
             (BinaryOpKind::Add, Literal::Float(l), Literal::Float(r)) => {

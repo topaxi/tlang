@@ -636,10 +636,26 @@ impl Interpreter {
             }
 
             hir::BinaryOpKind::LeftShift => {
-                self.eval_bitwise_op(lhs, rhs, |a, b| a << (b & 63), |a, b| a << (b & 63))
+                // Mask shift amount to 0..63 to match 64-bit integer width and avoid UB.
+                const SHIFT_MASK: i64 = 63;
+                const SHIFT_MASK_U: u64 = 63;
+                self.eval_bitwise_op(
+                    lhs,
+                    rhs,
+                    |a, b| a << (b & SHIFT_MASK),
+                    |a, b| a << (b & SHIFT_MASK_U),
+                )
             }
             hir::BinaryOpKind::RightShift => {
-                self.eval_bitwise_op(lhs, rhs, |a, b| a >> (b & 63), |a, b| a >> (b & 63))
+                // Mask shift amount to 0..63 to match 64-bit integer width and avoid UB.
+                const SHIFT_MASK: i64 = 63;
+                const SHIFT_MASK_U: u64 = 63;
+                self.eval_bitwise_op(
+                    lhs,
+                    rhs,
+                    |a, b| a >> (b & SHIFT_MASK),
+                    |a, b| a >> (b & SHIFT_MASK_U),
+                )
             }
 
             hir::BinaryOpKind::Assign | hir::BinaryOpKind::And | hir::BinaryOpKind::Or => {
