@@ -3,22 +3,22 @@ mod common;
 // ── Literal typing ──────────────────────────────────────────────────────
 
 #[test]
-fn integer_literal_no_error() {
+fn integer_literal_ok() {
     common::typecheck_ok("let x = 42;");
 }
 
 #[test]
-fn float_literal_no_error() {
+fn float_literal_ok() {
     common::typecheck_ok("let x = 3.14;");
 }
 
 #[test]
-fn string_literal_no_error() {
+fn string_literal_ok() {
     common::typecheck_ok(r#"let x = "hello";"#);
 }
 
 #[test]
-fn boolean_literal_no_error() {
+fn boolean_literal_ok() {
     common::typecheck_ok("let x = true;");
 }
 
@@ -167,7 +167,7 @@ fn let_binding_mismatched_annotation_error() {
 // ── Permissive mode (top-level / untyped functions) ─────────────────────
 
 #[test]
-fn unknown_in_permissive_mode_no_error() {
+fn unknown_in_permissive_mode_ok() {
     // In top-level (permissive) mode, operations with unknown values produce
     // no errors — they just propagate unknown.
     common::typecheck_ok(
