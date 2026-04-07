@@ -642,7 +642,7 @@ impl LoweringContext {
                             hir::Ty {
                                 res: None,
                                 kind,
-                                span: Span::default(),
+                                span: p.span,
                             }
                         })
                         .collect(),
