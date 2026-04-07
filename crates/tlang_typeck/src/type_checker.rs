@@ -32,9 +32,10 @@ impl HirPass for TypeChecker {
         _module: &mut hir::Module,
         ctx: &mut HirOptContext,
     ) -> Result<bool, HirOptError> {
-        // Convert any accumulated type errors into diagnostics.
-        for error in &self.errors {
-            ctx.diagnostics.push(error.into());
+        // Convert any accumulated type errors into diagnostics and consume
+        // them so repeated optimizer iterations do not emit duplicates.
+        for error in self.errors.drain(..) {
+            ctx.diagnostics.push((&error).into());
         }
 
         // The type checker does not transform the HIR (no changes reported).
