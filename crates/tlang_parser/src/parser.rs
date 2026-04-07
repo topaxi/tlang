@@ -2016,6 +2016,8 @@ impl<'src> Parser<'src> {
                 | TokenKind::Ampersand
                 | TokenKind::DoublePipe
                 | TokenKind::DoubleAmpersand
+                | TokenKind::LeftShift
+                | TokenKind::RightShift
                 | TokenKind::Pipeline
                 | TokenKind::Keyword(Keyword::And | Keyword::Or)
         )
@@ -2041,6 +2043,8 @@ impl<'src> Parser<'src> {
             TokenKind::Pipe => BinaryOpKind::BitwiseOr,
             TokenKind::Ampersand => BinaryOpKind::BitwiseAnd,
             TokenKind::Caret => BinaryOpKind::BitwiseXor,
+            TokenKind::LeftShift => BinaryOpKind::LeftShift,
+            TokenKind::RightShift => BinaryOpKind::RightShift,
             TokenKind::DoublePipe => BinaryOpKind::Or,
             TokenKind::DoubleAmpersand => BinaryOpKind::And,
             TokenKind::Pipeline => BinaryOpKind::Pipeline,
@@ -2091,6 +2095,10 @@ impl<'src> Parser<'src> {
                     associativity: Associativity::Left,
                 }
             }
+            BinaryOpKind::LeftShift | BinaryOpKind::RightShift => OperatorInfo {
+                precedence: 5,
+                associativity: Associativity::Left,
+            },
             BinaryOpKind::Exp => OperatorInfo {
                 precedence: 10,
                 associativity: Associativity::Right,

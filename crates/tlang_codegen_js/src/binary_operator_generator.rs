@@ -21,6 +21,8 @@ pub(crate) fn map_binary_op(op: hir::BinaryOpKind) -> Result<BinaryOperator, Log
         hir::BinaryOpKind::BitwiseOr => Ok(BinaryOperator::BitwiseOR),
         hir::BinaryOpKind::BitwiseAnd => Ok(BinaryOperator::BitwiseAnd),
         hir::BinaryOpKind::BitwiseXor => Ok(BinaryOperator::BitwiseXOR),
+        hir::BinaryOpKind::LeftShift => Ok(BinaryOperator::ShiftLeft),
+        hir::BinaryOpKind::RightShift => Ok(BinaryOperator::ShiftRight),
         hir::BinaryOpKind::And => Err(LogicalOperator::And),
         hir::BinaryOpKind::Or => Err(LogicalOperator::Or),
         // Assign is handled separately by the caller.

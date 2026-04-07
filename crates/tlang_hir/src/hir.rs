@@ -1030,6 +1030,8 @@ pub enum BinaryOpKind {
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
+    LeftShift,
+    RightShift,
 }
 
 #[derive(Debug, Clone)]

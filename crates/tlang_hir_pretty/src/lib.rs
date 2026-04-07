@@ -524,6 +524,8 @@ impl HirPretty {
             hir::BinaryOpKind::BitwiseOr => self.push_char('|'),
             hir::BinaryOpKind::BitwiseAnd => self.push_char('&'),
             hir::BinaryOpKind::BitwiseXor => self.push_char('^'),
+            hir::BinaryOpKind::LeftShift => self.push_str("<<"),
+            hir::BinaryOpKind::RightShift => self.push_str(">>"),
         }
 
         self.push_char(' ');

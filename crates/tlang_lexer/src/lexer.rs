@@ -794,7 +794,11 @@ impl<'src> Lexer<'src> {
                 }
             }
             '<' => {
-                if self.next_char == '=' {
+                if self.next_char == '<' {
+                    self.advance();
+                    self.advance();
+                    self.token(TokenKind::LeftShift, start_pos, start_lc)
+                } else if self.next_char == '=' {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::LessThanOrEqual, start_pos, start_lc)
@@ -804,7 +808,11 @@ impl<'src> Lexer<'src> {
                 }
             }
             '>' => {
-                if self.next_char == '=' {
+                if self.next_char == '>' {
+                    self.advance();
+                    self.advance();
+                    self.token(TokenKind::RightShift, start_pos, start_lc)
+                } else if self.next_char == '=' {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::GreaterThanOrEqual, start_pos, start_lc)
