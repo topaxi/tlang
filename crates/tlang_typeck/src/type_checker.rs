@@ -48,9 +48,9 @@ impl TypeChecker {
     fn type_of_literal(lit: &Literal) -> TyKind {
         match lit {
             // Both integer variants default to i64: the lexer produces
-            // UnsignedInteger for non-negative literals (e.g. `1`) and
-            // Integer for negated literals (e.g. `-1`). In the type system,
-            // all bare integer literals are `i64` by default.
+            // UnsignedInteger for numeric literals (e.g. `1`), and the parser
+            // introduces Integer for negated numeric literals (e.g. `-1`).
+            // In the type system, all bare integer literals are `i64` by default.
             Literal::Integer(_) | Literal::UnsignedInteger(_) => TyKind::Primitive(PrimTy::I64),
             Literal::Float(_) => TyKind::Primitive(PrimTy::F64),
             Literal::Boolean(_) => TyKind::Primitive(PrimTy::Bool),
@@ -114,8 +114,15 @@ impl TypeChecker {
             | BinaryOpKind::LeftShift
             | BinaryOpKind::RightShift => self.check_bitwise(op, lhs_ty, rhs_ty, span),
 
-            // Assignment is handled separately (pass-through).
-            BinaryOpKind::Assign => lhs_ty.clone(),
+            // Assignment expressions evaluate to the assigned value.
+            // Only preserve a concrete type when the assignment is type-compatible.
+            BinaryOpKind::Assign => {
+                if lhs_ty == rhs_ty {
+                    rhs_ty.clone()
+                } else {
+                    TyKind::Unknown
+                }
+            }
         }
     }
 
@@ -312,6 +319,40 @@ impl TypeChecker {
         }
     }
 
+    // ── Pattern binding registration ─────────────────────────────────
+
+    /// Walk a pattern and register all bound identifiers in the type table
+    /// with the given binding type.
+    fn register_pat_bindings(&mut self, pat: &mut hir::Pat, binding_ty: &TyKind) {
+        match &mut pat.kind {
+            hir::PatKind::Identifier(hir_id, _) => {
+                self.type_table.insert(
+                    *hir_id,
+                    TypeInfo {
+                        ty: Ty {
+                            kind: binding_ty.clone(),
+                            ..Ty::default()
+                        },
+                    },
+                );
+            }
+            hir::PatKind::List(pats) => {
+                for p in pats {
+                    self.register_pat_bindings(p, binding_ty);
+                }
+            }
+            hir::PatKind::Rest(inner) => {
+                self.register_pat_bindings(inner, binding_ty);
+            }
+            hir::PatKind::Enum(_, fields) => {
+                for (_, p) in fields {
+                    self.register_pat_bindings(p, binding_ty);
+                }
+            }
+            hir::PatKind::Wildcard | hir::PatKind::Literal(_) => {}
+        }
+    }
+
     // ── HIR walk entry point ─────────────────────────────────────────
 
     fn check_module(&mut self, module: &mut hir::Module) {
@@ -382,17 +423,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     ty.kind.clone()
                 };
 
-                if let hir::PatKind::Identifier(hir_id, _) = &pat.kind {
-                    self.type_table.insert(
-                        *hir_id,
-                        TypeInfo {
-                            ty: Ty {
-                                kind: binding_ty.clone(),
-                                ..Ty::default()
-                            },
-                        },
-                    );
-                }
+                self.register_pat_bindings(pat, &binding_ty);
                 pat.ty.kind = binding_ty;
             }
             hir::StmtKind::Const(_, pat, expr, ty) => {
@@ -408,17 +439,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     ty.kind.clone()
                 };
 
-                if let hir::PatKind::Identifier(hir_id, _) = &pat.kind {
-                    self.type_table.insert(
-                        *hir_id,
-                        TypeInfo {
-                            ty: Ty {
-                                kind: binding_ty.clone(),
-                                ..Ty::default()
-                            },
-                        },
-                    );
-                }
+                self.register_pat_bindings(pat, &binding_ty);
                 pat.ty.kind = binding_ty;
             }
             hir::StmtKind::FunctionDeclaration(decl) => {
