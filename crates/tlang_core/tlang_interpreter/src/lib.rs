@@ -518,81 +518,9 @@ impl Interpreter {
         rhs: &hir::Expr,
     ) -> EvalResult {
         match op {
-            hir::BinaryOpKind::And => {
-                let lhs = eval_value!(state, self.eval_expr(state, lhs));
-
-                if state.is_truthy(lhs) {
-                    let rhs = eval_value!(state, self.eval_expr(state, rhs));
-
-                    debug!(
-                        "eval_binary: {:?} && {:?}",
-                        state.stringify(lhs),
-                        state.stringify(rhs)
-                    );
-
-                    if state.is_truthy(rhs) {
-                        return EvalResult::Value(TlangValue::Bool(true));
-                    }
-                }
-
-                debug!("eval_binary: {:?} && ...", state.stringify(lhs));
-
-                return EvalResult::Value(TlangValue::Bool(false));
-            }
-
-            hir::BinaryOpKind::Or => {
-                let lhs = eval_value!(state, self.eval_expr(state, lhs));
-
-                if state.is_truthy(lhs) {
-                    debug!("eval_binary: {:?} || ...", state.stringify(lhs));
-
-                    return EvalResult::Value(TlangValue::Bool(true));
-                }
-
-                return self.eval_expr(state, rhs);
-            }
-
-            hir::BinaryOpKind::Assign if let hir::ExprKind::Path(path) = &lhs.kind => {
-                let value = eval_value!(state, self.eval_expr(state, rhs));
-
-                debug!("eval_binary: {} = {}", path, state.stringify(value));
-
-                state.execution.scope_stack.update_value(&path.res, value);
-
-                return EvalResult::Value(value);
-            }
-
-            hir::BinaryOpKind::Assign
-                if let hir::ExprKind::FieldAccess(base, ident) = &lhs.kind =>
-            {
-                let struct_value = eval_value!(state, self.eval_expr(state, base));
-                let struct_shape = state
-                    .get_object(struct_value)
-                    .and_then(|o| o.shape())
-                    .unwrap_or_else(|| {
-                        state.panic(format!("Cannot assign to field `{ident}` on non-object"))
-                    });
-                let index = state
-                    .get_struct_field_index(struct_shape, ident.as_str())
-                    .unwrap_or_else(|| {
-                        state.panic(format!(
-                            "Cannot assign to field `{ident}` on struct `{struct_shape:?}`"
-                        ))
-                    });
-
-                let value = eval_value!(state, self.eval_expr(state, rhs));
-
-                let struct_obj = state.get_struct_mut(struct_value).unwrap();
-
-                struct_obj[index] = value;
-
-                return EvalResult::Value(value);
-            }
-
-            hir::BinaryOpKind::Assign => {
-                todo!("eval_binary: Assign not implemented for {:?}", lhs);
-            }
-
+            hir::BinaryOpKind::And => return self.eval_logical_and(state, lhs, rhs),
+            hir::BinaryOpKind::Or => return self.eval_logical_or(state, lhs, rhs),
+            hir::BinaryOpKind::Assign => return self.eval_assign(state, lhs, rhs),
             _ => {}
         }
 
@@ -610,7 +538,91 @@ impl Interpreter {
             return self.eval_object_binary_op(state, op, lhs, rhs);
         }
 
-        let value = match op {
+        EvalResult::Value(self.eval_binary_values(lhs, rhs, op))
+    }
+
+    fn eval_logical_and(
+        &self,
+        state: &mut VMState,
+        lhs: &hir::Expr,
+        rhs: &hir::Expr,
+    ) -> EvalResult {
+        let lhs = eval_value!(state, self.eval_expr(state, lhs));
+
+        if state.is_truthy(lhs) {
+            let rhs = eval_value!(state, self.eval_expr(state, rhs));
+
+            debug!(
+                "eval_binary: {:?} && {:?}",
+                state.stringify(lhs),
+                state.stringify(rhs)
+            );
+
+            if state.is_truthy(rhs) {
+                return EvalResult::Value(TlangValue::Bool(true));
+            }
+        }
+
+        debug!("eval_binary: {:?} && ...", state.stringify(lhs));
+
+        EvalResult::Value(TlangValue::Bool(false))
+    }
+
+    fn eval_logical_or(&self, state: &mut VMState, lhs: &hir::Expr, rhs: &hir::Expr) -> EvalResult {
+        let lhs = eval_value!(state, self.eval_expr(state, lhs));
+
+        if state.is_truthy(lhs) {
+            debug!("eval_binary: {:?} || ...", state.stringify(lhs));
+            return EvalResult::Value(TlangValue::Bool(true));
+        }
+
+        self.eval_expr(state, rhs)
+    }
+
+    fn eval_assign(&self, state: &mut VMState, lhs: &hir::Expr, rhs: &hir::Expr) -> EvalResult {
+        match &lhs.kind {
+            hir::ExprKind::Path(path) => {
+                let value = eval_value!(state, self.eval_expr(state, rhs));
+                debug!("eval_binary: {} = {}", path, state.stringify(value));
+                state.execution.scope_stack.update_value(&path.res, value);
+                EvalResult::Value(value)
+            }
+            hir::ExprKind::FieldAccess(base, ident) => {
+                let struct_value = eval_value!(state, self.eval_expr(state, base));
+                let struct_shape = state
+                    .get_object(struct_value)
+                    .and_then(|o| o.shape())
+                    .unwrap_or_else(|| {
+                        state.panic(format!("Cannot assign to field `{ident}` on non-object"))
+                    });
+                let index = state
+                    .get_struct_field_index(struct_shape, ident.as_str())
+                    .unwrap_or_else(|| {
+                        state.panic(format!(
+                            "Cannot assign to field `{ident}` on struct `{struct_shape:?}`"
+                        ))
+                    });
+
+                let value = eval_value!(state, self.eval_expr(state, rhs));
+                let struct_obj = state.get_struct_mut(struct_value).unwrap();
+                struct_obj[index] = value;
+                EvalResult::Value(value)
+            }
+            _ => todo!("eval_binary: Assign not implemented for {:?}", lhs),
+        }
+    }
+
+    fn eval_binary_values(
+        &self,
+        lhs: TlangValue,
+        rhs: TlangValue,
+        op: hir::BinaryOpKind,
+    ) -> TlangValue {
+        // Mask shift amount to 0..63 to match 64-bit integer width and avoid UB.
+        const SHIFT_MASK: i64 = 63;
+        const SHIFT_MASK_U: u64 = 63;
+
+        match op {
             hir::BinaryOpKind::Add => lhs.add(rhs),
             hir::BinaryOpKind::Sub => lhs.sub(rhs),
             hir::BinaryOpKind::Mul => lhs.mul(rhs),
@@ -634,36 +646,23 @@ impl Interpreter {
             hir::BinaryOpKind::BitwiseXor => {
                 self.eval_bitwise_op(lhs, rhs, |a, b| a ^ b, |a, b| a ^ b)
             }
-
-            hir::BinaryOpKind::LeftShift => {
-                // Mask shift amount to 0..63 to match 64-bit integer width and avoid UB.
-                const SHIFT_MASK: i64 = 63;
-                const SHIFT_MASK_U: u64 = 63;
-                self.eval_bitwise_op(
-                    lhs,
-                    rhs,
-                    |a, b| a << (b & SHIFT_MASK),
-                    |a, b| a << (b & SHIFT_MASK_U),
-                )
-            }
-            hir::BinaryOpKind::RightShift => {
-                // Mask shift amount to 0..63 to match 64-bit integer width and avoid UB.
-                const SHIFT_MASK: i64 = 63;
-                const SHIFT_MASK_U: u64 = 63;
-                self.eval_bitwise_op(
-                    lhs,
-                    rhs,
-                    |a, b| a >> (b & SHIFT_MASK),
-                    |a, b| a >> (b & SHIFT_MASK_U),
-                )
-            }
+            hir::BinaryOpKind::LeftShift => self.eval_bitwise_op(
+                lhs,
+                rhs,
+                |a, b| a << (b & SHIFT_MASK),
+                |a, b| a << (b & SHIFT_MASK_U),
+            ),
+            hir::BinaryOpKind::RightShift => self.eval_bitwise_op(
+                lhs,
+                rhs,
+                |a, b| a >> (b & SHIFT_MASK),
+                |a, b| a >> (b & SHIFT_MASK_U),
+            ),
 
             hir::BinaryOpKind::Assign | hir::BinaryOpKind::And | hir::BinaryOpKind::Or => {
-                unreachable!("{:?} should be handled before", op)
+                unreachable!("{:?} should be handled in eval_binary", op)
             }
-        };
-
-        EvalResult::Value(value)
+        }
     }
 
     fn eval_comparison_op<F>(&self, lhs: TlangValue, rhs: TlangValue, op: F) -> TlangValue
