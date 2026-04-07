@@ -324,7 +324,19 @@ impl TypeChecker {
 
     // ── Function signature helpers ───────────────────────────────────
 
-    /// Build a `Fn(params) → return` type for a function declaration and
+    /// Construct a `TyKind::Fn(params, ret)` from parameter types and a
+    /// return type kind.
+    fn make_fn_ty(param_tys: Vec<Ty>, ret: TyKind) -> TyKind {
+        TyKind::Fn(
+            param_tys,
+            Box::new(Ty {
+                kind: ret,
+                ..Ty::default()
+            }),
+        )
+    }
+
+    /// Build a `Fn(params) -> return` type for a function declaration and
     /// store it in the type table keyed by the function's HIR id.
     fn register_function_signature(&mut self, decl: &hir::FunctionDeclaration) {
         let param_tys: Vec<Ty> = decl
@@ -332,8 +344,7 @@ impl TypeChecker {
             .iter()
             .map(|p| p.type_annotation.clone())
             .collect();
-        let ret_ty = decl.return_type.clone();
-        let fn_ty = TyKind::Fn(param_tys, Box::new(ret_ty));
+        let fn_ty = Self::make_fn_ty(param_tys, decl.return_type.kind.clone());
         self.type_table.insert(
             decl.hir_id,
             TypeInfo {
@@ -592,14 +603,7 @@ impl TypeChecker {
             .iter()
             .map(|p| p.type_annotation.clone())
             .collect();
-        let fn_ty = TyKind::Fn(
-            param_tys,
-            Box::new(Ty {
-                kind: ret_ty,
-                ..Ty::default()
-            }),
-        );
-        expr_ty.kind = fn_ty;
+        expr_ty.kind = Self::make_fn_ty(param_tys, ret_ty);
 
         self.return_type_stack.pop();
         self.pop_context();
@@ -724,13 +728,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                         .iter()
                         .map(|p| p.type_annotation.clone())
                         .collect();
-                    let fn_ty = TyKind::Fn(
-                        param_tys,
-                        Box::new(Ty {
-                            kind: body_ty,
-                            ..Ty::default()
-                        }),
-                    );
+                    let fn_ty = Self::make_fn_ty(param_tys, body_ty);
                     self.type_table.insert(
                         decl.hir_id,
                         TypeInfo {

@@ -409,7 +409,7 @@ fn call_result_type_mismatch_with_binding() {
 }
 
 #[test]
-fn call_wrong_argument_count() {
+fn call_correct_argument_count_ok() {
     // NOTE: For user-defined functions, arity mismatches are caught at the
     // semantic analysis stage (before the type checker runs). The type
     // checker's argument count check is a secondary safety net mainly for
@@ -425,7 +425,7 @@ fn call_wrong_argument_count() {
 }
 
 #[test]
-fn call_too_many_arguments() {
+fn call_with_matching_argument_count_ok() {
     // NOTE: For user-defined functions, arity mismatches are caught at the
     // semantic analysis stage. We test that correct arity passes the type
     // checker.
