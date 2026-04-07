@@ -108,7 +108,9 @@ fn expr_has_side_effects(expr: &hir::Expr) -> bool {
         ExprKind::FunctionExpression(_) => false,
 
         // Compound expressions: recurse.
-        ExprKind::Unary(_, inner) | ExprKind::Cast(inner, _) => expr_has_side_effects(inner),
+        ExprKind::Unary(_, inner) | ExprKind::Cast(inner, _) | ExprKind::TryCast(inner, _) => {
+            expr_has_side_effects(inner)
+        }
         ExprKind::Binary(_, lhs, rhs) => expr_has_side_effects(lhs) || expr_has_side_effects(rhs),
         ExprKind::Let(_, inner) => expr_has_side_effects(inner),
         // Field and index access are treated as pure: tlang has no getters/setters, so

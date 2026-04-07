@@ -260,7 +260,9 @@ fn collect_expr(entries: &mut Vec<(Span, SpanNode)>, expr: &hir::Expr) {
                 collect_expr(entries, val);
             }
         }
-        hir::ExprKind::Cast(inner, _) => collect_expr(entries, inner),
+        hir::ExprKind::Cast(inner, _) | hir::ExprKind::TryCast(inner, _) => {
+            collect_expr(entries, inner);
+        }
         hir::ExprKind::Implements(inner, path) => {
             collect_expr(entries, inner);
             collect_path(entries, path);

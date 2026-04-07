@@ -38,6 +38,11 @@ impl LoweringContext {
                 let ty = self.lower_ty(Some(ty));
                 hir::ExprKind::Cast(Box::new(expr), Box::new(ty))
             }
+            ast::node::ExprKind::TryCast(box expr, box ty) => {
+                let expr = self.lower_expr(expr);
+                let ty = self.lower_ty(Some(ty));
+                hir::ExprKind::TryCast(Box::new(expr), Box::new(ty))
+            }
             ast::node::ExprKind::UnaryOp(op, expr) => {
                 hir::ExprKind::Unary(*op, Box::new(self.lower_expr(expr)))
             }
@@ -86,19 +91,7 @@ impl LoweringContext {
             }
             ast::node::ExprKind::Matches(expr, pat) => self.lower_matches(expr, pat, node.span),
             ast::node::ExprKind::Match(match_expr) => self.lower_match(match_expr),
-            ast::node::ExprKind::Range(box ast::node::RangeExpression {
-                start,
-                end,
-                inclusive,
-            }) => {
-                let start = self.lower_expr(start);
-                let end = self.lower_expr(end);
-                hir::ExprKind::Range(Box::new(hir::RangeExpression {
-                    start,
-                    end,
-                    inclusive: *inclusive,
-                }))
-            }
+            ast::node::ExprKind::Range(box range) => self.lower_range_expr(range),
             ast::node::ExprKind::Wildcard => hir::ExprKind::Wildcard,
             ast::node::ExprKind::TaggedString { tag, parts, exprs } => {
                 hir::ExprKind::TaggedString {
@@ -118,6 +111,16 @@ impl LoweringContext {
             ty: hir::Ty::unknown(),
             span: node.span,
         }
+    }
+
+    fn lower_range_expr(&mut self, range: &ast::node::RangeExpression) -> hir::ExprKind {
+        let start = self.lower_expr(&range.start);
+        let end = self.lower_expr(&range.end);
+        hir::ExprKind::Range(Box::new(hir::RangeExpression {
+            start,
+            end,
+            inclusive: range.inclusive,
+        }))
     }
 
     fn lower_fn_expr(&mut self, decl: &ast::node::FunctionDeclaration) -> hir::ExprKind {

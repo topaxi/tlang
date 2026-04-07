@@ -2227,8 +2227,8 @@ impl<'src> Parser<'src> {
                     }
                     lhs = self.parse_call_expression(lhs);
                 }
-                TokenKind::Keyword(Keyword::Implements | Keyword::Matches) => {
-                    // Both keywords have comparison precedence (6), left-associative
+                TokenKind::Keyword(Keyword::Implements | Keyword::Matches | Keyword::As) => {
+                    // All three keywords have comparison precedence (6), left-associative
                     let op_info = OperatorInfo {
                         precedence: 6,
                         associativity: Associativity::Left,
@@ -2242,15 +2242,7 @@ impl<'src> Parser<'src> {
                     ) {
                         break;
                     }
-                    let keyword = self.current_token_kind();
-                    self.advance();
-                    lhs = if matches!(keyword, TokenKind::Keyword(Keyword::Implements)) {
-                        let path = self.parse_path();
-                        node::expr!(self.unique_id(), Implements(Box::new(lhs), Box::new(path)))
-                    } else {
-                        let pat = self.parse_pattern();
-                        node::expr!(self.unique_id(), Matches(Box::new(lhs), pat))
-                    };
+                    lhs = self.parse_keyword_suffix(lhs);
                 }
                 token if Self::is_binary_op(token) => {
                     let operator = Self::map_binary_op(token);
@@ -2297,6 +2289,35 @@ impl<'src> Parser<'src> {
 
         lhs.trailing_comments.extend(self.parse_comments());
         lhs
+    }
+
+    fn parse_keyword_suffix(&mut self, lhs: Expr) -> Expr {
+        let keyword = self.current_token_kind();
+        self.advance();
+        match keyword {
+            TokenKind::Keyword(Keyword::Implements) => {
+                let path = self.parse_path();
+                node::expr!(self.unique_id(), Implements(Box::new(lhs), Box::new(path)))
+            }
+            TokenKind::Keyword(Keyword::Matches) => {
+                let pat = self.parse_pattern();
+                node::expr!(self.unique_id(), Matches(Box::new(lhs), pat))
+            }
+            TokenKind::Keyword(Keyword::As) => {
+                // Check for `as?` (try-cast) vs `as` (cast)
+                let is_try_cast = matches!(self.current_token_kind(), TokenKind::QuestionMark);
+                if is_try_cast {
+                    self.advance();
+                }
+                let ty = self.parse_type_annotation();
+                if is_try_cast {
+                    node::expr!(self.unique_id(), TryCast(Box::new(lhs), Box::new(ty)))
+                } else {
+                    node::expr!(self.unique_id(), Cast(Box::new(lhs), Box::new(ty)))
+                }
+            }
+            _ => unreachable!(),
+        }
     }
 
     fn fn_name_identifier_to_string(&mut self, identifier: &Expr) -> String {

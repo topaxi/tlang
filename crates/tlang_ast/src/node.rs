@@ -308,6 +308,7 @@ pub enum ExprKind {
     Block(Box<Block>),
     Call(Box<CallExpression>),
     Cast(Box<Expr>, Box<Ty>),
+    TryCast(Box<Expr>, Box<Ty>),
     Dict(Vec<(Expr, Expr)>),
     Loop(Box<Block>),
     ForLoop(Box<ForLoop>),

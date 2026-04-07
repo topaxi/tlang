@@ -114,7 +114,7 @@ fn check_expr(expr: &hir::Expr, is_tail: bool, diagnostics: &mut Vec<Diagnostic>
             check_expr(base, false, diagnostics);
             check_expr(index, false, diagnostics);
         }
-        hir::ExprKind::Cast(inner, _) => {
+        hir::ExprKind::Cast(inner, _) | hir::ExprKind::TryCast(inner, _) => {
             check_expr(inner, false, diagnostics);
         }
         hir::ExprKind::Let(_, inner) => {

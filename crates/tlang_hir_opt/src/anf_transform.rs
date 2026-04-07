@@ -632,7 +632,9 @@ fn rewrite_break_values_in_expr<F: AnfFilter>(
             rewrite_break_values_in_expr(temp_name, pat_hir_id, lhs, folder);
             rewrite_break_values_in_expr(temp_name, pat_hir_id, rhs, folder);
         }
-        hir::ExprKind::Unary(_, inner) | hir::ExprKind::Cast(inner, _) => {
+        hir::ExprKind::Unary(_, inner)
+        | hir::ExprKind::Cast(inner, _)
+        | hir::ExprKind::TryCast(inner, _) => {
             rewrite_break_values_in_expr(temp_name, pat_hir_id, inner, folder);
         }
         hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {

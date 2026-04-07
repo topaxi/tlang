@@ -12,7 +12,9 @@ fn is_js_expressible(expr: &hir::Expr) -> bool {
         hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
             is_js_expressible(&call.callee) && call.arguments.iter().all(is_js_expressible)
         }
-        hir::ExprKind::Cast(inner, _) => is_js_expressible(inner),
+        hir::ExprKind::Cast(inner, _) | hir::ExprKind::TryCast(inner, _) => {
+            is_js_expressible(inner)
+        }
         hir::ExprKind::FieldAccess(base, _) => is_js_expressible(base),
         hir::ExprKind::IndexAccess(base, index) => {
             is_js_expressible(base) && is_js_expressible(index)

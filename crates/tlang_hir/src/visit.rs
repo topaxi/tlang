@@ -273,6 +273,10 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(
             visitor.visit_expr(expr, ctx);
             visitor.visit_ty(ty, ctx);
         }
+        hir::ExprKind::TryCast(expr, ty) => {
+            visitor.visit_expr(expr, ctx);
+            visitor.visit_ty(ty, ctx);
+        }
         hir::ExprKind::TaggedString { tag, exprs, .. } => {
             visitor.visit_expr(tag, ctx);
             for expr in exprs {

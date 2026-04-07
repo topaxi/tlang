@@ -7,7 +7,7 @@ use serde::Serialize;
 use tlang_ast::node::{Ident, UnaryOp, Visibility};
 use tlang_ast::token::{CommentToken, Literal};
 use tlang_defs::{DefIdAllocator, DefKind, DefScope};
-use tlang_span::{HirId, HirIdAllocator, Span};
+use tlang_span::{HirId, HirIdAllocator, Span, TypeVarId};
 
 pub trait HirScope {
     // fn hir_id(&self) -> HirId;
@@ -766,6 +766,7 @@ pub enum ExprKind {
     Call(Box<CallExpression>),
     TailCall(Box<CallExpression>),
     Cast(Box<Expr>, Box<Ty>),
+    TryCast(Box<Expr>, Box<Ty>),
     Binary(BinaryOpKind, Box<Expr>, Box<Expr>),
     Unary(UnaryOp, Box<Expr>),
     // Let expression, only valid within if conditions and guards
@@ -813,13 +814,49 @@ impl Ty {
     }
 }
 
+/// Primitive type kinds shared across HIR and type-checking phases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub enum PrimTy {
+    Bool,
+    I8,
+    I16,
+    I32,
+    I64,
+    Isize,
+    U8,
+    U16,
+    U32,
+    U64,
+    Usize,
+    F32,
+    F64,
+    Char,
+    String,
+    Nil,
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum TyKind {
     #[default]
     Unknown,
+    /// Primitive types (Bool, I8..I64, U8..U64, F32, F64, Char, String, Nil).
+    Primitive(PrimTy),
+    /// Function type: parameter types → return type.
+    Fn(Vec<Ty>, Box<Ty>),
+    /// Homogeneous list/slice type.
+    Slice(Box<Ty>),
+    /// Dictionary type: key type → value type.
+    Dict(Box<Ty>, Box<Ty>),
+    /// Bottom type for diverging expressions.
+    Never,
+    /// Placeholder for future generic type variables (Phase 8: Generics).
+    Var(TypeVarId),
+    /// User-defined types (structs, enums).
     Path(Path),
-    Union(Vec<Path>),
+    /// Union of multiple types.
+    Union(Vec<Ty>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

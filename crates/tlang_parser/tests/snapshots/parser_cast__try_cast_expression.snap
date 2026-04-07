@@ -1,0 +1,186 @@
+---
+source: crates/tlang_parser/tests/parser_cast.rs
+expression: "parse! (\"let x = value as? Foo;\")"
+---
+Module(
+  id: 2,
+  statements: [
+    Stmt(
+      id: 7,
+      kind: Let(LetDeclaration(
+        pattern: Pat(
+          id: 3,
+          kind: Identifier(Ident(
+            name: "x",
+            span: Span(
+              start: 4,
+              end: 5,
+              start_lc: LineColumn(
+                line: 0,
+                column: 4,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 5,
+              ),
+            ),
+          )),
+          leading_comments: [],
+          trailing_comments: [],
+          span: Span(
+            start: 4,
+            end: 5,
+            start_lc: LineColumn(
+              line: 0,
+              column: 4,
+            ),
+            end_lc: LineColumn(
+              line: 0,
+              column: 5,
+            ),
+          ),
+        ),
+        expression: Expr(
+          id: 6,
+          kind: TryCast(Expr(
+            id: 4,
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "value",
+                  span: Span(
+                    start: 8,
+                    end: 13,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 8,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 13,
+                    ),
+                  ),
+                ),
+              ],
+              res: Unresolved,
+              span: Span(
+                start: 8,
+                end: 13,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 8,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 13,
+                ),
+              ),
+            )),
+            leading_comments: [],
+            trailing_comments: [],
+            span: Span(
+              start: 8,
+              end: 13,
+              start_lc: LineColumn(
+                line: 0,
+                column: 8,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 13,
+              ),
+            ),
+          ), Ty(
+            id: 5,
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "Foo",
+                  span: Span(
+                    start: 18,
+                    end: 21,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 18,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 21,
+                    ),
+                  ),
+                ),
+              ],
+              res: Unresolved,
+              span: Span(
+                start: 18,
+                end: 21,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 18,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 21,
+                ),
+              ),
+            )),
+            parameters: [],
+            span: Span(
+              start: 0,
+              end: 0,
+              start_lc: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+            ),
+          )),
+          leading_comments: [],
+          trailing_comments: [],
+          span: Span(
+            start: 8,
+            end: 21,
+            start_lc: LineColumn(
+              line: 0,
+              column: 8,
+            ),
+            end_lc: LineColumn(
+              line: 0,
+              column: 21,
+            ),
+          ),
+        ),
+        type_annotation: None,
+      )),
+      span: Span(
+        start: 0,
+        end: 22,
+        start_lc: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end_lc: LineColumn(
+          line: 0,
+          column: 22,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: 0,
+    end: 22,
+    start_lc: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end_lc: LineColumn(
+      line: 0,
+      column: 22,
+    ),
+  ),
+)
