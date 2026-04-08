@@ -61,12 +61,17 @@ impl VariableUsageValidator {
             // themselves.
             .filter(|symbol| !symbol.is_fn_self_binding())
             .filter(|symbol| !symbol.name.starts_with('_'))
-            // TODO: We currently do not track member methods, as we do not have any type
+            // TODO(#580): We currently do not track member methods, as we do not have any type
             //       information yet.
             .filter(|symbol| !symbol.name.contains('.'))
             // StructMethod aliases (e.g. `Expense::is_food`) shadow the dot-method
             // and are only used when referenced explicitly; don't report them as unused.
             .filter(|symbol| !matches!(symbol.kind, DefKind::StructMethod(_)))
+            // TODO(#580): StructField symbols (e.g. `Vector::x`) are never marked as used
+            // because field-access expressions (`v.x`) cannot be resolved at this stage
+            // (no type information available). Suppress false positives until unused-symbol
+            // detection moves to a type-aware pass.
+            .filter(|symbol| !matches!(symbol.kind, DefKind::StructField))
             .collect::<Vec<_>>();
 
         for unused_symbol in &unused_symbols {
@@ -461,7 +466,7 @@ impl<'ast> Visitor<'ast> for VariableUsageValidator {
             }
             ExprKind::FieldExpression(field_expr) => {
                 self.visit_expr(&field_expr.base, ctx);
-                // TODO: We are checking for unused variables, this should be refactored into
+                // TODO(#580): We are checking for unused variables, this should be refactored into
                 //       it's own pass. Skipping analyzing field of variable as we do not have
                 //       any type information yet.
                 // Don't analyze the field name as it's not a variable reference
