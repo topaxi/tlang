@@ -32,7 +32,12 @@ pub struct DocumentState {
     /// Cached symbol index for hover/goto (extracted from analyzer).
     pub symbol_index: Option<SymbolIndex>,
     /// Cached type-checked HIR for inlay hints.
-    pub typed_hir: Option<TypedHir>,
+    ///
+    /// `None` means the typed HIR has not been computed yet for this source
+    /// version.  `Some(None)` means the pipeline was attempted but failed
+    /// (lowering error, type-check panic, etc.) and should not be retried
+    /// until the source changes.  `Some(Some(..))` holds the cached result.
+    pub typed_hir: Option<Option<TypedHir>>,
 }
 
 /// Simple HashMap-based document cache.

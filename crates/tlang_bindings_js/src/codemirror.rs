@@ -199,17 +199,16 @@ pub struct CodemirrorInlayHint {
     pub kind: String,
 }
 
-/// Convert a (line, column) pair from the analysis layer to a byte offset.
+/// Convert a 0-based (line, column) pair to a byte offset in `source`.
 ///
-/// The analysis layer produces 0-based (line, column) positions from the
-/// lexer's `LineColumn` (which uses 0-based lines but 0-based columns for
-/// spans).  We compute the byte offset and then convert to UTF-16.
+/// Both `line` and `column` are 0-based (editor convention).  `column` counts
+/// Unicode scalar values (Rust `char`s) from the start of the line.
 pub(crate) fn line_column_to_byte_offset(source: &str, line: u32, column: u32) -> u32 {
     let mut current_line = 0u32;
 
     for (i, ch) in source.char_indices() {
         if current_line == line {
-            // Now count `column` characters from this position.
+            // Count `column` characters from this position.
             for (col, (j, c)) in source[i..].char_indices().enumerate() {
                 if col as u32 >= column || c == '\n' {
                     return (i + j) as u32;

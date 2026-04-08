@@ -225,7 +225,7 @@ fn collect_fn_decl_hints(
                 hints,
                 range,
                 pos,
-                format!(" -> {ret_kind}"),
+                format!("-> {ret_kind}"),
                 InlayHintKind::ReturnType,
             );
         }
@@ -393,6 +393,12 @@ fn collect_pat_type_hints(pat: &hir::Pat, range: Option<(u32, u32)>, hints: &mut
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /// Push a hint if it falls within the optional line range.
+///
+/// Positions coming from the lexer's [`LineColumn`] use a mixed coordinate
+/// system: line 0 has 0-based columns, but subsequent lines use 1-based
+/// columns (the lexer resets `current_column` to 1 after each `\n`).  This
+/// function normalises to the editor-standard 0-based columns before
+/// recording the hint.
 fn push_hint(
     hints: &mut Vec<InlayHint>,
     range: Option<(u32, u32)>,
@@ -405,9 +411,17 @@ fn push_hint(
     {
         return;
     }
+
+    // Normalise to 0-based columns (lexer uses 1-based on lines > 0).
+    let column = if pos.line > 0 {
+        pos.column.saturating_sub(1)
+    } else {
+        pos.column
+    };
+
     hints.push(InlayHint {
         line: pos.line,
-        character: pos.column,
+        character: column,
         label,
         kind,
     });
