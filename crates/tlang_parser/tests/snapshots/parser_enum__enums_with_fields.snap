@@ -219,14 +219,14 @@ Module(
                 res: Unresolved,
                 span: Span(
                   start: 50,
-                  end: 56,
+                  end: 62,
                   start_lc: LineColumn(
                     line: 4,
                     column: 9,
                   ),
                   end_lc: LineColumn(
                     line: 4,
-                    column: 15,
+                    column: 21,
                   ),
                 ),
               )),

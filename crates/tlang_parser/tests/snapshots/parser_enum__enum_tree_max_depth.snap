@@ -1228,14 +1228,14 @@ Module(
                         res: Unresolved,
                         span: Span(
                           start: 221,
-                          end: 225,
+                          end: 231,
                           start_lc: LineColumn(
                             line: 9,
                             column: 13,
                           ),
                           end_lc: LineColumn(
                             line: 9,
-                            column: 17,
+                            column: 23,
                           ),
                         ),
                       )),
@@ -1347,14 +1347,14 @@ Module(
                                   res: Unresolved,
                                   span: Span(
                                     start: 248,
-                                    end: 252,
+                                    end: 258,
                                     start_lc: LineColumn(
                                       line: 10,
                                       column: 15,
                                     ),
                                     end_lc: LineColumn(
                                       line: 10,
-                                      column: 19,
+                                      column: 25,
                                     ),
                                   ),
                                 )),
@@ -1498,14 +1498,14 @@ Module(
                                   res: Unresolved,
                                   span: Span(
                                     start: 278,
-                                    end: 282,
+                                    end: 288,
                                     start_lc: LineColumn(
                                       line: 11,
                                       column: 16,
                                     ),
                                     end_lc: LineColumn(
                                       line: 11,
-                                      column: 20,
+                                      column: 26,
                                     ),
                                   ),
                                 )),
@@ -1617,14 +1617,14 @@ Module(
                                             res: Unresolved,
                                             span: Span(
                                               start: 309,
-                                              end: 313,
+                                              end: 319,
                                               start_lc: LineColumn(
                                                 line: 12,
                                                 column: 19,
                                               ),
                                               end_lc: LineColumn(
                                                 line: 12,
-                                                column: 23,
+                                                column: 29,
                                               ),
                                             ),
                                           )),
@@ -1768,14 +1768,14 @@ Module(
                                             res: Unresolved,
                                             span: Span(
                                               start: 343,
-                                              end: 347,
+                                              end: 353,
                                               start_lc: LineColumn(
                                                 line: 13,
                                                 column: 20,
                                               ),
                                               end_lc: LineColumn(
                                                 line: 13,
-                                                column: 24,
+                                                column: 30,
                                               ),
                                             ),
                                           )),

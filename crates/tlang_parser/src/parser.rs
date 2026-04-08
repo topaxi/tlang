@@ -1484,6 +1484,7 @@ impl<'src> Parser<'src> {
         }
 
         self.end_span_from_previous_token(&mut span);
+        path.span = span;
 
         let mut expr = node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span);
 
@@ -1590,6 +1591,7 @@ impl<'src> Parser<'src> {
         }
 
         self.end_span_from_previous_token(&mut span);
+        path.span = span;
 
         let mut expr = node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span);
 

@@ -96,14 +96,14 @@ Module(
                 res: Unresolved,
                 span: Span(
                   start: 34,
-                  end: 37,
+                  end: 48,
                   start_lc: LineColumn(
                     line: 0,
                     column: 34,
                   ),
                   end_lc: LineColumn(
                     line: 0,
-                    column: 37,
+                    column: 48,
                   ),
                 ),
               )),

@@ -1590,14 +1590,14 @@ Module(
                     res: Unresolved,
                     span: Span(
                       start: 289,
-                      end: 295,
+                      end: 301,
                       start_lc: LineColumn(
                         line: 12,
                         column: 37,
                       ),
                       end_lc: LineColumn(
                         line: 12,
-                        column: 43,
+                        column: 49,
                       ),
                     ),
                   )),
@@ -2027,14 +2027,14 @@ Module(
                 res: Unresolved,
                 span: Span(
                   start: 343,
-                  end: 349,
+                  end: 355,
                   start_lc: LineColumn(
                     line: 13,
                     column: 34,
                   ),
                   end_lc: LineColumn(
                     line: 13,
-                    column: 40,
+                    column: 46,
                   ),
                 ),
               )),

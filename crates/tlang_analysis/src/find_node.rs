@@ -291,6 +291,32 @@ mod tests {
     }
 
     #[test]
+    fn find_second_segment_of_multi_segment_path() {
+        // Hovering over `sqrt` in `math::sqrt(x)` should resolve to
+        // `math::sqrt`, not return no result.
+        let source = "math::sqrt(4);";
+
+        // `math` is at cols 0..4, `::` at 4..6, `sqrt` at cols 6..10
+        let found_cols: Vec<(u32, String)> = (0..14)
+            .filter_map(|col| parse_and_find(source, 0, col).map(|f| (col, f.name)))
+            .collect();
+
+        // Hovering on `math` (col 0..4) should yield `math::sqrt`
+        let on_math = found_cols.iter().find(|(col, _)| *col == 0);
+        assert!(
+            on_math.is_some() && on_math.unwrap().1 == "math::sqrt",
+            "hovering on `math` should resolve to `math::sqrt`.\nAll: {found_cols:?}"
+        );
+
+        // Hovering on `sqrt` (col 6..10) should also yield `math::sqrt`
+        let on_sqrt = found_cols.iter().find(|(col, _)| *col == 6);
+        assert!(
+            on_sqrt.is_some() && on_sqrt.unwrap().1 == "math::sqrt",
+            "hovering on `sqrt` should resolve to `math::sqrt`.\nAll: {found_cols:?}"
+        );
+    }
+
+    #[test]
     fn find_field_expression_records_base() {
         // `v1.add` should record field_base = "v1" when cursor is on "add"
         let source = "struct Vector { x: i64 }\nfn Vector.add(self, other) { self }\nlet v1 = Vector { x: 1 };\nv1.add(v1);";

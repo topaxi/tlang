@@ -250,14 +250,14 @@ Module(
                 res: Unresolved,
                 span: Span(
                   start: 48,
-                  end: 54,
+                  end: 60,
                   start_lc: LineColumn(
                     line: 5,
                     column: 9,
                   ),
                   end_lc: LineColumn(
                     line: 5,
-                    column: 15,
+                    column: 21,
                   ),
                 ),
               )),
