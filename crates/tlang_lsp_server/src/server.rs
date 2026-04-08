@@ -8,8 +8,8 @@ use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     GotoDefinitionParams, GotoDefinitionResponse, HoverParams, HoverProviderCapability,
-    InitializeParams, InitializeResult, PublishDiagnosticsParams, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, Url,
+    InitializeParams, InitializeResult, InlayHint, InlayHintParams, PublishDiagnosticsParams,
+    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Url,
 };
 use serde::Deserialize;
 use tlang_analysis::CompilationTarget;
@@ -97,6 +97,7 @@ impl ServerState {
             .request::<lsp_types::request::HoverRequest, _>(Self::on_hover)
             .request::<lsp_types::request::GotoDefinition, _>(Self::on_goto_definition)
             .request::<lsp_types::request::Completion, _>(Self::on_completion)
+            .request::<lsp_types::request::InlayHintRequest, _>(Self::on_inlay_hint)
             .notification::<lsp_types::notification::Initialized>(|_, _| ControlFlow::Continue(()))
             .notification::<lsp_types::notification::Exit>(|_, _| ControlFlow::Break(Ok(())))
             .notification::<lsp_types::notification::DidOpenTextDocument>(Self::on_did_open)
@@ -134,6 +135,7 @@ impl ServerState {
                     hover_provider: Some(HoverProviderCapability::Simple(true)),
                     definition_provider: Some(lsp_types::OneOf::Left(true)),
                     completion_provider: Some(CompletionOptions::default()),
+                    inlay_hint_provider: Some(lsp_types::OneOf::Left(true)),
                     ..ServerCapabilities::default()
                 },
                 server_info: Some(lsp_types::ServerInfo {
@@ -235,6 +237,101 @@ impl ServerState {
         let uri = &params.text_document_position.text_document.uri;
         let items = Self::collect_completions(state, uri);
         Box::pin(async move { Ok(Some(CompletionResponse::Array(items))) })
+    }
+
+    fn on_inlay_hint(
+        state: &mut Self,
+        params: InlayHintParams,
+    ) -> futures::future::BoxFuture<
+        'static,
+        Result<Option<Vec<InlayHint>>, async_lsp::ResponseError>,
+    > {
+        let uri = params.text_document.uri;
+        let range = params.range;
+
+        // Ensure typed HIR is available — compute on demand if not cached.
+        Self::ensure_typed_hir(state, &uri);
+
+        let hints = match state.store.get(&uri) {
+            Some(doc) => match doc.typed_hir.as_ref() {
+                Some(typed_hir) => {
+                    let line_range = Some((range.start.line, range.end.line));
+                    let analysis_hints =
+                        tlang_analysis::inlay_hints::collect_inlay_hints(typed_hir, line_range);
+
+                    analysis_hints
+                        .into_iter()
+                        .map(|h| Self::to_lsp_inlay_hint(&h))
+                        .collect()
+                }
+                None => vec![],
+            },
+            None => vec![],
+        };
+
+        Box::pin(async move { Ok(Some(hints)) })
+    }
+
+    /// Convert an analysis-layer inlay hint to an LSP inlay hint.
+    fn to_lsp_inlay_hint(hint: &tlang_analysis::inlay_hints::InlayHint) -> InlayHint {
+        InlayHint {
+            position: lsp_types::Position {
+                line: hint.line,
+                character: hint.character,
+            },
+            label: lsp_types::InlayHintLabel::String(hint.label.clone()),
+            kind: Some(match hint.kind {
+                tlang_analysis::inlay_hints::InlayHintKind::Type => lsp_types::InlayHintKind::TYPE,
+                tlang_analysis::inlay_hints::InlayHintKind::ReturnType => {
+                    lsp_types::InlayHintKind::TYPE
+                }
+            }),
+            text_edits: None,
+            tooltip: None,
+            padding_left: Some(matches!(
+                hint.kind,
+                tlang_analysis::inlay_hints::InlayHintKind::ReturnType
+            )),
+            padding_right: None,
+            data: None,
+        }
+    }
+
+    /// Ensure the typed HIR cache is populated for a document.
+    ///
+    /// If the cache is empty, runs the full analysis + HIR lowering + type
+    /// checking pipeline.  This is a lazy computation — the typed HIR is only
+    /// produced when an inlay hint request arrives.
+    fn ensure_typed_hir(state: &mut Self, uri: &Url) {
+        let needs_compute = state
+            .store
+            .get(uri)
+            .is_some_and(|doc| doc.typed_hir.is_none());
+
+        if !needs_compute {
+            return;
+        }
+
+        let source = match state.store.get(uri) {
+            Some(doc) => doc.source.clone(),
+            None => return,
+        };
+
+        let target = state.target;
+        let typed_hir = std::panic::catch_unwind(AssertUnwindSafe(|| {
+            let result = tlang_analysis::analyze_for_target(&source, target);
+            tlang_analysis::inlay_hints::lower_and_typecheck(&result)
+        }));
+
+        if let Some(doc) = state.store.documents_mut().get_mut(uri) {
+            doc.typed_hir = match typed_hir {
+                Ok(hir) => hir,
+                Err(_) => {
+                    error!("typed HIR computation panicked for {uri}");
+                    None
+                }
+            };
+        }
     }
 
     /// Collect LSP completion items for a document.

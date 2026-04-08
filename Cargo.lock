@@ -2098,13 +2098,17 @@ name = "tlang_analysis"
 version = "0.1.0"
 dependencies = [
  "tlang_ast",
+ "tlang_ast_lowering",
  "tlang_codegen_js",
  "tlang_core",
  "tlang_defs",
  "tlang_diagnostics",
+ "tlang_hir",
+ "tlang_hir_opt",
  "tlang_parser",
  "tlang_semantics",
  "tlang_span",
+ "tlang_typeck",
 ]
 
 [[package]]
@@ -2351,6 +2355,7 @@ dependencies = [
  "tlang_ast",
  "tlang_defs",
  "tlang_diagnostics",
+ "tlang_hir",
  "tlang_parser",
  "tlang_semantics",
  "tlang_span",

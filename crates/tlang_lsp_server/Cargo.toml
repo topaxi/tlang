@@ -22,6 +22,7 @@ tlang_ast = { path = "../tlang_ast" }
 tlang_analysis = { path = "../tlang_analysis", features = ["js", "interpreter"] }
 tlang_defs = { path = "../tlang_defs" }
 tlang_diagnostics = { path = "../tlang_diagnostics" }
+tlang_hir = { path = "../tlang_hir" }
 tlang_parser = { path = "../tlang_parser" }
 tlang_semantics = { path = "../tlang_semantics" }
 tlang_span = { path = "../tlang_span" }
