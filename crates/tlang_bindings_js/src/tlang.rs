@@ -39,6 +39,9 @@ extern "C" {
     #[wasm_bindgen(typescript_type = "CodemirrorCompletion[]")]
     pub type JsCodemirrorCompletionArray;
 
+    #[wasm_bindgen(typescript_type = "CodemirrorInlayHint[]")]
+    pub type JsCodemirrorInlayHintArray;
+
     #[wasm_bindgen(typescript_type = "unknown")]
     pub type JsUnknown;
 }
@@ -713,5 +716,62 @@ impl Tlang {
             .collect();
 
         Ok(serde_wasm_bindgen::to_value(&items)?.unchecked_into())
+    }
+
+    /// Return inlay hints for the current source.
+    ///
+    /// Runs the full type-checking pipeline (analysis → HIR lowering →
+    /// optimisation → type checking) and collects hints for variable bindings,
+    /// function return types, and function parameters.
+    ///
+    /// Positions in the returned hints are UTF-16 code unit offsets suitable
+    /// for use with CodeMirror 6's text model.
+    #[wasm_bindgen(js_name = "getInlayHints")]
+    #[allow(clippy::missing_panics_doc)]
+    pub fn get_inlay_hints(
+        &mut self,
+    ) -> Result<JsCodemirrorInlayHintArray, serde_wasm_bindgen::Error> {
+        if !self.build.analyzed {
+            self.analyze();
+        }
+
+        let target = match self.runner {
+            RunnerKind::JavaScript => tlang_analysis::CompilationTarget::Js,
+            RunnerKind::Interpreter => tlang_analysis::CompilationTarget::Interpreter,
+        };
+
+        let result = tlang_analysis::analyze_for_target(&self.source, target);
+        let hints = match tlang_analysis::inlay_hints::lower_and_typecheck(&result) {
+            Some(typed_hir) => {
+                let analysis_hints =
+                    tlang_analysis::inlay_hints::collect_inlay_hints(&typed_hir, None);
+                analysis_hints
+                    .into_iter()
+                    .map(|h| {
+                        let byte_offset = codemirror::line_column_to_byte_offset(
+                            &self.source,
+                            h.line,
+                            h.character,
+                        );
+                        let utf16_pos = codemirror::byte_offset_to_utf16(&self.source, byte_offset);
+                        codemirror::CodemirrorInlayHint {
+                            position: utf16_pos,
+                            label: h.label,
+                            kind: match h.kind {
+                                tlang_analysis::inlay_hints::InlayHintKind::Type => {
+                                    "type".to_string()
+                                }
+                                tlang_analysis::inlay_hints::InlayHintKind::ReturnType => {
+                                    "returnType".to_string()
+                                }
+                            },
+                        }
+                    })
+                    .collect()
+            }
+            None => vec![],
+        };
+
+        Ok(serde_wasm_bindgen::to_value(&hints)?.unchecked_into())
     }
 }

@@ -182,3 +182,45 @@ pub struct CodemirrorDefinitionLocation {
     /// UTF-16 code unit offset of the end of the definition.
     pub to: u32,
 }
+
+/// An inlay hint formatted for CodeMirror 6.
+///
+/// The `position` is a UTF-16 code unit offset matching JavaScript string
+/// positions, so it can be used directly with CodeMirror's text model.
+#[derive(Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi)]
+pub struct CodemirrorInlayHint {
+    /// UTF-16 code unit offset where the hint should be displayed.
+    pub position: u32,
+    /// The label text to display (e.g. `: i64`, `-> bool`).
+    pub label: String,
+    /// The kind of hint: `"type"` for type annotations, `"returnType"` for
+    /// function return types.
+    pub kind: String,
+}
+
+/// Convert a 0-based (line, column) pair to a byte offset in `source`.
+///
+/// Both `line` and `column` are 0-based (editor convention).  `column` counts
+/// Unicode scalar values (Rust `char`s) from the start of the line.
+pub(crate) fn line_column_to_byte_offset(source: &str, line: u32, column: u32) -> u32 {
+    let mut current_line = 0u32;
+
+    for (i, ch) in source.char_indices() {
+        if current_line == line {
+            // Count `column` characters from this position.
+            for (col, (j, c)) in source[i..].char_indices().enumerate() {
+                if col as u32 >= column || c == '\n' {
+                    return (i + j) as u32;
+                }
+            }
+            // Reached end of source while counting columns — return end.
+            return source.len() as u32;
+        }
+        if ch == '\n' {
+            current_line += 1;
+        }
+    }
+
+    source.len() as u32
+}

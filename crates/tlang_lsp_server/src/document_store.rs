@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use lsp_types::Url;
+use tlang_analysis::inlay_hints::TypedHir;
 use tlang_ast::node as ast;
 
 pub use tlang_analysis::symbol_index::{SymbolEntry, SymbolIndex};
@@ -30,6 +31,13 @@ pub struct DocumentState {
     pub semantic_cache: Option<Vec<lsp_types::Diagnostic>>,
     /// Cached symbol index for hover/goto (extracted from analyzer).
     pub symbol_index: Option<SymbolIndex>,
+    /// Cached type-checked HIR for inlay hints.
+    ///
+    /// `None` means the typed HIR has not been computed yet for this source
+    /// version.  `Some(None)` means the pipeline was attempted but failed
+    /// (lowering error, type-check panic, etc.) and should not be retried
+    /// until the source changes.  `Some(Some(..))` holds the cached result.
+    pub typed_hir: Option<Option<TypedHir>>,
 }
 
 /// Simple HashMap-based document cache.
@@ -62,6 +70,7 @@ impl DocumentStore {
                 parse_cache: None,
                 semantic_cache: None,
                 symbol_index: None,
+                typed_hir: None,
             })
             .into_mut()
     }
@@ -87,6 +96,7 @@ impl DocumentStore {
             state.parse_cache = None;
             state.semantic_cache = None;
             state.symbol_index = None;
+            state.typed_hir = None;
         }
 
         Some((state, changed))

@@ -22,6 +22,7 @@
 //! | [`configure_interpreter_analyzer`] | Configure an existing analyzer with VM symbols (feature `interpreter`) |
 
 pub mod find_node;
+pub mod inlay_hints;
 pub mod query;
 pub mod symbol_index;
 

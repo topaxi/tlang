@@ -8,8 +8,8 @@ use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     GotoDefinitionParams, GotoDefinitionResponse, HoverParams, HoverProviderCapability,
-    InitializeParams, InitializeResult, PublishDiagnosticsParams, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, Url,
+    InitializeParams, InitializeResult, InlayHint, InlayHintParams, PublishDiagnosticsParams,
+    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Url,
 };
 use serde::Deserialize;
 use tlang_analysis::CompilationTarget;
@@ -97,6 +97,7 @@ impl ServerState {
             .request::<lsp_types::request::HoverRequest, _>(Self::on_hover)
             .request::<lsp_types::request::GotoDefinition, _>(Self::on_goto_definition)
             .request::<lsp_types::request::Completion, _>(Self::on_completion)
+            .request::<lsp_types::request::InlayHintRequest, _>(Self::on_inlay_hint)
             .notification::<lsp_types::notification::Initialized>(|_, _| ControlFlow::Continue(()))
             .notification::<lsp_types::notification::Exit>(|_, _| ControlFlow::Break(Ok(())))
             .notification::<lsp_types::notification::DidOpenTextDocument>(Self::on_did_open)
@@ -134,6 +135,7 @@ impl ServerState {
                     hover_provider: Some(HoverProviderCapability::Simple(true)),
                     definition_provider: Some(lsp_types::OneOf::Left(true)),
                     completion_provider: Some(CompletionOptions::default()),
+                    inlay_hint_provider: Some(lsp_types::OneOf::Left(true)),
                     ..ServerCapabilities::default()
                 },
                 server_info: Some(lsp_types::ServerInfo {
@@ -235,6 +237,128 @@ impl ServerState {
         let uri = &params.text_document_position.text_document.uri;
         let items = Self::collect_completions(state, uri);
         Box::pin(async move { Ok(Some(CompletionResponse::Array(items))) })
+    }
+
+    fn on_inlay_hint(
+        state: &mut Self,
+        params: InlayHintParams,
+    ) -> futures::future::BoxFuture<'static, Result<Option<Vec<InlayHint>>, async_lsp::ResponseError>>
+    {
+        let uri = params.text_document.uri;
+        let range = params.range;
+
+        // Ensure typed HIR is available — compute on demand if not cached.
+        Self::ensure_typed_hir(state, &uri);
+
+        let hints = match state.store.get(&uri) {
+            Some(doc) => match doc.typed_hir.as_ref() {
+                Some(Some(typed_hir)) => {
+                    // The LSP range `end` is exclusive.  Adjust the end line
+                    // so we don't request an extra line of hints when the
+                    // client sends `end = { line: N+1, character: 0 }`.
+                    let end_line = if range.end.character == 0 && range.end.line > range.start.line
+                    {
+                        range.end.line.saturating_sub(1)
+                    } else {
+                        range.end.line
+                    };
+                    let line_range = Some((range.start.line, end_line));
+                    let analysis_hints =
+                        tlang_analysis::inlay_hints::collect_inlay_hints(typed_hir, line_range);
+
+                    analysis_hints
+                        .into_iter()
+                        .map(|h| Self::to_lsp_inlay_hint(&h, &doc.source))
+                        .filter(|hint| {
+                            let pos = hint.position;
+                            let after_start = pos.line > range.start.line
+                                || (pos.line == range.start.line
+                                    && pos.character >= range.start.character);
+                            let before_end = pos.line < range.end.line
+                                || (pos.line == range.end.line
+                                    && pos.character < range.end.character);
+                            after_start && before_end
+                        })
+                        .collect()
+                }
+                _ => vec![],
+            },
+            None => vec![],
+        };
+
+        Box::pin(async move { Ok(Some(hints)) })
+    }
+
+    /// Convert an analysis-layer inlay hint to an LSP inlay hint.
+    ///
+    /// The analysis layer provides 0-based `(line, character)` positions using
+    /// Unicode scalar value counts.  The LSP protocol requires `character` to
+    /// be a UTF-16 code unit offset, so we convert here using the document
+    /// source.
+    fn to_lsp_inlay_hint(hint: &tlang_analysis::inlay_hints::InlayHint, source: &str) -> InlayHint {
+        // Convert the 0-based character (Unicode scalar) to a UTF-16 offset.
+        let utf16_character = char_column_to_utf16(source, hint.line, hint.character);
+
+        InlayHint {
+            position: lsp_types::Position {
+                line: hint.line,
+                character: utf16_character,
+            },
+            label: lsp_types::InlayHintLabel::String(hint.label.clone()),
+            kind: Some(match hint.kind {
+                tlang_analysis::inlay_hints::InlayHintKind::Type => lsp_types::InlayHintKind::TYPE,
+                tlang_analysis::inlay_hints::InlayHintKind::ReturnType => {
+                    lsp_types::InlayHintKind::TYPE
+                }
+            }),
+            text_edits: None,
+            tooltip: None,
+            padding_left: Some(matches!(
+                hint.kind,
+                tlang_analysis::inlay_hints::InlayHintKind::ReturnType
+            )),
+            padding_right: None,
+            data: None,
+        }
+    }
+
+    /// Ensure the typed HIR cache is populated for a document.
+    ///
+    /// If the cache is empty (`None`), runs the full analysis + HIR lowering +
+    /// type checking pipeline.  If the pipeline previously failed for this
+    /// source version, the result is cached as `Some(None)` so we don't
+    /// recompute on every request.  The cache is invalidated when the source
+    /// changes (see [`DocumentStore::change`]).
+    fn ensure_typed_hir(state: &mut Self, uri: &Url) {
+        let needs_compute = state
+            .store
+            .get(uri)
+            .is_some_and(|doc| doc.typed_hir.is_none());
+
+        if !needs_compute {
+            return;
+        }
+
+        let source = match state.store.get(uri) {
+            Some(doc) => doc.source.clone(),
+            None => return,
+        };
+
+        let target = state.target;
+        let typed_hir = std::panic::catch_unwind(AssertUnwindSafe(|| {
+            let result = tlang_analysis::analyze_for_target(&source, target);
+            tlang_analysis::inlay_hints::lower_and_typecheck(&result)
+        }));
+
+        if let Some(doc) = state.store.documents_mut().get_mut(uri) {
+            doc.typed_hir = Some(match typed_hir {
+                Ok(hir) => hir,
+                Err(_) => {
+                    error!("typed HIR computation panicked for {uri}");
+                    None
+                }
+            });
+        }
     }
 
     /// Collect LSP completion items for a document.
@@ -436,6 +560,39 @@ fn def_kind_to_completion_item_kind(kind: DefKind) -> CompletionItemKind {
         DefKind::ProtocolMethod(_) | DefKind::StructMethod(_) => CompletionItemKind::METHOD,
         DefKind::Module => CompletionItemKind::MODULE,
     }
+}
+
+/// Convert a 0-based (line, character) position from the analysis layer to
+/// a UTF-16 code unit column offset as required by the LSP protocol.
+///
+/// For pure-ASCII sources the column is returned unchanged.  For sources
+/// containing non-BMP characters (surrogate pairs), the column is adjusted
+/// so that the LSP client renders the hint at the correct position.
+fn char_column_to_utf16(source: &str, line: u32, char_column: u32) -> u32 {
+    // Find the start of the target line.
+    let mut current_line = 0u32;
+    let mut line_start = 0usize;
+    for (i, ch) in source.char_indices() {
+        if current_line == line {
+            line_start = i;
+            break;
+        }
+        if ch == '\n' {
+            current_line += 1;
+        }
+    }
+
+    // Count `char_column` Unicode scalars from `line_start` and accumulate
+    // the corresponding number of UTF-16 code units.
+    let mut utf16_offset = 0u32;
+    for (col, ch) in source[line_start..].chars().enumerate() {
+        if col as u32 >= char_column || ch == '\n' {
+            break;
+        }
+        utf16_offset += ch.len_utf16() as u32;
+    }
+
+    utf16_offset
 }
 
 #[cfg(test)]
@@ -809,6 +966,185 @@ mod tests {
         assert_eq!(
             def_kind_to_completion_item_kind(DefKind::ProtocolMethod(1)),
             CompletionItemKind::METHOD
+        );
+    }
+
+    // ── Inlay hint tests ───────────────────────────────────────────────
+
+    #[test]
+    fn inlay_hint_returns_type_hints_for_let_binding() {
+        let mut state = setup_server_with_source("let x = 42;");
+        ServerState::ensure_typed_hir(&mut state, &test_uri());
+
+        let doc = state.store.get(&test_uri()).unwrap();
+        assert!(doc.typed_hir.is_some(), "typed HIR should be cached");
+
+        let typed_hir = doc.typed_hir.as_ref().unwrap().as_ref().unwrap();
+        let hints = tlang_analysis::inlay_hints::collect_inlay_hints(typed_hir, None);
+        assert!(
+            hints.iter().any(|h| h.label == ": i64"),
+            "expected `: i64` hint, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn inlay_hint_returns_return_type_hints_for_function() {
+        let mut state = setup_server_with_source("fn add(a: i64, b: i64) { a + b }");
+        ServerState::ensure_typed_hir(&mut state, &test_uri());
+
+        let doc = state.store.get(&test_uri()).unwrap();
+        let typed_hir = doc.typed_hir.as_ref().unwrap().as_ref().unwrap();
+        let hints = tlang_analysis::inlay_hints::collect_inlay_hints(typed_hir, None);
+        assert!(
+            hints.iter().any(|h| h.label.contains("-> i64")),
+            "expected return type hint, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn inlay_hint_no_return_type_hint_when_annotated() {
+        let mut state = setup_server_with_source("fn add(a: i64, b: i64) -> i64 { a + b }");
+        ServerState::ensure_typed_hir(&mut state, &test_uri());
+
+        let doc = state.store.get(&test_uri()).unwrap();
+        let typed_hir = doc.typed_hir.as_ref().unwrap().as_ref().unwrap();
+        let hints = tlang_analysis::inlay_hints::collect_inlay_hints(typed_hir, None);
+        assert!(
+            !hints
+                .iter()
+                .any(|h| h.kind == tlang_analysis::inlay_hints::InlayHintKind::ReturnType),
+            "should not show return type hint when annotated, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn inlay_hint_lsp_conversion_sets_correct_kind() {
+        let source = "let x = 42;";
+        let hint = tlang_analysis::inlay_hints::InlayHint {
+            line: 0,
+            character: 5,
+            label: ": i64".into(),
+            kind: tlang_analysis::inlay_hints::InlayHintKind::Type,
+        };
+        let lsp_hint = ServerState::to_lsp_inlay_hint(&hint, source);
+        assert_eq!(lsp_hint.kind, Some(lsp_types::InlayHintKind::TYPE));
+        assert_eq!(lsp_hint.position.line, 0);
+        assert_eq!(lsp_hint.position.character, 5);
+        match &lsp_hint.label {
+            lsp_types::InlayHintLabel::String(s) => assert_eq!(s, ": i64"),
+            _ => panic!("expected string label"),
+        }
+    }
+
+    #[test]
+    fn inlay_hint_return_type_has_padding_left() {
+        let source = "fn f() { 1 }";
+        let hint = tlang_analysis::inlay_hints::InlayHint {
+            line: 0,
+            character: 7,
+            label: "-> i64".into(),
+            kind: tlang_analysis::inlay_hints::InlayHintKind::ReturnType,
+        };
+        let lsp_hint = ServerState::to_lsp_inlay_hint(&hint, source);
+        assert_eq!(lsp_hint.padding_left, Some(true));
+    }
+
+    #[test]
+    fn inlay_hint_type_has_no_padding_left() {
+        let source = "let x = 42;";
+        let hint = tlang_analysis::inlay_hints::InlayHint {
+            line: 0,
+            character: 5,
+            label: ": i64".into(),
+            kind: tlang_analysis::inlay_hints::InlayHintKind::Type,
+        };
+        let lsp_hint = ServerState::to_lsp_inlay_hint(&hint, source);
+        assert_eq!(lsp_hint.padding_left, Some(false));
+    }
+
+    #[test]
+    fn inlay_hint_cache_invalidated_on_source_change() {
+        let client = async_lsp::ClientSocket::new_closed();
+        let mut state = ServerState {
+            client,
+            store: DocumentStore::new(),
+            target: CompilationTarget::Js,
+        };
+        let uri = test_uri();
+        state.store.open(uri.clone(), 1, "let x = 42;".into());
+        state.run_diagnostics(&uri, "let x = 42;");
+        ServerState::ensure_typed_hir(&mut state, &uri);
+        assert!(state.store.get(&uri).unwrap().typed_hir.is_some());
+
+        // Change source — typed_hir cache should be invalidated.
+        state.store.change(&uri, 2, "let y = \"hello\";".into());
+        assert!(
+            state.store.get(&uri).unwrap().typed_hir.is_none(),
+            "typed_hir should be invalidated on source change"
+        );
+    }
+
+    #[test]
+    fn inlay_hint_utf16_conversion_for_ascii() {
+        // For ASCII text, char columns and UTF-16 columns are the same.
+        assert_eq!(char_column_to_utf16("let x = 42;", 0, 5), 5);
+    }
+
+    #[test]
+    fn inlay_hint_utf16_conversion_multiline() {
+        // Line 1 column 3 in "abc\ndef" is 'd', 'e', 'f' → UTF-16 offset 3.
+        assert_eq!(char_column_to_utf16("abc\ndef", 1, 3), 3);
+    }
+
+    #[test]
+    fn inlay_hint_utf16_conversion_non_bmp() {
+        // '😀' is U+1F600 — a non-BMP character that takes 2 UTF-16 code units.
+        // Source: "😀x = 1;" — column 1 (the 'x') should be UTF-16 offset 2.
+        let source = "😀x = 1;";
+        assert_eq!(char_column_to_utf16(source, 0, 1), 2);
+    }
+
+    #[test]
+    fn inlay_hint_range_end_exclusive_at_line_boundary() {
+        // When the client sends end = { line: 1, character: 0 }, it means
+        // "up to but not including line 1".  We should only see hints on
+        // line 0, not line 1.
+        let source = "let a = 1;\nlet b = 2;\nlet c = 3;";
+        let mut state = setup_server_with_source(source);
+        ServerState::ensure_typed_hir(&mut state, &test_uri());
+
+        let doc = state.store.get(&test_uri()).unwrap();
+        let typed_hir = doc.typed_hir.as_ref().unwrap().as_ref().unwrap();
+        let all_hints = tlang_analysis::inlay_hints::collect_inlay_hints(typed_hir, None);
+        // Verify there are hints on line 1 in the full set.
+        assert!(
+            all_hints.iter().any(|h| h.line == 1),
+            "expected hints on line 1, got: {all_hints:?}"
+        );
+
+        // Request range { start: { line: 0, char: 0 }, end: { line: 1, char: 0 } }
+        // This is exclusive — should only return hints on line 0.
+        let range = lsp_types::Range {
+            start: lsp_types::Position {
+                line: 0,
+                character: 0,
+            },
+            end: lsp_types::Position {
+                line: 1,
+                character: 0,
+            },
+        };
+        let end_line = if range.end.character == 0 && range.end.line > range.start.line {
+            range.end.line.saturating_sub(1)
+        } else {
+            range.end.line
+        };
+        let line_range = Some((range.start.line, end_line));
+        let filtered = tlang_analysis::inlay_hints::collect_inlay_hints(typed_hir, line_range);
+        assert!(
+            filtered.iter().all(|h| h.line < range.end.line),
+            "all hints should be before end line {}, got: {filtered:?}",
+            range.end.line
         );
     }
 }
