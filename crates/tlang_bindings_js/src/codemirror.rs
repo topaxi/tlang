@@ -206,23 +206,17 @@ pub struct CodemirrorInlayHint {
 /// spans).  We compute the byte offset and then convert to UTF-16.
 pub(crate) fn line_column_to_byte_offset(source: &str, line: u32, column: u32) -> u32 {
     let mut current_line = 0u32;
-    let mut byte_pos = 0usize;
 
     for (i, ch) in source.char_indices() {
         if current_line == line {
             // Now count `column` characters from this position.
             for (col, (j, c)) in source[i..].char_indices().enumerate() {
-                if col as u32 >= column {
+                if col as u32 >= column || c == '\n' {
                     return (i + j) as u32;
                 }
-                if c == '\n' {
-                    // Column overflows the line — clamp to line end.
-                    return (i + j) as u32;
-                }
-                byte_pos = i + j + c.len_utf8();
             }
-            // Reached end of source while counting columns.
-            return byte_pos as u32;
+            // Reached end of source while counting columns — return end.
+            return source.len() as u32;
         }
         if ch == '\n' {
             current_line += 1;
