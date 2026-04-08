@@ -408,11 +408,24 @@ impl TypeChecker {
             ) && call.arguments.len() == 1
                 && matches!(call.arguments[0].kind, hir::ExprKind::Dict(_))
             {
-                // Derive the constructor's result type from the callee path
-                // segments, preserving the qualification used at the call site.
+                // Preserve constructor result-type resolution metadata. For
+                // enum variants, use the registered constructor signature's
+                // return type instead of rebuilding a path with `as_init()`,
+                // which drops `Path.res`.
                 return match binding_kind {
                     hir::BindingKind::Struct => TyKind::Path((**path).clone()),
-                    hir::BindingKind::Variant => TyKind::Path(path.as_init()),
+                    hir::BindingKind::Variant => {
+                        if let Some(hir_id) = path.res.hir_id()
+                            && let Some(info) = self.type_table.get(&hir_id)
+                            && let TyKind::Fn(_, ret) = &info.ty.kind
+                        {
+                            ret.kind.clone()
+                        } else {
+                            unreachable!(
+                                "enum variant constructors must have a registered function signature"
+                            )
+                        }
+                    }
                     _ => unreachable!(),
                 };
             }
