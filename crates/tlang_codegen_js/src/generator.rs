@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::LazyLock;
 
 use oxc_allocator::{Allocator, Vec as OxcVec};
 use oxc_ast::AstBuilder;
@@ -9,7 +8,6 @@ use oxc_codegen::{Codegen, CodegenOptions, IndentChar};
 use oxc_sourcemap::{SourceMap, Token};
 use oxc_span::SPAN;
 
-use crate::builtins::JS_BUILTINS;
 use crate::error::{CodegenError, CodegenWarning};
 use crate::name_map::NameMap;
 use oxc_estree::{ESTree, PrettyJSSerializer};
@@ -225,49 +223,7 @@ impl CodegenJS {
     }
 
     pub fn get_standard_library_symbols() -> &'static [(&'static str, DefKind)] {
-        /// Symbols that exist in the semantic layer only — no JS name mapping.
-        static SEMANTIC_ONLY_SYMBOLS: &[(&str, DefKind)] = &[
-            ("Option", DefKind::Enum),
-            ("Result", DefKind::Enum),
-            ("Option::Some", DefKind::EnumVariant(1)),
-            ("Option::None", DefKind::EnumVariant(0)),
-            ("Result::Ok", DefKind::EnumVariant(1)),
-            ("Result::Err", DefKind::EnumVariant(1)),
-            // `List` and `ListIterator` are builtin struct-backed types used as
-            // impl-block target types in the stdlib and user code. Registering
-            // them here suppresses spurious "no symbol found" warnings from the
-            // IdentifierResolver when compiling `impl Protocol for List`.
-            ("List", DefKind::Struct),
-            ("ListIterator", DefKind::Struct),
-            ("Functor", DefKind::Protocol),
-            ("Functor::map", DefKind::ProtocolMethod(2)),
-            ("Accepts", DefKind::Protocol),
-            ("Accepts::accepts", DefKind::ProtocolMethod(2)),
-            ("Regex", DefKind::Struct),
-            ("Iterable", DefKind::Protocol),
-            ("Iterable::iter", DefKind::ProtocolMethod(1)),
-            ("Iterator", DefKind::Protocol),
-            ("Iterator::next", DefKind::ProtocolMethod(1)),
-            ("Display", DefKind::Protocol),
-            ("Display::to_string", DefKind::ProtocolMethod(1)),
-            ("len", DefKind::Function(1)),
-            ("compose", DefKind::Function(2)),
-            ("re", DefKind::Function(2)),
-            ("f", DefKind::Function(2)),
-            ("map", DefKind::Function(2)),
-            ("panic", DefKind::Function(1)),
-            ("string", DefKind::Module),
-        ];
-
-        static SYMBOLS: LazyLock<Vec<(&'static str, DefKind)>> = LazyLock::new(|| {
-            JS_BUILTINS
-                .iter()
-                .filter_map(|b| b.def_kind.map(|dk| (b.tlang_name, dk)))
-                .chain(SEMANTIC_ONLY_SYMBOLS.iter().copied())
-                .collect()
-        });
-
-        &SYMBOLS
+        tlang_builtins_js::symbols()
     }
 
     pub fn generate_code(&mut self, module: &hir::Module) -> Result<(), Vec<CodegenError>> {

@@ -1,5 +1,3 @@
-use tlang_defs::DefKind;
-
 /// One entry in the JS glue registry: a tlang stdlib name, its JavaScript
 /// equivalent, and (where applicable) the semantic `DefKind` used by the
 /// semantic analyser.
@@ -9,19 +7,13 @@ use tlang_defs::DefKind;
 pub struct JsBuiltin {
     pub tlang_name: &'static str,
     pub js_name: &'static str,
-    pub def_kind: Option<DefKind>,
 }
 
 impl JsBuiltin {
-    const fn new(
-        tlang_name: &'static str,
-        js_name: &'static str,
-        def_kind: Option<DefKind>,
-    ) -> Self {
+    const fn new(tlang_name: &'static str, js_name: &'static str) -> Self {
         Self {
             tlang_name,
             js_name,
-            def_kind,
         }
     }
 }
@@ -38,205 +30,100 @@ impl JsBuiltin {
 /// with `def_kind: None` are JS-glue-only aliases that are not registered as
 /// independent semantic symbols.
 pub static JS_BUILTINS: &[JsBuiltin] = &[
-    JsBuiltin::new("Some", "Option.Some", Some(DefKind::EnumVariant(1))),
-    JsBuiltin::new("None", "Option.None", Some(DefKind::EnumVariant(0))),
-    JsBuiltin::new("Ok", "Result.Ok", Some(DefKind::EnumVariant(1))),
-    JsBuiltin::new("Err", "Result.Err", Some(DefKind::EnumVariant(1))),
-    JsBuiltin::new("log", "console.log", Some(DefKind::Function(u16::MAX))),
-    JsBuiltin::new("log::log", "console.log", None),
-    JsBuiltin::new("log::group", "console.group", None),
-    JsBuiltin::new("log::groupEnd", "console.groupEnd", None),
-    JsBuiltin::new("math", "Math", Some(DefKind::Module)),
-    JsBuiltin::new("math::pi", "Math.PI", Some(DefKind::Variable)),
-    JsBuiltin::new("math::min", "Math.min", Some(DefKind::Function(u16::MAX))),
-    JsBuiltin::new("math::max", "Math.max", Some(DefKind::Function(u16::MAX))),
-    JsBuiltin::new("math::floor", "Math.floor", Some(DefKind::Function(1))),
-    JsBuiltin::new("math::sqrt", "Math.sqrt", Some(DefKind::Function(1))),
-    JsBuiltin::new("math::random", "Math.random", Some(DefKind::Function(0))),
-    JsBuiltin::new("random_int", "random_int", Some(DefKind::Function(1))),
-    JsBuiltin::new(
-        "string::StringBuf",
-        "string.StringBuf",
-        Some(DefKind::Struct),
-    ),
-    JsBuiltin::new(
-        "string::from_char_code",
-        "String.fromCharCode",
-        Some(DefKind::Function(1)),
-    ),
-    JsBuiltin::new(
-        "string::char_code_at",
-        "string.char_code_at",
-        Some(DefKind::Function(2)),
-    ),
+    JsBuiltin::new("Some", "Option.Some"),
+    JsBuiltin::new("None", "Option.None"),
+    JsBuiltin::new("Ok", "Result.Ok"),
+    JsBuiltin::new("Err", "Result.Err"),
+    JsBuiltin::new("log", "console.log"),
+    JsBuiltin::new("log::log", "console.log"),
+    JsBuiltin::new("log::group", "console.group"),
+    JsBuiltin::new("log::groupEnd", "console.groupEnd"),
+    JsBuiltin::new("math", "Math"),
+    JsBuiltin::new("math::pi", "Math.PI"),
+    JsBuiltin::new("math::min", "Math.min"),
+    JsBuiltin::new("math::max", "Math.max"),
+    JsBuiltin::new("math::floor", "Math.floor"),
+    JsBuiltin::new("math::sqrt", "Math.sqrt"),
+    JsBuiltin::new("math::random", "Math.random"),
+    JsBuiltin::new("random_int", "random_int"),
+    JsBuiltin::new("string::StringBuf", "string.StringBuf"),
+    JsBuiltin::new("string::from_char_code", "String.fromCharCode"),
+    JsBuiltin::new("string::char_code_at", "string.char_code_at"),
     // ── Temporal ───────────────────────────────────────────────────────
-    JsBuiltin::new("Temporal", "Temporal", Some(DefKind::Module)),
-    JsBuiltin::new("Temporal::Now", "Temporal.Now", Some(DefKind::Module)),
-    JsBuiltin::new(
-        "Temporal::Now::instant",
-        "Temporal.Now.instant",
-        Some(DefKind::Function(0)),
-    ),
+    JsBuiltin::new("Temporal", "Temporal"),
+    JsBuiltin::new("Temporal::Now", "Temporal.Now"),
+    JsBuiltin::new("Temporal::Now::instant", "Temporal.Now.instant"),
     JsBuiltin::new(
         "Temporal::Now::plain_date_time_iso",
         "Temporal.Now.plain_date_time_iso",
-        Some(DefKind::Function(u16::MAX)),
     ),
     JsBuiltin::new(
         "Temporal::Now::plain_date_iso",
         "Temporal.Now.plain_date_iso",
-        Some(DefKind::Function(u16::MAX)),
     ),
     JsBuiltin::new(
         "Temporal::Now::plain_time_iso",
         "Temporal.Now.plain_time_iso",
-        Some(DefKind::Function(u16::MAX)),
     ),
     JsBuiltin::new(
         "Temporal::Now::zoned_date_time_iso",
         "Temporal.Now.zoned_date_time_iso",
-        Some(DefKind::Function(u16::MAX)),
     ),
-    JsBuiltin::new(
-        "Temporal::Now::time_zone_id",
-        "Temporal.Now.time_zone_id",
-        Some(DefKind::Function(0)),
-    ),
-    JsBuiltin::new(
-        "Temporal::Instant",
-        "Temporal.Instant",
-        Some(DefKind::Struct),
-    ),
-    JsBuiltin::new(
-        "Temporal::Instant::from",
-        "Temporal.Instant.from",
-        Some(DefKind::Function(1)),
-    ),
+    JsBuiltin::new("Temporal::Now::time_zone_id", "Temporal.Now.time_zone_id"),
+    JsBuiltin::new("Temporal::Instant", "Temporal.Instant"),
+    JsBuiltin::new("Temporal::Instant::from", "Temporal.Instant.from"),
     JsBuiltin::new(
         "Temporal::Instant::from_epoch_milliseconds",
         "Temporal.Instant.from_epoch_milliseconds",
-        Some(DefKind::Function(1)),
     ),
-    JsBuiltin::new(
-        "Temporal::Instant::compare",
-        "Temporal.Instant.compare",
-        Some(DefKind::Function(2)),
-    ),
-    JsBuiltin::new(
-        "Temporal::Duration",
-        "Temporal.Duration",
-        Some(DefKind::Struct),
-    ),
-    JsBuiltin::new(
-        "Temporal::Duration::from",
-        "Temporal.Duration.from",
-        Some(DefKind::Function(1)),
-    ),
-    JsBuiltin::new(
-        "Temporal::PlainDate",
-        "Temporal.PlainDate",
-        Some(DefKind::Struct),
-    ),
-    JsBuiltin::new(
-        "Temporal::PlainDate::from",
-        "Temporal.PlainDate.from",
-        Some(DefKind::Function(1)),
-    ),
-    JsBuiltin::new(
-        "Temporal::PlainDate::new",
-        "Temporal.PlainDate.new",
-        Some(DefKind::Function(3)),
-    ),
-    JsBuiltin::new(
-        "Temporal::PlainDate::compare",
-        "Temporal.PlainDate.compare",
-        Some(DefKind::Function(2)),
-    ),
-    JsBuiltin::new(
-        "Temporal::PlainTime",
-        "Temporal.PlainTime",
-        Some(DefKind::Struct),
-    ),
-    JsBuiltin::new(
-        "Temporal::PlainTime::from",
-        "Temporal.PlainTime.from",
-        Some(DefKind::Function(1)),
-    ),
-    JsBuiltin::new(
-        "Temporal::PlainTime::new",
-        "Temporal.PlainTime.new",
-        Some(DefKind::Function(3)),
-    ),
-    JsBuiltin::new(
-        "Temporal::PlainTime::compare",
-        "Temporal.PlainTime.compare",
-        Some(DefKind::Function(2)),
-    ),
-    JsBuiltin::new(
-        "Temporal::PlainDateTime",
-        "Temporal.PlainDateTime",
-        Some(DefKind::Struct),
-    ),
+    JsBuiltin::new("Temporal::Instant::compare", "Temporal.Instant.compare"),
+    JsBuiltin::new("Temporal::Duration", "Temporal.Duration"),
+    JsBuiltin::new("Temporal::Duration::from", "Temporal.Duration.from"),
+    JsBuiltin::new("Temporal::PlainDate", "Temporal.PlainDate"),
+    JsBuiltin::new("Temporal::PlainDate::from", "Temporal.PlainDate.from"),
+    JsBuiltin::new("Temporal::PlainDate::new", "Temporal.PlainDate.new"),
+    JsBuiltin::new("Temporal::PlainDate::compare", "Temporal.PlainDate.compare"),
+    JsBuiltin::new("Temporal::PlainTime", "Temporal.PlainTime"),
+    JsBuiltin::new("Temporal::PlainTime::from", "Temporal.PlainTime.from"),
+    JsBuiltin::new("Temporal::PlainTime::new", "Temporal.PlainTime.new"),
+    JsBuiltin::new("Temporal::PlainTime::compare", "Temporal.PlainTime.compare"),
+    JsBuiltin::new("Temporal::PlainDateTime", "Temporal.PlainDateTime"),
     JsBuiltin::new(
         "Temporal::PlainDateTime::from",
         "Temporal.PlainDateTime.from",
-        Some(DefKind::Function(1)),
     ),
     JsBuiltin::new(
         "Temporal::PlainDateTime::compare",
         "Temporal.PlainDateTime.compare",
-        Some(DefKind::Function(2)),
     ),
-    JsBuiltin::new(
-        "Temporal::ZonedDateTime",
-        "Temporal.ZonedDateTime",
-        Some(DefKind::Struct),
-    ),
+    JsBuiltin::new("Temporal::ZonedDateTime", "Temporal.ZonedDateTime"),
     JsBuiltin::new(
         "Temporal::ZonedDateTime::from",
         "Temporal.ZonedDateTime.from",
-        Some(DefKind::Function(1)),
     ),
     JsBuiltin::new(
         "Temporal::ZonedDateTime::compare",
         "Temporal.ZonedDateTime.compare",
-        Some(DefKind::Function(2)),
     ),
-    JsBuiltin::new(
-        "Temporal::PlainYearMonth",
-        "Temporal.PlainYearMonth",
-        Some(DefKind::Struct),
-    ),
+    JsBuiltin::new("Temporal::PlainYearMonth", "Temporal.PlainYearMonth"),
     JsBuiltin::new(
         "Temporal::PlainYearMonth::from",
         "Temporal.PlainYearMonth.from",
-        Some(DefKind::Function(1)),
     ),
     JsBuiltin::new(
         "Temporal::PlainYearMonth::new",
         "Temporal.PlainYearMonth.new",
-        Some(DefKind::Function(2)),
     ),
     JsBuiltin::new(
         "Temporal::PlainYearMonth::compare",
         "Temporal.PlainYearMonth.compare",
-        Some(DefKind::Function(2)),
     ),
-    JsBuiltin::new(
-        "Temporal::PlainMonthDay",
-        "Temporal.PlainMonthDay",
-        Some(DefKind::Struct),
-    ),
+    JsBuiltin::new("Temporal::PlainMonthDay", "Temporal.PlainMonthDay"),
     JsBuiltin::new(
         "Temporal::PlainMonthDay::from",
         "Temporal.PlainMonthDay.from",
-        Some(DefKind::Function(1)),
     ),
-    JsBuiltin::new(
-        "Temporal::PlainMonthDay::new",
-        "Temporal.PlainMonthDay.new",
-        Some(DefKind::Function(2)),
-    ),
+    JsBuiltin::new("Temporal::PlainMonthDay::new", "Temporal.PlainMonthDay.new"),
 ];
 
 /// Look up a tlang name in the JS builtins registry.

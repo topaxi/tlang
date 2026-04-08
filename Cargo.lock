@@ -2099,7 +2099,7 @@ version = "0.1.0"
 dependencies = [
  "tlang_ast",
  "tlang_ast_lowering",
- "tlang_codegen_js",
+ "tlang_builtins_js",
  "tlang_core",
  "tlang_defs",
  "tlang_diagnostics",
@@ -2172,6 +2172,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "tlang_builtins_js"
+version = "0.1.0"
+dependencies = [
+ "tlang_defs",
+]
+
+[[package]]
 name = "tlang_cli"
 version = "0.1.0"
 dependencies = [
@@ -2212,6 +2219,7 @@ dependencies = [
  "pretty_assertions",
  "tlang_ast",
  "tlang_ast_lowering",
+ "tlang_builtins_js",
  "tlang_defs",
  "tlang_diagnostics",
  "tlang_hir",

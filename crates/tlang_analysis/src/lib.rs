@@ -16,9 +16,9 @@
 //! |---|---|
 //! | [`analyze`] | Parse + semantic analysis with a custom analyzer setup |
 //! | [`analyze_for_target`] | As above, dispatching on [`CompilationTarget`] |
-//! | [`analyze_with_js_symbols`] | As above, pre-configured for the JS backend (feature `js`) |
+//! | [`analyze_with_js_symbols`] | As above, pre-configured for the JS backend |
 //! | [`analyze_with_interpreter_symbols`] | As above, pre-configured for the interpreter (feature `interpreter`) |
-//! | [`configure_js_analyzer`] | Configure an existing analyzer with JS stdlib symbols (feature `js`) |
+//! | [`configure_js_analyzer`] | Configure an existing analyzer with JS stdlib symbols |
 //! | [`configure_interpreter_analyzer`] | Configure an existing analyzer with VM symbols (feature `interpreter`) |
 
 pub mod find_node;
@@ -125,21 +125,11 @@ pub enum CompilationTarget {
 
 /// Run the full analysis pipeline selecting builtins based on `target`.
 ///
-/// When the requested backend feature is not compiled in, analysis runs
-/// without any extra builtins and a warning is emitted to stderr.
+/// When the `interpreter` feature is not compiled in and `Interpreter` is
+/// requested, analysis runs without extra builtins and a warning is emitted.
 pub fn analyze_for_target(source: &str, target: CompilationTarget) -> AnalysisResult {
     match target {
-        #[cfg(feature = "js")]
         CompilationTarget::Js => analyze_with_js_symbols(source),
-        #[cfg(not(feature = "js"))]
-        CompilationTarget::Js => {
-            eprintln!(
-                "warning: analyze_for_target requested JavaScript analysis, \
-                 but the `js` feature is not enabled; \
-                 falling back to analysis without JavaScript builtins"
-            );
-            analyze(source, |_| {})
-        }
         #[cfg(feature = "interpreter")]
         CompilationTarget::Interpreter => analyze_with_interpreter_symbols(source),
         #[cfg(not(feature = "interpreter"))]
@@ -154,18 +144,15 @@ pub fn analyze_for_target(source: &str, target: CompilationTarget) -> AnalysisRe
     }
 }
 
-/// Configure a [`SemanticAnalyzer`] with the JavaScript code-generation
-/// standard-library symbols.
+/// Configure a [`SemanticAnalyzer`] with the JavaScript standard-library
+/// symbols.
 ///
 /// This is the same setup used by [`tlang_lsp_server`] and
 /// [`analyze_with_js_symbols`].  Useful when the caller needs to reuse an
 /// existing long-lived analyzer (e.g. in the WASM bindings where the same
 /// analyzer is used across multiple operations).
-#[cfg(feature = "js")]
 pub fn configure_js_analyzer(analyzer: &mut SemanticAnalyzer) {
-    analyzer.add_builtin_symbols(
-        tlang_codegen_js::generator::CodegenJS::get_standard_library_symbols(),
-    );
+    analyzer.add_builtin_symbols(tlang_builtins_js::symbols());
 }
 
 /// Cached interpreter builtin symbols, computed once and reused across all
@@ -186,12 +173,10 @@ pub fn configure_interpreter_analyzer(analyzer: &mut SemanticAnalyzer) {
     analyzer.add_builtin_symbols_with_slots(&*INTERPRETER_BUILTINS);
 }
 
-/// Run analysis with the JavaScript code-generation standard-library symbols
-/// pre-registered.
+/// Run analysis with the JavaScript standard-library symbols pre-registered.
 ///
 /// This matches the setup used by [`tlang_lsp_server`] and is the correct
 /// choice for diagnosing code that will be compiled to JavaScript.
-#[cfg(feature = "js")]
 pub fn analyze_with_js_symbols(source: &str) -> AnalysisResult {
     analyze(source, configure_js_analyzer)
 }

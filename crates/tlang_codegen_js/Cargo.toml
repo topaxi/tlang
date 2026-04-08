@@ -19,6 +19,7 @@ tlang_hir_opt = { path = "../tlang_hir_opt" }
 tlang_parser = { path = "../tlang_parser" }
 tlang_semantics = { path = "../tlang_semantics" }
 tlang_span = { path = "../tlang_span" }
+tlang_builtins_js = { path = "../tlang_builtins_js" }
 tlang_defs = { path = "../tlang_defs" }
 
 [dependencies.tlang_ast_lowering]
