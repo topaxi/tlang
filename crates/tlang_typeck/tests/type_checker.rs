@@ -695,7 +695,6 @@ fn enum_variant_with_params_ok() {
 #[test]
 fn implements_expression_is_bool() {
     // `implements` should always produce a bool.
-    // Use a simpler setup without protocol declarations.
     common::typecheck_ok(
         r#"
         enum Animal {
@@ -850,5 +849,24 @@ fn struct_method_return_type_used_in_binding() {
         let p = Point { x: 3, y: 4 };
         let x: isize = Point::get_x(p);
         "#,
+    );
+}
+
+// ── Negative tests: struct/enum construction errors ─────────────────────
+
+#[test]
+fn struct_field_access_unknown_field_error() {
+    // Accessing a field that doesn't exist on the struct should error.
+    let errs = common::typecheck_errors(
+        r#"
+        struct Point { x: isize, y: isize }
+        let p = Point { x: 1, y: 2 };
+        let z = p.z;
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("unknown field `z` on struct `Point`")),
+        "expected unknown field error, got: {errs:?}"
     );
 }

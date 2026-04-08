@@ -394,28 +394,36 @@ impl TypeChecker {
     /// Type-check a call expression. Resolves the callee's function type,
     /// checks argument count and types, and returns the call's result type.
     fn check_call(&mut self, call: &hir::CallExpression, span: tlang_span::Span) -> TyKind {
-        // For struct/enum constructor calls, the arguments are passed as a
-        // single dict expression (e.g. `Point { x: 1, y: 2 }` → `Call(Point, [{x:1,y:2}])`).
-        // Skip normal argument count/type checking and just return the
-        // constructor's result type.
+        // Struct/enum record construction is lowered to a call with exactly
+        // one dict argument (e.g. `Point { x: 1, y: 2 }` →
+        // `Call(Point, [{ x: 1, y: 2 }])`). Only that lowered shape should
+        // bypass normal positional argument checking. Any other constructor
+        // call form must fall through to the regular call checker so that
+        // wrong arity / wrong argument-shape diagnostics are still emitted.
         if let hir::ExprKind::Path(path) = &call.callee.kind {
             let binding_kind = path.res.binding_kind();
             if matches!(
                 binding_kind,
                 hir::BindingKind::Struct | hir::BindingKind::Variant
-            ) {
-                // Resolve the constructor's return type from the type table.
-                if let Some(hir_id) = path.res.hir_id()
-                    && let Some(info) = self.type_table.get(&hir_id)
-                {
-                    match &info.ty.kind {
-                        TyKind::Fn(_, ret_ty) => return ret_ty.kind.clone(),
-                        // Discriminant (unit) variant: type is the enum type
-                        // itself.
-                        kind => return kind.clone(),
-                    }
-                }
-                return TyKind::Unknown;
+            ) && call.arguments.len() == 1
+                && matches!(call.arguments[0].kind, hir::ExprKind::Dict(_))
+            {
+                // Derive the constructor's result type from the callee path
+                // segments, preserving the qualification used at the call site.
+                return match binding_kind {
+                    hir::BindingKind::Struct => TyKind::Path((**path).clone()),
+                    hir::BindingKind::Variant => TyKind::Path(path.as_init()),
+                    _ => unreachable!(),
+                };
+            }
+            // Discriminant (unit) variant used as a value (no call args):
+            // resolve to the enum type directly.
+            if binding_kind == hir::BindingKind::Variant
+                && let Some(hir_id) = path.res.hir_id()
+                && let Some(info) = self.type_table.get(&hir_id)
+                && !matches!(info.ty.kind, TyKind::Fn(_, _))
+            {
+                return info.ty.kind.clone();
             }
         }
 
@@ -738,28 +746,42 @@ impl TypeChecker {
 
     /// Type-check a field access expression (`base.field`).
     /// Resolves the field's type from the base expression's struct type.
+    /// Emits a diagnostic when the base is a known struct but the field
+    /// does not exist.
     fn check_field_access(
         &mut self,
         base_ty_kind: &TyKind,
         field_name: &str,
         expr_hir_id: tlang_span::HirId,
+        span: tlang_span::Span,
     ) -> TyKind {
-        if let Some(hir_id) = Self::resolve_type_hir_id(base_ty_kind)
-            && let Some(field_ty) = self.resolve_field_type(&hir_id, field_name)
-        {
-            self.type_table.insert(
-                expr_hir_id,
-                TypeInfo {
-                    ty: Ty {
-                        kind: field_ty.clone(),
-                        ..Ty::default()
+        if let Some(hir_id) = Self::resolve_type_hir_id(base_ty_kind) {
+            if let Some(field_ty) = self.resolve_field_type(&hir_id, field_name) {
+                self.type_table.insert(
+                    expr_hir_id,
+                    TypeInfo {
+                        ty: Ty {
+                            kind: field_ty.clone(),
+                            ..Ty::default()
+                        },
                     },
-                },
-            );
-            field_ty
-        } else {
-            TyKind::Unknown
+                );
+                return field_ty;
+            }
+
+            // Base is a known struct but the field does not exist.
+            if let Some(info) = self.type_table.get_struct_info(&hir_id) {
+                let available: Vec<String> =
+                    info.fields.iter().map(|(n, _)| n.to_string()).collect();
+                self.errors.push(TypeError::UnknownField {
+                    field: field_name.to_string(),
+                    type_name: info.name.to_string(),
+                    available,
+                    span,
+                });
+            }
         }
+        TyKind::Unknown
     }
 
     // ── HIR walk entry point ─────────────────────────────────────────
@@ -1101,7 +1123,8 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 self.visit_expr(base, ctx);
                 let field_name = ident.as_str();
                 let base_ty = base.ty.kind.clone();
-                expr.ty.kind = self.check_field_access(&base_ty, field_name, expr.hir_id);
+                expr.ty.kind =
+                    self.check_field_access(&base_ty, field_name, expr.hir_id, expr.span);
             }
             hir::ExprKind::Implements(inner_expr, _path) => {
                 self.visit_expr(inner_expr, ctx);
