@@ -645,29 +645,24 @@ fn struct_declaration_registered() {
 #[test]
 fn struct_field_access_ok() {
     // Accessing a typed field on a struct should resolve to the field's type.
-    let (tc, diags) = common::typecheck(
+    common::typecheck_ok(
         r#"
         struct Point { x: isize, y: isize }
         let p = Point { x: 1, y: 2 };
         let x_val = p.x;
         "#,
     );
-    assert!(diags.is_empty(), "expected no errors, got: {diags:?}");
-    // Verify that x_val has type isize via the type table.
-    let _ = tc;
 }
 
 #[test]
 fn struct_construction_type_is_path() {
     // The type of a struct construction expression should be the struct type.
-    let (tc, diags) = common::typecheck(
+    common::typecheck_ok(
         r#"
         struct Point { x: isize, y: isize }
         let p = Point { x: 1, y: 2 };
         "#,
     );
-    assert!(diags.is_empty(), "expected no errors, got: {diags:?}");
-    let _ = tc;
 }
 
 // ── Enum declaration typing ─────────────────────────────────────────────
