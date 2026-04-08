@@ -143,6 +143,7 @@ pub fn completion_type_from_def_kind(kind: DefKind) -> String {
         DefKind::EnumVariant(0) => "enum".into(),
         DefKind::EnumVariant(_) => "function".into(),
         DefKind::Struct => "class".into(),
+        DefKind::StructField => "property".into(),
         DefKind::Protocol => "interface".into(),
         DefKind::ProtocolMethod(_) | DefKind::StructMethod(_) => "method".into(),
         DefKind::Module => "namespace".into(),

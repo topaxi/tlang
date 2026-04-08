@@ -92,7 +92,7 @@ impl From<DefKind> for BindingKind {
         match kind {
             DefKind::Variable => BindingKind::Local,
             DefKind::Const => BindingKind::Local,
-            DefKind::Struct => BindingKind::Struct,
+            DefKind::Struct | DefKind::StructField => BindingKind::Struct,
             DefKind::Enum => BindingKind::Enum,
             DefKind::EnumVariant(_) => BindingKind::Variant,
             DefKind::Function(_) | DefKind::FunctionSelfRef(_) => BindingKind::Fn,

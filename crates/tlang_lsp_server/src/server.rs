@@ -461,11 +461,11 @@ impl ServerState {
                 r.type_info.as_deref()
             })
             .or_else(|| {
-                // Fallback: use the DefKind::Struct name if the variable was
-                // declared with a struct type annotation.
+                // Fallback: use the DefKind name if the variable was
+                // declared with a struct or enum type annotation.
                 resolved
                     .as_ref()
-                    .filter(|r| matches!(r.def_kind, DefKind::Struct))
+                    .filter(|r| matches!(r.def_kind, DefKind::Struct | DefKind::Enum))
                     .map(|r| r.name.as_str())
             });
 
@@ -726,6 +726,7 @@ fn def_kind_to_completion_item_kind(kind: DefKind) -> CompletionItemKind {
         DefKind::EnumVariant(0) => CompletionItemKind::ENUM_MEMBER,
         DefKind::EnumVariant(_) => CompletionItemKind::FUNCTION,
         DefKind::Struct => CompletionItemKind::STRUCT,
+        DefKind::StructField => CompletionItemKind::FIELD,
         DefKind::Protocol => CompletionItemKind::INTERFACE,
         DefKind::ProtocolMethod(_) | DefKind::StructMethod(_) => CompletionItemKind::METHOD,
         DefKind::Module => CompletionItemKind::MODULE,

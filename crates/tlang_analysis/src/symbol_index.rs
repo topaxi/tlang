@@ -181,16 +181,16 @@ impl SymbolIndex {
                 if !entry.name.starts_with(prefix.as_str()) {
                     continue;
                 }
-                // Only include callable symbols.
-                if entry.kind.arity().is_none() {
+                // Include callable symbols (methods/functions) and struct fields.
+                if !entry.kind.is_type_member() {
                     continue;
                 }
-                let method_name = &entry.name[prefix.len()..];
-                if method_name.is_empty() {
+                let member_name = &entry.name[prefix.len()..];
+                if member_name.is_empty() {
                     continue;
                 }
                 let item = CompletionItem {
-                    label: method_name.to_string(),
+                    label: member_name.to_string(),
                     kind: entry.kind,
                     detail: completion_detail(entry.kind),
                 };
@@ -205,26 +205,27 @@ impl SymbolIndex {
         items
     }
 
-    /// Find a method/function symbol whose qualified name ends with
-    /// `::method_name`.
+    /// Find a method/function or struct field symbol whose qualified name ends
+    /// with `::member_name`.
     ///
     /// This is used as a fallback when the cursor is on a field expression
-    /// like `v1.add` and the bare name `add` doesn't resolve — we search
-    /// for any `X::add` in scope that is a method or function.
-    pub fn find_method_by_suffix(
+    /// like `v1.add` or `v1.x` and the bare name doesn't resolve — we search
+    /// for any `X::add` or `X::x` in scope that is a method, function, or
+    /// struct field.
+    pub fn find_member_by_suffix(
         &self,
         scope_id: NodeId,
-        method_name: &str,
+        member_name: &str,
         span: Span,
     ) -> Option<SymbolEntry> {
-        let suffix = format!("::{method_name}");
+        let suffix = format!("::{member_name}");
         let mut current = Some(scope_id);
 
         while let Some(sid) = current {
             if let Some(entries) = self.scopes.get(&sid) {
                 let matches: Vec<&SymbolEntry> = entries
                     .iter()
-                    .filter(|e| e.name.ends_with(suffix.as_str()) && e.kind.arity().is_some())
+                    .filter(|e| e.name.ends_with(suffix.as_str()) && e.kind.is_type_member())
                     .collect();
 
                 if let Some(entry) = matches
@@ -232,7 +233,7 @@ impl SymbolIndex {
                     .rev()
                     .find(|e| {
                         e.defined_at.start_lc < span.start_lc
-                            || e.kind.arity().is_some()
+                            || e.kind.is_type_member()
                             || e.builtin
                     })
                     .cloned()
@@ -286,6 +287,7 @@ pub fn completion_detail(kind: DefKind) -> Option<String> {
         DefKind::ProtocolMethod(arity) | DefKind::StructMethod(arity) => {
             Some(format!("method({arity})"))
         }
+        DefKind::StructField => Some("field".into()),
         _ => None,
     }
 }
@@ -404,6 +406,46 @@ mod tests {
         assert!(
             methods.is_empty(),
             "should be empty for unknown type, got: {methods:?}"
+        );
+    }
+
+    #[test]
+    fn method_completions_include_struct_fields() {
+        let source = "struct Vector {\n    x: f64,\n    y: f64,\n}\nfn Vector.add(self, other: Vector) -> Vector { self }";
+        let result = crate::analyze(source, |_| {});
+        assert!(result.parse_issues.is_empty());
+        let index = SymbolIndex::from_analyzer(&result.analyzer);
+        let methods = index.collect_method_completions("Vector");
+        let labels: Vec<&str> = methods.iter().map(|m| m.label.as_str()).collect();
+        assert!(
+            labels.contains(&"x"),
+            "should include field `x`, got: {labels:?}"
+        );
+        assert!(
+            labels.contains(&"y"),
+            "should include field `y`, got: {labels:?}"
+        );
+        assert!(
+            labels.contains(&"add"),
+            "should include method `add`, got: {labels:?}"
+        );
+    }
+
+    #[test]
+    fn method_completions_for_enum() {
+        let source = "enum Option {\n  Some(x),\n  None,\n}\nfn Option.map(Option::Some(x), f) { Option::Some(f(x)) }\nfn Option.map(Option::None, _) { Option::None }\nfn Option.is_some(Option::Some(_)) { true }\nfn Option.is_some(Option::None) { false }";
+        let result = crate::analyze(source, |_| {});
+        assert!(result.parse_issues.is_empty());
+        let index = SymbolIndex::from_analyzer(&result.analyzer);
+        let methods = index.collect_method_completions("Option");
+        let labels: Vec<&str> = methods.iter().map(|m| m.label.as_str()).collect();
+        assert!(
+            labels.contains(&"map"),
+            "should include `map`, got: {labels:?}"
+        );
+        assert!(
+            labels.contains(&"is_some"),
+            "should include `is_some`, got: {labels:?}"
         );
     }
 }

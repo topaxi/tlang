@@ -81,14 +81,14 @@ pub fn resolve_symbol(
             let base_name = found.field_base.as_deref()?;
             let base_entry = index.get_closest_by_name(found.scope_id, base_name, found.span)?;
 
-            // The base must be a struct to attempt qualified method lookup.
-            if base_entry.kind != DefKind::Struct {
+            // The base must be a struct or enum to attempt qualified method lookup.
+            if !matches!(base_entry.kind, DefKind::Struct | DefKind::Enum) {
                 // The base is a variable/parameter — try to find its type
-                // by looking for qualified names ending with `::field_name`.
-                return index.find_method_by_suffix(found.scope_id, &found.name, found.span);
+                // by looking for qualified names ending with `::member_name`.
+                return index.find_member_by_suffix(found.scope_id, &found.name, found.span);
             }
 
-            // Base is a struct name itself (e.g. `Vector.add`)
+            // Base is a type name itself (e.g. `Vector.add` or `Option.map`)
             let qualified = format!("{}::{}", base_name, found.name);
             index.get_closest_by_name(found.scope_id, &qualified, found.span)
         })?;
@@ -250,6 +250,75 @@ mod tests {
         assert!(
             resolved.is_none(),
             "primitive type 'i64' should not resolve (not a user-defined symbol)"
+        );
+    }
+
+    #[test]
+    fn resolve_field_access_on_variable() {
+        // `other.x` should resolve to the struct field `Vector::x`
+        let source = "struct Vector { x: i64, y: i64 }\nfn Vector.add(self, other: Vector) -> Vector {\n  let sum_x = other.x;\n  sum_x\n}";
+        // `x` in `other.x` on line 2 — 0-based col 20
+        let resolved = setup_and_resolve(source, 2, 20);
+        assert!(resolved.is_some(), "field 'x' in 'other.x' should resolve");
+        let resolved = resolved.unwrap();
+        assert_eq!(resolved.def_kind, DefKind::StructField);
+    }
+
+    #[test]
+    fn resolve_field_access_on_self() {
+        // `self.x` should resolve to the struct field `Vector::x`
+        let source =
+            "struct Vector { x: i64, y: i64 }\nfn Vector.get_x(self) -> i64 {\n  self.x\n}";
+        // `x` in `self.x` on line 2 — 0-based col 7
+        let resolved = setup_and_resolve(source, 2, 7);
+        assert!(resolved.is_some(), "field 'x' in 'self.x' should resolve");
+        let resolved = resolved.unwrap();
+        assert_eq!(resolved.def_kind, DefKind::StructField);
+    }
+
+    #[test]
+    fn resolve_method_call_on_self() {
+        // `self.add` should resolve to the method `Vector::add`
+        let source = "struct Vector { x: i64 }\nfn Vector.add(self, other: Vector) -> Vector { self }\nfn Vector.add_twice(self, other: Vector) -> Vector {\n  self.add(other)\n}";
+        // `add` in `self.add` on line 3 — 0-based col 7
+        let resolved = setup_and_resolve(source, 3, 7);
+        assert!(
+            resolved.is_some(),
+            "method 'add' in 'self.add' should resolve"
+        );
+        let resolved = resolved.unwrap();
+        assert!(
+            resolved.def_kind.arity().is_some(),
+            "resolved symbol should be a function/method"
+        );
+    }
+
+    #[test]
+    fn resolve_enum_method_call_on_variable() {
+        // `opt.map(f)` should resolve to the method `Option::map`
+        let source = "enum Option {\n  Some(x),\n  None,\n}\nfn Option.map(Option::Some(x), f) { Option::Some(f(x)) }\nfn Option.map(Option::None, _) { Option::None }\nlet opt = Option::Some(1);\nopt.map(fn (x) { x + 1 });";
+        // `map` in `opt.map` on line 7 — 0-based col 4
+        let resolved = setup_and_resolve(source, 7, 4);
+        assert!(
+            resolved.is_some(),
+            "method 'map' in 'opt.map' should resolve"
+        );
+        let resolved = resolved.unwrap();
+        assert!(
+            resolved.def_kind.arity().is_some(),
+            "resolved enum method should be callable"
+        );
+    }
+
+    #[test]
+    fn resolve_enum_method_call_on_self() {
+        // `self.is_some()` inside an enum method should resolve
+        let source = "enum Option {\n  Some(x),\n  None,\n}\nfn Option.is_some(Option::Some(_)) { true }\nfn Option.is_some(Option::None) { false }\nfn Option.check(self) {\n  self.is_some()\n}";
+        // `is_some` in `self.is_some` on line 7 — 0-based col 7
+        let resolved = setup_and_resolve(source, 7, 7);
+        assert!(
+            resolved.is_some(),
+            "method 'is_some' in 'self.is_some' should resolve"
         );
     }
 }

@@ -31,6 +31,10 @@ pub enum DefKind {
     /// A `::` alias for a dot-method on a struct/enum (e.g. `Expense::is_food`
     /// pointing at the definition `fn Expense.is_food`).
     StructMethod(u16),
+    /// A field of a struct (e.g. `x` in `struct Vector { x: i64 }`).
+    /// Registered with a qualified name like `Vector::x` so that
+    /// field-access expressions (`v.x`) can resolve to the definition.
+    StructField,
 }
 
 impl DefKind {
@@ -42,6 +46,14 @@ impl DefKind {
             | DefKind::StructMethod(arity) => Some(arity),
             _ => None,
         }
+    }
+
+    /// Returns `true` for kinds that represent members of a type — methods,
+    /// associated functions, and struct fields.  This is used in the analysis
+    /// layer to filter symbols when resolving dot-expressions or producing
+    /// member completions for a given type.
+    pub fn is_type_member(self) -> bool {
+        self.arity().is_some() || self == DefKind::StructField
     }
 }
 
@@ -61,6 +73,7 @@ impl Display for DefKind {
             DefKind::Enum => write!(f, "enum"),
             DefKind::EnumVariant(_) => write!(f, "enum variant"),
             DefKind::Struct => write!(f, "struct"),
+            DefKind::StructField => write!(f, "field"),
             DefKind::Protocol => write!(f, "protocol"),
         }
     }
@@ -499,7 +512,7 @@ impl DefScope {
         // Builtins use global slots assigned at interpreter startup, not local scope slots.
         !s.builtin
             // Enum and struct definitions do not generate a slot
-            && !matches!(s.kind, DefKind::Enum | DefKind::Struct)
+            && !matches!(s.kind, DefKind::Enum | DefKind::Struct | DefKind::StructField)
             // Protocol definitions do not generate a slot
             && !matches!(s.kind, DefKind::Protocol)
             // Protocol method implementations do not generate a slot

@@ -371,6 +371,20 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     stmt.span.end_lc.line,
                 );
 
+                // Register struct fields with qualified names (e.g. "Vector::x")
+                // so that field-access expressions can resolve to the definition.
+                for field in &decl.fields {
+                    let qualified = format!("{}::{}", decl.name, field.name);
+                    self.declare_symbol(
+                        ctx,
+                        field.id,
+                        &qualified,
+                        DefKind::StructField,
+                        field.name.span,
+                        field.name.span.end_lc.line,
+                    );
+                }
+
                 // Register struct const members with qualified names
                 self.register_type_const_items(ctx, decl.name.as_str(), &decl.consts);
 
