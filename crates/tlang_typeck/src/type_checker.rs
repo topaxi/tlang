@@ -5,6 +5,7 @@ use tlang_hir::visit::{walk_block, walk_expr, walk_module, walk_stmt};
 use tlang_hir::{self as hir, BinaryOpKind, PrimTy, Ty, TyKind};
 use tlang_hir_opt::hir_opt::{HirOptContext, HirOptError, HirPass};
 
+use crate::builtins;
 use crate::typing_context::TypingContext;
 use crate::{TypeError, TypeInfo, TypeTable};
 
@@ -21,6 +22,12 @@ pub struct TypeChecker {
     pub type_table: TypeTable,
     /// Stack of typing contexts (strict/permissive) for nested functions.
     context_stack: Vec<TypingContext>,
+    /// Stack of enclosing function return types for return-statement checking.
+    return_type_stack: Vec<TyKind>,
+    /// Stack of observed return-expression types collected during function
+    /// body traversal.  Used to infer the return type when no annotation
+    /// and no trailing expression are present (e.g. `fn f() { return 42; }`).
+    observed_return_types: Vec<Vec<TyKind>>,
 }
 
 impl TypeChecker {
@@ -319,6 +326,229 @@ impl TypeChecker {
         }
     }
 
+    // ── Function signature helpers ───────────────────────────────────
+
+    /// Construct a `TyKind::Fn(params, ret)` from parameter types and a
+    /// return type kind.
+    fn make_fn_ty(param_tys: Vec<Ty>, ret: TyKind) -> TyKind {
+        TyKind::Fn(
+            param_tys,
+            Box::new(Ty {
+                kind: ret,
+                ..Ty::default()
+            }),
+        )
+    }
+
+    /// Build a `Fn(params) -> return` type for a function declaration and
+    /// store it in the type table keyed by the function's HIR id.
+    fn register_function_signature(&mut self, decl: &hir::FunctionDeclaration) {
+        let param_tys: Vec<Ty> = decl
+            .parameters
+            .iter()
+            .map(|p| p.type_annotation.clone())
+            .collect();
+        let fn_ty = Self::make_fn_ty(param_tys, decl.return_type.kind.clone());
+        self.type_table.insert(
+            decl.hir_id,
+            TypeInfo {
+                ty: Ty {
+                    kind: fn_ty,
+                    ..Ty::default()
+                },
+            },
+        );
+    }
+
+    /// After visiting the function body, infer the return type from the
+    /// body's trailing expression (if no explicit return type annotation)
+    /// and check that body type matches the declared return type.
+    fn check_function_body_return(&mut self, decl: &hir::FunctionDeclaration) {
+        // Only check when the body has a trailing expression.
+        // If the body ends with statements only (e.g. `return` statements),
+        // the return type is checked via return-statement checking instead.
+        let body_ty = match decl.body.expr.as_ref() {
+            Some(e) => &e.ty.kind,
+            None => return,
+        };
+
+        let declared_ret = &decl.return_type.kind;
+
+        if matches!(declared_ret, TyKind::Unknown) || matches!(body_ty, TyKind::Unknown) {
+            // No annotation or unknown body — nothing to check.
+            return;
+        }
+
+        if declared_ret != body_ty {
+            self.errors.push(TypeError::ReturnTypeMismatch {
+                expected: declared_ret.to_string(),
+                actual: body_ty.to_string(),
+                span: decl.body.span,
+            });
+        }
+    }
+
+    // ── Call expression checking ─────────────────────────────────────
+
+    /// Type-check a call expression. Resolves the callee's function type,
+    /// checks argument count and types, and returns the call's result type.
+    fn check_call(&mut self, call: &hir::CallExpression, span: tlang_span::Span) -> TyKind {
+        // Try to resolve the callee to a function signature.
+        let fn_ty = self.resolve_callee_type(&call.callee);
+
+        match fn_ty {
+            Some(TyKind::Fn(ref param_tys, ref ret_ty)) => {
+                let callee_name = callee_name_str(&call.callee);
+                let is_variadic = callee_name.as_deref().is_some_and(builtins::is_variadic);
+
+                // Check argument count (skip for variadic builtins).
+                if !is_variadic && param_tys.len() != call.arguments.len() {
+                    self.errors.push(TypeError::ArgumentCountMismatch {
+                        expected: param_tys.len(),
+                        actual: call.arguments.len(),
+                        span,
+                    });
+                    return ret_ty.kind.clone();
+                }
+
+                // Check each argument type.
+                // For variadic builtins, validate every argument against the
+                // (single) parameter type; for normal calls, zip 1:1.
+                if is_variadic {
+                    if let Some(param_ty) = param_tys.first() {
+                        for (i, arg) in call.arguments.iter().enumerate() {
+                            if matches!(param_ty.kind, TyKind::Unknown)
+                                || matches!(arg.ty.kind, TyKind::Unknown)
+                            {
+                                continue;
+                            }
+                            if arg.ty.kind != param_ty.kind {
+                                let param_name = callee_name
+                                    .as_deref()
+                                    .map(|n| format!("arg{i} of `{n}`"))
+                                    .unwrap_or_else(|| format!("arg{i}"));
+                                self.errors.push(TypeError::ArgumentTypeMismatch {
+                                    param_name,
+                                    expected: param_ty.kind.to_string(),
+                                    actual: arg.ty.kind.to_string(),
+                                    span: arg.span,
+                                });
+                            }
+                        }
+                    }
+                } else {
+                    for (i, (arg, param_ty)) in
+                        call.arguments.iter().zip(param_tys.iter()).enumerate()
+                    {
+                        if matches!(param_ty.kind, TyKind::Unknown)
+                            || matches!(arg.ty.kind, TyKind::Unknown)
+                        {
+                            continue;
+                        }
+                        if arg.ty.kind != param_ty.kind {
+                            let param_name = callee_name
+                                .as_deref()
+                                .map(|n| format!("arg{i} of `{n}`"))
+                                .unwrap_or_else(|| format!("arg{i}"));
+                            self.errors.push(TypeError::ArgumentTypeMismatch {
+                                param_name,
+                                expected: param_ty.kind.to_string(),
+                                actual: arg.ty.kind.to_string(),
+                                span: arg.span,
+                            });
+                        }
+                    }
+                }
+
+                ret_ty.kind.clone()
+            }
+            _ => {
+                // Callee type is unknown — cannot check, propagate unknown.
+                TyKind::Unknown
+            }
+        }
+    }
+
+    /// Try to resolve the callee expression to a `TyKind::Fn`.
+    fn resolve_callee_type(&self, callee: &hir::Expr) -> Option<TyKind> {
+        match &callee.kind {
+            hir::ExprKind::Path(path) => {
+                // First try the type table (user-defined functions).
+                if let Some(hir_id) = path.res.hir_id()
+                    && let Some(info) = self.type_table.get(&hir_id)
+                    && matches!(info.ty.kind, TyKind::Fn(..))
+                {
+                    return Some(info.ty.kind.clone());
+                }
+                // Then try builtin signatures.
+                let name = path.join("::");
+                builtins::lookup(&name)
+            }
+            _ => {
+                // For other callee forms (e.g. field access, closures),
+                // check if the expression already has a Fn type.
+                match &callee.ty.kind {
+                    TyKind::Fn(..) => Some(callee.ty.kind.clone()),
+                    _ => None,
+                }
+            }
+        }
+    }
+
+    // ── Return statement checking ────────────────────────────────────
+
+    fn check_return_type(&mut self, return_expr: Option<&hir::Expr>, span: tlang_span::Span) {
+        let actual = return_expr
+            .map(|e| &e.ty.kind)
+            .unwrap_or(&TyKind::Primitive(PrimTy::Nil));
+
+        // Record the observed return type for later inference.
+        if let Some(observed) = self.observed_return_types.last_mut() {
+            observed.push(actual.clone());
+        }
+
+        let expected = match self.return_type_stack.last() {
+            Some(ty) => ty,
+            None => return, // top-level, no function context
+        };
+
+        if matches!(expected, TyKind::Unknown) {
+            return; // No declared return type — nothing to check.
+        }
+
+        if matches!(actual, TyKind::Unknown) {
+            return; // Unknown value — skip.
+        }
+
+        if expected != actual {
+            self.errors.push(TypeError::ReturnTypeMismatch {
+                expected: expected.to_string(),
+                actual: actual.to_string(),
+                span,
+            });
+        }
+    }
+
+    /// Infer a return type from observed `return` statements during the
+    /// current function's body traversal.  If all observed returns agree
+    /// on a single concrete (non-unknown) type, return that type; otherwise
+    /// return `None`.
+    fn infer_return_type_from_observed(&self) -> Option<TyKind> {
+        let observed = self.observed_return_types.last()?;
+        let mut inferred: Option<&TyKind> = None;
+        for ty in observed {
+            if matches!(ty, TyKind::Unknown) {
+                continue;
+            }
+            match inferred {
+                None => inferred = Some(ty),
+                Some(prev) if prev == ty => {}
+                Some(_) => return None, // conflicting types
+            }
+        }
+        inferred.cloned()
+    }
+
     // ── Pattern binding registration ─────────────────────────────────
 
     /// Walk a pattern and register all bound identifiers in the type table
@@ -359,6 +589,85 @@ impl TypeChecker {
         // Top-level is always permissive.
         self.push_context(TypingContext::Permissive);
         self.visit_module(module, &mut ());
+        self.pop_context();
+    }
+
+    // ── Expression visit helpers ─────────────────────────────────────
+
+    /// Visit a Call or TailCall expression: check arguments, resolve
+    /// callee, and set the expression's type to the return type.
+    fn visit_call_expr(
+        &mut self,
+        call: &mut hir::CallExpression,
+        expr_hir_id: tlang_span::HirId,
+        expr_span: tlang_span::Span,
+        expr_ty: &mut Ty,
+    ) {
+        for arg in &mut call.arguments {
+            self.visit_expr(arg, &mut ());
+        }
+        self.visit_expr(&mut call.callee, &mut ());
+
+        let result_ty = self.check_call(call, expr_span);
+        expr_ty.kind = result_ty.clone();
+        self.type_table.insert(
+            expr_hir_id,
+            TypeInfo {
+                ty: Ty {
+                    kind: result_ty,
+                    ..Ty::default()
+                },
+            },
+        );
+    }
+
+    /// Visit a FunctionExpression (closure): register parameters, visit
+    /// body, infer return type, and set the expression's type to `Fn(…) → …`.
+    fn visit_closure_expr(&mut self, decl: &mut hir::FunctionDeclaration, expr_ty: &mut Ty) {
+        let enclosing = self.current_context();
+        let closure_ctx = TypingContext::for_closure(decl, enclosing);
+        self.push_context(closure_ctx);
+
+        self.register_function_signature(decl);
+
+        for param in &decl.parameters {
+            self.type_table.insert(
+                param.hir_id,
+                TypeInfo {
+                    ty: param.type_annotation.clone(),
+                },
+            );
+        }
+
+        self.return_type_stack.push(decl.return_type.kind.clone());
+        self.observed_return_types.push(Vec::new());
+        self.visit_block(&mut decl.body, &mut ());
+
+        // Check that the closure body type matches the declared return type.
+        self.check_function_body_return(decl);
+
+        let body_ret = decl
+            .body
+            .expr
+            .as_ref()
+            .map(|e| e.ty.kind.clone())
+            .or_else(|| self.infer_return_type_from_observed())
+            .unwrap_or_else(|| decl.return_type.kind.clone());
+        let ret_ty = if matches!(decl.return_type.kind, TyKind::Unknown) {
+            body_ret
+        } else {
+            decl.return_type.kind.clone()
+        };
+
+        let param_tys: Vec<Ty> = decl
+            .parameters
+            .iter()
+            .map(|p| p.type_annotation.clone())
+            .collect();
+        expr_ty.kind = Self::make_fn_ty(param_tys, ret_ty);
+
+        self.observed_return_types.pop();
+        self.return_type_stack.pop();
         self.pop_context();
     }
 }
@@ -446,6 +755,9 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 let fn_ctx = TypingContext::for_function(decl);
                 self.push_context(fn_ctx);
 
+                // Register function signature in the type table.
+                self.register_function_signature(decl);
+
                 // Store parameter types in the type table.
                 for param in &decl.parameters {
                     self.type_table.insert(
@@ -456,8 +768,55 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     );
                 }
 
+                // Push the declared return type for return-statement checking
+                // and start tracking observed return types.
+                self.return_type_stack.push(decl.return_type.kind.clone());
+                self.observed_return_types.push(Vec::new());
+
                 self.visit_block(&mut decl.body, ctx);
+
+                // Check that body type matches declared return type.
+                self.check_function_body_return(decl);
+
+                // Update the function signature with the inferred return type
+                // if the declared return type was unknown.
+                if matches!(decl.return_type.kind, TyKind::Unknown) {
+                    // Prefer trailing expression type, then fall back to the
+                    // type inferred from `return` statements, then keep unknown.
+                    let body_ty = decl
+                        .body
+                        .expr
+                        .as_ref()
+                        .map(|e| e.ty.kind.clone())
+                        .or_else(|| self.infer_return_type_from_observed())
+                        .unwrap_or_else(|| decl.return_type.kind.clone());
+                    let param_tys: Vec<Ty> = decl
+                        .parameters
+                        .iter()
+                        .map(|p| p.type_annotation.clone())
+                        .collect();
+                    let fn_ty = Self::make_fn_ty(param_tys, body_ty);
+                    self.type_table.insert(
+                        decl.hir_id,
+                        TypeInfo {
+                            ty: Ty {
+                                kind: fn_ty,
+                                ..Ty::default()
+                            },
+                        },
+                    );
+                }
+
+                self.observed_return_types.pop();
+                self.return_type_stack.pop();
                 self.pop_context();
+            }
+            hir::StmtKind::Return(expr) => {
+                if let Some(e) = expr.as_mut() {
+                    self.visit_expr(e, ctx);
+                }
+                let span = stmt.span;
+                self.check_return_type(expr.as_deref(), span);
             }
             _ => walk_stmt(self, stmt, ctx),
         }
@@ -511,21 +870,12 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 );
             }
             hir::ExprKind::FunctionExpression(decl) => {
-                let enclosing = self.current_context();
-                let closure_ctx = TypingContext::for_closure(decl, enclosing);
-                self.push_context(closure_ctx);
-
-                for param in &decl.parameters {
-                    self.type_table.insert(
-                        param.hir_id,
-                        TypeInfo {
-                            ty: param.type_annotation.clone(),
-                        },
-                    );
-                }
-
-                self.visit_block(&mut decl.body, ctx);
-                self.pop_context();
+                self.visit_closure_expr(decl, &mut expr.ty);
+            }
+            hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
+                let hir_id = expr.hir_id;
+                let span = expr.span;
+                self.visit_call_expr(call, hir_id, span, &mut expr.ty);
             }
             hir::ExprKind::Path(path) => {
                 // Try to resolve the type from the type table via the path's
@@ -534,6 +884,12 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     && let Some(info) = self.type_table.get(&hir_id)
                 {
                     expr.ty = info.ty.clone();
+                } else {
+                    // Try builtin signature lookup for unresolved paths.
+                    let name = path.join("::");
+                    if let Some(fn_ty) = builtins::lookup(&name) {
+                        expr.ty.kind = fn_ty;
+                    }
                 }
             }
             hir::ExprKind::Block(block) => {
@@ -547,5 +903,13 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 walk_expr(self, expr, ctx);
             }
         }
+    }
+}
+
+/// Extract a human-readable name from a callee expression.
+fn callee_name_str(callee: &hir::Expr) -> Option<String> {
+    match &callee.kind {
+        hir::ExprKind::Path(path) => Some(path.join("::")),
+        _ => None,
     }
 }

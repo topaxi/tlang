@@ -324,3 +324,307 @@ fn multiple_type_errors() {
     );
     assert!(errs.len() >= 2, "expected at least 2 errors, got: {errs:?}");
 }
+
+// ── Function signature collection ───────────────────────────────────────
+
+#[test]
+fn function_signature_registered_in_type_table() {
+    common::typecheck_ok(
+        r#"
+        fn add(a: i64, b: i64) -> i64 { a + b }
+        let result = add(1, 2);
+        "#,
+    );
+}
+
+#[test]
+fn function_body_return_type_ok() {
+    common::typecheck_ok(
+        r#"
+        fn double(x: i64) -> i64 { x + x }
+        "#,
+    );
+}
+
+#[test]
+fn function_body_return_type_mismatch() {
+    let errs = common::typecheck_errors(
+        r#"
+        fn greet(x: i64) -> i64 { "hello" }
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("return type mismatch")),
+        "expected return type mismatch, got: {errs:?}"
+    );
+}
+
+#[test]
+fn function_inferred_return_type() {
+    // No explicit return type — inferred from body.
+    common::typecheck_ok(
+        r#"
+        fn double(x: i64) { x + x }
+        "#,
+    );
+}
+
+// ── Call expression type checking ───────────────────────────────────────
+
+#[test]
+fn call_typed_function_ok() {
+    common::typecheck_ok(
+        r#"
+        fn add(a: i64, b: i64) -> i64 { a + b }
+        let x = add(1, 2);
+        "#,
+    );
+}
+
+#[test]
+fn call_result_type_propagates() {
+    // The result of calling `add` should be i64, so binding to i64 is ok.
+    common::typecheck_ok(
+        r#"
+        fn add(a: i64, b: i64) -> i64 { a + b }
+        let x: i64 = add(1, 2);
+        "#,
+    );
+}
+
+#[test]
+fn call_result_type_mismatch_with_binding() {
+    let errs = common::typecheck_errors(
+        r#"
+        fn add(a: i64, b: i64) -> i64 { a + b }
+        let x: String = add(1, 2);
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("type mismatch in binding")),
+        "expected binding type mismatch, got: {errs:?}"
+    );
+}
+
+#[test]
+fn call_correct_argument_count_ok() {
+    // NOTE: For user-defined functions, arity mismatches are caught at the
+    // semantic analysis stage (before the type checker runs). The type
+    // checker's argument count check is a secondary safety net mainly for
+    // builtin functions with fixed arity.
+    let errs = common::typecheck_errors(
+        r#"
+        fn add(a: i64, b: i64) -> i64 { a + b }
+        let x = add(1, 2);
+        "#,
+    );
+    // This should type-check successfully since arity matches.
+    assert!(errs.is_empty(), "expected no errors, got: {errs:?}");
+}
+
+#[test]
+fn call_with_matching_argument_count_ok() {
+    // NOTE: For user-defined functions, arity mismatches are caught at the
+    // semantic analysis stage. We test that correct arity passes the type
+    // checker.
+    common::typecheck_ok(
+        r#"
+        fn add(a: i64, b: i64) -> i64 { a + b }
+        let x = add(1, 2);
+        "#,
+    );
+}
+
+#[test]
+fn call_argument_type_mismatch() {
+    let errs = common::typecheck_errors(
+        r#"
+        fn add(a: i64, b: i64) -> i64 { a + b }
+        let x = add(1, "hello");
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("argument type mismatch")),
+        "expected argument type mismatch, got: {errs:?}"
+    );
+}
+
+// ── Return statement type checking ──────────────────────────────────────
+
+#[test]
+fn return_matching_type_ok() {
+    common::typecheck_ok(
+        r#"
+        fn foo() -> i64 { return 42; }
+        "#,
+    );
+}
+
+#[test]
+fn return_mismatched_type_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        fn foo() -> i64 { return "hello"; }
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("return type mismatch")),
+        "expected return type mismatch, got: {errs:?}"
+    );
+}
+
+#[test]
+fn infer_return_type_from_return_statement_without_trailing_expression() {
+    common::typecheck_ok(
+        r#"
+        fn foo() { return 42; }
+        let x: i64 = foo();
+        "#,
+    );
+}
+
+#[test]
+fn bare_return_in_nil_function_ok() {
+    common::typecheck_ok(
+        r#"
+        fn foo() -> nil { return; }
+        "#,
+    );
+}
+
+// ── Pipeline operator ───────────────────────────────────────────────────
+
+#[test]
+fn pipeline_typed_function_ok() {
+    // Pipeline desugars to a Call, so type checking works the same.
+    common::typecheck_ok(
+        r#"
+        fn double(x: i64) -> i64 { x + x }
+        let x = 5 |> double();
+        "#,
+    );
+}
+
+#[test]
+fn pipeline_result_type_propagates() {
+    common::typecheck_ok(
+        r#"
+        fn double(x: i64) -> i64 { x + x }
+        let x: i64 = 5 |> double();
+        "#,
+    );
+}
+
+// ── Builtin function signatures ─────────────────────────────────────────
+
+#[test]
+fn call_builtin_log_ok() {
+    // log accepts anything, returns nil.
+    common::typecheck_ok(
+        r#"
+        log(42);
+        log("hello");
+        "#,
+    );
+}
+
+#[test]
+fn call_builtin_math_min_variadic_ok() {
+    common::typecheck_ok(
+        r#"
+        let x = math::min(1.0, 2.0, 3.0);
+        "#,
+    );
+}
+
+#[test]
+fn call_builtin_math_min_variadic_type_mismatch_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        let x = math::min(1.0, "x");
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("argument type mismatch") && e.contains("math::min")),
+        "expected variadic builtin argument type error, got: {errs:?}"
+    );
+}
+
+// ── Call with untyped function ──────────────────────────────────────────
+
+#[test]
+fn call_untyped_function_propagates_unknown() {
+    // Calling an untyped function returns unknown, which should not error
+    // in permissive mode.
+    common::typecheck_ok(
+        r#"
+        fn identity(x) { x }
+        let y = identity(42);
+        "#,
+    );
+}
+
+#[test]
+fn call_untyped_function_into_annotated_binding_error() {
+    // Calling an untyped function and binding the result to an annotated
+    // binding should error because the return type is inferred as unknown
+    // (parameter is untyped).
+    let errs = common::typecheck_errors(
+        r#"
+        fn identity(x) { x }
+        let y: i64 = identity(42);
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("type mismatch in binding")),
+        "expected binding type mismatch, got: {errs:?}"
+    );
+}
+
+// ── Function calling function ───────────────────────────────────────────
+
+#[test]
+fn function_calls_another_function_ok() {
+    common::typecheck_ok(
+        r#"
+        fn add(a: i64, b: i64) -> i64 { a + b }
+        fn double(x: i64) -> i64 { add(x, x) }
+        "#,
+    );
+}
+
+// ── Closure type checking ───────────────────────────────────────────────
+
+#[test]
+fn closure_call_ok() {
+    common::typecheck_ok(
+        r#"
+        let f = fn(x: i64) -> i64 { x + 1 };
+        let y = f(42);
+        "#,
+    );
+}
+
+#[test]
+fn closure_call_result_type_propagates() {
+    common::typecheck_ok(
+        r#"
+        let f = fn(x: i64) -> i64 { x + 1 };
+        let y: i64 = f(42);
+        "#,
+    );
+}
+
+#[test]
+fn closure_body_return_type_mismatch() {
+    let errs = common::typecheck_errors(
+        r#"
+        let f = fn(x: i64) -> i64 { "hello" };
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("return type mismatch")),
+        "expected return type mismatch for closure, got: {errs:?}"
+    );
+}
