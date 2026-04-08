@@ -1,4 +1,4 @@
-.PHONY: all clean verify test test-coverage test-debug test-review test-accept test-bindings-js tlangdi-release-debug
+.PHONY: all clean verify test test-coverage test-debug test-review test-accept test-bindings-js tlangdi-release-debug lsp-build lsp-install
 
 all:
 	cargo +nightly make
@@ -49,3 +49,10 @@ test-bindings-js:
 
 tlangdi-release-debug:
 	RUSTFLAGS="-C force-frame-pointers=yes -C opt-level=0" cargo build --release --features=tlang_vm/binary --bin tlangdi
+
+lsp-build:
+	cargo build --release --bin tlang-lsp-server
+
+lsp-install: lsp-build
+	mkdir -p ~/.local/bin
+	ln -sf "$(CURDIR)/target/release/tlang-lsp-server" ~/.local/bin/tlang-lsp-server
