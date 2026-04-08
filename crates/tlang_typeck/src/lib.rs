@@ -6,5 +6,5 @@ mod typing_context;
 
 pub use type_checker::TypeChecker;
 pub use type_error::TypeError;
-pub use type_table::{TypeInfo, TypeTable};
+pub use type_table::{EnumInfo, StructInfo, TypeInfo, TypeTable, VariantInfo};
 pub use typing_context::TypingContext;

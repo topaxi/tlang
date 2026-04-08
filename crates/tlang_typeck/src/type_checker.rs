@@ -6,6 +6,7 @@ use tlang_hir::{self as hir, BinaryOpKind, PrimTy, Ty, TyKind};
 use tlang_hir_opt::hir_opt::{HirOptContext, HirOptError, HirPass};
 
 use crate::builtins;
+use crate::type_table::{EnumInfo, StructInfo, VariantInfo};
 use crate::typing_context::TypingContext;
 use crate::{TypeError, TypeInfo, TypeTable};
 
@@ -393,6 +394,52 @@ impl TypeChecker {
     /// Type-check a call expression. Resolves the callee's function type,
     /// checks argument count and types, and returns the call's result type.
     fn check_call(&mut self, call: &hir::CallExpression, span: tlang_span::Span) -> TyKind {
+        // Struct/enum record construction is lowered to a call with exactly
+        // one dict argument (e.g. `Point { x: 1, y: 2 }` →
+        // `Call(Point, [{ x: 1, y: 2 }])`). Only that lowered shape should
+        // bypass normal positional argument checking. Any other constructor
+        // call form must fall through to the regular call checker so that
+        // wrong arity / wrong argument-shape diagnostics are still emitted.
+        if let hir::ExprKind::Path(path) = &call.callee.kind {
+            let binding_kind = path.res.binding_kind();
+            if matches!(
+                binding_kind,
+                hir::BindingKind::Struct | hir::BindingKind::Variant
+            ) && call.arguments.len() == 1
+                && matches!(call.arguments[0].kind, hir::ExprKind::Dict(_))
+            {
+                // Preserve constructor result-type resolution metadata. For
+                // enum variants, use the registered constructor signature's
+                // return type instead of rebuilding a path with `as_init()`,
+                // which drops `Path.res`.
+                return match binding_kind {
+                    hir::BindingKind::Struct => TyKind::Path((**path).clone()),
+                    hir::BindingKind::Variant => {
+                        if let Some(hir_id) = path.res.hir_id()
+                            && let Some(info) = self.type_table.get(&hir_id)
+                            && let TyKind::Fn(_, ret) = &info.ty.kind
+                        {
+                            ret.kind.clone()
+                        } else {
+                            unreachable!(
+                                "enum variant constructors must have a registered function signature"
+                            )
+                        }
+                    }
+                    _ => unreachable!(),
+                };
+            }
+            // Discriminant (unit) variant used as a value (no call args):
+            // resolve to the enum type directly.
+            if binding_kind == hir::BindingKind::Variant
+                && let Some(hir_id) = path.res.hir_id()
+                && let Some(info) = self.type_table.get(&hir_id)
+                && !matches!(info.ty.kind, TyKind::Fn(_, _))
+            {
+                return info.ty.kind.clone();
+            }
+        }
+
         // Try to resolve the callee to a function signature.
         let fn_ty = self.resolve_callee_type(&call.callee);
 
@@ -581,6 +628,173 @@ impl TypeChecker {
             }
             hir::PatKind::Wildcard | hir::PatKind::Literal(_) => {}
         }
+    }
+
+    // ── Struct and enum declaration registration ──────────────────────
+
+    /// Register a struct declaration in the type table: store field metadata
+    /// and register a constructor function type `Fn(field_tys…) → Path(Struct)`.
+    fn register_struct_declaration(&mut self, decl: &hir::StructDeclaration) {
+        let mut struct_path = hir::Path::new(
+            vec![hir::PathSegment { ident: decl.name }],
+            tlang_span::Span::default(),
+        );
+        // Set the resolution so that field access can find the struct info.
+        struct_path.res.set_hir_id(decl.hir_id);
+        struct_path.res.set_binding_kind(hir::BindingKind::Struct);
+        let struct_ty_kind = TyKind::Path(struct_path);
+
+        // Store struct field metadata.
+        let fields: Vec<(tlang_ast::node::Ident, Ty)> =
+            decl.fields.iter().map(|f| (f.name, f.ty.clone())).collect();
+        self.type_table.insert_struct_info(
+            decl.hir_id,
+            StructInfo {
+                name: decl.name,
+                fields: fields.clone(),
+            },
+        );
+
+        // Register constructor: Fn(field_types…) → StructPath
+        let param_tys: Vec<Ty> = fields.iter().map(|(_, ty)| ty.clone()).collect();
+        let fn_ty = Self::make_fn_ty(param_tys, struct_ty_kind);
+        self.type_table.insert(
+            decl.hir_id,
+            TypeInfo {
+                ty: Ty {
+                    kind: fn_ty,
+                    ..Ty::default()
+                },
+            },
+        );
+    }
+
+    /// Register an enum declaration in the type table: store variant metadata
+    /// and register each variant constructor.
+    fn register_enum_declaration(&mut self, decl: &hir::EnumDeclaration) {
+        let mut enum_path = hir::Path::new(
+            vec![hir::PathSegment { ident: decl.name }],
+            tlang_span::Span::default(),
+        );
+        // Set the resolution so that variant access can find the enum info.
+        enum_path.res.set_hir_id(decl.hir_id);
+        enum_path.res.set_binding_kind(hir::BindingKind::Enum);
+        let enum_ty_kind = TyKind::Path(enum_path);
+
+        // Collect variant info.
+        let variants: Vec<VariantInfo> = decl
+            .variants
+            .iter()
+            .map(|v| VariantInfo {
+                name: v.name,
+                parameters: v
+                    .parameters
+                    .iter()
+                    .map(|p| (p.name, p.ty.clone()))
+                    .collect(),
+            })
+            .collect();
+
+        self.type_table.insert_enum_info(
+            decl.hir_id,
+            EnumInfo {
+                name: decl.name,
+                variants,
+            },
+        );
+
+        // Register each variant as a constructor function.
+        for variant in &decl.variants {
+            if variant.parameters.is_empty() {
+                // Discriminant/unit variant: its type is the enum type.
+                self.type_table.insert(
+                    variant.hir_id,
+                    TypeInfo {
+                        ty: Ty {
+                            kind: enum_ty_kind.clone(),
+                            ..Ty::default()
+                        },
+                    },
+                );
+            } else {
+                // Constructor variant: Fn(param_types…) → EnumPath
+                let param_tys: Vec<Ty> = variant.parameters.iter().map(|p| p.ty.clone()).collect();
+                let fn_ty = Self::make_fn_ty(param_tys, enum_ty_kind.clone());
+                self.type_table.insert(
+                    variant.hir_id,
+                    TypeInfo {
+                        ty: Ty {
+                            kind: fn_ty,
+                            ..Ty::default()
+                        },
+                    },
+                );
+            }
+        }
+    }
+
+    /// Resolve a struct field type given a struct `HirId` and field name.
+    fn resolve_field_type(
+        &self,
+        struct_hir_id: &tlang_span::HirId,
+        field_name: &str,
+    ) -> Option<TyKind> {
+        if let Some(info) = self.type_table.get_struct_info(struct_hir_id) {
+            for (name, ty) in &info.fields {
+                if name.as_str() == field_name {
+                    return Some(ty.kind.clone());
+                }
+            }
+        }
+        None
+    }
+
+    /// Resolve the HirId of a struct/enum type from a TyKind::Path.
+    fn resolve_type_hir_id(ty_kind: &TyKind) -> Option<tlang_span::HirId> {
+        match ty_kind {
+            TyKind::Path(path) => path.res.hir_id(),
+            _ => None,
+        }
+    }
+
+    /// Type-check a field access expression (`base.field`).
+    /// Resolves the field's type from the base expression's struct type.
+    /// Emits a diagnostic when the base is a known struct but the field
+    /// does not exist.
+    fn check_field_access(
+        &mut self,
+        base_ty_kind: &TyKind,
+        field_name: &str,
+        expr_hir_id: tlang_span::HirId,
+        span: tlang_span::Span,
+    ) -> TyKind {
+        if let Some(hir_id) = Self::resolve_type_hir_id(base_ty_kind) {
+            if let Some(field_ty) = self.resolve_field_type(&hir_id, field_name) {
+                self.type_table.insert(
+                    expr_hir_id,
+                    TypeInfo {
+                        ty: Ty {
+                            kind: field_ty.clone(),
+                            ..Ty::default()
+                        },
+                    },
+                );
+                return field_ty;
+            }
+
+            // Base is a known struct but the field does not exist.
+            if let Some(info) = self.type_table.get_struct_info(&hir_id) {
+                let available: Vec<String> =
+                    info.fields.iter().map(|(n, _)| n.to_string()).collect();
+                self.errors.push(TypeError::UnknownField {
+                    field: field_name.to_string(),
+                    type_name: info.name.to_string(),
+                    available,
+                    span,
+                });
+            }
+        }
+        TyKind::Unknown
     }
 
     // ── HIR walk entry point ─────────────────────────────────────────
@@ -818,6 +1032,25 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 let span = stmt.span;
                 self.check_return_type(expr.as_deref(), span);
             }
+            hir::StmtKind::StructDeclaration(decl) => {
+                self.register_struct_declaration(decl);
+                // Walk the struct's const items.
+                for const_item in &mut decl.consts {
+                    self.visit_expr(&mut const_item.value, ctx);
+                }
+            }
+            hir::StmtKind::EnumDeclaration(decl) => {
+                self.register_enum_declaration(decl);
+                // Walk the enum's const items and variant discriminants.
+                for variant in &mut decl.variants {
+                    if let Some(disc) = &mut variant.discriminant {
+                        self.visit_expr(disc, ctx);
+                    }
+                }
+                for const_item in &mut decl.consts {
+                    self.visit_expr(&mut const_item.value, ctx);
+                }
+            }
             _ => walk_stmt(self, stmt, ctx),
         }
     }
@@ -898,6 +1131,27 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 if let Some(trailing) = &block.expr {
                     expr.ty = trailing.ty.clone();
                 }
+            }
+            hir::ExprKind::FieldAccess(base, ident) => {
+                self.visit_expr(base, ctx);
+                let field_name = ident.as_str();
+                let base_ty = base.ty.kind.clone();
+                expr.ty.kind =
+                    self.check_field_access(&base_ty, field_name, expr.hir_id, expr.span);
+            }
+            hir::ExprKind::Implements(inner_expr, _path) => {
+                self.visit_expr(inner_expr, ctx);
+                let result_ty = TyKind::Primitive(PrimTy::Bool);
+                expr.ty.kind = result_ty.clone();
+                self.type_table.insert(
+                    expr.hir_id,
+                    TypeInfo {
+                        ty: Ty {
+                            kind: result_ty,
+                            ..Ty::default()
+                        },
+                    },
+                );
             }
             _ => {
                 walk_expr(self, expr, ctx);

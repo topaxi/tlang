@@ -61,6 +61,13 @@ pub enum TypeError {
         actual: String,
         span: Span,
     },
+    /// Field does not exist on the struct type.
+    UnknownField {
+        field: String,
+        type_name: String,
+        available: Vec<String>,
+        span: Span,
+    },
 }
 
 impl TypeError {
@@ -76,7 +83,8 @@ impl TypeError {
             | TypeError::BindingTypeMismatch { span, .. }
             | TypeError::ArgumentCountMismatch { span, .. }
             | TypeError::ArgumentTypeMismatch { span, .. }
-            | TypeError::ReturnTypeMismatch { span, .. } => *span,
+            | TypeError::ReturnTypeMismatch { span, .. }
+            | TypeError::UnknownField { span, .. } => *span,
         }
     }
 
@@ -131,6 +139,17 @@ impl TypeError {
             } => {
                 format!(
                     "return type mismatch: function declares `→ {expected}`, but returns `{actual}`"
+                )
+            }
+            TypeError::UnknownField {
+                field,
+                type_name,
+                available,
+                ..
+            } => {
+                format!(
+                    "unknown field `{field}` on struct `{type_name}`; available fields: {}",
+                    available.join(", ")
                 )
             }
         }
