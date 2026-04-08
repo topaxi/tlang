@@ -2060,9 +2060,9 @@ dependencies = [
 
 [[package]]
 name = "timezone_provider"
-version = "0.2.1"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5126ed50e02202ecb7483e7432303f38fdc69334919af590817315708f765572"
+checksum = "c48f9b04628a2b813051e4dfe97c65281e49625eabd09ec343190e31e399a8c2"
 dependencies = [
  "combine",
  "jiff-tzdb",
