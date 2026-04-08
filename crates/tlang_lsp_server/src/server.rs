@@ -1041,6 +1041,37 @@ mod tests {
     }
 
     #[test]
+    fn goto_definition_position_is_zero_based() {
+        // `add` is defined on line 1 at 0-based column 3 (i.e. `fn add(...)`)
+        // Goto definition from a call on line 2 should point to that position.
+        let source = "fn f() { 1 }\nfn add(a, b) { a + b }\nadd(1, 2);";
+        let state = setup_server_with_source(source);
+        // Resolve `add` on line 2, col 0 (0-based)
+        let resolved = ServerState::resolve_symbol(
+            &state,
+            &test_uri(),
+            lsp_types::Position {
+                line: 2,
+                character: 0,
+            },
+        )
+        .expect("should resolve `add` call");
+
+        let goto = resolved.to_goto_definition(&test_uri()).unwrap();
+        match goto {
+            GotoDefinitionResponse::Scalar(loc) => {
+                // Definition is `fn add(...)` on line 1, `add` starts at 0-based col 3.
+                assert_eq!(loc.range.start.line, 1, "definition should be on line 1");
+                assert_eq!(
+                    loc.range.start.character, 3,
+                    "definition column should be 0-based (3 = position of 'a' in 'add')"
+                );
+            }
+            _ => panic!("expected scalar location"),
+        }
+    }
+
+    #[test]
     fn resolve_symbol_unknown_document_returns_none() {
         let state = setup_server_with_source("fn f() { }");
         let unknown_uri = Url::parse("file:///unknown.tlang").unwrap();

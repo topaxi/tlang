@@ -5,18 +5,26 @@ use tlang_span::Span;
 
 /// Convert a tlang `Span` to an LSP `Range`.
 ///
-/// `Span.start_lc` / `end_lc` are 0-indexed line+column. The LSP protocol
-/// uses 0-indexed line + UTF-16 character offset. For ASCII-only identifiers
-/// and keywords (the common case) these are identical.
+/// The lexer uses 0-based columns on line 0 but 1-based columns on subsequent
+/// lines (`current_column` resets to 1 after each newline).  LSP positions are
+/// always 0-based, so we adjust columns on lines > 0.
 pub fn span_to_range(span: &Span) -> Range {
     Range {
         start: Position {
             line: span.start_lc.line,
-            character: span.start_lc.column,
+            character: if span.start_lc.line > 0 {
+                span.start_lc.column.saturating_sub(1)
+            } else {
+                span.start_lc.column
+            },
         },
         end: Position {
             line: span.end_lc.line,
-            character: span.end_lc.column,
+            character: if span.end_lc.line > 0 {
+                span.end_lc.column.saturating_sub(1)
+            } else {
+                span.end_lc.column
+            },
         },
     }
 }
