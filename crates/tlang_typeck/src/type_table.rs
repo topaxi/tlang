@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use tlang_ast::node::Ident;
 use tlang_hir::Ty;
 use tlang_span::HirId;
 
@@ -14,11 +15,36 @@ pub struct TypeInfo {
     pub ty: Ty,
 }
 
+/// Metadata for a struct declaration, mapping field names to types.
+#[derive(Debug, Clone)]
+pub struct StructInfo {
+    pub name: Ident,
+    pub fields: Vec<(Ident, Ty)>,
+}
+
+/// Metadata for a single enum variant.
+#[derive(Debug, Clone)]
+pub struct VariantInfo {
+    pub name: Ident,
+    pub parameters: Vec<(Ident, Ty)>,
+}
+
+/// Metadata for an enum declaration, mapping variant names to their info.
+#[derive(Debug, Clone)]
+pub struct EnumInfo {
+    pub name: Ident,
+    pub variants: Vec<VariantInfo>,
+}
+
 /// Maps `HirId → TypeInfo` for supplementary type data (function signatures,
 /// struct field types, etc.).
 #[derive(Debug, Default)]
 pub struct TypeTable {
     entries: HashMap<HirId, TypeInfo>,
+    /// Struct declarations keyed by the struct's `HirId`.
+    struct_info: HashMap<HirId, StructInfo>,
+    /// Enum declarations keyed by the enum's `HirId`.
+    enum_info: HashMap<HirId, EnumInfo>,
 }
 
 impl TypeTable {
@@ -44,5 +70,25 @@ impl TypeTable {
             .get(hir_id)
             .map(|info| &info.ty)
             .unwrap_or(&UNKNOWN)
+    }
+
+    /// Register struct declaration metadata.
+    pub fn insert_struct_info(&mut self, hir_id: HirId, info: StructInfo) {
+        self.struct_info.insert(hir_id, info);
+    }
+
+    /// Look up struct info by the struct declaration's `HirId`.
+    pub fn get_struct_info(&self, hir_id: &HirId) -> Option<&StructInfo> {
+        self.struct_info.get(hir_id)
+    }
+
+    /// Register enum declaration metadata.
+    pub fn insert_enum_info(&mut self, hir_id: HirId, info: EnumInfo) {
+        self.enum_info.insert(hir_id, info);
+    }
+
+    /// Look up enum info by the enum declaration's `HirId`.
+    pub fn get_enum_info(&self, hir_id: &HirId) -> Option<&EnumInfo> {
+        self.enum_info.get(hir_id)
     }
 }

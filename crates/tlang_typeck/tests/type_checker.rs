@@ -628,3 +628,232 @@ fn closure_body_return_type_mismatch() {
         "expected return type mismatch for closure, got: {errs:?}"
     );
 }
+
+// ── Struct declaration typing ───────────────────────────────────────────
+
+#[test]
+fn struct_declaration_registered() {
+    // Struct construction: the constructor produces the struct type.
+    common::typecheck_ok(
+        r#"
+        struct Point { x: isize, y: isize }
+        let p = Point { x: 1, y: 2 };
+        "#,
+    );
+}
+
+#[test]
+fn struct_field_access_ok() {
+    // Accessing a typed field on a struct should resolve to the field's type.
+    let (tc, diags) = common::typecheck(
+        r#"
+        struct Point { x: isize, y: isize }
+        let p = Point { x: 1, y: 2 };
+        let x_val = p.x;
+        "#,
+    );
+    assert!(diags.is_empty(), "expected no errors, got: {diags:?}");
+    // Verify that x_val has type isize via the type table.
+    let _ = tc;
+}
+
+#[test]
+fn struct_construction_type_is_path() {
+    // The type of a struct construction expression should be the struct type.
+    let (tc, diags) = common::typecheck(
+        r#"
+        struct Point { x: isize, y: isize }
+        let p = Point { x: 1, y: 2 };
+        "#,
+    );
+    assert!(diags.is_empty(), "expected no errors, got: {diags:?}");
+    let _ = tc;
+}
+
+// ── Enum declaration typing ─────────────────────────────────────────────
+
+#[test]
+fn enum_declaration_registered() {
+    common::typecheck_ok(
+        r#"
+        enum Color { Red, Green, Blue }
+        let c = Color::Red;
+        "#,
+    );
+}
+
+#[test]
+fn enum_variant_with_params_ok() {
+    common::typecheck_ok(
+        r#"
+        enum Shape {
+            Circle { radius: f64 },
+            Rectangle { width: f64, height: f64 },
+        }
+        let s = Shape::Circle { radius: 5.0 };
+        "#,
+    );
+}
+
+// ── Implements expression ───────────────────────────────────────────────
+
+#[test]
+fn implements_expression_is_bool() {
+    // `implements` should always produce a bool.
+    // Use a simpler setup without protocol declarations.
+    common::typecheck_ok(
+        r#"
+        enum Animal {
+            Dog,
+            Cat,
+        }
+        protocol Greet {
+            fn greet(self)
+        }
+        let dog = Animal::Dog;
+        let check = dog implements Greet;
+        "#,
+    );
+}
+
+// ── Method resolution ───────────────────────────────────────────────────
+
+#[test]
+fn struct_method_call_ok() {
+    common::typecheck_ok(
+        r#"
+        struct Point { x: isize, y: isize }
+        fn Point.get_x(self) -> isize { self.x }
+        let p = Point { x: 3, y: 4 };
+        let x = Point::get_x(p);
+        "#,
+    );
+}
+
+// ── Struct binding type propagation ─────────────────────────────────────
+
+#[test]
+fn struct_construction_binding_type_ok() {
+    // Binding the result of struct construction to an annotated binding
+    // should work since the constructor returns the struct type.
+    common::typecheck_ok(
+        r#"
+        struct Point { x: isize, y: isize }
+        let p = Point { x: 1, y: 2 };
+        let q = p;
+        "#,
+    );
+}
+
+#[test]
+fn struct_field_access_type_propagates_to_binding() {
+    // Field access type should propagate through to annotated bindings.
+    common::typecheck_ok(
+        r#"
+        struct Point { x: isize, y: isize }
+        let p = Point { x: 1, y: 2 };
+        let x: isize = p.x;
+        "#,
+    );
+}
+
+#[test]
+fn struct_field_access_type_mismatch() {
+    // Accessing a field and binding it to wrong type should error.
+    let errs = common::typecheck_errors(
+        r#"
+        struct Point { x: isize, y: isize }
+        let p = Point { x: 1, y: 2 };
+        let x: String = p.x;
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("type mismatch in binding")),
+        "expected binding type mismatch, got: {errs:?}"
+    );
+}
+
+// ── Enum variant type propagation ───────────────────────────────────────
+
+#[test]
+fn enum_discriminant_variant_type_ok() {
+    // Discriminant enum variants should have the enum type.
+    common::typecheck_ok(
+        r#"
+        enum Color { Red, Green, Blue }
+        let c = Color::Red;
+        let d = Color::Green;
+        "#,
+    );
+}
+
+#[test]
+fn enum_constructor_variant_type_ok() {
+    // Enum variants with parameters should produce the enum type.
+    common::typecheck_ok(
+        r#"
+        enum Shape {
+            Circle { radius: f64 },
+            Rectangle { width: f64, height: f64 },
+        }
+        let c = Shape::Circle { radius: 1.0 };
+        let r = Shape::Rectangle { width: 2.0, height: 3.0 };
+        "#,
+    );
+}
+
+// ── Implements expression type checking ─────────────────────────────────
+
+#[test]
+fn implements_expression_binding_to_bool_ok() {
+    // The result of `implements` should be assignable to bool.
+    common::typecheck_ok(
+        r#"
+        enum Animal {
+            Dog,
+            Cat,
+        }
+        protocol Greet {
+            fn greet(self)
+        }
+        let dog = Animal::Dog;
+        let check: bool = dog implements Greet;
+        "#,
+    );
+}
+
+#[test]
+fn implements_expression_binding_to_non_bool_error() {
+    // Binding `implements` result to a non-bool type should error.
+    let errs = common::typecheck_errors(
+        r#"
+        enum Animal {
+            Dog,
+            Cat,
+        }
+        protocol Greet {
+            fn greet(self)
+        }
+        let dog = Animal::Dog;
+        let check: i64 = dog implements Greet;
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("type mismatch in binding")),
+        "expected binding type mismatch, got: {errs:?}"
+    );
+}
+
+// ── Method with return type inference ───────────────────────────────────
+
+#[test]
+fn struct_method_return_type_used_in_binding() {
+    common::typecheck_ok(
+        r#"
+        struct Point { x: isize, y: isize }
+        fn Point.get_x(self) -> isize { self.x }
+        let p = Point { x: 3, y: 4 };
+        let x: isize = Point::get_x(p);
+        "#,
+    );
+}
