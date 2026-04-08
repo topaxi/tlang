@@ -182,3 +182,52 @@ pub struct CodemirrorDefinitionLocation {
     /// UTF-16 code unit offset of the end of the definition.
     pub to: u32,
 }
+
+/// An inlay hint formatted for CodeMirror 6.
+///
+/// The `position` is a UTF-16 code unit offset matching JavaScript string
+/// positions, so it can be used directly with CodeMirror's text model.
+#[derive(Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi)]
+pub struct CodemirrorInlayHint {
+    /// UTF-16 code unit offset where the hint should be displayed.
+    pub position: u32,
+    /// The label text to display (e.g. `: i64`, `-> bool`).
+    pub label: String,
+    /// The kind of hint: `"type"` for type annotations, `"returnType"` for
+    /// function return types.
+    pub kind: String,
+}
+
+/// Convert a (line, column) pair from the analysis layer to a byte offset.
+///
+/// The analysis layer produces 0-based (line, column) positions from the
+/// lexer's `LineColumn` (which uses 0-based lines but 0-based columns for
+/// spans).  We compute the byte offset and then convert to UTF-16.
+pub(crate) fn line_column_to_byte_offset(source: &str, line: u32, column: u32) -> u32 {
+    let mut current_line = 0u32;
+    let mut byte_pos = 0usize;
+
+    for (i, ch) in source.char_indices() {
+        if current_line == line {
+            // Now count `column` characters from this position.
+            for (col, (j, c)) in source[i..].char_indices().enumerate() {
+                if col as u32 >= column {
+                    return (i + j) as u32;
+                }
+                if c == '\n' {
+                    // Column overflows the line — clamp to line end.
+                    return (i + j) as u32;
+                }
+                byte_pos = i + j + c.len_utf8();
+            }
+            // Reached end of source while counting columns.
+            return byte_pos as u32;
+        }
+        if ch == '\n' {
+            current_line += 1;
+        }
+    }
+
+    source.len() as u32
+}
