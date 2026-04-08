@@ -1095,4 +1095,56 @@ mod tests {
         // Line 1 column 3 in "abc\ndef" is 'd', 'e', 'f' → UTF-16 offset 3.
         assert_eq!(char_column_to_utf16("abc\ndef", 1, 3), 3);
     }
+
+    #[test]
+    fn inlay_hint_utf16_conversion_non_bmp() {
+        // '😀' is U+1F600 — a non-BMP character that takes 2 UTF-16 code units.
+        // Source: "😀x = 1;" — column 1 (the 'x') should be UTF-16 offset 2.
+        let source = "😀x = 1;";
+        assert_eq!(char_column_to_utf16(source, 0, 1), 2);
+    }
+
+    #[test]
+    fn inlay_hint_range_end_exclusive_at_line_boundary() {
+        // When the client sends end = { line: 1, character: 0 }, it means
+        // "up to but not including line 1".  We should only see hints on
+        // line 0, not line 1.
+        let source = "let a = 1;\nlet b = 2;\nlet c = 3;";
+        let mut state = setup_server_with_source(source);
+        ServerState::ensure_typed_hir(&mut state, &test_uri());
+
+        let doc = state.store.get(&test_uri()).unwrap();
+        let typed_hir = doc.typed_hir.as_ref().unwrap().as_ref().unwrap();
+        let all_hints = tlang_analysis::inlay_hints::collect_inlay_hints(typed_hir, None);
+        // Verify there are hints on line 1 in the full set.
+        assert!(
+            all_hints.iter().any(|h| h.line == 1),
+            "expected hints on line 1, got: {all_hints:?}"
+        );
+
+        // Request range { start: { line: 0, char: 0 }, end: { line: 1, char: 0 } }
+        // This is exclusive — should only return hints on line 0.
+        let range = lsp_types::Range {
+            start: lsp_types::Position {
+                line: 0,
+                character: 0,
+            },
+            end: lsp_types::Position {
+                line: 1,
+                character: 0,
+            },
+        };
+        let end_line = if range.end.character == 0 && range.end.line > range.start.line {
+            range.end.line.saturating_sub(1)
+        } else {
+            range.end.line
+        };
+        let line_range = Some((range.start.line, end_line));
+        let filtered = tlang_analysis::inlay_hints::collect_inlay_hints(typed_hir, line_range);
+        assert!(
+            filtered.iter().all(|h| h.line < range.end.line),
+            "all hints should be before end line {}, got: {filtered:?}",
+            range.end.line
+        );
+    }
 }
