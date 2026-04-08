@@ -129,29 +129,29 @@ Module(
               )),
               parameters: [],
               span: Span(
-                start: 0,
-                end: 0,
+                start: 14,
+                end: 17,
                 start_lc: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 14,
                 ),
                 end_lc: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 17,
                 ),
               ),
             ),
           ],
           span: Span(
-            start: 0,
-            end: 0,
+            start: 7,
+            end: 18,
             start_lc: LineColumn(
               line: 0,
-              column: 0,
+              column: 7,
             ),
             end_lc: LineColumn(
               line: 0,
-              column: 0,
+              column: 18,
             ),
           ),
         )),

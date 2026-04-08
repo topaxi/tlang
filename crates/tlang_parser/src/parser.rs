@@ -1700,10 +1700,14 @@ impl<'src> Parser<'src> {
 
         match self.current_token_kind() {
             TokenKind::Identifier => {
+                let mut span = self.create_span_from_current_token();
                 let identifier = self.parse_path();
                 let parameters = self.parse_type_annotation_parameters();
+                self.end_span_from_previous_token(&mut span);
 
-                Ty::new(self.unique_id(), identifier).with_parameters(parameters)
+                Ty::new(self.unique_id(), identifier)
+                    .with_parameters(parameters)
+                    .with_span(span)
             }
             _ => Ty::new_unknown(self.unique_id()),
         }

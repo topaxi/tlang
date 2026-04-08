@@ -208,4 +208,48 @@ mod tests {
             "should resolve to a callable"
         );
     }
+
+    #[test]
+    fn resolve_return_type_annotation() {
+        // Hovering on `Vector` in `-> Vector` should resolve to the struct.
+        let source = "struct Vector { x: i64 }\nfn Vector::new(x: i64) -> Vector { Vector { x } }";
+        // "-> Vector" on line 1 — the "Vector" type starts at 0-based col 26
+        let resolved = setup_and_resolve(source, 1, 26);
+        assert!(
+            resolved.is_some(),
+            "should resolve return type annotation 'Vector'"
+        );
+        let resolved = resolved.unwrap();
+        assert_eq!(resolved.name, "Vector");
+        assert_eq!(resolved.def_kind, DefKind::Struct);
+    }
+
+    #[test]
+    fn resolve_parameter_type_annotation() {
+        // Hovering on `Vector` in `other: Vector` should resolve to the struct.
+        let source =
+            "struct Vector { x: i64 }\nfn Vector.add(self, other: Vector) -> Vector { self }";
+        // `Vector` type in `other: Vector` on line 1 — the "V" starts at 0-based col 27
+        let resolved = setup_and_resolve(source, 1, 27);
+        assert!(
+            resolved.is_some(),
+            "should resolve parameter type annotation 'Vector'"
+        );
+        let resolved = resolved.unwrap();
+        assert_eq!(resolved.name, "Vector");
+        assert_eq!(resolved.def_kind, DefKind::Struct);
+    }
+
+    #[test]
+    fn resolve_primitive_type_annotation_not_found() {
+        // Primitive types like `i64` are not in the symbol index,
+        // so they don't resolve to a definition.
+        let source = "struct Vector { x: i64 }\nfn Vector::new(x: i64) -> Vector { Vector { x } }";
+        // `i64` in `x: i64` on line 1 — starts at 0-based col 18
+        let resolved = setup_and_resolve(source, 1, 18);
+        assert!(
+            resolved.is_none(),
+            "primitive type 'i64' should not resolve (not a user-defined symbol)"
+        );
+    }
 }

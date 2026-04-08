@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use tlang_ast::{
-    node::{FunctionDeclaration, ImplBlock, Module, PatKind, Res, StmtKind, Ty, TyKind},
+    node::{
+        ExprKind, FunctionDeclaration, Ident, ImplBlock, Module, PatKind, Path, Res, StmtKind, Ty,
+        TyKind,
+    },
     token::Literal,
     visit_mut::{VisitorMut, walk_fn_decl},
 };
@@ -33,7 +36,21 @@ pub struct FnParamTypeInference {
 }
 
 impl VisitorMut for FnParamTypeInference {
+    fn visit_fn_decl(&mut self, decl: &mut FunctionDeclaration) {
+        // Infer `self` parameter type from the method's qualified name.
+        // Instance methods like `fn Vector.add(self, ...)` have a
+        // FieldExpression name — extract the struct type from the base path.
+        annotate_self_param(decl);
+
+        walk_fn_decl(self, decl);
+    }
+
     fn visit_fn_decls(&mut self, decls: &mut [FunctionDeclaration]) {
+        // Annotate `self` parameters before cross-overload inference.
+        for decl in decls.iter_mut() {
+            annotate_self_param(decl);
+        }
+
         let num_params = decls.iter().map(|d| d.parameters.len()).max().unwrap_or(0);
 
         for i in 0..num_params {
@@ -83,6 +100,40 @@ impl VisitorMut for FnParamTypeInference {
                     impl_block.methods[i] = group[pos].clone();
                 }
             }
+        }
+    }
+}
+
+/// Annotates the `self` parameter of an instance method with the struct type
+/// inferred from the function's qualified name.
+///
+/// For `fn Vector.add(self, ...)`, the name is a `FieldExpression` with
+/// base path `Vector` — the `self` parameter gets type annotation `Vector`.
+fn annotate_self_param(decl: &mut FunctionDeclaration) {
+    let struct_path = match &decl.name.kind {
+        ExprKind::FieldExpression(field_expr) => field_expr.base.path().cloned(),
+        _ => None,
+    };
+
+    let struct_path = match struct_path {
+        Some(p) => p,
+        None => return,
+    };
+
+    for param in &mut decl.parameters {
+        if matches!(param.pattern.kind, PatKind::_Self) && param.type_annotation.is_none() {
+            param.type_annotation = Some(Ty {
+                id: NodeId::new(1),
+                kind: TyKind::Path(Path::new(
+                    struct_path
+                        .segments
+                        .iter()
+                        .map(|s| Ident::new(s.as_str(), Default::default()))
+                        .collect(),
+                )),
+                parameters: vec![],
+                span: Default::default(),
+            });
         }
     }
 }
@@ -160,8 +211,6 @@ fn infer_param_type(
     if type_names.is_empty() {
         return None;
     }
-
-    use tlang_ast::node::{Ident, Path};
 
     let make_path = |name: &str| {
         let res = if builtin_types::ALL.contains(&name) {

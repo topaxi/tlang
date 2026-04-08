@@ -890,4 +890,19 @@ mod tests {
         let ty = type_at_definition(&typed_hir, 0, 0);
         assert!(ty.is_none());
     }
+
+    #[test]
+    fn type_at_definition_self_parameter() {
+        // `self` in `fn Vector.add(self, ...)` should be typed as `Vector`.
+        let source =
+            "struct Vector { x: i64 }\nfn Vector.add(self, other: Vector) -> Vector { self }";
+        let typed_hir = typed_hir_for(source);
+        // `self` is at line 1, col 14 (0-based editor position)
+        let ty = type_at_definition(&typed_hir, 1, 14);
+        assert_eq!(
+            ty.as_deref(),
+            Some("Vector"),
+            "self parameter should be typed as Vector"
+        );
+    }
 }

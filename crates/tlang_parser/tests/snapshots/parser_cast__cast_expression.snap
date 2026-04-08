@@ -126,15 +126,15 @@ Module(
             )),
             parameters: [],
             span: Span(
-              start: 0,
-              end: 0,
+              start: 17,
+              end: 20,
               start_lc: LineColumn(
                 line: 0,
-                column: 0,
+                column: 17,
               ),
               end_lc: LineColumn(
                 line: 0,
-                column: 0,
+                column: 20,
               ),
             ),
           )),

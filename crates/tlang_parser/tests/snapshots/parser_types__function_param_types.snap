@@ -129,15 +129,15 @@ Module(
               )),
               parameters: [],
               span: Span(
-                start: 0,
-                end: 0,
+                start: 10,
+                end: 13,
                 start_lc: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 10,
                 ),
                 end_lc: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 13,
                 ),
               ),
             )),
@@ -223,15 +223,15 @@ Module(
               )),
               parameters: [],
               span: Span(
-                start: 0,
-                end: 0,
+                start: 18,
+                end: 21,
                 start_lc: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 18,
                 ),
                 end_lc: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 21,
                 ),
               ),
             )),
@@ -286,15 +286,15 @@ Module(
           )),
           parameters: [],
           span: Span(
-            start: 0,
-            end: 0,
+            start: 26,
+            end: 29,
             start_lc: LineColumn(
               line: 0,
-              column: 0,
+              column: 26,
             ),
             end_lc: LineColumn(
               line: 0,
-              column: 0,
+              column: 29,
             ),
           ),
         )),

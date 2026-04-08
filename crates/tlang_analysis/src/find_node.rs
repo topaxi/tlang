@@ -183,6 +183,38 @@ impl<'ast> Visitor<'ast> for NodeFinder {
         }
     }
 
+    fn visit_ty(&mut self, ty: &'ast node::Ty, _ctx: &mut ()) {
+        // Type annotations (e.g. `-> Vector`, `x: i64`) contain paths that
+        // should be hoverable / goto-definitionable.  The default `walk_ty`
+        // only descends into generic parameters, not the path itself.
+        match &ty.kind {
+            node::TyKind::Path(path) => {
+                if self.contains_position(&ty.span) {
+                    self.record_ident(&path.to_string(), &ty.span);
+                }
+            }
+            node::TyKind::Union(paths) => {
+                for path in paths {
+                    if self.contains_position(&path.span) {
+                        self.record_ident(&path.to_string(), &path.span);
+                    }
+                }
+            }
+            node::TyKind::Unknown => {}
+        }
+        // Still walk generic type parameters.
+        for param in &ty.parameters {
+            self.visit_ty(param, &mut ());
+        }
+    }
+
+    fn visit_fn_ret_ty(&mut self, annotation: &'ast node::Ty, ctx: &mut ()) {
+        // The default visit_fn_ret_ty calls walk_ty which only recurses into
+        // generic parameters.  We must call visit_ty first so the return type
+        // path (e.g. `-> Vector`) is recorded by our visit_ty override.
+        self.visit_ty(annotation, ctx);
+    }
+
     fn visit_fn_decl(&mut self, declaration: &'ast node::FunctionDeclaration, ctx: &mut ()) {
         // Walk the declaration using the standard walk which handles
         // enter_scope / leave_scope for the function body.
@@ -391,6 +423,47 @@ Vector::new(1, 2)
             add_entry.is_some(),
             "should find field 'add' with field_base='v1' on line 3.\nAll found: {:?}",
             found_items
+        );
+    }
+
+    #[test]
+    fn find_return_type_annotation() {
+        // `-> Vector` in a function signature should be hoverable.
+        let source = "struct Vector { x: i64 }\nfn Vector::new(x: i64) -> Vector { Vector { x } }";
+
+        // Line 1: `fn Vector::new(x: i64) -> Vector { ... }`
+        // The return type annotation "Vector" is after "-> "
+        let found: Vec<(u32, String)> = (0..50)
+            .filter_map(|col| parse_and_find(source, 1, col).map(|f| (col, f.name)))
+            .collect();
+
+        // There should be a "Vector" entry from the return type annotation
+        let return_type_entries: Vec<_> = found
+            .iter()
+            .filter(|(col, name)| name == "Vector" && *col > 25)
+            .collect();
+        assert!(
+            !return_type_entries.is_empty(),
+            "should find 'Vector' return type annotation on line 1.\nAll found: {:?}",
+            found
+        );
+    }
+
+    #[test]
+    fn find_parameter_type_annotation() {
+        // `: i64` in a parameter should be hoverable.
+        let source = "fn add(x: i64, y: i64) -> i64 { x + y }";
+
+        let found: Vec<(u32, String)> = (0..40)
+            .filter_map(|col| parse_and_find(source, 0, col).map(|f| (col, f.name)))
+            .collect();
+
+        // There should be "i64" entries from parameter type annotations
+        let i64_entries: Vec<_> = found.iter().filter(|(_, name)| name == "i64").collect();
+        assert!(
+            i64_entries.len() >= 2,
+            "should find at least 2 'i64' type annotations.\nAll found: {:?}",
+            found
         );
     }
 }
