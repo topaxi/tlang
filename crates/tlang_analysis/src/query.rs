@@ -25,16 +25,21 @@ pub struct ResolvedSymbol {
     pub def_span: Span,
     /// Whether the symbol is a builtin (no source location to jump to).
     pub builtin: bool,
+    /// Optional inferred type string (e.g. `"i64"`, `"Vector"`).
+    pub type_info: Option<String>,
 }
 
 impl ResolvedSymbol {
     /// Format the hover text for this symbol.
     ///
-    /// Returns a string like `(function) add/2` or `(parameter) x`.
+    /// When type information is available, includes it:
+    /// `(variable) v1: Vector` or `(function) add/2`.
     pub fn hover_text(&self) -> String {
         let kind_label = self.def_kind.to_string();
         if let Some(arity) = self.def_kind.arity() {
             format!("({kind_label}) {name}/{arity}", name = self.name)
+        } else if let Some(ty) = &self.type_info {
+            format!("({kind_label}) {name}: {ty}", name = self.name)
         } else {
             format!("({kind_label}) {name}", name = self.name)
         }
@@ -66,7 +71,27 @@ pub fn resolve_symbol(
     let found = find_node::find_node_at_position(module, line, lexer_column)?;
 
     // Look up the symbol in the scope's symbol table.
-    let entry = index.get_closest_by_name(found.scope_id, &found.name, found.span)?;
+    let entry = index
+        .get_closest_by_name(found.scope_id, &found.name, found.span)
+        .or_else(|| {
+            // When the cursor is on a field of a field-access expression
+            // (e.g. `v1.add`), the bare name `add` may not be in scope.
+            // Try to resolve the base variable to its defining type and
+            // attempt a qualified lookup like `Vector::add`.
+            let base_name = found.field_base.as_deref()?;
+            let base_entry = index.get_closest_by_name(found.scope_id, base_name, found.span)?;
+
+            // The base must be a struct to attempt qualified method lookup.
+            if base_entry.kind != DefKind::Struct {
+                // The base is a variable/parameter — try to find its type
+                // by looking for qualified names ending with `::field_name`.
+                return index.find_method_by_suffix(found.scope_id, &found.name, found.span);
+            }
+
+            // Base is a struct name itself (e.g. `Vector.add`)
+            let qualified = format!("{}::{}", base_name, found.name);
+            index.get_closest_by_name(found.scope_id, &qualified, found.span)
+        })?;
 
     Some(ResolvedSymbol {
         name: found.name,
@@ -74,6 +99,7 @@ pub fn resolve_symbol(
         def_kind: entry.kind,
         def_span: entry.defined_at,
         builtin: entry.builtin,
+        type_info: None,
     })
 }
 
@@ -150,5 +176,36 @@ mod tests {
         assert!(!resolved.builtin);
         // The def_span.start should be at the parameter `x` position (col 5).
         assert_eq!(resolved.def_span.start_lc.column, 5);
+    }
+
+    #[test]
+    fn resolve_multi_segment_path_vector_new() {
+        // `Vector::new` should resolve as a qualified name.
+        // tlang uses `fn Vector::new(...)` syntax for static methods
+        let source = "struct Vector { x: i64 }\nfn Vector::new(x: i64) -> Vector { Vector { x } }\nlet v = Vector::new(1);";
+        // Hover on `Vector` part of `Vector::new` at line 2, col 8 (0-based)
+        let resolved = setup_and_resolve(source, 2, 8);
+        assert!(resolved.is_some(), "should resolve Vector::new");
+        assert_eq!(resolved.unwrap().name, "Vector::new");
+    }
+
+    #[test]
+    fn resolve_field_expression_method() {
+        // `v1.add(v2)` — hovering on `add` should resolve to `Vector::add`.
+        // tlang uses `fn Vector.add(self, ...)` for instance methods
+        let source = "struct Vector { x: i64 }\nfn Vector.add(self, other) { self }\nlet v1 = Vector { x: 1 };\nv1.add(v1);";
+        // `add` on line 3, col 3 (0-based)
+        let resolved = setup_and_resolve(source, 3, 3);
+        assert!(
+            resolved.is_some(),
+            "should resolve field method call `v1.add`"
+        );
+        let resolved = resolved.unwrap();
+        // The method resolves to "Vector::add" in the symbol table.
+        assert_eq!(resolved.name, "add");
+        assert!(
+            resolved.def_kind.arity().is_some(),
+            "should resolve to a callable"
+        );
     }
 }

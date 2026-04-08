@@ -164,6 +164,88 @@ impl SymbolIndex {
 
         items
     }
+
+    /// Collect completion items for methods of a given type.
+    ///
+    /// Searches all scopes for symbols whose qualified name starts with
+    /// `type_name::` and have a callable kind (StructMethod, FunctionSelfRef,
+    /// etc.).  Returns items with just the method name as the label (not
+    /// the qualified `Type::method` form).
+    pub fn collect_method_completions(&self, type_name: &str) -> Vec<CompletionItem> {
+        let prefix = format!("{type_name}::");
+        let mut seen = HashSet::new();
+        let mut items = Vec::new();
+
+        for entries in self.scopes.values() {
+            for entry in entries {
+                if !entry.name.starts_with(prefix.as_str()) {
+                    continue;
+                }
+                // Only include callable symbols.
+                if entry.kind.arity().is_none() {
+                    continue;
+                }
+                let method_name = &entry.name[prefix.len()..];
+                if method_name.is_empty() {
+                    continue;
+                }
+                let item = CompletionItem {
+                    label: method_name.to_string(),
+                    kind: entry.kind,
+                    detail: completion_detail(entry.kind),
+                };
+                let key = (item.label.clone(), item.detail.clone());
+                if seen.insert(key) {
+                    items.push(item);
+                }
+            }
+        }
+
+        items.sort_by(|a, b| a.label.cmp(&b.label));
+        items
+    }
+
+    /// Find a method/function symbol whose qualified name ends with
+    /// `::method_name`.
+    ///
+    /// This is used as a fallback when the cursor is on a field expression
+    /// like `v1.add` and the bare name `add` doesn't resolve — we search
+    /// for any `X::add` in scope that is a method or function.
+    pub fn find_method_by_suffix(
+        &self,
+        scope_id: NodeId,
+        method_name: &str,
+        span: Span,
+    ) -> Option<SymbolEntry> {
+        let suffix = format!("::{method_name}");
+        let mut current = Some(scope_id);
+
+        while let Some(sid) = current {
+            if let Some(entries) = self.scopes.get(&sid) {
+                let matches: Vec<&SymbolEntry> = entries
+                    .iter()
+                    .filter(|e| e.name.ends_with(suffix.as_str()) && e.kind.arity().is_some())
+                    .collect();
+
+                if let Some(entry) = matches
+                    .iter()
+                    .rev()
+                    .find(|e| {
+                        e.defined_at.start_lc < span.start_lc
+                            || e.kind.arity().is_some()
+                            || e.builtin
+                    })
+                    .cloned()
+                {
+                    return Some(entry.clone());
+                }
+            }
+
+            current = self.parents.get(&sid).copied();
+        }
+
+        None
+    }
 }
 
 /// A protocol-agnostic completion item produced by the analysis layer.
@@ -291,5 +373,37 @@ mod tests {
     #[test]
     fn completion_detail_for_variable() {
         assert_eq!(completion_detail(DefKind::Variable), None);
+    }
+
+    #[test]
+    fn method_completions_for_struct() {
+        let source = "struct Vector {\n    x: f64,\n    y: f64,\n}\nfn Vector::new(x: f64, y: f64) -> Vector { Vector { x, y } }\nfn Vector.add(self, other: Vector) -> Vector {\n    Vector::new(self.x + other.x, self.y + other.y)\n}";
+        let result = crate::analyze(source, |_| {});
+        assert!(
+            result.parse_issues.is_empty(),
+            "parse issues: {:?}",
+            result.parse_issues
+        );
+        let index = SymbolIndex::from_analyzer(&result.analyzer);
+        let methods = index.collect_method_completions("Vector");
+        let labels: Vec<&str> = methods.iter().map(|m| m.label.as_str()).collect();
+        assert!(
+            labels.contains(&"new"),
+            "should include `new`, got: {labels:?}"
+        );
+        assert!(
+            labels.contains(&"add"),
+            "should include `add`, got: {labels:?}"
+        );
+    }
+
+    #[test]
+    fn method_completions_empty_for_unknown_type() {
+        let index = index_for("fn add(a, b) { a + b }");
+        let methods = index.collect_method_completions("Vector");
+        assert!(
+            methods.is_empty(),
+            "should be empty for unknown type, got: {methods:?}"
+        );
     }
 }

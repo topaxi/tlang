@@ -19,6 +19,10 @@ pub struct FoundNode {
     /// The innermost scope [`NodeId`] that contains the cursor position.
     /// Use this to look up the symbol in the semantic analyzer's symbol tables.
     pub scope_id: NodeId,
+    /// When the cursor is on the field of a field access expression (e.g.
+    /// `v1.add`), this holds the name of the base expression (e.g. `"v1"`).
+    /// Used by the query layer to attempt qualified method lookup.
+    pub field_base: Option<String>,
 }
 
 /// Walk the AST to find the identifier at the given `(line, column)` position.
@@ -78,7 +82,29 @@ impl NodeFinder {
                 name: name.to_string(),
                 span: *span,
                 scope_id: self.current_scope(),
+                field_base: None,
             });
+        }
+    }
+
+    fn record_field_ident(&mut self, name: &str, span: &Span, base_name: String) {
+        if self.contains_position(span) {
+            self.result = Some(FoundNode {
+                name: name.to_string(),
+                span: *span,
+                scope_id: self.current_scope(),
+                field_base: Some(base_name),
+            });
+        }
+    }
+
+    /// Extract a simple name from an expression (for field access base tracking).
+    fn expr_name(expr: &node::Expr) -> Option<String> {
+        match &expr.kind {
+            node::ExprKind::Path(path) if path.segments.len() == 1 => {
+                Some(path.segments[0].to_string())
+            }
+            _ => None,
         }
     }
 }
@@ -98,12 +124,27 @@ impl<'ast> Visitor<'ast> for NodeFinder {
         self.record_ident(ident.as_str(), &ident.span);
     }
 
-    fn visit_path(&mut self, path: &'ast node::Path, ctx: &mut ()) {
-        // Record the full qualified path name (e.g. "Enum::Variant") so that
-        // hover/goto resolves against the semantic declaration name.
-        self.record_ident(&path.to_string(), &path.span);
-        // Also walk individual segments so the most-specific match wins.
-        visit::walk_path(self, path, ctx);
+    fn visit_path(&mut self, path: &'ast node::Path, _ctx: &mut ()) {
+        if path.segments.len() > 1 {
+            // Multi-segment paths (e.g. "Vector::new", "math::sqrt") are
+            // registered as qualified names in the symbol table.  Walking
+            // individual segments would overwrite the result with a bare
+            // segment name like "new" that can't be resolved.
+            //
+            // Check each segment's span individually so the cursor position
+            // correctly selects the full qualified name only when hovering on
+            // one of its segments.
+            for seg in &path.segments {
+                if self.contains_position(&seg.span) {
+                    self.record_ident(&path.to_string(), &path.span);
+                    return;
+                }
+            }
+        } else {
+            // Single-segment paths: the full path name equals the segment
+            // name, so no ambiguity.
+            self.record_ident(&path.to_string(), &path.span);
+        }
     }
 
     fn visit_module(&mut self, module: &'ast Module, ctx: &mut ()) {
@@ -120,6 +161,24 @@ impl<'ast> Visitor<'ast> for NodeFinder {
     fn visit_expr(&mut self, expression: &'ast node::Expr, ctx: &mut ()) {
         // Only descend into expressions whose span contains the cursor.
         if self.contains_position(&expression.span) {
+            // For field access expressions (e.g. `v1.add`), if the cursor is
+            // on the field name, record the base expression name so the query
+            // layer can try qualified method lookup (e.g. `Vector::add`).
+            if let node::ExprKind::FieldExpression(ref field_expr) = expression.kind
+                && self.contains_position(&field_expr.field.span)
+                && let Some(base_name) = Self::expr_name(&field_expr.base)
+            {
+                self.record_field_ident(
+                    field_expr.field.as_str(),
+                    &field_expr.field.span,
+                    base_name,
+                );
+                // Still walk the base in case the cursor is actually
+                // on the base (the field ident record only sticks if
+                // the cursor is on the field span).
+                self.visit_expr(&field_expr.base, ctx);
+                return;
+            }
             visit::walk_expr(self, expression, ctx);
         }
     }
@@ -201,5 +260,60 @@ mod tests {
         let found = parse_and_find(source, 2, 3);
         assert!(found.is_some(), "should find 'x' at (2,3)");
         assert_eq!(found.unwrap().name, "x");
+    }
+
+    #[test]
+    fn find_multi_segment_path() {
+        // tlang uses `fn Vector::new(...)` syntax for static methods
+        let source = "struct Vector { x: i64 }\nfn Vector::new(x: i64) -> Vector { Vector { x } }\nlet v = Vector::new(1);";
+
+        let result = analyze(source, |_| {});
+        assert!(
+            result.module.is_some(),
+            "parse failed: {:?}",
+            result.parse_issues
+        );
+
+        // "Vector::new" call on line 2
+        // Scan line 2 to verify Vector::new is found
+        let found_cols: Vec<(u32, String)> = (0..25)
+            .filter_map(|col| parse_and_find(source, 2, col).map(|f| (col, f.name)))
+            .collect();
+        let vec_new_entries: Vec<_> = found_cols
+            .iter()
+            .filter(|(_, name)| name == "Vector::new")
+            .collect();
+        assert!(
+            !vec_new_entries.is_empty(),
+            "should find 'Vector::new' on line 2.\nAll found: {:?}",
+            found_cols
+        );
+    }
+
+    #[test]
+    fn find_field_expression_records_base() {
+        // `v1.add` should record field_base = "v1" when cursor is on "add"
+        let source = "struct Vector { x: i64 }\nfn Vector.add(self, other) { self }\nlet v1 = Vector { x: 1 };\nv1.add(v1);";
+
+        let result = analyze(source, |_| {});
+        assert!(
+            result.module.is_some(),
+            "parse failed: {:?}",
+            result.parse_issues
+        );
+
+        // Scan line 3 to find `add` with field_base = "v1"
+        let found_items: Vec<(u32, String, Option<String>)> = (0..15)
+            .filter_map(|col| parse_and_find(source, 3, col).map(|f| (col, f.name, f.field_base)))
+            .collect();
+
+        let add_entry = found_items
+            .iter()
+            .find(|(_, name, fb)| name == "add" && fb.as_deref() == Some("v1"));
+        assert!(
+            add_entry.is_some(),
+            "should find field 'add' with field_base='v1' on line 3.\nAll found: {:?}",
+            found_items
+        );
     }
 }

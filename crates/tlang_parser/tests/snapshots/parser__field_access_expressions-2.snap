@@ -82,14 +82,14 @@ Module(
             trailing_comments: [],
             span: Span(
               start: 0,
-              end: 0,
+              end: 7,
               start_lc: LineColumn(
                 line: 0,
                 column: 0,
               ),
               end_lc: LineColumn(
                 line: 0,
-                column: 0,
+                column: 7,
               ),
             ),
           ),

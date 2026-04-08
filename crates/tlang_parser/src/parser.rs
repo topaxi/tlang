@@ -2198,22 +2198,28 @@ impl<'src> Parser<'src> {
                     self.advance();
                     lhs.trailing_comments = self.parse_comments();
                     let field_name = self.parse_identifier();
+                    let mut field_span = span;
+                    self.end_span_from_previous_token(&mut field_span);
                     lhs = node::expr!(
                         self.unique_id(),
                         FieldExpression(Box::new(FieldAccessExpression {
                             base: lhs,
                             field: field_name,
                         }))
-                    );
+                    )
+                    .with_span(field_span);
                 }
                 TokenKind::LBracket => {
                     self.advance();
                     let index = self.parse_expression_with_precedence(0, Associativity::Left);
                     self.consume_token(TokenKind::RBracket);
+                    let mut index_span = span;
+                    self.end_span_from_previous_token(&mut index_span);
                     lhs = node::expr!(
                         self.unique_id(),
                         IndexExpression(Box::new(IndexAccessExpression { base: lhs, index }))
-                    );
+                    )
+                    .with_span(index_span);
                 }
                 TokenKind::LParen => {
                     lhs = self.parse_call_expression(lhs);

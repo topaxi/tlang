@@ -134,7 +134,10 @@ impl ServerState {
                     )),
                     hover_provider: Some(HoverProviderCapability::Simple(true)),
                     definition_provider: Some(lsp_types::OneOf::Left(true)),
-                    completion_provider: Some(CompletionOptions::default()),
+                    completion_provider: Some(CompletionOptions {
+                        trigger_characters: Some(vec![".".into(), ":".into()]),
+                        ..CompletionOptions::default()
+                    }),
                     inlay_hint_provider: Some(lsp_types::OneOf::Left(true)),
                     ..ServerCapabilities::default()
                 },
@@ -210,8 +213,32 @@ impl ServerState {
     > {
         let uri = &params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
-        let result = Self::resolve_symbol(state, uri, pos);
-        Box::pin(async move { Ok(result.map(|info| info.to_hover())) })
+
+        // Ensure typed HIR is available for type enrichment.
+        Self::ensure_typed_hir(state, uri);
+
+        let mut resolved = Self::resolve_symbol(state, uri, pos);
+
+        // Enrich with type information from the typed HIR when available.
+        if let Some(ref mut sym) = resolved
+            && sym.type_info.is_none()
+            && let Some(doc) = state.store.get(uri)
+            && let Some(Some(typed_hir)) = doc.typed_hir.as_ref()
+        {
+            let def = &sym.def_span;
+            // def_span uses the lexer's mixed coordinate system;
+            // type_at_definition expects 0-based editor positions.
+            let def_line = def.start_lc.line;
+            let def_col = if def_line > 0 {
+                def.start_lc.column.saturating_sub(1)
+            } else {
+                def.start_lc.column
+            };
+            sym.type_info =
+                tlang_analysis::inlay_hints::type_at_definition(typed_hir, def_line, def_col);
+        }
+
+        Box::pin(async move { Ok(resolved.map(|info| info.to_hover())) })
     }
 
     fn on_goto_definition(
@@ -235,7 +262,21 @@ impl ServerState {
         Result<Option<CompletionResponse>, async_lsp::ResponseError>,
     > {
         let uri = &params.text_document_position.text_document.uri;
-        let items = Self::collect_completions(state, uri);
+        let pos = params.text_document_position.position;
+
+        // Check if this is a dot-triggered completion for method access.
+        let is_dot = params
+            .context
+            .as_ref()
+            .and_then(|ctx| ctx.trigger_character.as_deref())
+            == Some(".");
+
+        let items = if is_dot {
+            Self::collect_dot_completions(state, uri, pos)
+        } else {
+            Self::collect_completions(state, uri)
+        };
+
         Box::pin(async move { Ok(Some(CompletionResponse::Array(items))) })
     }
 
@@ -376,6 +417,99 @@ impl ServerState {
 
         index
             .collect_completion_items()
+            .into_iter()
+            .map(|item| CompletionItem {
+                label: item.label,
+                kind: Some(def_kind_to_completion_item_kind(item.kind)),
+                detail: item.detail,
+                ..CompletionItem::default()
+            })
+            .collect()
+    }
+
+    /// Collect dot-triggered method completions for a receiver expression.
+    ///
+    /// When the user types `v1.`, this extracts the identifier before the dot,
+    /// resolves its type via typed HIR, and returns methods of that type.
+    fn collect_dot_completions(
+        state: &mut Self,
+        uri: &Url,
+        pos: lsp_types::Position,
+    ) -> Vec<CompletionItem> {
+        let Some(doc) = state.store.get(uri) else {
+            return vec![];
+        };
+
+        // Extract the identifier before the dot from source text.
+        let receiver = extract_receiver_before_dot(&doc.source, pos);
+        let receiver = match receiver {
+            Some(r) => r,
+            None => return Self::collect_completions(state, uri),
+        };
+
+        // Resolve the receiver's type via symbol resolution. The receiver is
+        // a variable at `(pos.line, receiver_col)`.
+        let receiver_col = pos.character.saturating_sub(receiver.len() as u32 + 1);
+        let receiver_pos = lsp_types::Position::new(pos.line, receiver_col);
+        let resolved = Self::resolve_symbol(state, uri, receiver_pos);
+
+        // Try to get the type name from type info enrichment.
+        let type_name = resolved
+            .as_ref()
+            .and_then(|r| {
+                // First try the type_info field.
+                r.type_info.as_deref()
+            })
+            .or_else(|| {
+                // Fallback: use the DefKind::Struct name if the variable was
+                // declared with a struct type annotation.
+                resolved
+                    .as_ref()
+                    .filter(|r| matches!(r.def_kind, DefKind::Struct))
+                    .map(|r| r.name.as_str())
+            });
+
+        let type_name = match type_name {
+            Some(t) => t.to_string(),
+            None => {
+                // If we can't determine the type, try to get it from typed HIR.
+                Self::ensure_typed_hir(state, uri);
+                let doc = match state.store.get(uri) {
+                    Some(d) => d,
+                    None => return vec![],
+                };
+                match doc.typed_hir.as_ref().and_then(|t| t.as_ref()) {
+                    Some(typed_hir) => {
+                        let line = receiver_pos.line;
+                        let col = receiver_pos.character;
+                        // Adjust column for lexer coordinate system.
+                        let adj_col = if line > 0 { col + 1 } else { col };
+                        match tlang_analysis::inlay_hints::type_at_definition(
+                            typed_hir, line, adj_col,
+                        ) {
+                            Some(ty) => ty,
+                            None => return Self::collect_completions(state, uri),
+                        }
+                    }
+                    None => return Self::collect_completions(state, uri),
+                }
+            }
+        };
+
+        let Some(doc) = state.store.get(uri) else {
+            return vec![];
+        };
+        let Some(index) = doc.symbol_index.as_ref() else {
+            return vec![];
+        };
+
+        let methods = index.collect_method_completions(&type_name);
+        if methods.is_empty() {
+            // Fallback to general completions if no methods found.
+            return Self::collect_completions(state, uri);
+        }
+
+        methods
             .into_iter()
             .map(|item| CompletionItem {
                 label: item.label,
@@ -539,6 +673,42 @@ impl ResolvedSymbolLspExt for ResolvedSymbol {
             range,
         }))
     }
+}
+
+/// Extract the identifier immediately before a dot at the given cursor position.
+///
+/// When the user types `v1.` and triggers completion, the cursor is at the
+/// position after the dot.  This function scans backwards from just before the
+/// dot to extract the identifier (`v1` in this case).
+///
+/// Returns `None` if the character before the cursor is not a dot or if there
+/// is no valid identifier before it.
+fn extract_receiver_before_dot(source: &str, pos: lsp_types::Position) -> Option<String> {
+    // Find the line.
+    let line = source.lines().nth(pos.line as usize)?;
+    let col = pos.character as usize;
+
+    // The cursor is right after the dot, so the dot is at col-1.
+    if col == 0 || col > line.len() {
+        return None;
+    }
+    let before_dot = &line[..col - 1];
+
+    // Scan backwards for an identifier.
+    let end = before_dot.len();
+    let start = before_dot
+        .char_indices()
+        .rev()
+        .take_while(|(_, c)| c.is_alphanumeric() || *c == '_')
+        .last()
+        .map(|(i, _)| i)?;
+
+    let ident = &before_dot[start..end];
+    if ident.is_empty() {
+        return None;
+    }
+
+    Some(ident.to_string())
 }
 
 /// Map a [`DefKind`] to an LSP [`CompletionItemKind`].
@@ -967,6 +1137,41 @@ mod tests {
             def_kind_to_completion_item_kind(DefKind::ProtocolMethod(1)),
             CompletionItemKind::METHOD
         );
+    }
+
+    // ── Dot completion tests ───────────────────────────────────────────
+
+    #[test]
+    fn extract_receiver_simple() {
+        let source = "let v1 = Vector::new(1.0, 2.0)\nv1.";
+        let pos = lsp_types::Position {
+            line: 1,
+            character: 3,
+        };
+        assert_eq!(
+            extract_receiver_before_dot(source, pos),
+            Some("v1".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_receiver_no_dot() {
+        let source = "let v1 = 42";
+        let pos = lsp_types::Position {
+            line: 0,
+            character: 0,
+        };
+        assert_eq!(extract_receiver_before_dot(source, pos), None);
+    }
+
+    #[test]
+    fn extract_receiver_at_col_zero() {
+        let source = ".foo";
+        let pos = lsp_types::Position {
+            line: 0,
+            character: 0,
+        };
+        assert_eq!(extract_receiver_before_dot(source, pos), None);
     }
 
     // ── Inlay hint tests ───────────────────────────────────────────────
