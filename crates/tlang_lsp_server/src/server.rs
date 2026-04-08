@@ -242,10 +242,8 @@ impl ServerState {
     fn on_inlay_hint(
         state: &mut Self,
         params: InlayHintParams,
-    ) -> futures::future::BoxFuture<
-        'static,
-        Result<Option<Vec<InlayHint>>, async_lsp::ResponseError>,
-    > {
+    ) -> futures::future::BoxFuture<'static, Result<Option<Vec<InlayHint>>, async_lsp::ResponseError>>
+    {
         let uri = params.text_document.uri;
         let range = params.range;
 
@@ -906,6 +904,118 @@ mod tests {
         assert_eq!(
             def_kind_to_completion_item_kind(DefKind::ProtocolMethod(1)),
             CompletionItemKind::METHOD
+        );
+    }
+
+    // ── Inlay hint tests ───────────────────────────────────────────────
+
+    #[test]
+    fn inlay_hint_returns_type_hints_for_let_binding() {
+        let mut state = setup_server_with_source("let x = 42;");
+        ServerState::ensure_typed_hir(&mut state, &test_uri());
+
+        let doc = state.store.get(&test_uri()).unwrap();
+        assert!(doc.typed_hir.is_some(), "typed HIR should be cached");
+
+        let typed_hir = doc.typed_hir.as_ref().unwrap();
+        let hints = tlang_analysis::inlay_hints::collect_inlay_hints(typed_hir, None);
+        assert!(
+            hints.iter().any(|h| h.label == ": i64"),
+            "expected `: i64` hint, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn inlay_hint_returns_return_type_hints_for_function() {
+        let mut state = setup_server_with_source("fn add(a: i64, b: i64) { a + b }");
+        ServerState::ensure_typed_hir(&mut state, &test_uri());
+
+        let doc = state.store.get(&test_uri()).unwrap();
+        let typed_hir = doc.typed_hir.as_ref().unwrap();
+        let hints = tlang_analysis::inlay_hints::collect_inlay_hints(typed_hir, None);
+        assert!(
+            hints.iter().any(|h| h.label.contains("-> i64")),
+            "expected return type hint, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn inlay_hint_no_return_type_hint_when_annotated() {
+        let mut state = setup_server_with_source("fn add(a: i64, b: i64) -> i64 { a + b }");
+        ServerState::ensure_typed_hir(&mut state, &test_uri());
+
+        let doc = state.store.get(&test_uri()).unwrap();
+        let typed_hir = doc.typed_hir.as_ref().unwrap();
+        let hints = tlang_analysis::inlay_hints::collect_inlay_hints(typed_hir, None);
+        assert!(
+            !hints
+                .iter()
+                .any(|h| h.kind == tlang_analysis::inlay_hints::InlayHintKind::ReturnType),
+            "should not show return type hint when annotated, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn inlay_hint_lsp_conversion_sets_correct_kind() {
+        let hint = tlang_analysis::inlay_hints::InlayHint {
+            line: 0,
+            character: 5,
+            label: ": i64".into(),
+            kind: tlang_analysis::inlay_hints::InlayHintKind::Type,
+        };
+        let lsp_hint = ServerState::to_lsp_inlay_hint(&hint);
+        assert_eq!(lsp_hint.kind, Some(lsp_types::InlayHintKind::TYPE));
+        assert_eq!(lsp_hint.position.line, 0);
+        assert_eq!(lsp_hint.position.character, 5);
+        match &lsp_hint.label {
+            lsp_types::InlayHintLabel::String(s) => assert_eq!(s, ": i64"),
+            _ => panic!("expected string label"),
+        }
+    }
+
+    #[test]
+    fn inlay_hint_return_type_has_padding_left() {
+        let hint = tlang_analysis::inlay_hints::InlayHint {
+            line: 0,
+            character: 10,
+            label: " -> i64".into(),
+            kind: tlang_analysis::inlay_hints::InlayHintKind::ReturnType,
+        };
+        let lsp_hint = ServerState::to_lsp_inlay_hint(&hint);
+        assert_eq!(lsp_hint.padding_left, Some(true));
+    }
+
+    #[test]
+    fn inlay_hint_type_has_no_padding_left() {
+        let hint = tlang_analysis::inlay_hints::InlayHint {
+            line: 0,
+            character: 5,
+            label: ": i64".into(),
+            kind: tlang_analysis::inlay_hints::InlayHintKind::Type,
+        };
+        let lsp_hint = ServerState::to_lsp_inlay_hint(&hint);
+        assert_eq!(lsp_hint.padding_left, Some(false));
+    }
+
+    #[test]
+    fn inlay_hint_cache_invalidated_on_source_change() {
+        let client = async_lsp::ClientSocket::new_closed();
+        let mut state = ServerState {
+            client,
+            store: DocumentStore::new(),
+            target: CompilationTarget::Js,
+        };
+        let uri = test_uri();
+        state.store.open(uri.clone(), 1, "let x = 42;".into());
+        state.run_diagnostics(&uri, "let x = 42;");
+        ServerState::ensure_typed_hir(&mut state, &uri);
+        assert!(state.store.get(&uri).unwrap().typed_hir.is_some());
+
+        // Change source — typed_hir cache should be invalidated.
+        state.store.change(&uri, 2, "let y = \"hello\";".into());
+        assert!(
+            state.store.get(&uri).unwrap().typed_hir.is_none(),
+            "typed_hir should be invalidated on source change"
         );
     }
 }

@@ -55,6 +55,11 @@ pub struct TypedHir {
 ///
 /// Returns `None` when the analysis result has no parsed module or when HIR
 /// lowering fails.
+///
+/// # Panics
+///
+/// Panics if a symbol table `RwLock` is poisoned (should not happen in
+/// single-threaded analysis).
 pub fn lower_and_typecheck(result: &AnalysisResult) -> Option<TypedHir> {
     let ast = result.module.as_ref()?;
     let parse_meta = result.parse_meta.as_ref()?;
@@ -101,12 +106,14 @@ pub fn lower_and_typecheck(result: &AnalysisResult) -> Option<TypedHir> {
 ///
 /// If `range` is `Some`, only hints within the given line range
 /// `[start_line, end_line]` (inclusive, 0-based) are returned.
-pub fn collect_inlay_hints(
-    typed_hir: &TypedHir,
-    range: Option<(u32, u32)>,
-) -> Vec<InlayHint> {
+pub fn collect_inlay_hints(typed_hir: &TypedHir, range: Option<(u32, u32)>) -> Vec<InlayHint> {
     let mut hints = Vec::new();
-    collect_block_hints(&typed_hir.module.block, &typed_hir.type_table, range, &mut hints);
+    collect_block_hints(
+        &typed_hir.module.block,
+        &typed_hir.type_table,
+        range,
+        &mut hints,
+    );
     hints
 }
 
@@ -208,19 +215,19 @@ fn collect_fn_decl_hints(
             })
             .or_else(|| decl.body.expr.as_ref().map(|e| &e.ty.kind));
 
-        if let Some(ret_kind) = inferred_ret {
-            if !matches!(ret_kind, TyKind::Unknown) {
-                // Find the position after the closing `)` of the parameter list.
-                // Use the span of the last parameter, or the function name span.
-                let pos = return_type_hint_position(decl);
-                push_hint(
-                    hints,
-                    range,
-                    pos,
-                    format!(" -> {ret_kind}"),
-                    InlayHintKind::ReturnType,
-                );
-            }
+        if let Some(ret_kind) = inferred_ret
+            && !matches!(ret_kind, TyKind::Unknown)
+        {
+            // Find the position after the closing `)` of the parameter list.
+            // Use the span of the last parameter, or the function name span.
+            let pos = return_type_hint_position(decl);
+            push_hint(
+                hints,
+                range,
+                pos,
+                format!(" -> {ret_kind}"),
+                InlayHintKind::ReturnType,
+            );
         }
     }
 
@@ -342,11 +349,7 @@ fn collect_expr_hints(
 // ── Pattern type hints ─────────────────────────────────────────────────
 
 /// Emit a type hint for a pattern binding (let/const).
-fn collect_pat_type_hints(
-    pat: &hir::Pat,
-    range: Option<(u32, u32)>,
-    hints: &mut Vec<InlayHint>,
-) {
+fn collect_pat_type_hints(pat: &hir::Pat, range: Option<(u32, u32)>, hints: &mut Vec<InlayHint>) {
     match &pat.kind {
         hir::PatKind::Identifier(_, ident) => {
             // Skip wildcard bindings (`_`).
@@ -397,10 +400,10 @@ fn push_hint(
     label: String,
     kind: InlayHintKind,
 ) {
-    if let Some((start, end)) = range {
-        if pos.line < start || pos.line > end {
-            return;
-        }
+    if let Some((start, end)) = range
+        && (pos.line < start || pos.line > end)
+    {
+        return;
     }
     hints.push(InlayHint {
         line: pos.line,
@@ -417,9 +420,14 @@ mod tests {
     /// Helper: run the full pipeline on source code and collect inlay hints.
     fn hints_for(source: &str) -> Vec<InlayHint> {
         let result = crate::analyze(source, |_| {});
-        assert!(result.module.is_some(), "parsing failed: {:?}", result.parse_issues);
+        assert!(
+            result.module.is_some(),
+            "parsing failed: {:?}",
+            result.parse_issues
+        );
         assert!(result.parse_meta.is_some(), "parse_meta is None");
-        let typed_hir = lower_and_typecheck(&result).expect("HIR lowering/typechecking should succeed");
+        let typed_hir =
+            lower_and_typecheck(&result).expect("HIR lowering/typechecking should succeed");
         collect_inlay_hints(&typed_hir, None)
     }
 
@@ -427,7 +435,9 @@ mod tests {
     fn let_binding_with_integer_literal() {
         let hints = hints_for("let x = 42;");
         assert!(
-            hints.iter().any(|h| h.label == ": i64" && h.kind == InlayHintKind::Type),
+            hints
+                .iter()
+                .any(|h| h.label == ": i64" && h.kind == InlayHintKind::Type),
             "expected `: i64` hint, got: {hints:?}"
         );
     }
@@ -436,7 +446,9 @@ mod tests {
     fn let_binding_with_string_literal() {
         let hints = hints_for("let name = \"hello\";");
         assert!(
-            hints.iter().any(|h| h.label == ": String" && h.kind == InlayHintKind::Type),
+            hints
+                .iter()
+                .any(|h| h.label == ": String" && h.kind == InlayHintKind::Type),
             "expected `: String` hint, got: {hints:?}"
         );
     }
@@ -445,7 +457,9 @@ mod tests {
     fn let_binding_with_float_literal() {
         let hints = hints_for("let pi = 3.14;");
         assert!(
-            hints.iter().any(|h| h.label == ": f64" && h.kind == InlayHintKind::Type),
+            hints
+                .iter()
+                .any(|h| h.label == ": f64" && h.kind == InlayHintKind::Type),
             "expected `: f64` hint, got: {hints:?}"
         );
     }
@@ -454,7 +468,9 @@ mod tests {
     fn let_binding_with_bool_literal() {
         let hints = hints_for("let flag = true;");
         assert!(
-            hints.iter().any(|h| h.label == ": bool" && h.kind == InlayHintKind::Type),
+            hints
+                .iter()
+                .any(|h| h.label == ": bool" && h.kind == InlayHintKind::Type),
             "expected `: bool` hint, got: {hints:?}"
         );
     }
@@ -463,7 +479,9 @@ mod tests {
     fn const_binding_with_integer_literal() {
         let hints = hints_for("const MAX = 100;");
         assert!(
-            hints.iter().any(|h| h.label == ": i64" && h.kind == InlayHintKind::Type),
+            hints
+                .iter()
+                .any(|h| h.label == ": i64" && h.kind == InlayHintKind::Type),
             "expected `: i64` hint for const, got: {hints:?}"
         );
     }
@@ -473,7 +491,9 @@ mod tests {
         let hints = hints_for("let x: i64 = 42;");
         // No type hint should be shown when the user explicitly annotated.
         assert!(
-            !hints.iter().any(|h| h.kind == InlayHintKind::Type && h.label.contains("i64")),
+            !hints
+                .iter()
+                .any(|h| h.kind == InlayHintKind::Type && h.label.contains("i64")),
             "should not show hint for explicitly annotated binding, got: {hints:?}"
         );
     }
@@ -482,7 +502,9 @@ mod tests {
     fn function_return_type_hint() {
         let hints = hints_for("fn add(a: i64, b: i64) { a + b }");
         assert!(
-            hints.iter().any(|h| h.label.contains("-> i64") && h.kind == InlayHintKind::ReturnType),
+            hints
+                .iter()
+                .any(|h| h.label.contains("-> i64") && h.kind == InlayHintKind::ReturnType),
             "expected `-> i64` return type hint, got: {hints:?}"
         );
     }
@@ -500,7 +522,9 @@ mod tests {
     fn function_parameter_unknown_type_hint() {
         let hints = hints_for("fn double(x) { x }");
         assert!(
-            hints.iter().any(|h| h.label == ": unknown" && h.kind == InlayHintKind::Type),
+            hints
+                .iter()
+                .any(|h| h.label == ": unknown" && h.kind == InlayHintKind::Type),
             "expected `: unknown` hint for un-annotated parameter, got: {hints:?}"
         );
     }
@@ -523,7 +547,9 @@ mod tests {
     fn nested_function_gets_hints() {
         let hints = hints_for("fn outer() { let x = 42; x }");
         assert!(
-            hints.iter().any(|h| h.label == ": i64" && h.kind == InlayHintKind::Type),
+            hints
+                .iter()
+                .any(|h| h.label == ": i64" && h.kind == InlayHintKind::Type),
             "expected hint for let binding inside function, got: {hints:?}"
         );
     }
