@@ -294,15 +294,15 @@ Module(
             leading_comments: [],
             trailing_comments: [],
             span: Span(
-              start: 0,
-              end: 0,
+              start: 142,
+              end: 219,
               start_lc: LineColumn(
-                line: 0,
-                column: 0,
+                line: 4,
+                column: 9,
               ),
               end_lc: LineColumn(
-                line: 0,
-                column: 0,
+                line: 6,
+                column: 17,
               ),
             ),
           ),

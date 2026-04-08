@@ -2273,6 +2273,9 @@ impl<'src> Parser<'src> {
                         operator_info.associativity,
                     );
 
+                    let mut binop_span = span;
+                    self.end_span_from_previous_token(&mut binop_span);
+
                     lhs = node::expr!(
                         self.unique_id(),
                         BinaryOp(Box::new(BinaryOpExpression {
@@ -2280,7 +2283,8 @@ impl<'src> Parser<'src> {
                             lhs,
                             rhs,
                         }))
-                    );
+                    )
+                    .with_span(binop_span);
                 }
                 _ => break,
             }

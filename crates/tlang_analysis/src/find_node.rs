@@ -317,6 +317,57 @@ mod tests {
     }
 
     #[test]
+    fn find_multi_segment_path_in_pipeline() {
+        // The LHS of a pipeline `Vector::new(1, 2) |> ...` should resolve
+        // `Vector::new` on hover, just like a standalone call.
+        let source = "\
+struct Vector { x: i64, y: i64 }
+fn Vector::new(x: i64, y: i64) -> Vector { Vector { x, y } }
+fn Vector.add(self, other: Vector) -> Vector { Vector { x: self.x + other.x, y: self.y + other.y } }
+let v1 = Vector::new(3, 4);
+
+Vector::new(1, 2)
+|> v1.add()
+|> log();";
+
+        let result = analyze(source, |_| {});
+        assert!(
+            result.module.is_some(),
+            "parse failed: {:?}",
+            result.parse_issues
+        );
+
+        // Line 3: `let v1 = Vector::new(3, 4);` — first Vector::new
+        // Note: lines > 0 have 1-based columns in the lexer
+        let found_line3: Vec<(u32, String)> = (0..30)
+            .filter_map(|col| parse_and_find(source, 3, col).map(|f| (col, f.name)))
+            .collect();
+        let first_vec_new: Vec<_> = found_line3
+            .iter()
+            .filter(|(_, name)| name == "Vector::new")
+            .collect();
+        assert!(
+            !first_vec_new.is_empty(),
+            "should find 'Vector::new' on line 3 (let binding).\nAll found: {:?}",
+            found_line3
+        );
+
+        // Line 5: `Vector::new(1, 2)` — second Vector::new (pipeline LHS)
+        let found_line5: Vec<(u32, String)> = (0..20)
+            .filter_map(|col| parse_and_find(source, 5, col).map(|f| (col, f.name)))
+            .collect();
+        let second_vec_new: Vec<_> = found_line5
+            .iter()
+            .filter(|(_, name)| name == "Vector::new")
+            .collect();
+        assert!(
+            !second_vec_new.is_empty(),
+            "should find 'Vector::new' on line 5 (pipeline LHS).\nAll found: {:?}",
+            found_line5
+        );
+    }
+
+    #[test]
     fn find_field_expression_records_base() {
         // `v1.add` should record field_base = "v1" when cursor is on "add"
         let source = "struct Vector { x: i64 }\nfn Vector.add(self, other) { self }\nlet v1 = Vector { x: 1 };\nv1.add(v1);";

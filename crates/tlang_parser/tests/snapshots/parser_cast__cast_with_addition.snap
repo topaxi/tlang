@@ -86,15 +86,15 @@ Module(
             leading_comments: [],
             trailing_comments: [],
             span: Span(
-              start: 0,
-              end: 0,
+              start: 8,
+              end: 13,
               start_lc: LineColumn(
                 line: 0,
-                column: 0,
+                column: 8,
               ),
               end_lc: LineColumn(
                 line: 0,
-                column: 0,
+                column: 13,
               ),
             ),
           ), Ty(
