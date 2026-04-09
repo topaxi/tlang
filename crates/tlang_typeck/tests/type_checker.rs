@@ -1165,6 +1165,32 @@ fn list_literal_annotation_mismatch_error() {
     );
 }
 
+#[test]
+fn list_literal_return_type_mismatch_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        fn get_number() -> i64 { [1, 2, 3] }
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("return type mismatch")),
+        "expected return type mismatch, got: {errs:?}"
+    );
+}
+
+#[test]
+fn dict_literal_return_type_mismatch_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        fn get_number() -> i64 { {key: "value"} }
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("return type mismatch")),
+        "expected return type mismatch, got: {errs:?}"
+    );
+}
+
 // ── builtin_types registry ──────────────────────────────────────────────
 
 #[test]
