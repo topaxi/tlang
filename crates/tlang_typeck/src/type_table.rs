@@ -72,7 +72,7 @@ pub struct TypeTable {
     enum_info: HashMap<HirId, EnumInfo>,
     /// Protocol declarations keyed by the protocol name.
     protocol_info: HashMap<String, ProtocolInfo>,
-    /// Impl blocks keyed by `"Protocol::Type"`.
+    /// Registered impl blocks.
     impl_info: Vec<ImplInfo>,
 }
 

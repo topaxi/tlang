@@ -850,52 +850,7 @@ impl TypeChecker {
 
         // Type-check the impl methods.
         for decl in &mut impl_block.methods {
-            let fn_ctx = TypingContext::for_function(decl);
-            self.push_context(fn_ctx);
-            self.register_function_signature(decl);
-
-            for param in &decl.parameters {
-                self.type_table.insert(
-                    param.hir_id,
-                    TypeInfo {
-                        ty: param.type_annotation.clone(),
-                    },
-                );
-            }
-
-            self.return_type_stack.push(decl.return_type.kind.clone());
-            self.observed_return_types.push(Vec::new());
-            self.visit_block(&mut decl.body, &mut ());
-            self.check_function_body_return(decl);
-
-            if matches!(decl.return_type.kind, TyKind::Unknown) {
-                let body_ty = decl
-                    .body
-                    .expr
-                    .as_ref()
-                    .map(|e| e.ty.kind.clone())
-                    .or_else(|| self.infer_return_type_from_observed())
-                    .unwrap_or_else(|| decl.return_type.kind.clone());
-                let param_tys: Vec<Ty> = decl
-                    .parameters
-                    .iter()
-                    .map(|p| p.type_annotation.clone())
-                    .collect();
-                let fn_ty = Self::make_fn_ty(param_tys, body_ty);
-                self.type_table.insert(
-                    decl.hir_id,
-                    TypeInfo {
-                        ty: Ty {
-                            kind: fn_ty,
-                            ..Ty::default()
-                        },
-                    },
-                );
-            }
-
-            self.observed_return_types.pop();
-            self.return_type_stack.pop();
-            self.pop_context();
+            self.typecheck_function_decl(decl);
         }
     }
     fn resolve_field_type(
@@ -1051,6 +1006,13 @@ impl TypeChecker {
 
     /// Visit a top-level function declaration statement.
     fn visit_function_decl_stmt(&mut self, decl: &mut hir::FunctionDeclaration) {
+        self.typecheck_function_decl(decl);
+    }
+
+    /// Common helper: register a function declaration, type-check its body,
+    /// and infer return types.  Used by both top-level function declarations
+    /// and impl block methods.
+    fn typecheck_function_decl(&mut self, decl: &mut hir::FunctionDeclaration) {
         let fn_ctx = TypingContext::for_function(decl);
         self.push_context(fn_ctx);
         self.register_function_signature(decl);
