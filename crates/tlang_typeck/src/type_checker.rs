@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use tlang_ast::node::UnaryOp;
 use tlang_ast::token::Literal;
 use tlang_hir::Visitor;
@@ -31,6 +33,10 @@ pub struct TypeChecker {
     /// body traversal.  Used to infer the return type when no annotation
     /// and no trailing expression are present (e.g. `fn f() { return 42; }`).
     observed_return_types: Vec<Vec<TyKind>>,
+    /// Dot-method names collected from the module's function declarations
+    /// (e.g. `"Animal.greet"` from `fn Animal.greet(self)`).  Pre-scanned
+    /// once at the start of `check_module` for `apply` conflict detection.
+    dot_methods: HashSet<String>,
 }
 
 impl TypeChecker {
@@ -783,22 +789,19 @@ impl TypeChecker {
     }
 
     /// Validate an impl block: check that all required methods from the
-    /// protocol are present, register the impl, and type-check the methods.
+    /// protocol are present, and type-check the methods.
+    ///
+    /// Note: impl registrations are handled by the pre-scan in `check_module`,
+    /// so constraint checking is order-independent.
     fn check_impl_block(&mut self, impl_block: &mut hir::ImplBlock) {
         let protocol_name = impl_block.protocol_name.join("::");
         let target_type_name = impl_block.target_type.join("::");
-
-        // Record that this impl exists.
-        self.type_table.insert_impl_info(ImplInfo {
-            protocol_name: protocol_name.clone(),
-            target_type_name: target_type_name.clone(),
-        });
 
         // Check that `apply` directives do not conflict with existing
         // dot-methods on the target type.
         for apply_method in &impl_block.apply_methods {
             let dot_name = format!("{target_type_name}.{}", apply_method.as_str());
-            if self.type_table.has_dot_method(&dot_name) {
+            if self.dot_methods.contains(&dot_name) {
                 self.errors.push(TypeError::ApplyConflict {
                     method: apply_method.as_str().to_string(),
                     target_type: target_type_name.clone(),
@@ -807,7 +810,9 @@ impl TypeChecker {
             }
         }
 
-        // Collect names of methods present in the impl (including apply methods).
+        // Collect names of methods present in the impl.
+        // `apply` directives only install the method on the target type;
+        // they do not count toward satisfying the protocol contract.
         let impl_method_names: Vec<String> = impl_block
             .methods
             .iter()
@@ -824,26 +829,15 @@ impl TypeChecker {
             // Check that every required method is implemented.
             for proto_method in &proto_info.methods {
                 let method_name = proto_method.name.as_str();
-                let is_present = impl_method_names.iter().any(|n| n == method_name)
-                    || impl_block
-                        .apply_methods
-                        .iter()
-                        .any(|a| a.as_str() == method_name);
-                if !is_present {
-                    // Check if the protocol has a default implementation.
-                    let has_default = proto_info
-                        .methods
-                        .iter()
-                        .any(|m| m.name.as_str() == method_name && m.has_default_body);
-                    if !has_default {
-                        let span = impl_block.target_type.span;
-                        self.errors.push(TypeError::MissingProtocolMethod {
-                            method: method_name.to_string(),
-                            protocol: protocol_name.clone(),
-                            target_type: target_type_name.clone(),
-                            span,
-                        });
-                    }
+                let is_present = impl_method_names.iter().any(|n| n == method_name);
+                if !is_present && !proto_method.has_default_body {
+                    let span = impl_block.target_type.span;
+                    self.errors.push(TypeError::MissingProtocolMethod {
+                        method: method_name.to_string(),
+                        protocol: protocol_name.clone(),
+                        target_type: target_type_name.clone(),
+                        span,
+                    });
                 }
             }
 
@@ -932,6 +926,28 @@ impl TypeChecker {
     // ── HIR walk entry point ─────────────────────────────────────────
 
     fn check_module(&mut self, module: &mut hir::Module) {
+        // Pre-scan the module for impl blocks and dot-methods so that
+        // validation is order-independent (an impl or dot-method declared
+        // after the first use site is still visible).
+        let mut dot_methods = HashSet::new();
+        for stmt in &module.block.stmts {
+            match &stmt.kind {
+                hir::StmtKind::FunctionDeclaration(decl) => {
+                    if matches!(&decl.name.kind, hir::ExprKind::FieldAccess(..)) {
+                        dot_methods.insert(decl.name());
+                    }
+                }
+                hir::StmtKind::ImplBlock(impl_block) => {
+                    self.type_table.insert_impl_info(ImplInfo {
+                        protocol_name: impl_block.protocol_name.join("::"),
+                        target_type_name: impl_block.target_type.join("::"),
+                    });
+                }
+                _ => {}
+            }
+        }
+        self.dot_methods = dot_methods;
+
         // Top-level is always permissive.
         self.push_context(TypingContext::Permissive);
         self.visit_module(module, &mut ());
@@ -1019,10 +1035,6 @@ impl TypeChecker {
 
     /// Visit a top-level function declaration statement.
     fn visit_function_decl_stmt(&mut self, decl: &mut hir::FunctionDeclaration) {
-        // Track dot-methods (e.g. `fn Animal.greet(self)`) for apply conflict detection.
-        if let hir::ExprKind::FieldAccess(..) = &decl.name.kind {
-            self.type_table.register_dot_method(decl.name());
-        }
         self.typecheck_function_decl(decl);
     }
 
