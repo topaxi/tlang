@@ -64,11 +64,11 @@ static BUILTIN_SIGNATURES: &[BuiltinSignature] = &[
         ret: TyKind::Primitive(PrimTy::F64),
         variadic: false,
     },
-    // math::floor(f64) → f64
+    // math::floor(f64) → i64
     BuiltinSignature {
         name: "math::floor",
         params: &[TyKind::Primitive(PrimTy::F64)],
-        ret: TyKind::Primitive(PrimTy::F64),
+        ret: TyKind::Primitive(PrimTy::I64),
         variadic: false,
     },
     // math::random() → f64
