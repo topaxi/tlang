@@ -517,6 +517,7 @@ impl LoweringContext {
                 visibility: decl.visibility,
                 name,
                 parameters,
+                params_span: decl.params_span,
                 return_type,
                 body,
                 span: decl.span,

@@ -444,6 +444,7 @@ mod tests {
             visibility: tlang_ast::node::Visibility::Private,
             name: make_name_expr(13),
             parameters: vec![],
+            params_span: Span::default(),
             return_type: hir::Ty::default(),
             body: hir::Block {
                 hir_id: HirId::new(12),
@@ -542,6 +543,7 @@ mod tests {
             visibility: tlang_ast::node::Visibility::Private,
             name: make_name_expr(35),
             parameters: vec![],
+            params_span: Span::default(),
             return_type: hir::Ty::default(),
             body: hir::Block {
                 hir_id: HirId::new(36),
@@ -600,6 +602,7 @@ mod tests {
             visibility: tlang_ast::node::Visibility::Private,
             name: make_name_expr(13),
             parameters: vec![],
+            params_span: Span::default(),
             return_type: hir::Ty::default(),
             body: hir::Block {
                 hir_id: HirId::new(12),
@@ -653,6 +656,7 @@ mod tests {
             visibility: tlang_ast::node::Visibility::Private,
             name: make_name_expr(13),
             parameters: vec![],
+            params_span: Span::default(),
             return_type: hir::Ty::default(),
             body,
             span: Span::default(),

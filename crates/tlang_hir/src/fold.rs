@@ -307,6 +307,7 @@ fn fold_function_declaration<F: Folder>(
         visibility: decl.visibility,
         name: folder.fold_expr(decl.name),
         parameters: decl.parameters,
+        params_span: decl.params_span,
         return_type: folder.fold_ty(decl.return_type),
         body: folder.fold_block(decl.body),
         span: decl.span,

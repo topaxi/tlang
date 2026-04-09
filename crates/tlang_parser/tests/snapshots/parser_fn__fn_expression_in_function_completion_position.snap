@@ -60,6 +60,18 @@ Module(
           ),
         ),
         parameters: [],
+        params_span: Span(
+          start: 6,
+          end: 8,
+          start_lc: LineColumn(
+            line: 0,
+            column: 6,
+          ),
+          end_lc: LineColumn(
+            line: 0,
+            column: 8,
+          ),
+        ),
         guard: None,
         return_type_annotation: None,
         body: Block(
@@ -120,6 +132,18 @@ Module(
                 ),
               ),
               parameters: [],
+              params_span: Span(
+                start: 17,
+                end: 19,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 17,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 19,
+                ),
+              ),
               guard: None,
               return_type_annotation: None,
               body: Block(

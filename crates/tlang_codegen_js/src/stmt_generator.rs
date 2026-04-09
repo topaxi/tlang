@@ -444,6 +444,7 @@ impl<'a> InnerCodegen<'a> {
             visibility: Visibility::Private,
             name,
             parameters: method.parameters.clone(),
+            params_span: tlang_span::Span::default(),
             return_type: method.return_type.clone(),
             body: method.body.clone().unwrap_or_else(|| hir::Block {
                 hir_id: method.hir_id,

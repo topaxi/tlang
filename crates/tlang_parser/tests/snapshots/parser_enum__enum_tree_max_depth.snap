@@ -417,6 +417,18 @@ Module(
               ),
             ),
           ],
+          params_span: Span(
+            start: 74,
+            end: 89,
+            start_lc: LineColumn(
+              line: 5,
+              column: 17,
+            ),
+            end_lc: LineColumn(
+              line: 5,
+              column: 32,
+            ),
+          ),
           guard: None,
           return_type_annotation: None,
           body: Block(
@@ -697,6 +709,18 @@ Module(
               ),
             ),
           ],
+          params_span: Span(
+            start: 112,
+            end: 140,
+            start_lc: LineColumn(
+              line: 6,
+              column: 17,
+            ),
+            end_lc: LineColumn(
+              line: 6,
+              column: 45,
+            ),
+          ),
           guard: None,
           return_type_annotation: None,
           body: Block(
@@ -1147,6 +1171,18 @@ Module(
           ),
         ),
         parameters: [],
+        params_span: Span(
+          start: 204,
+          end: 206,
+          start_lc: LineColumn(
+            line: 8,
+            column: 8,
+          ),
+          end_lc: LineColumn(
+            line: 8,
+            column: 10,
+          ),
+        ),
         guard: None,
         return_type_annotation: None,
         body: Block(

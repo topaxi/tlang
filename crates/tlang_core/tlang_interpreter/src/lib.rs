@@ -1030,6 +1030,7 @@ impl Interpreter {
                     visibility: Visibility::Private,
                     name: name_expr,
                     parameters: method.parameters.clone(),
+                    params_span: tlang_span::Span::default(),
                     return_type: method.return_type.clone(),
                     body: body.clone(),
                     span: method.span,

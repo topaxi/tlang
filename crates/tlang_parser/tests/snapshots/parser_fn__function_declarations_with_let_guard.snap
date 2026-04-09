@@ -142,6 +142,18 @@ Module(
               ),
             ),
           ],
+          params_span: Span(
+            start: 13,
+            end: 20,
+            start_lc: LineColumn(
+              line: 0,
+              column: 13,
+            ),
+            end_lc: LineColumn(
+              line: 0,
+              column: 20,
+            ),
+          ),
           guard: None,
           return_type_annotation: None,
           body: Block(
@@ -409,6 +421,18 @@ Module(
               ),
             ),
           ],
+          params_span: Span(
+            start: 41,
+            end: 56,
+            start_lc: LineColumn(
+              line: 1,
+              column: 14,
+            ),
+            end_lc: LineColumn(
+              line: 1,
+              column: 29,
+            ),
+          ),
           guard: Some(Expr(
             id: 20,
             kind: Let(Pat(
@@ -1077,6 +1101,18 @@ Module(
               ),
             ),
           ],
+          params_span: Span(
+            start: 116,
+            end: 131,
+            start_lc: LineColumn(
+              line: 2,
+              column: 14,
+            ),
+            end_lc: LineColumn(
+              line: 2,
+              column: 29,
+            ),
+          ),
           guard: None,
           return_type_annotation: None,
           body: Block(

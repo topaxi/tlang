@@ -745,6 +745,7 @@ fn fold_function_decl<F: AnfFilter>(
         visibility: decl.visibility,
         name: decl.name,
         parameters: decl.parameters,
+        params_span: decl.params_span,
         return_type: decl.return_type,
         body,
         span: decl.span,

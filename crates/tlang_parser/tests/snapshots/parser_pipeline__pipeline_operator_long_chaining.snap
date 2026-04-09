@@ -252,6 +252,18 @@ Module(
                                     ),
                                   ),
                                 ],
+                                params_span: Span(
+                                  start: 18,
+                                  end: 21,
+                                  start_lc: LineColumn(
+                                    line: 1,
+                                    column: 11,
+                                  ),
+                                  end_lc: LineColumn(
+                                    line: 1,
+                                    column: 14,
+                                  ),
+                                ),
                                 guard: None,
                                 return_type_annotation: None,
                                 body: Block(
@@ -576,6 +588,18 @@ Module(
                                 ),
                               ),
                             ],
+                            params_span: Span(
+                              start: 47,
+                              end: 50,
+                              start_lc: LineColumn(
+                                line: 2,
+                                column: 14,
+                              ),
+                              end_lc: LineColumn(
+                                line: 2,
+                                column: 17,
+                              ),
+                            ),
                             guard: None,
                             return_type_annotation: None,
                             body: Block(
@@ -985,6 +1009,18 @@ Module(
                             ),
                           ),
                         ],
+                        params_span: Span(
+                          start: 79,
+                          end: 87,
+                          start_lc: LineColumn(
+                            line: 3,
+                            column: 13,
+                          ),
+                          end_lc: LineColumn(
+                            line: 3,
+                            column: 21,
+                          ),
+                        ),
                         guard: None,
                         return_type_annotation: None,
                         body: Block(

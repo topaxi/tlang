@@ -960,6 +960,9 @@ pub struct FunctionDeclaration {
     pub visibility: Visibility,
     pub name: Expr,
     pub parameters: Vec<FunctionParameter>,
+    /// Span of the `(…)` parameter list, from `(` through `)` inclusive.
+    /// Used to place return-type inlay hints right after `)`.
+    pub params_span: Span,
     pub return_type: Ty,
     pub body: Block,
     pub span: Span,
@@ -972,6 +975,7 @@ impl FunctionDeclaration {
             visibility: Visibility::Private,
             name,
             parameters: params,
+            params_span: Span::default(),
             return_type: Ty::default(),
             body,
             span: Span::default(),

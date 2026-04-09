@@ -760,10 +760,8 @@ impl LoweringContext {
             // Use actual source spans for the synthesised body so that inlay hints
             // (return-type hints in particular) land at the real `{` position rather
             // than the default (0, 0).
-            let body_span = tlang_span::Span::from_spans(
-                &decls[0].body.span,
-                &decls.last().unwrap().body.span,
-            );
+            let body_span =
+                tlang_span::Span::from_spans(&decls[0].body.span, &decls.last().unwrap().body.span);
 
             let body = hir::Block::new(
                 this.unique_id(),
@@ -781,6 +779,9 @@ impl LoweringContext {
                 let mut decl = hir::FunctionDeclaration::new(hir_id, fn_name, params, body);
                 // Multi-clause functions inherit visibility from the first clause.
                 decl.visibility = decls[0].visibility;
+                // Use the first clause's params_span so return-type hints land
+                // right after the `)` of the representative parameter list.
+                decl.params_span = decls[0].params_span;
                 // Carry the combined source span so position-based features (e.g. inlay
                 // hints) can locate the declaration in the editor.
                 decl.span = span;

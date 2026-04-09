@@ -642,7 +642,7 @@ impl<'src> Parser<'src> {
         self.consume_keyword_token(Keyword::Fn);
         let name = self.parse_identifier();
         self.expect_token(TokenKind::LParen);
-        let parameters = self.parse_parameter_list();
+        let (parameters, _params_span) = self.parse_parameter_list();
         let return_type = self.parse_return_type();
 
         // Optional default implementation body
@@ -1643,10 +1643,12 @@ impl<'src> Parser<'src> {
         )
     }
 
-    fn parse_parameter_list(&mut self) -> Vec<FunctionParameter> {
+    fn parse_parameter_list(&mut self) -> (Vec<FunctionParameter>, Span) {
         let mut parameters = Vec::new();
+        let mut params_span = Span::default();
 
         if matches!(self.current_token_kind(), TokenKind::LParen) {
+            params_span = self.create_span_from_current_token();
             self.consume_token(TokenKind::LParen);
 
             let mut is_first_parameter = true;
@@ -1680,9 +1682,10 @@ impl<'src> Parser<'src> {
                 });
             }
             self.consume_token(TokenKind::RParen);
+            self.end_span_from_previous_token(&mut params_span);
         }
 
-        parameters
+        (parameters, params_span)
     }
 
     fn is_type_annotation_token(token: TokenKind) -> bool {
@@ -1765,7 +1768,7 @@ impl<'src> Parser<'src> {
             )
         };
 
-        let parameters = self.parse_parameter_list();
+        let (parameters, params_span) = self.parse_parameter_list();
         let return_type = self.parse_return_type();
         let body = self.parse_block();
 
@@ -1778,6 +1781,7 @@ impl<'src> Parser<'src> {
                 visibility: Visibility::Private,
                 name,
                 parameters,
+                params_span,
                 body,
                 return_type_annotation: return_type,
                 span,
@@ -1930,7 +1934,7 @@ impl<'src> Parser<'src> {
             }
 
             self.expect_token(TokenKind::LParen);
-            let parameters = self.parse_parameter_list();
+            let (parameters, params_span) = self.parse_parameter_list();
             let guard = self.parse_guard_clause();
             let return_type = self.parse_return_type();
             let body = self.parse_block();
@@ -1946,6 +1950,7 @@ impl<'src> Parser<'src> {
                 visibility: clause_visibility,
                 name: fn_name,
                 parameters,
+                params_span,
                 guard,
                 body,
                 return_type_annotation: return_type,

@@ -190,6 +190,18 @@ Module(
           ),
         ),
         parameters: [],
+        params_span: Span(
+          start: 56,
+          end: 58,
+          start_lc: LineColumn(
+            line: 3,
+            column: 12,
+          ),
+          end_lc: LineColumn(
+            line: 3,
+            column: 14,
+          ),
+        ),
         guard: None,
         return_type_annotation: None,
         body: Block(

@@ -715,6 +715,7 @@ mod tests {
                 })),
             )),
             return_type_annotation: None,
+            params_span: Span::default(),
             body: node::Block::new(NodeId::new(7), vec![], None),
             leading_comments: vec![],
             trailing_comments: vec![],

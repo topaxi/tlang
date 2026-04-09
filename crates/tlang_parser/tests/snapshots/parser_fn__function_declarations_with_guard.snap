@@ -142,6 +142,18 @@ Module(
               ),
             ),
           ],
+          params_span: Span(
+            start: 9,
+            end: 16,
+            start_lc: LineColumn(
+              line: 0,
+              column: 9,
+            ),
+            end_lc: LineColumn(
+              line: 0,
+              column: 16,
+            ),
+          ),
           guard: None,
           return_type_annotation: None,
           body: Block(
@@ -409,6 +421,18 @@ Module(
               ),
             ),
           ],
+          params_span: Span(
+            start: 33,
+            end: 48,
+            start_lc: LineColumn(
+              line: 1,
+              column: 10,
+            ),
+            end_lc: LineColumn(
+              line: 1,
+              column: 25,
+            ),
+          ),
           guard: Some(Expr(
             id: 18,
             kind: Call(CallExpression(
@@ -1029,6 +1053,18 @@ Module(
               ),
             ),
           ],
+          params_span: Span(
+            start: 92,
+            end: 107,
+            start_lc: LineColumn(
+              line: 2,
+              column: 10,
+            ),
+            end_lc: LineColumn(
+              line: 2,
+              column: 25,
+            ),
+          ),
           guard: None,
           return_type_annotation: None,
           body: Block(

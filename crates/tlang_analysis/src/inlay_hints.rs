@@ -237,22 +237,16 @@ fn collect_fn_decl_hints(
 
 /// Determine the position for a return type hint.
 ///
-/// The hint is placed one character before the opening `{` of the body
-/// (i.e. on the space that precedes it).  Combined with a leading-space
-/// label (`" -> T"`), the background of the hint starts right after `)`
-/// — visually matching the `: type` parameter hints — and the uncoloured
-/// source space after the hint provides natural separation before `{`.
+/// The hint is placed right after the closing `)` of the parameter list,
+/// using `params_span.end_lc`.  Combined with a leading-space label
+/// (`" -> T"`), the background of the hint starts right after `)` —
+/// visually matching the `: type` parameter hints — and the source space
+/// (or newline) before `{` is left uncoloured.
 ///
-/// For C-style brace placement the hint lands at the end of the closing
-/// `)` line, which is equally readable.
+/// This also handles C-style brace placement cleanly: when `{` is on the
+/// next line the hint still lands at the end of the `)` line.
 fn return_type_hint_position(decl: &hir::FunctionDeclaration) -> LineColumn {
-    let lc = decl.body.span.start_lc;
-    // Move one character to the left.  The column convention is:
-    //   line 0 → 0-based,  line > 0 → 1-based (lexer convention).
-    // Subtracting 1 works uniformly: for line 0 it steps back one 0-based
-    // column; for line > 0 it steps back one 1-based column (push_hint
-    // then normalises to 0-based).
-    LineColumn::new(lc.line, lc.column.saturating_sub(1))
+    decl.params_span.end_lc
 }
 
 // ── Expression traversal (recurse into nested functions / blocks) ──────
