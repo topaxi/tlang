@@ -982,6 +982,72 @@ impl TypeChecker {
 
     /// Visit a Call or TailCall expression: check arguments, resolve
     /// callee, and set the expression's type to the return type.
+    fn visit_binary_expr(
+        &mut self,
+        op: BinaryOpKind,
+        lhs: &mut hir::Expr,
+        rhs: &mut hir::Expr,
+        expr_hir_id: tlang_span::HirId,
+        expr_span: tlang_span::Span,
+        expr_ty: &mut Ty,
+    ) {
+        self.visit_expr(lhs, &mut ());
+        self.visit_expr(rhs, &mut ());
+        let result_ty = self.check_binary_op(op, &lhs.ty.kind, &rhs.ty.kind, expr_span);
+        expr_ty.kind = result_ty.clone();
+        self.type_table.insert(
+            expr_hir_id,
+            TypeInfo {
+                ty: Ty {
+                    kind: result_ty,
+                    ..Ty::default()
+                },
+            },
+        );
+    }
+
+    fn visit_unary_expr(
+        &mut self,
+        op: UnaryOp,
+        operand: &mut hir::Expr,
+        expr_hir_id: tlang_span::HirId,
+        expr_span: tlang_span::Span,
+        expr_ty: &mut Ty,
+    ) {
+        self.visit_expr(operand, &mut ());
+        let result_ty = self.check_unary_op(op, &operand.ty.kind, expr_span);
+        expr_ty.kind = result_ty.clone();
+        self.type_table.insert(
+            expr_hir_id,
+            TypeInfo {
+                ty: Ty {
+                    kind: result_ty,
+                    ..Ty::default()
+                },
+            },
+        );
+    }
+
+    fn visit_implements_expr(
+        &mut self,
+        inner_expr: &mut hir::Expr,
+        expr_hir_id: tlang_span::HirId,
+        expr_ty: &mut Ty,
+    ) {
+        self.visit_expr(inner_expr, &mut ());
+        let result_ty = TyKind::Primitive(PrimTy::Bool);
+        expr_ty.kind = result_ty.clone();
+        self.type_table.insert(
+            expr_hir_id,
+            TypeInfo {
+                ty: Ty {
+                    kind: result_ty,
+                    ..Ty::default()
+                },
+            },
+        );
+    }
+
     fn visit_call_expr(
         &mut self,
         call: &mut hir::CallExpression,
@@ -1261,36 +1327,16 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 );
             }
             hir::ExprKind::Binary(op, lhs, rhs) => {
-                self.visit_expr(lhs, ctx);
-                self.visit_expr(rhs, ctx);
-
                 let op = *op;
-                let result_ty = self.check_binary_op(op, &lhs.ty.kind, &rhs.ty.kind, expr.span);
-                expr.ty.kind = result_ty.clone();
-                self.type_table.insert(
-                    expr.hir_id,
-                    TypeInfo {
-                        ty: Ty {
-                            kind: result_ty,
-                            ..Ty::default()
-                        },
-                    },
-                );
+                let hir_id = expr.hir_id;
+                let span = expr.span;
+                self.visit_binary_expr(op, lhs, rhs, hir_id, span, &mut expr.ty);
             }
             hir::ExprKind::Unary(op, operand) => {
-                self.visit_expr(operand, ctx);
                 let op = *op;
-                let result_ty = self.check_unary_op(op, &operand.ty.kind, expr.span);
-                expr.ty.kind = result_ty.clone();
-                self.type_table.insert(
-                    expr.hir_id,
-                    TypeInfo {
-                        ty: Ty {
-                            kind: result_ty,
-                            ..Ty::default()
-                        },
-                    },
-                );
+                let hir_id = expr.hir_id;
+                let span = expr.span;
+                self.visit_unary_expr(op, operand, hir_id, span, &mut expr.ty);
             }
             hir::ExprKind::FunctionExpression(decl) => {
                 self.visit_closure_expr(decl, &mut expr.ty);
@@ -1330,18 +1376,8 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     self.check_field_access(&base_ty, field_name, expr.hir_id, expr.span);
             }
             hir::ExprKind::Implements(inner_expr, _path) => {
-                self.visit_expr(inner_expr, ctx);
-                let result_ty = TyKind::Primitive(PrimTy::Bool);
-                expr.ty.kind = result_ty.clone();
-                self.type_table.insert(
-                    expr.hir_id,
-                    TypeInfo {
-                        ty: Ty {
-                            kind: result_ty,
-                            ..Ty::default()
-                        },
-                    },
-                );
+                let hir_id = expr.hir_id;
+                self.visit_implements_expr(inner_expr, hir_id, &mut expr.ty);
             }
             hir::ExprKind::List(elements) => {
                 for elem in elements.iter_mut() {
