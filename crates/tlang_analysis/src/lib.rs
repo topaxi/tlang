@@ -17,9 +17,9 @@
 //! | [`analyze`] | Parse + semantic analysis with a custom analyzer setup |
 //! | [`analyze_for_target`] | As above, dispatching on [`CompilationTarget`] |
 //! | [`analyze_with_js_symbols`] | As above, pre-configured for the JS backend |
-//! | [`analyze_with_interpreter_symbols`] | As above, pre-configured for the interpreter (feature `interpreter`) |
+//! | [`analyze_with_interpreter_symbols`] | As above, pre-configured for the interpreter |
 //! | [`configure_js_analyzer`] | Configure an existing analyzer with JS stdlib symbols |
-//! | [`configure_interpreter_analyzer`] | Configure an existing analyzer with VM symbols (feature `interpreter`) |
+//! | [`configure_interpreter_analyzer`] | Configure an existing analyzer with VM symbols |
 
 pub mod find_node;
 pub mod inlay_hints;
@@ -124,23 +124,10 @@ pub enum CompilationTarget {
 }
 
 /// Run the full analysis pipeline selecting builtins based on `target`.
-///
-/// When the `interpreter` feature is not compiled in and `Interpreter` is
-/// requested, analysis runs without extra builtins and a warning is emitted.
 pub fn analyze_for_target(source: &str, target: CompilationTarget) -> AnalysisResult {
     match target {
         CompilationTarget::Js => analyze_with_js_symbols(source),
-        #[cfg(feature = "interpreter")]
         CompilationTarget::Interpreter => analyze_with_interpreter_symbols(source),
-        #[cfg(not(feature = "interpreter"))]
-        CompilationTarget::Interpreter => {
-            eprintln!(
-                "warning: analyze_for_target requested interpreter analysis, \
-                 but the `interpreter` feature is not enabled; \
-                 falling back to analysis without interpreter builtins"
-            );
-            analyze(source, |_| {})
-        }
     }
 }
 
@@ -155,22 +142,13 @@ pub fn configure_js_analyzer(analyzer: &mut SemanticAnalyzer) {
     analyzer.add_builtin_symbols(tlang_builtins_js::symbols());
 }
 
-/// Cached interpreter builtin symbols, computed once and reused across all
-/// diagnostic runs.  `VM::builtin_symbols()` allocates and sorts on every
-/// call, so caching here avoids a per-keystroke allocation in the LSP.
-#[cfg(feature = "interpreter")]
-static INTERPRETER_BUILTINS: std::sync::LazyLock<
-    Vec<(String, tlang_defs::DefKind, Option<usize>)>,
-> = std::sync::LazyLock::new(tlang_core::vm::VM::builtin_symbols);
-
 /// Configure a [`SemanticAnalyzer`] with the interpreter (VM) builtin
-/// symbols (with slot indices).
+/// symbols.
 ///
 /// This is the same setup used by [`analyze_with_interpreter_symbols`] and
 /// the interpreter runner in the WASM bindings.
-#[cfg(feature = "interpreter")]
 pub fn configure_interpreter_analyzer(analyzer: &mut SemanticAnalyzer) {
-    analyzer.add_builtin_symbols_with_slots(&*INTERPRETER_BUILTINS);
+    analyzer.add_builtin_symbols(tlang_builtins_vm::symbols());
 }
 
 /// Run analysis with the JavaScript standard-library symbols pre-registered.
@@ -181,12 +159,10 @@ pub fn analyze_with_js_symbols(source: &str) -> AnalysisResult {
     analyze(source, configure_js_analyzer)
 }
 
-/// Run analysis with the interpreter (VM) builtin symbols pre-registered
-/// (with slot indices).
+/// Run analysis with the interpreter (VM) builtin symbols pre-registered.
 ///
 /// This matches the setup used by the WASM bindings when running under the
 /// interpreter runner.
-#[cfg(feature = "interpreter")]
 pub fn analyze_with_interpreter_symbols(source: &str) -> AnalysisResult {
     analyze(source, configure_interpreter_analyzer)
 }

@@ -3,15 +3,11 @@ name = "tlang_analysis"
 version = "0.1.0"
 edition.workspace = true
 
-[features]
-default = []
-interpreter = ["dep:tlang_core"]
-
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }
 tlang_builtins_js = { path = "../tlang_builtins_js" }
-tlang_core = { path = "../tlang_core", optional = true }
+tlang_builtins_vm = { path = "../tlang_builtins_vm" }
 tlang_defs = { path = "../tlang_defs" }
 tlang_diagnostics = { path = "../tlang_diagnostics" }
 tlang_hir = { path = "../tlang_hir" }

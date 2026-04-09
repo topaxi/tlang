@@ -19,7 +19,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 tlang_ast = { path = "../tlang_ast" }
-tlang_analysis = { path = "../tlang_analysis", features = ["interpreter"] }
+tlang_analysis = { path = "../tlang_analysis" }
 tlang_defs = { path = "../tlang_defs" }
 tlang_diagnostics = { path = "../tlang_diagnostics" }
 tlang_parser = { path = "../tlang_parser" }

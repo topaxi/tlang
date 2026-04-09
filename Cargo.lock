@@ -2100,7 +2100,7 @@ dependencies = [
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_builtins_js",
- "tlang_core",
+ "tlang_builtins_vm",
  "tlang_defs",
  "tlang_diagnostics",
  "tlang_hir",
@@ -2173,6 +2173,13 @@ dependencies = [
 
 [[package]]
 name = "tlang_builtins_js"
+version = "0.1.0"
+dependencies = [
+ "tlang_defs",
+]
+
+[[package]]
+name = "tlang_builtins_vm"
 version = "0.1.0"
 dependencies = [
  "tlang_defs",
@@ -2504,6 +2511,7 @@ dependencies = [
  "log",
  "pretty_assertions",
  "tlang_ast_lowering",
+ "tlang_builtins_vm",
  "tlang_defs",
  "tlang_diagnostics",
  "tlang_hir",

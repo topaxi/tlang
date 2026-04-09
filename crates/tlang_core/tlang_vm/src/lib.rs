@@ -198,3 +198,34 @@ impl VM {
         fn_object
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::VM;
+
+    /// Ensure every symbol that `VM::builtin_symbols()` returns at runtime is
+    /// also present in the static `tlang_builtins_vm::SYMBOLS` list.
+    ///
+    /// This test will fail if a new `#[native_fn]`, `define_enum!`,
+    /// `define_struct!`, or `define_protocol!` entry is added to the stdlib
+    /// without a matching entry in `tlang_builtins_vm`.
+    #[test]
+    fn static_symbol_list_covers_all_inventory_symbols() {
+        let static_names: std::collections::HashSet<&str> = tlang_builtins_vm::SYMBOLS
+            .iter()
+            .map(|(name, _)| *name)
+            .collect();
+
+        let missing: Vec<String> = VM::builtin_symbols()
+            .into_iter()
+            .filter(|(name, _, _)| !static_names.contains(name.as_str()))
+            .map(|(name, kind, _)| format!("{name:?} ({kind:?})"))
+            .collect();
+
+        assert!(
+            missing.is_empty(),
+            "tlang_builtins_vm::SYMBOLS is missing the following VM symbols:\n  {}",
+            missing.join("\n  "),
+        );
+    }
+}

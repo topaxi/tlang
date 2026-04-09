@@ -33,6 +33,7 @@ env_logger = { workspace = true, optional = true }
 ctor = { workspace = true }
 env_logger = { workspace = true }
 pretty_assertions = { workspace = true }
+tlang_builtins_vm = { path = "../../tlang_builtins_vm" }
 
 [lints]
 workspace = true
