@@ -363,9 +363,17 @@ export class TlangPlayground extends LitElement {
   @state()
   hasLigatures = localStorage.getItem('ligatures') !== 'false';
 
+  @state()
+  hasInlayHints = localStorage.getItem('inlayHints') !== 'false';
+
   private toggleLigatures() {
     this.hasLigatures = !this.hasLigatures;
     localStorage.setItem('ligatures', String(this.hasLigatures));
+  }
+
+  private toggleInlayHints() {
+    this.hasInlayHints = !this.hasInlayHints;
+    localStorage.setItem('inlayHints', String(this.hasInlayHints));
   }
 
   private readonly hoverProvider = (pos: number) =>
@@ -373,6 +381,11 @@ export class TlangPlayground extends LitElement {
 
   private readonly gotoDefinitionProvider = (pos: number) =>
     this.tlang.getDefinitionLocation(pos);
+
+  // The inlay hint source ignores the `code` argument because the playground
+  // already keeps `TlangController` in sync with the editor on every change.
+  private readonly inlayHintSource = (_code: string) =>
+    this.tlang.getInlayHints();
 
   private async run() {
     if (!this.consoleElement.persist) {
@@ -709,6 +722,12 @@ export class TlangPlayground extends LitElement {
               >
                 Ligatures
               </t-menuitem-checkbox>
+              <t-menuitem-checkbox
+                @change=${this.toggleInlayHints}
+                ?checked=${this.hasInlayHints}
+              >
+                Inlay Hints
+              </t-menuitem-checkbox>
             </t-menu>
             <t-button
               slot="end"
@@ -733,6 +752,9 @@ export class TlangPlayground extends LitElement {
                 with-diagnostics
                 .hoverProvider=${this.hoverProvider}
                 .gotoDefinitionProvider=${this.gotoDefinitionProvider}
+                .inlayHintSource=${this.hasInlayHints
+                  ? this.inlayHintSource
+                  : undefined}
                 @source-change=${this.handleSourceChange}
               ></t-codemirror>
               <t-diagnostics

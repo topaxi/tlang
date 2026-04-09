@@ -1,0 +1,15 @@
+{
+  "name": "codemirror-inlay-hints",
+  "version": "1.0.0",
+  "description": "CodeMirror 6 inlay hints extension",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "sideEffects": false,
+  "author": "Damian Senn <damian.senn@topaxi.codes>",
+  "license": "ISC",
+  "peerDependencies": {
+    "@codemirror/state": "^6.0.0",
+    "@codemirror/view": "^6.0.0"
+  }
+}

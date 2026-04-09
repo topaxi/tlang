@@ -10,6 +10,7 @@ import {
   type HoverProvider,
   type GotoDefinitionProvider,
 } from 'codemirror-lang-tlang';
+import { inlayHints, type InlayHintSource } from 'codemirror-inlay-hints';
 import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
 import { json, jsonLanguage } from '@codemirror/lang-json';
 import { htmlLanguage } from '@codemirror/lang-html';
@@ -48,6 +49,7 @@ export class TCodeMirror extends LitElement {
 
   private view: EditorView | null = null;
   private completionCompartment = new Compartment();
+  private inlayHintsCompartment = new Compartment();
 
   private getCompletionConfig() {
     return this.completionItems.length > 0
@@ -87,6 +89,9 @@ export class TCodeMirror extends LitElement {
   @property({ attribute: false })
   gotoDefinitionProvider?: GotoDefinitionProvider;
 
+  @property({ attribute: false })
+  inlayHintSource?: InlayHintSource;
+
   @hostListener('keyup')
   handleKeyUp(event: KeyboardEvent) {
     // ? will show the shortcuts popover, but within the editor we do not
@@ -115,6 +120,10 @@ export class TCodeMirror extends LitElement {
     });
   }
 
+  private getInlayHintsConfig() {
+    return this.inlayHintSource ? inlayHints(this.inlayHintSource) : [];
+  }
+
   private getEditorExtensions() {
     let extensions = [
       basicSetup,
@@ -122,6 +131,7 @@ export class TCodeMirror extends LitElement {
       // We currently use Ctrl+Enter to run the code.
       Prec.highest(keymap.of([{ key: 'Ctrl-Enter', run: () => true }])),
       this.completionCompartment.of(this.getCompletionConfig()),
+      this.inlayHintsCompartment.of(this.getInlayHintsConfig()),
     ];
 
     switch (this.language) {
@@ -189,6 +199,14 @@ export class TCodeMirror extends LitElement {
         this.view.dispatch({
           effects: this.completionCompartment.reconfigure(
             this.getCompletionConfig(),
+          ),
+        });
+      }
+
+      if (changedProperties.has('inlayHintSource')) {
+        this.view.dispatch({
+          effects: this.inlayHintsCompartment.reconfigure(
+            this.getInlayHintsConfig(),
           ),
         });
       }

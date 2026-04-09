@@ -296,4 +296,8 @@ export class TlangController {
   getDefinitionLocation(pos: number): { from: number; to: number } | null {
     return this.tlang.getDefinitionLocation(pos) ?? null;
   }
+
+  getInlayHints(): { position: number; label: string; kind: string }[] {
+    return this.tlang.getInlayHints();
+  }
 }

@@ -34,6 +34,7 @@
     "@floating-ui/dom": "1.7.6",
     "@lit/context": "1.1.6",
     "codemirror": "6.0.2",
+    "codemirror-inlay-hints": "file:../packages/codemirror-inlay-hints",
     "codemirror-lang-tlang": "file:../packages/codemirror-lang-tlang",
     "codemirror-theme-catppuccin": "0.3.0",
     "lit": "3.3.2",
