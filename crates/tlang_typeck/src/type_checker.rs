@@ -7,6 +7,7 @@ use tlang_hir::visit::{walk_block, walk_expr, walk_module, walk_stmt};
 use tlang_hir::{self as hir, BinaryOpKind, PrimTy, Ty, TyKind};
 use tlang_hir_opt::hir_opt::{HirOptContext, HirOptError, HirPass};
 
+use crate::builtin_types;
 use crate::builtins;
 use crate::type_table::{
     EnumInfo, ImplInfo, ProtocolInfo, ProtocolMethodInfo, StructInfo, VariantInfo,
@@ -61,14 +62,11 @@ impl TypeChecker {
 
     // ── Builtin collection types ─────────────────────────────────────
 
-    /// Create a `TyKind::Path` for a single-segment builtin type name such as
-    /// `"List"` or `"Dict"`.  These paths carry no HirId resolution — they
-    /// are purely nominal and used for display / LSP hover info.
+    /// Create the canonical `TyKind` for a builtin collection type name
+    /// (`"List"` or `"Dict"`).  Delegates to `builtin_types::lookup`.
     fn builtin_type_path(name: &str) -> TyKind {
-        let ident = tlang_ast::node::Ident::new(name, tlang_span::Span::default());
-        let segment = hir::PathSegment::new(ident);
-        let path = hir::Path::new(vec![segment], tlang_span::Span::default());
-        TyKind::Path(path)
+        builtin_types::lookup(name)
+            .unwrap_or_else(|| panic!("unknown builtin collection type: {name}"))
     }
 
     /// Assign `ty_kind` to `expr.ty` and record it in the type table.

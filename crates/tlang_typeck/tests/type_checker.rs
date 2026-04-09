@@ -1165,7 +1165,44 @@ fn list_literal_annotation_mismatch_error() {
     );
 }
 
-// ── Dict literal type inference ─────────────────────────────────────────
+// ── builtin_types registry ──────────────────────────────────────────────
+
+#[test]
+fn builtin_types_list_lookup_returns_prim_ty_res() {
+    use tlang_hir::TyKind;
+    use tlang_typeck::builtin_types;
+
+    let ty = builtin_types::lookup("List").expect("List should be a known builtin type");
+    match ty {
+        TyKind::Path(path) => {
+            assert!(path.res.is_prim_ty(), "List path should carry Res::PrimTy");
+            assert_eq!(path.join("::"), "List");
+        }
+        other => panic!("expected TyKind::Path for List, got {other:?}"),
+    }
+}
+
+#[test]
+fn builtin_types_dict_lookup_returns_prim_ty_res() {
+    use tlang_hir::TyKind;
+    use tlang_typeck::builtin_types;
+
+    let ty = builtin_types::lookup("Dict").expect("Dict should be a known builtin type");
+    match ty {
+        TyKind::Path(path) => {
+            assert!(path.res.is_prim_ty(), "Dict path should carry Res::PrimTy");
+            assert_eq!(path.join("::"), "Dict");
+        }
+        other => panic!("expected TyKind::Path for Dict, got {other:?}"),
+    }
+}
+
+#[test]
+fn builtin_types_unknown_name_returns_none() {
+    use tlang_typeck::builtin_types;
+    assert!(builtin_types::lookup("Foo").is_none());
+    assert!(builtin_types::lookup("i64").is_none());
+}
 
 #[test]
 fn dict_literal_inferred_as_dict_ok() {
