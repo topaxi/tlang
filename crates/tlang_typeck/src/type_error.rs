@@ -68,6 +68,20 @@ pub enum TypeError {
         available: Vec<String>,
         span: Span,
     },
+    /// A required protocol method is missing from an impl block.
+    MissingProtocolMethod {
+        method: String,
+        protocol: String,
+        target_type: String,
+        span: Span,
+    },
+    /// A constraint protocol is not implemented for the target type.
+    MissingConstraintImpl {
+        constraint: String,
+        protocol: String,
+        target_type: String,
+        span: Span,
+    },
 }
 
 impl TypeError {
@@ -84,7 +98,9 @@ impl TypeError {
             | TypeError::ArgumentCountMismatch { span, .. }
             | TypeError::ArgumentTypeMismatch { span, .. }
             | TypeError::ReturnTypeMismatch { span, .. }
-            | TypeError::UnknownField { span, .. } => *span,
+            | TypeError::UnknownField { span, .. }
+            | TypeError::MissingProtocolMethod { span, .. }
+            | TypeError::MissingConstraintImpl { span, .. } => *span,
         }
     }
 
@@ -150,6 +166,24 @@ impl TypeError {
                 format!(
                     "unknown field `{field}` on struct `{type_name}`; available fields: {}",
                     available.join(", ")
+                )
+            }
+            TypeError::MissingProtocolMethod {
+                method,
+                protocol,
+                target_type,
+                ..
+            } => {
+                format!("missing method `{method}` in impl `{protocol}` for `{target_type}`")
+            }
+            TypeError::MissingConstraintImpl {
+                constraint,
+                protocol,
+                target_type,
+                ..
+            } => {
+                format!(
+                    "missing constraint: `{protocol}` requires `{constraint}` to be implemented for `{target_type}`"
                 )
             }
         }

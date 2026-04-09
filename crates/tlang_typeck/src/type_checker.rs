@@ -6,7 +6,9 @@ use tlang_hir::{self as hir, BinaryOpKind, PrimTy, Ty, TyKind};
 use tlang_hir_opt::hir_opt::{HirOptContext, HirOptError, HirPass};
 
 use crate::builtins;
-use crate::type_table::{EnumInfo, StructInfo, VariantInfo};
+use crate::type_table::{
+    EnumInfo, ImplInfo, ProtocolInfo, ProtocolMethodInfo, StructInfo, VariantInfo,
+};
 use crate::typing_context::TypingContext;
 use crate::{TypeError, TypeInfo, TypeTable};
 
@@ -733,7 +735,169 @@ impl TypeChecker {
         }
     }
 
-    /// Resolve a struct field type given a struct `HirId` and field name.
+    // ── Protocol and impl block registration ─────────────────────────
+
+    /// Register a protocol declaration in the type table: store method
+    /// signatures and constraint protocol names.
+    fn register_protocol_declaration(&mut self, decl: &hir::ProtocolDeclaration) {
+        let methods: Vec<ProtocolMethodInfo> = decl
+            .methods
+            .iter()
+            .map(|m| ProtocolMethodInfo {
+                name: m.name,
+                param_tys: m
+                    .parameters
+                    .iter()
+                    .map(|p| p.type_annotation.clone())
+                    .collect(),
+                return_ty: m.return_type.clone(),
+                has_default_body: m.body.is_some(),
+            })
+            .collect();
+        let constraints: Vec<String> = decl.constraints.iter().map(|c| c.join("::")).collect();
+        self.type_table.insert_protocol_info(ProtocolInfo {
+            name: decl.name,
+            methods,
+            constraints,
+        });
+
+        // Register each protocol method signature in the type table so
+        // that `Protocol::method(…)` calls can resolve to the method's type.
+        for method in &decl.methods {
+            let param_tys: Vec<Ty> = method
+                .parameters
+                .iter()
+                .map(|p| p.type_annotation.clone())
+                .collect();
+            let fn_ty = Self::make_fn_ty(param_tys, method.return_type.kind.clone());
+            self.type_table.insert(
+                method.hir_id,
+                TypeInfo {
+                    ty: Ty {
+                        kind: fn_ty,
+                        ..Ty::default()
+                    },
+                },
+            );
+        }
+    }
+
+    /// Validate an impl block: check that all required methods from the
+    /// protocol are present, register the impl, and type-check the methods.
+    fn check_impl_block(&mut self, impl_block: &mut hir::ImplBlock) {
+        let protocol_name = impl_block.protocol_name.join("::");
+        let target_type_name = impl_block.target_type.join("::");
+
+        // Record that this impl exists.
+        self.type_table.insert_impl_info(ImplInfo {
+            protocol_name: protocol_name.clone(),
+            target_type_name: target_type_name.clone(),
+        });
+
+        // Collect names of methods present in the impl (including apply methods).
+        let impl_method_names: Vec<String> = impl_block
+            .methods
+            .iter()
+            .map(|m| {
+                // Method names in impl blocks are qualified as "Protocol::method"
+                // in the HIR.  Extract the unqualified method name.
+                let full = m.name();
+                full.rsplit("::").next().unwrap_or(&full).to_string()
+            })
+            .collect();
+
+        // Check protocol method requirements.
+        if let Some(proto_info) = self.type_table.get_protocol_info(&protocol_name).cloned() {
+            // Check that every required method is implemented.
+            for proto_method in &proto_info.methods {
+                let method_name = proto_method.name.as_str();
+                let is_present = impl_method_names.iter().any(|n| n == method_name)
+                    || impl_block
+                        .apply_methods
+                        .iter()
+                        .any(|a| a.as_str() == method_name);
+                if !is_present {
+                    // Check if the protocol has a default implementation.
+                    let has_default = proto_info
+                        .methods
+                        .iter()
+                        .any(|m| m.name.as_str() == method_name && m.has_default_body);
+                    if !has_default {
+                        let span = impl_block.target_type.span;
+                        self.errors.push(TypeError::MissingProtocolMethod {
+                            method: method_name.to_string(),
+                            protocol: protocol_name.clone(),
+                            target_type: target_type_name.clone(),
+                            span,
+                        });
+                    }
+                }
+            }
+
+            // Check constraint protocols.
+            for constraint in &proto_info.constraints {
+                if !self.type_table.has_impl(constraint, &target_type_name) {
+                    let span = impl_block.target_type.span;
+                    self.errors.push(TypeError::MissingConstraintImpl {
+                        constraint: constraint.clone(),
+                        protocol: protocol_name.clone(),
+                        target_type: target_type_name.clone(),
+                        span,
+                    });
+                }
+            }
+        }
+
+        // Type-check the impl methods.
+        for decl in &mut impl_block.methods {
+            let fn_ctx = TypingContext::for_function(decl);
+            self.push_context(fn_ctx);
+            self.register_function_signature(decl);
+
+            for param in &decl.parameters {
+                self.type_table.insert(
+                    param.hir_id,
+                    TypeInfo {
+                        ty: param.type_annotation.clone(),
+                    },
+                );
+            }
+
+            self.return_type_stack.push(decl.return_type.kind.clone());
+            self.observed_return_types.push(Vec::new());
+            self.visit_block(&mut decl.body, &mut ());
+            self.check_function_body_return(decl);
+
+            if matches!(decl.return_type.kind, TyKind::Unknown) {
+                let body_ty = decl
+                    .body
+                    .expr
+                    .as_ref()
+                    .map(|e| e.ty.kind.clone())
+                    .or_else(|| self.infer_return_type_from_observed())
+                    .unwrap_or_else(|| decl.return_type.kind.clone());
+                let param_tys: Vec<Ty> = decl
+                    .parameters
+                    .iter()
+                    .map(|p| p.type_annotation.clone())
+                    .collect();
+                let fn_ty = Self::make_fn_ty(param_tys, body_ty);
+                self.type_table.insert(
+                    decl.hir_id,
+                    TypeInfo {
+                        ty: Ty {
+                            kind: fn_ty,
+                            ..Ty::default()
+                        },
+                    },
+                );
+            }
+
+            self.observed_return_types.pop();
+            self.return_type_stack.pop();
+            self.pop_context();
+        }
+    }
     fn resolve_field_type(
         &self,
         struct_hir_id: &tlang_span::HirId,
@@ -884,6 +1048,56 @@ impl TypeChecker {
         self.return_type_stack.pop();
         self.pop_context();
     }
+
+    /// Visit a top-level function declaration statement.
+    fn visit_function_decl_stmt(&mut self, decl: &mut hir::FunctionDeclaration) {
+        let fn_ctx = TypingContext::for_function(decl);
+        self.push_context(fn_ctx);
+        self.register_function_signature(decl);
+
+        for param in &decl.parameters {
+            self.type_table.insert(
+                param.hir_id,
+                TypeInfo {
+                    ty: param.type_annotation.clone(),
+                },
+            );
+        }
+
+        self.return_type_stack.push(decl.return_type.kind.clone());
+        self.observed_return_types.push(Vec::new());
+        self.visit_block(&mut decl.body, &mut ());
+        self.check_function_body_return(decl);
+
+        if matches!(decl.return_type.kind, TyKind::Unknown) {
+            let body_ty = decl
+                .body
+                .expr
+                .as_ref()
+                .map(|e| e.ty.kind.clone())
+                .or_else(|| self.infer_return_type_from_observed())
+                .unwrap_or_else(|| decl.return_type.kind.clone());
+            let param_tys: Vec<Ty> = decl
+                .parameters
+                .iter()
+                .map(|p| p.type_annotation.clone())
+                .collect();
+            let fn_ty = Self::make_fn_ty(param_tys, body_ty);
+            self.type_table.insert(
+                decl.hir_id,
+                TypeInfo {
+                    ty: Ty {
+                        kind: fn_ty,
+                        ..Ty::default()
+                    },
+                },
+            );
+        }
+
+        self.observed_return_types.pop();
+        self.return_type_stack.pop();
+        self.pop_context();
+    }
 }
 
 fn unary_op_str(op: UnaryOp) -> &'static str {
@@ -966,64 +1180,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 pat.ty.kind = binding_ty;
             }
             hir::StmtKind::FunctionDeclaration(decl) => {
-                let fn_ctx = TypingContext::for_function(decl);
-                self.push_context(fn_ctx);
-
-                // Register function signature in the type table.
-                self.register_function_signature(decl);
-
-                // Store parameter types in the type table.
-                for param in &decl.parameters {
-                    self.type_table.insert(
-                        param.hir_id,
-                        TypeInfo {
-                            ty: param.type_annotation.clone(),
-                        },
-                    );
-                }
-
-                // Push the declared return type for return-statement checking
-                // and start tracking observed return types.
-                self.return_type_stack.push(decl.return_type.kind.clone());
-                self.observed_return_types.push(Vec::new());
-
-                self.visit_block(&mut decl.body, ctx);
-
-                // Check that body type matches declared return type.
-                self.check_function_body_return(decl);
-
-                // Update the function signature with the inferred return type
-                // if the declared return type was unknown.
-                if matches!(decl.return_type.kind, TyKind::Unknown) {
-                    // Prefer trailing expression type, then fall back to the
-                    // type inferred from `return` statements, then keep unknown.
-                    let body_ty = decl
-                        .body
-                        .expr
-                        .as_ref()
-                        .map(|e| e.ty.kind.clone())
-                        .or_else(|| self.infer_return_type_from_observed())
-                        .unwrap_or_else(|| decl.return_type.kind.clone());
-                    let param_tys: Vec<Ty> = decl
-                        .parameters
-                        .iter()
-                        .map(|p| p.type_annotation.clone())
-                        .collect();
-                    let fn_ty = Self::make_fn_ty(param_tys, body_ty);
-                    self.type_table.insert(
-                        decl.hir_id,
-                        TypeInfo {
-                            ty: Ty {
-                                kind: fn_ty,
-                                ..Ty::default()
-                            },
-                        },
-                    );
-                }
-
-                self.observed_return_types.pop();
-                self.return_type_stack.pop();
-                self.pop_context();
+                self.visit_function_decl_stmt(decl);
             }
             hir::StmtKind::Return(expr) => {
                 if let Some(e) = expr.as_mut() {
@@ -1050,6 +1207,24 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 for const_item in &mut decl.consts {
                     self.visit_expr(&mut const_item.value, ctx);
                 }
+            }
+            hir::StmtKind::ProtocolDeclaration(decl) => {
+                self.register_protocol_declaration(decl);
+                // Walk default method bodies.
+                for method in &mut decl.methods {
+                    if let Some(body) = &mut method.body {
+                        let fn_ctx = TypingContext::Permissive;
+                        self.push_context(fn_ctx);
+                        self.visit_block(body, ctx);
+                        self.pop_context();
+                    }
+                }
+                for const_item in &mut decl.consts {
+                    self.visit_expr(&mut const_item.value, ctx);
+                }
+            }
+            hir::StmtKind::ImplBlock(impl_block) => {
+                self.check_impl_block(impl_block);
             }
             _ => walk_stmt(self, stmt, ctx),
         }
