@@ -1182,7 +1182,7 @@ fn list_literal_return_type_mismatch_error() {
 fn dict_literal_return_type_mismatch_error() {
     let errs = common::typecheck_errors(
         r#"
-        fn get_number() -> i64 { {key: "value"} }
+        fn get_number() -> i64 { return {key: "value"}; }
         "#,
     );
     assert!(
