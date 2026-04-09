@@ -603,7 +603,15 @@ impl LoweringContext {
                 } else if let Some(Some(ident)) = all_param_names.get(i) {
                     *ident
                 } else {
-                    Ident::new(&format!("arg{i}"), Default::default())
+                    // Synthesised placeholder — use the source span of the corresponding
+                    // parameter in the first clause that has one, so that any inlay hints
+                    // derived from this parameter land at the right position rather than
+                    // falling back to the default (0, 0) span.
+                    let source_span = decls
+                        .iter()
+                        .find_map(|d| d.parameters.get(i).map(|p| p.span))
+                        .unwrap_or_default();
+                    Ident::new(&format!("arg{i}"), source_span)
                 }
             })
             .collect::<Vec<_>>();
@@ -749,6 +757,14 @@ impl LoweringContext {
 
             let match_arms = this.create_match_arms(decls, leading_comments);
 
+            // Use actual source spans for the synthesised body so that inlay hints
+            // (return-type hints in particular) land at the real `{` position rather
+            // than the default (0, 0).
+            let body_span = tlang_span::Span::from_spans(
+                &decls[0].body.span,
+                &decls.last().unwrap().body.span,
+            );
+
             let body = hir::Block::new(
                 this.unique_id(),
                 vec![],
@@ -756,15 +772,18 @@ impl LoweringContext {
                     hir_id: this.unique_id(),
                     kind: hir::ExprKind::Match(Box::new(match_value), match_arms),
                     ty: hir::Ty::unknown(),
-                    span: tlang_span::Span::default(),
+                    span: body_span,
                 }),
-                tlang_span::Span::default(),
+                body_span,
             );
 
             (hir_id, {
                 let mut decl = hir::FunctionDeclaration::new(hir_id, fn_name, params, body);
                 // Multi-clause functions inherit visibility from the first clause.
                 decl.visibility = decls[0].visibility;
+                // Carry the combined source span so position-based features (e.g. inlay
+                // hints) can locate the declaration in the editor.
+                decl.span = span;
                 decl
             })
         })
@@ -889,7 +908,21 @@ fn get_param_names(decls: &[FunctionDeclaration]) -> Vec<Option<Ident>> {
                     _ => true,
                 })
         {
-            argument_names.push(Some(Ident::new(&arg_name, Default::default())));
+            // Use the source span of the identifier from whichever clause defines it, so
+            // that any inlay hints derived from this parameter land at the right location.
+            let source_span = decls
+                .iter()
+                .find_map(|d| {
+                    if let Some(ast::node::PatKind::Identifier(ident)) =
+                        d.parameters.get(i).map(|p| &p.pattern.kind)
+                    {
+                        Some(ident.span)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_default();
+            argument_names.push(Some(Ident::new(&arg_name, source_span)));
         } else {
             argument_names.push(None);
         }
