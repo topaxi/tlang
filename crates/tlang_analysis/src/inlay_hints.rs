@@ -225,7 +225,7 @@ fn collect_fn_decl_hints(
                 hints,
                 range,
                 pos,
-                format!("-> {ret_kind}"),
+                format!("-> {ret_kind} "),
                 InlayHintKind::ReturnType,
             );
         }

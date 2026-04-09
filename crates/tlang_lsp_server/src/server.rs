@@ -354,10 +354,7 @@ impl ServerState {
             }),
             text_edits: None,
             tooltip: None,
-            padding_left: Some(matches!(
-                hint.kind,
-                tlang_analysis::inlay_hints::InlayHintKind::ReturnType
-            )),
+            padding_left: None,
             padding_right: None,
             data: None,
         }
@@ -1274,20 +1271,21 @@ mod tests {
     }
 
     #[test]
-    fn inlay_hint_return_type_has_padding_left() {
+    fn inlay_hint_return_type_has_no_padding() {
         let source = "fn f() { 1 }";
         let hint = tlang_analysis::inlay_hints::InlayHint {
             line: 0,
             character: 7,
-            label: "-> i64".into(),
+            label: "-> i64 ".into(),
             kind: tlang_analysis::inlay_hints::InlayHintKind::ReturnType,
         };
         let lsp_hint = ServerState::to_lsp_inlay_hint(&hint, source);
-        assert_eq!(lsp_hint.padding_left, Some(true));
+        assert_eq!(lsp_hint.padding_left, None);
+        assert_eq!(lsp_hint.padding_right, None);
     }
 
     #[test]
-    fn inlay_hint_type_has_no_padding_left() {
+    fn inlay_hint_type_has_no_padding() {
         let source = "let x = 42;";
         let hint = tlang_analysis::inlay_hints::InlayHint {
             line: 0,
@@ -1296,7 +1294,8 @@ mod tests {
             kind: tlang_analysis::inlay_hints::InlayHintKind::Type,
         };
         let lsp_hint = ServerState::to_lsp_inlay_hint(&hint, source);
-        assert_eq!(lsp_hint.padding_left, Some(false));
+        assert_eq!(lsp_hint.padding_left, None);
+        assert_eq!(lsp_hint.padding_right, None);
     }
 
     #[test]
