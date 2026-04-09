@@ -100,6 +100,13 @@ impl SymbolIndex {
                     entries.iter().filter(|e| *e.name == *name).collect();
 
                 if !by_name.is_empty() {
+                    // When the cursor is exactly on a symbol's definition site
+                    // (e.g. the name in `let a = …`), prefer that symbol over
+                    // any outer shadowed symbol with the same name.
+                    if let Some(definition) = by_name.iter().find(|e| e.defined_at == span) {
+                        return Some((*definition).clone());
+                    }
+
                     // Try scope_start < line first.
                     let closest = by_name
                         .iter()

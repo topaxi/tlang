@@ -143,6 +143,40 @@ mod tests {
     }
 
     #[test]
+    fn resolve_let_binding_shadowing_parameter() {
+        // `let a` shadows parameter `a`. Hovering on the let binding name
+        // should resolve to the variable, not the shadowed parameter.
+        // `a` in `let a = 0` is at col 16 (0-based).
+        let resolved = setup_and_resolve("fn foo(a) { let a = 0; a }", 0, 16);
+        assert!(resolved.is_some(), "should resolve `a` in let binding");
+        let resolved = resolved.unwrap();
+        assert_eq!(
+            resolved.def_kind,
+            DefKind::Variable,
+            "should be a variable, not a parameter"
+        );
+    }
+
+    #[test]
+    fn resolve_let_binding_shadowing_parameter_multiline() {
+        // Same but across lines. Hovering on the `a` in `let a = 0` should
+        // resolve to the variable, not the outer parameter.
+        let source = "fn foo(a) {\n  let a = 0;\n  a\n}";
+        // `let a = 0;` is on line 1, `a` is at 0-based col 6
+        let resolved = setup_and_resolve(source, 1, 6);
+        assert!(
+            resolved.is_some(),
+            "should resolve `a` in let binding on line 1"
+        );
+        let resolved = resolved.unwrap();
+        assert_eq!(
+            resolved.def_kind,
+            DefKind::Variable,
+            "should be a variable, not a parameter"
+        );
+    }
+
+    #[test]
     fn resolve_multiline_uses_0based_column() {
         // Caller passes 0-based column; resolve_symbol adjusts for lexer.
         let resolved = setup_and_resolve("fn f() {\n  let x = 1;\n  x\n}", 2, 2);
