@@ -1138,3 +1138,50 @@ fn empty_impl_for_constraint_protocol_with_no_methods_ok() {
         "#,
     );
 }
+
+// ── List literal type inference ─────────────────────────────────────────
+
+#[test]
+fn list_literal_inferred_as_list_ok() {
+    common::typecheck_ok("let a = [1, 2, 3];");
+}
+
+#[test]
+fn empty_list_literal_inferred_as_list_ok() {
+    common::typecheck_ok("let a = [];");
+}
+
+#[test]
+fn list_literal_annotation_matches_ok() {
+    common::typecheck_ok("let a: List = [1, 2, 3];");
+}
+
+#[test]
+fn list_literal_annotation_mismatch_error() {
+    let errs = common::typecheck_errors("let a: i64 = [1, 2];");
+    assert!(
+        errs.iter().any(|e| e.contains("type mismatch in binding")),
+        "expected binding type mismatch, got: {errs:?}"
+    );
+}
+
+// ── Dict literal type inference ─────────────────────────────────────────
+
+#[test]
+fn dict_literal_inferred_as_dict_ok() {
+    common::typecheck_ok("let a = {};");
+}
+
+#[test]
+fn dict_literal_annotation_matches_ok() {
+    common::typecheck_ok("let a: Dict = {};");
+}
+
+#[test]
+fn dict_literal_annotation_mismatch_error() {
+    let errs = common::typecheck_errors("let a: i64 = {};");
+    assert!(
+        errs.iter().any(|e| e.contains("type mismatch in binding")),
+        "expected binding type mismatch, got: {errs:?}"
+    );
+}

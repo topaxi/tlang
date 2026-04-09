@@ -59,6 +59,18 @@ impl TypeChecker {
         self.context_stack.pop();
     }
 
+    // ── Builtin collection types ─────────────────────────────────────
+
+    /// Create a `TyKind::Path` for a single-segment builtin type name such as
+    /// `"List"` or `"Dict"`.  These paths carry no HirId resolution — they
+    /// are purely nominal and used for display / LSP hover info.
+    fn builtin_type_path(name: &str) -> TyKind {
+        let ident = tlang_ast::node::Ident::new(name, tlang_span::Span::default());
+        let segment = hir::PathSegment::new(ident);
+        let path = hir::Path::new(vec![segment], tlang_span::Span::default());
+        TyKind::Path(path)
+    }
+
     // ── Literal typing ───────────────────────────────────────────────
 
     fn type_of_literal(lit: &Literal) -> TyKind {
@@ -1314,6 +1326,39 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     TypeInfo {
                         ty: Ty {
                             kind: result_ty,
+                            ..Ty::default()
+                        },
+                    },
+                );
+            }
+            hir::ExprKind::List(elements) => {
+                for elem in elements.iter_mut() {
+                    self.visit_expr(elem, ctx);
+                }
+                let ty_kind = Self::builtin_type_path("List");
+                expr.ty.kind = ty_kind.clone();
+                self.type_table.insert(
+                    expr.hir_id,
+                    TypeInfo {
+                        ty: Ty {
+                            kind: ty_kind,
+                            ..Ty::default()
+                        },
+                    },
+                );
+            }
+            hir::ExprKind::Dict(entries) => {
+                for (key, val) in entries.iter_mut() {
+                    self.visit_expr(key, ctx);
+                    self.visit_expr(val, ctx);
+                }
+                let ty_kind = Self::builtin_type_path("Dict");
+                expr.ty.kind = ty_kind.clone();
+                self.type_table.insert(
+                    expr.hir_id,
+                    TypeInfo {
+                        ty: Ty {
+                            kind: ty_kind,
                             ..Ty::default()
                         },
                     },
