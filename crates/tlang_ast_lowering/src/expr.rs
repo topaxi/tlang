@@ -472,9 +472,11 @@ impl LoweringContext {
             ast::node::ExprKind::Path(_) => {
                 let lhs = self.lower_expr(&node.lhs);
                 let rhs = self.lower_callee(&node.rhs, 1);
+                let call_hir_id = self.unique_id();
+                self.pipeline_call_ids.insert(call_hir_id);
 
                 hir::ExprKind::Call(Box::new(hir::CallExpression {
-                    hir_id: self.unique_id(),
+                    hir_id: call_hir_id,
                     callee: rhs,
                     arguments: vec![lhs],
                 }))
@@ -499,9 +501,11 @@ impl LoweringContext {
                     arguments
                 };
                 let callee = self.lower_callee(&call_expr.callee, arguments.len());
+                let call_hir_id = self.unique_id();
+                self.pipeline_call_ids.insert(call_hir_id);
 
                 hir::ExprKind::Call(Box::new(hir::CallExpression {
-                    hir_id: self.unique_id(),
+                    hir_id: call_hir_id,
                     callee,
                     arguments,
                 }))

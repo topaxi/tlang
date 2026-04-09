@@ -764,6 +764,9 @@ impl Tlang {
                                 tlang_analysis::inlay_hints::InlayHintKind::ReturnType => {
                                     "returnType".to_string()
                                 }
+                                tlang_analysis::inlay_hints::InlayHintKind::ChainedPipeline => {
+                                    "chainedPipeline".to_string()
+                                }
                             },
                         }
                     })

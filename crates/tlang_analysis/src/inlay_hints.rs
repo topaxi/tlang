@@ -8,14 +8,16 @@
 //! - **Variable/const bindings** without explicit type annotations.
 //! - **Function return types** when not annotated.
 //! - **Function parameters** without explicit type annotations.
+//! - **Pipeline chain steps** — intermediate types after each `|>` operator
+//!   when the chain spans multiple lines.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
 use tlang_defs::DefScope;
 use tlang_hir as hir;
 use tlang_hir::TyKind;
-use tlang_span::{LineColumn, NodeId, Span};
+use tlang_span::{HirId, LineColumn, NodeId, Span};
 use tlang_typeck::TypeChecker;
 use tlang_typeck::TypeTable;
 
@@ -41,6 +43,8 @@ pub enum InlayHintKind {
     Type,
     /// Return type for a function declaration.
     ReturnType,
+    /// Intermediate type produced by one step of a multi-line `|>` pipeline.
+    ChainedPipeline,
 }
 
 /// The result of running the full type-checking pipeline: a typed HIR module
@@ -48,6 +52,8 @@ pub enum InlayHintKind {
 pub struct TypedHir {
     pub module: hir::Module,
     pub type_table: TypeTable,
+    /// HirIds of `CallExpression` nodes that were desugared from `|>`.
+    pub pipeline_call_ids: HashSet<HirId>,
 }
 
 /// Run the full pipeline (HIR lowering → optimisation → type checking) on an
@@ -82,6 +88,9 @@ pub fn lower_and_typecheck(result: &AnalysisResult) -> Option<TypedHir> {
     )
     .ok()?;
 
+    // Extract pipeline provenance before converting meta into HirOptContext.
+    let pipeline_call_ids = meta.pipeline_call_ids.clone();
+
     let mut ctx: tlang_hir_opt::hir_opt::HirOptContext = meta.into();
 
     // Run default optimisations without dead code elimination — DCE would
@@ -99,6 +108,7 @@ pub fn lower_and_typecheck(result: &AnalysisResult) -> Option<TypedHir> {
     Some(TypedHir {
         module,
         type_table: tc.type_table,
+        pipeline_call_ids,
     })
 }
 
@@ -108,67 +118,66 @@ pub fn lower_and_typecheck(result: &AnalysisResult) -> Option<TypedHir> {
 /// `[start_line, end_line]` (inclusive, 0-based) are returned.
 pub fn collect_inlay_hints(typed_hir: &TypedHir, range: Option<(u32, u32)>) -> Vec<InlayHint> {
     let mut hints = Vec::new();
-    collect_block_hints(
-        &typed_hir.module.block,
-        &typed_hir.type_table,
+    let ctx = HintCtx {
+        type_table: &typed_hir.type_table,
+        pipeline_call_ids: &typed_hir.pipeline_call_ids,
         range,
-        &mut hints,
-    );
+    };
+    collect_block_hints(&typed_hir.module.block, &ctx, &mut hints);
     hints
+}
+
+// ── Internal collection context ────────────────────────────────────────
+
+/// Shared read-only context threaded through all hint-collection helpers.
+struct HintCtx<'a> {
+    type_table: &'a TypeTable,
+    pipeline_call_ids: &'a HashSet<HirId>,
+    range: Option<(u32, u32)>,
 }
 
 // ── Block / statement traversal ────────────────────────────────────────
 
-fn collect_block_hints(
-    block: &hir::Block,
-    type_table: &TypeTable,
-    range: Option<(u32, u32)>,
-    hints: &mut Vec<InlayHint>,
-) {
+fn collect_block_hints(block: &hir::Block, ctx: &HintCtx<'_>, hints: &mut Vec<InlayHint>) {
     for stmt in &block.stmts {
-        collect_stmt_hints(stmt, type_table, range, hints);
+        collect_stmt_hints(stmt, ctx, hints);
     }
     if let Some(expr) = &block.expr {
-        collect_expr_hints(expr, type_table, range, hints);
+        collect_expr_hints(expr, ctx, hints);
     }
 }
 
-fn collect_stmt_hints(
-    stmt: &hir::Stmt,
-    type_table: &TypeTable,
-    range: Option<(u32, u32)>,
-    hints: &mut Vec<InlayHint>,
-) {
+fn collect_stmt_hints(stmt: &hir::Stmt, ctx: &HintCtx<'_>, hints: &mut Vec<InlayHint>) {
     match &stmt.kind {
         hir::StmtKind::Let(pat, expr, ty) => {
             // Recurse into the initialiser expression.
-            collect_expr_hints(expr, type_table, range, hints);
+            collect_expr_hints(expr, ctx, hints);
 
             // Show a type hint when no explicit annotation was written.
             if matches!(ty.kind, TyKind::Unknown) && !matches!(pat.ty.kind, TyKind::Unknown) {
-                collect_pat_type_hints(pat, range, hints);
+                collect_pat_type_hints(pat, ctx.range, hints);
             }
         }
         hir::StmtKind::Const(_, pat, expr, ty) => {
-            collect_expr_hints(expr, type_table, range, hints);
+            collect_expr_hints(expr, ctx, hints);
 
             if matches!(ty.kind, TyKind::Unknown) && !matches!(pat.ty.kind, TyKind::Unknown) {
-                collect_pat_type_hints(pat, range, hints);
+                collect_pat_type_hints(pat, ctx.range, hints);
             }
         }
         hir::StmtKind::FunctionDeclaration(decl) => {
-            collect_fn_decl_hints(decl, type_table, range, hints);
+            collect_fn_decl_hints(decl, ctx, hints);
         }
         hir::StmtKind::DynFunctionDeclaration(_) => {
             // Dynamic dispatch wrappers — no hints needed.
         }
         hir::StmtKind::Return(expr) => {
             if let Some(e) = expr {
-                collect_expr_hints(e, type_table, range, hints);
+                collect_expr_hints(e, ctx, hints);
             }
         }
         hir::StmtKind::Expr(expr) => {
-            collect_expr_hints(expr, type_table, range, hints);
+            collect_expr_hints(expr, ctx, hints);
         }
         hir::StmtKind::EnumDeclaration(_)
         | hir::StmtKind::StructDeclaration(_)
@@ -183,8 +192,7 @@ fn collect_stmt_hints(
 
 fn collect_fn_decl_hints(
     decl: &hir::FunctionDeclaration,
-    type_table: &TypeTable,
-    range: Option<(u32, u32)>,
+    ctx: &HintCtx<'_>,
     hints: &mut Vec<InlayHint>,
 ) {
     // Parameter type hints — show when the user didn't annotate a type.
@@ -196,7 +204,7 @@ fn collect_fn_decl_hints(
             let pos = param.name.span.end_lc;
             push_hint(
                 hints,
-                range,
+                ctx.range,
                 pos,
                 format!(": {}", param.type_annotation.kind),
                 InlayHintKind::Type,
@@ -207,7 +215,8 @@ fn collect_fn_decl_hints(
     // Return type hint — show when no explicit return type was written.
     if matches!(decl.return_type.kind, TyKind::Unknown) {
         // Try to get the inferred return type from the type table.
-        let inferred_ret = type_table
+        let inferred_ret = ctx
+            .type_table
             .get(&decl.hir_id)
             .and_then(|info| match &info.ty.kind {
                 TyKind::Fn(_, ret) => Some(&ret.kind),
@@ -223,7 +232,7 @@ fn collect_fn_decl_hints(
             let pos = return_type_hint_position(decl);
             push_hint(
                 hints,
-                range,
+                ctx.range,
                 pos,
                 format!(" -> {ret_kind}"),
                 InlayHintKind::ReturnType,
@@ -232,7 +241,7 @@ fn collect_fn_decl_hints(
     }
 
     // Recurse into the function body.
-    collect_block_hints(&decl.body, type_table, range, hints);
+    collect_block_hints(&decl.body, ctx, hints);
 }
 
 /// Determine the position for a return type hint.
@@ -251,92 +260,106 @@ fn return_type_hint_position(decl: &hir::FunctionDeclaration) -> LineColumn {
 
 // ── Expression traversal (recurse into nested functions / blocks) ──────
 
-fn collect_expr_hints(
-    expr: &hir::Expr,
-    type_table: &TypeTable,
-    range: Option<(u32, u32)>,
-    hints: &mut Vec<InlayHint>,
-) {
+fn collect_expr_hints(expr: &hir::Expr, ctx: &HintCtx<'_>, hints: &mut Vec<InlayHint>) {
     match &expr.kind {
         hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
-            collect_block_hints(block, type_table, range, hints);
+            collect_block_hints(block, ctx, hints);
         }
         hir::ExprKind::FunctionExpression(decl) => {
-            collect_fn_decl_hints(decl, type_table, range, hints);
+            collect_fn_decl_hints(decl, ctx, hints);
         }
         hir::ExprKind::IfElse(cond, then_block, else_clauses) => {
-            collect_expr_hints(cond, type_table, range, hints);
-            collect_block_hints(then_block, type_table, range, hints);
+            collect_expr_hints(cond, ctx, hints);
+            collect_block_hints(then_block, ctx, hints);
             for clause in else_clauses {
                 if let Some(cond) = &clause.condition {
-                    collect_expr_hints(cond, type_table, range, hints);
+                    collect_expr_hints(cond, ctx, hints);
                 }
-                collect_block_hints(&clause.consequence, type_table, range, hints);
+                collect_block_hints(&clause.consequence, ctx, hints);
             }
         }
         hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
-            collect_expr_hints(&call.callee, type_table, range, hints);
+            // Pipeline chain hint: if this Call was desugared from `|>` and
+            // the piped-in LHS ends on a different line than the overall
+            // expression, show the intermediate type at the end of the LHS
+            // line so the user can see the value flowing into each step.
+            if ctx.pipeline_call_ids.contains(&call.hir_id) {
+                if let Some(lhs) = call.arguments.first() {
+                    if lhs.span.end_lc.line < expr.span.end_lc.line
+                        && !matches!(lhs.ty.kind, TyKind::Unknown)
+                    {
+                        push_hint(
+                            hints,
+                            ctx.range,
+                            lhs.span.end_lc,
+                            format!(": {}", lhs.ty.kind),
+                            InlayHintKind::ChainedPipeline,
+                        );
+                    }
+                }
+            }
+            collect_expr_hints(&call.callee, ctx, hints);
             for arg in &call.arguments {
-                collect_expr_hints(arg, type_table, range, hints);
+                collect_expr_hints(arg, ctx, hints);
             }
         }
         hir::ExprKind::Binary(_, lhs, rhs) => {
-            collect_expr_hints(lhs, type_table, range, hints);
-            collect_expr_hints(rhs, type_table, range, hints);
+            collect_expr_hints(lhs, ctx, hints);
+            collect_expr_hints(rhs, ctx, hints);
         }
         hir::ExprKind::Unary(_, operand) => {
-            collect_expr_hints(operand, type_table, range, hints);
+            collect_expr_hints(operand, ctx, hints);
         }
         hir::ExprKind::Let(_, expr) => {
-            collect_expr_hints(expr, type_table, range, hints);
+            collect_expr_hints(expr, ctx, hints);
         }
         hir::ExprKind::Cast(expr, _) | hir::ExprKind::TryCast(expr, _) => {
-            collect_expr_hints(expr, type_table, range, hints);
+            collect_expr_hints(expr, ctx, hints);
         }
         hir::ExprKind::List(items) => {
             for item in items {
-                collect_expr_hints(item, type_table, range, hints);
+                collect_expr_hints(item, ctx, hints);
             }
         }
         hir::ExprKind::Dict(entries) => {
             for (k, v) in entries {
-                collect_expr_hints(k, type_table, range, hints);
-                collect_expr_hints(v, type_table, range, hints);
+                collect_expr_hints(k, ctx, hints);
+                collect_expr_hints(v, ctx, hints);
             }
         }
         hir::ExprKind::FieldAccess(base, _) => {
-            collect_expr_hints(base, type_table, range, hints);
+            collect_expr_hints(base, ctx, hints);
         }
         hir::ExprKind::IndexAccess(base, index) => {
-            collect_expr_hints(base, type_table, range, hints);
-            collect_expr_hints(index, type_table, range, hints);
+            collect_expr_hints(base, ctx, hints);
+            collect_expr_hints(index, ctx, hints);
         }
         hir::ExprKind::Match(scrutinee, arms) => {
-            collect_expr_hints(scrutinee, type_table, range, hints);
+            collect_expr_hints(scrutinee, ctx, hints);
             for arm in arms {
                 if let Some(guard) = &arm.guard {
-                    collect_expr_hints(guard, type_table, range, hints);
+                    collect_expr_hints(guard, ctx, hints);
                 }
-                collect_block_hints(&arm.block, type_table, range, hints);
+                collect_block_hints(&arm.block, ctx, hints);
             }
         }
         hir::ExprKind::Break(expr) => {
             if let Some(e) = expr {
-                collect_expr_hints(e, type_table, range, hints);
+                collect_expr_hints(e, ctx, hints);
             }
         }
         hir::ExprKind::Range(range_expr) => {
-            collect_expr_hints(&range_expr.start, type_table, range, hints);
-            collect_expr_hints(&range_expr.end, type_table, range, hints);
+            collect_expr_hints(&range_expr.start, ctx, hints);
+            collect_expr_hints(&range_expr.end, ctx, hints);
         }
         hir::ExprKind::TaggedString { tag, exprs, .. } => {
-            collect_expr_hints(tag, type_table, range, hints);
+            collect_expr_hints(tag, ctx, hints);
             for e in exprs {
-                collect_expr_hints(e, type_table, range, hints);
+                collect_expr_hints(e, ctx, hints);
             }
         }
         hir::ExprKind::Implements(expr, _) => {
-            collect_expr_hints(expr, type_table, range, hints);
+            collect_expr_hints(expr, ctx, hints);
         }
         // Leaf nodes — no children to recurse into.
         hir::ExprKind::Path(_)

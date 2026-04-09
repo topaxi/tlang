@@ -134,6 +134,11 @@ pub struct LoweringContext {
     /// so that `lower_protocol_decl` can look up constraint protocols' method
     /// lists when building a `ProtocolDispatchContext`.
     protocol_registry: HashMap<String, ProtocolRegistryEntry>,
+    /// HirIds of `CallExpression` nodes that were desugared from the `|>`
+    /// pipeline operator.  Collected during lowering and forwarded to
+    /// [`hir::LowerResultMeta`] so that downstream passes can identify
+    /// pipeline-originated calls without modifying the HIR structure.
+    pub(crate) pipeline_call_ids: HashSet<HirId>,
 }
 
 impl LoweringContext {
@@ -153,6 +158,7 @@ impl LoweringContext {
             errors: Vec::new(),
             protocol_dispatch_ctx: None,
             protocol_registry: HashMap::default(),
+            pipeline_call_ids: HashSet::default(),
         }
     }
 
@@ -756,6 +762,7 @@ pub fn lower(
             hir_id_allocator,
             symbol_id_allocator,
             constant_pool_ids,
+            pipeline_call_ids: std::mem::take(&mut ctx.pipeline_call_ids),
         },
     ))
 }

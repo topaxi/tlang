@@ -351,6 +351,9 @@ impl ServerState {
                 tlang_analysis::inlay_hints::InlayHintKind::ReturnType => {
                     lsp_types::InlayHintKind::TYPE
                 }
+                tlang_analysis::inlay_hints::InlayHintKind::ChainedPipeline => {
+                    lsp_types::InlayHintKind::TYPE
+                }
             }),
             text_edits: None,
             tooltip: None,
@@ -1381,6 +1384,51 @@ mod tests {
             filtered.iter().all(|h| h.line < range.end.line),
             "all hints should be before end line {}, got: {filtered:?}",
             range.end.line
+        );
+    }
+
+    #[test]
+    fn inlay_hint_pipeline_chain_shows_intermediate_types() {
+        // Multi-line pipeline: each `|>` step on its own line should produce
+        // a ChainedPipeline hint showing the type flowing into that step.
+        let source = "fn double(x: i64) -> i64 { x * 2 }\nfn inc(x: i64) -> i64 { x + 1 }\n42\n|> double()\n|> inc();";
+        let mut state = setup_server_with_source(source);
+        ServerState::ensure_typed_hir(&mut state, &test_uri());
+
+        let doc = state.store.get(&test_uri()).unwrap();
+        let typed_hir = doc.typed_hir.as_ref().unwrap().as_ref().unwrap();
+        let hints = tlang_analysis::inlay_hints::collect_inlay_hints(typed_hir, None);
+
+        let chain_hints: Vec<_> = hints
+            .iter()
+            .filter(|h| h.kind == tlang_analysis::inlay_hints::InlayHintKind::ChainedPipeline)
+            .collect();
+        assert!(
+            !chain_hints.is_empty(),
+            "expected ChainedPipeline hints for multi-line pipeline, got: {hints:?}"
+        );
+        assert!(
+            chain_hints.iter().all(|h| h.label.starts_with(": ")),
+            "chain hints should have ': <type>' label, got: {chain_hints:?}"
+        );
+    }
+
+    #[test]
+    fn inlay_hint_pipeline_no_chain_hint_for_single_line() {
+        // A single-line pipeline should NOT produce a ChainedPipeline hint.
+        let source = "fn double(x: i64) -> i64 { x * 2 }\n42 |> double();";
+        let mut state = setup_server_with_source(source);
+        ServerState::ensure_typed_hir(&mut state, &test_uri());
+
+        let doc = state.store.get(&test_uri()).unwrap();
+        let typed_hir = doc.typed_hir.as_ref().unwrap().as_ref().unwrap();
+        let hints = tlang_analysis::inlay_hints::collect_inlay_hints(typed_hir, None);
+
+        assert!(
+            !hints
+                .iter()
+                .any(|h| h.kind == tlang_analysis::inlay_hints::InlayHintKind::ChainedPipeline),
+            "should not show chain hints for single-line pipeline, got: {hints:?}"
         );
     }
 }

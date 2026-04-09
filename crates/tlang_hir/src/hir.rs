@@ -1197,6 +1197,11 @@ pub struct LowerResultMeta {
     /// (e.g. tagged string parts lists). Used by the interpreter to cache
     /// these values for singleton semantics.
     pub constant_pool_ids: HashSet<HirId>,
+    /// HirIds of `CallExpression` nodes that were produced by the `|>`
+    /// pipeline operator.  Stored here so that analysis passes (e.g. inlay
+    /// hints) can identify pipeline-desugared calls without changing the HIR
+    /// structure.
+    pub pipeline_call_ids: HashSet<HirId>,
 }
 
 pub type LowerResult = (Module, LowerResultMeta);
