@@ -225,7 +225,7 @@ fn collect_fn_decl_hints(
                 hints,
                 range,
                 pos,
-                format!("-> {ret_kind} "),
+                format!(" -> {ret_kind}"),
                 InlayHintKind::ReturnType,
             );
         }
@@ -237,16 +237,22 @@ fn collect_fn_decl_hints(
 
 /// Determine the position for a return type hint.
 ///
-/// The hint should appear after the closing `)` of the parameter list,
-/// which is right before the function body `{`.  We approximate this as
-/// the start of the body block's span minus one character (the `{`), but
-/// in practice we use the body span start since the hint goes *before*
-/// the body.
+/// The hint is placed one character before the opening `{` of the body
+/// (i.e. on the space that precedes it).  Combined with a leading-space
+/// label (`" -> T"`), the background of the hint starts right after `)`
+/// — visually matching the `: type` parameter hints — and the uncoloured
+/// source space after the hint provides natural separation before `{`.
+///
+/// For C-style brace placement the hint lands at the end of the closing
+/// `)` line, which is equally readable.
 fn return_type_hint_position(decl: &hir::FunctionDeclaration) -> LineColumn {
-    // The body block span starts at `{`. The hint should go just before
-    // it. We use body.span.start_lc as a reasonable approximation.
-    // The LSP client will render the hint inline at this position.
-    decl.body.span.start_lc
+    let lc = decl.body.span.start_lc;
+    // Move one character to the left.  The column convention is:
+    //   line 0 → 0-based,  line > 0 → 1-based (lexer convention).
+    // Subtracting 1 works uniformly: for line 0 it steps back one 0-based
+    // column; for line > 0 it steps back one 1-based column (push_hint
+    // then normalises to 0-based).
+    LineColumn::new(lc.line, lc.column.saturating_sub(1))
 }
 
 // ── Expression traversal (recurse into nested functions / blocks) ──────
