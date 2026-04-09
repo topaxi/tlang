@@ -1170,6 +1170,7 @@ fn list_literal_annotation_mismatch_error() {
 #[test]
 fn dict_literal_inferred_as_dict_ok() {
     common::typecheck_ok("let a = {};");
+    common::typecheck_ok(r#"let b = {key: "value"};"#);
 }
 
 #[test]

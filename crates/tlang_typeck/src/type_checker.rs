@@ -71,6 +71,20 @@ impl TypeChecker {
         TyKind::Path(path)
     }
 
+    /// Assign `ty_kind` to `expr.ty` and record it in the type table.
+    fn assign_expr_type(&mut self, expr: &mut hir::Expr, ty_kind: TyKind) {
+        expr.ty.kind = ty_kind.clone();
+        self.type_table.insert(
+            expr.hir_id,
+            TypeInfo {
+                ty: Ty {
+                    kind: ty_kind,
+                    ..Ty::default()
+                },
+            },
+        );
+    }
+
     // ── Literal typing ───────────────────────────────────────────────
 
     fn type_of_literal(lit: &Literal) -> TyKind {
@@ -1336,16 +1350,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     self.visit_expr(elem, ctx);
                 }
                 let ty_kind = Self::builtin_type_path("List");
-                expr.ty.kind = ty_kind.clone();
-                self.type_table.insert(
-                    expr.hir_id,
-                    TypeInfo {
-                        ty: Ty {
-                            kind: ty_kind,
-                            ..Ty::default()
-                        },
-                    },
-                );
+                self.assign_expr_type(expr, ty_kind);
             }
             hir::ExprKind::Dict(entries) => {
                 for (key, val) in entries.iter_mut() {
@@ -1353,16 +1358,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     self.visit_expr(val, ctx);
                 }
                 let ty_kind = Self::builtin_type_path("Dict");
-                expr.ty.kind = ty_kind.clone();
-                self.type_table.insert(
-                    expr.hir_id,
-                    TypeInfo {
-                        ty: Ty {
-                            kind: ty_kind,
-                            ..Ty::default()
-                        },
-                    },
-                );
+                self.assign_expr_type(expr, ty_kind);
             }
             _ => {
                 walk_expr(self, expr, ctx);
