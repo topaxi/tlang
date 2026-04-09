@@ -6,10 +6,10 @@ use tlang_ast::token::Literal;
 use tlang_hir as hir;
 use tlang_hir::HirId;
 
-use crate::builtins;
 use crate::error::CodegenError;
 use crate::generator::{CodegenJS, InnerCodegen};
 use crate::js;
+use tlang_builtins_js as builtins;
 
 impl<'a> InnerCodegen<'a> {
     pub fn generate_stmts(&mut self, stmts: &[hir::Stmt]) -> Vec<Statement<'a>> {

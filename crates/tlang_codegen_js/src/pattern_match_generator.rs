@@ -7,10 +7,10 @@ use tlang_ast::token::Literal;
 use tlang_hir as hir;
 use tlang_hir::HirId;
 
-use crate::builtins;
 use crate::error::CodegenWarning;
 use crate::generator::InnerCodegen;
 use tlang_ast::node::Ident;
+use tlang_builtins_js as builtins;
 
 /// Represents an access path into a match subject value.
 /// Used to build OXC expressions for nested pattern access without cloning expressions.

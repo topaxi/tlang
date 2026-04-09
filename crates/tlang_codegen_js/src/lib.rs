@@ -1,5 +1,4 @@
 mod binary_operator_generator;
-mod builtins;
 mod enum_generator;
 pub mod error;
 mod expr_generator;

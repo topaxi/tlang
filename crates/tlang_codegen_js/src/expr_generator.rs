@@ -6,9 +6,9 @@ use tlang_ast::token::Literal;
 use tlang_hir as hir;
 
 use crate::binary_operator_generator::{map_binary_op, map_unary_op};
-use crate::builtins;
 use crate::generator::InnerCodegen;
 use crate::js;
+use tlang_builtins_js as builtins;
 
 impl<'a> InnerCodegen<'a> {
     pub fn generate_expr(&mut self, expr: &hir::Expr) -> Expression<'a> {
