@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use tlang_ast::node::Ident;
 use tlang_hir::Ty;
@@ -74,6 +74,9 @@ pub struct TypeTable {
     protocol_info: HashMap<String, ProtocolInfo>,
     /// Registered impl blocks.
     impl_info: Vec<ImplInfo>,
+    /// Dot-methods defined on types (e.g. `"Animal.greet"` from
+    /// `fn Animal.greet(self)`).
+    dot_methods: HashSet<String>,
 }
 
 impl TypeTable {
@@ -141,5 +144,15 @@ impl TypeTable {
         self.impl_info
             .iter()
             .any(|i| i.protocol_name == protocol_name && i.target_type_name == target_type_name)
+    }
+
+    /// Register a dot-method (e.g. `"Animal.greet"` from `fn Animal.greet(self)`).
+    pub fn register_dot_method(&mut self, name: String) {
+        self.dot_methods.insert(name);
+    }
+
+    /// Check whether a dot-method is already defined on a type.
+    pub fn has_dot_method(&self, name: &str) -> bool {
+        self.dot_methods.contains(name)
     }
 }

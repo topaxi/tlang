@@ -82,6 +82,12 @@ pub enum TypeError {
         target_type: String,
         span: Span,
     },
+    /// An `apply` directive conflicts with an already-defined dot-method.
+    ApplyConflict {
+        method: String,
+        target_type: String,
+        span: Span,
+    },
 }
 
 impl TypeError {
@@ -100,7 +106,8 @@ impl TypeError {
             | TypeError::ReturnTypeMismatch { span, .. }
             | TypeError::UnknownField { span, .. }
             | TypeError::MissingProtocolMethod { span, .. }
-            | TypeError::MissingConstraintImpl { span, .. } => *span,
+            | TypeError::MissingConstraintImpl { span, .. }
+            | TypeError::ApplyConflict { span, .. } => *span,
         }
     }
 
@@ -185,6 +192,13 @@ impl TypeError {
                 format!(
                     "missing constraint: `{protocol}` requires `{constraint}` to be implemented for `{target_type}`"
                 )
+            }
+            TypeError::ApplyConflict {
+                method,
+                target_type,
+                ..
+            } => {
+                format!("`apply {method}`: method `{method}` is already defined on `{target_type}`")
             }
         }
     }

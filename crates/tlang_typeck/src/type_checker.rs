@@ -794,6 +794,19 @@ impl TypeChecker {
             target_type_name: target_type_name.clone(),
         });
 
+        // Check that `apply` directives do not conflict with existing
+        // dot-methods on the target type.
+        for apply_method in &impl_block.apply_methods {
+            let dot_name = format!("{target_type_name}.{}", apply_method.as_str());
+            if self.type_table.has_dot_method(&dot_name) {
+                self.errors.push(TypeError::ApplyConflict {
+                    method: apply_method.as_str().to_string(),
+                    target_type: target_type_name.clone(),
+                    span: apply_method.span,
+                });
+            }
+        }
+
         // Collect names of methods present in the impl (including apply methods).
         let impl_method_names: Vec<String> = impl_block
             .methods
@@ -1006,6 +1019,10 @@ impl TypeChecker {
 
     /// Visit a top-level function declaration statement.
     fn visit_function_decl_stmt(&mut self, decl: &mut hir::FunctionDeclaration) {
+        // Track dot-methods (e.g. `fn Animal.greet(self)`) for apply conflict detection.
+        if let hir::ExprKind::FieldAccess(..) = &decl.name.kind {
+            self.type_table.register_dot_method(decl.name());
+        }
         self.typecheck_function_decl(decl);
     }
 

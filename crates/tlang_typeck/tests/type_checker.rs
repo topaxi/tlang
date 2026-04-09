@@ -1011,6 +1011,35 @@ fn impl_block_with_apply_method_ok() {
 }
 
 #[test]
+fn impl_block_apply_conflicts_with_existing_method_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        protocol Greet {
+            fn greet(self)
+        }
+        enum Animal {
+            Dog(name),
+            Cat(name),
+        }
+        fn Animal.greet(self) {
+            Greet::greet(self)
+        }
+        impl Greet for Animal {
+            apply greet;
+            fn greet(Animal::Dog(name)) { "Woof! " + name }
+            fn greet(Animal::Cat(name)) { "Meow! " + name }
+        }
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("apply greet")
+            && e.contains("already defined")
+            && e.contains("Animal")),
+        "expected apply conflict error, got: {errs:?}"
+    );
+}
+
+#[test]
 fn impl_block_constraints_satisfied_ok() {
     common::typecheck_ok(
         r#"
