@@ -1,3 +1,4 @@
+pub mod builtin_types;
 pub mod builtins;
 mod type_checker;
 mod type_error;

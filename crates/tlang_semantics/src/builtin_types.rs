@@ -30,7 +30,14 @@ pub const STRING: &str = "String";
 /// (strings).
 pub const SLICE: &str = "Slice";
 
+/// The builtin ordered list (array) type produced by list literals `[1, 2, 3]`.
+pub const LIST: &str = "List";
+
+/// The builtin dictionary (map) type produced by dict literals `{key: value}`.
+pub const DICT: &str = "Dict";
+
 /// All user-facing builtin type names, for validation or registry lookup.
 pub const ALL: &[&str] = &[
-    BOOL, I8, I16, I32, I64, ISIZE, U8, U16, U32, U64, USIZE, F32, F64, CHAR, STRING, SLICE,
+    BOOL, I8, I16, I32, I64, ISIZE, U8, U16, U32, U64, USIZE, F32, F64, CHAR, STRING, SLICE, LIST,
+    DICT,
 ];

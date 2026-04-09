@@ -1138,3 +1138,114 @@ fn empty_impl_for_constraint_protocol_with_no_methods_ok() {
         "#,
     );
 }
+
+// ── List literal type inference ─────────────────────────────────────────
+
+#[test]
+fn list_literal_inferred_as_list_ok() {
+    common::typecheck_ok("let a = [1, 2, 3];");
+}
+
+#[test]
+fn empty_list_literal_inferred_as_list_ok() {
+    common::typecheck_ok("let a = [];");
+}
+
+#[test]
+fn list_literal_annotation_matches_ok() {
+    common::typecheck_ok("let a: List = [1, 2, 3];");
+}
+
+#[test]
+fn list_literal_annotation_mismatch_error() {
+    let errs = common::typecheck_errors("let a: i64 = [1, 2];");
+    assert!(
+        errs.iter().any(|e| e.contains("type mismatch in binding")),
+        "expected binding type mismatch, got: {errs:?}"
+    );
+}
+
+#[test]
+fn list_literal_return_type_mismatch_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        fn get_number() -> i64 { [1, 2, 3] }
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("return type mismatch")),
+        "expected return type mismatch, got: {errs:?}"
+    );
+}
+
+#[test]
+fn dict_literal_return_type_mismatch_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        fn get_number() -> i64 { return {key: "value"}; }
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("return type mismatch")),
+        "expected return type mismatch, got: {errs:?}"
+    );
+}
+
+// ── builtin_types registry ──────────────────────────────────────────────
+
+#[test]
+fn builtin_types_list_lookup_returns_prim_ty_res() {
+    use tlang_hir::TyKind;
+    use tlang_typeck::builtin_types;
+
+    let ty = builtin_types::lookup("List").expect("List should be a known builtin type");
+    match ty {
+        TyKind::Path(path) => {
+            assert!(path.res.is_prim_ty(), "List path should carry Res::PrimTy");
+            assert_eq!(path.join("::"), "List");
+        }
+        other => panic!("expected TyKind::Path for List, got {other:?}"),
+    }
+}
+
+#[test]
+fn builtin_types_dict_lookup_returns_prim_ty_res() {
+    use tlang_hir::TyKind;
+    use tlang_typeck::builtin_types;
+
+    let ty = builtin_types::lookup("Dict").expect("Dict should be a known builtin type");
+    match ty {
+        TyKind::Path(path) => {
+            assert!(path.res.is_prim_ty(), "Dict path should carry Res::PrimTy");
+            assert_eq!(path.join("::"), "Dict");
+        }
+        other => panic!("expected TyKind::Path for Dict, got {other:?}"),
+    }
+}
+
+#[test]
+fn builtin_types_unknown_name_returns_none() {
+    use tlang_typeck::builtin_types;
+    assert!(builtin_types::lookup("Foo").is_none());
+    assert!(builtin_types::lookup("i64").is_none());
+}
+
+#[test]
+fn dict_literal_inferred_as_dict_ok() {
+    common::typecheck_ok("let a = {};");
+    common::typecheck_ok(r#"let b = {key: "value"};"#);
+}
+
+#[test]
+fn dict_literal_annotation_matches_ok() {
+    common::typecheck_ok("let a: Dict = {};");
+}
+
+#[test]
+fn dict_literal_annotation_mismatch_error() {
+    let errs = common::typecheck_errors("let a: i64 = {};");
+    assert!(
+        errs.iter().any(|e| e.contains("type mismatch in binding")),
+        "expected binding type mismatch, got: {errs:?}"
+    );
+}
