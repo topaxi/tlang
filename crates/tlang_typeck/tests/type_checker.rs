@@ -870,3 +870,271 @@ fn struct_field_access_unknown_field_error() {
         "expected unknown field error, got: {errs:?}"
     );
 }
+
+// ── Protocol declaration typing ─────────────────────────────────────────
+
+#[test]
+fn protocol_declaration_no_errors() {
+    common::typecheck_ok(
+        r#"
+        protocol Greet {
+            fn greet(self)
+        }
+        "#,
+    );
+}
+
+#[test]
+fn protocol_with_return_type_no_errors() {
+    common::typecheck_ok(
+        r#"
+        protocol Greet {
+            fn greet(self) -> String
+        }
+        "#,
+    );
+}
+
+#[test]
+fn protocol_with_constraints_no_errors() {
+    common::typecheck_ok(
+        r#"
+        protocol PartialEq {
+            fn eq(self, other)
+        }
+        protocol Eq : PartialEq {}
+        "#,
+    );
+}
+
+// ── Impl block validation ───────────────────────────────────────────────
+
+#[test]
+fn impl_block_all_methods_present_ok() {
+    common::typecheck_ok(
+        r#"
+        protocol Greet {
+            fn greet(self)
+        }
+        enum Animal {
+            Dog(name),
+            Cat(name),
+        }
+        impl Greet for Animal {
+            fn greet(Animal::Dog(name)) { "Woof! I'm " + name }
+            fn greet(Animal::Cat(name)) { "Meow! I'm " + name }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn impl_block_missing_method_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        protocol Greet {
+            fn greet(self)
+        }
+        protocol Display {
+            fn to_string(self)
+        }
+        enum Animal {
+            Dog(name),
+        }
+        impl Greet for Animal {
+            fn greet(Animal::Dog(name)) { "Woof! " + name }
+        }
+        impl Display for Animal {}
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("missing method `to_string`") && e.contains("Display")),
+        "expected missing method error, got: {errs:?}"
+    );
+}
+
+#[test]
+fn impl_block_missing_constraint_caught_by_semantic_analysis() {
+    // Note: Missing constraint protocols are caught by the semantic
+    // analyzer's ProtocolConstraintValidator pass before the type checker
+    // runs. The type checker has complementary constraint checking for
+    // robustness. This test verifies the semantic pass catches the error.
+    let (mut ast, _parse_meta) = tlang_parser::Parser::from_source(
+        r#"
+        protocol PartialEq {
+            fn eq(self, other)
+        }
+        protocol Eq : PartialEq {}
+        protocol Ord : Eq {
+            fn cmp(self, other)
+        }
+        struct Point { x: isize, y: isize }
+        impl Ord for Point {
+            fn cmp(a, b) { 0 }
+        }
+        "#,
+    )
+    .parse()
+    .unwrap();
+    let mut semantic_analyzer = tlang_semantics::SemanticAnalyzer::default();
+    let result = semantic_analyzer.analyze(&mut ast);
+    assert!(
+        result.is_err(),
+        "expected semantic analysis to catch missing constraints"
+    );
+    let diagnostics = result.unwrap_err();
+    assert!(
+        diagnostics.iter().any(|d| d.message().contains("Eq")),
+        "expected missing constraint for Eq, got: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn impl_block_with_apply_method_ok() {
+    common::typecheck_ok(
+        r#"
+        protocol Greet {
+            fn greet(self)
+        }
+        enum Animal {
+            Dog(name),
+            Cat(name),
+        }
+        impl Greet for Animal {
+            apply greet;
+            fn greet(Animal::Dog(name)) { "Woof! " + name }
+            fn greet(Animal::Cat(name)) { "Meow! " + name }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn impl_block_apply_conflicts_with_existing_method_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        protocol Greet {
+            fn greet(self)
+        }
+        enum Animal {
+            Dog(name),
+            Cat(name),
+        }
+        fn Animal.greet(self) {
+            Greet::greet(self)
+        }
+        impl Greet for Animal {
+            apply greet;
+            fn greet(Animal::Dog(name)) { "Woof! " + name }
+            fn greet(Animal::Cat(name)) { "Meow! " + name }
+        }
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("apply greet")
+            && e.contains("already defined")
+            && e.contains("Animal")),
+        "expected apply conflict error, got: {errs:?}"
+    );
+}
+
+#[test]
+fn impl_block_constraints_satisfied_ok() {
+    common::typecheck_ok(
+        r#"
+        protocol PartialEq {
+            fn eq(self, other)
+        }
+        protocol Eq : PartialEq {}
+        protocol Ord : Eq {
+            fn cmp(self, other)
+        }
+        struct Point { x: isize, y: isize }
+        impl PartialEq for Point {
+            fn eq(a, b) { a.x == b.x && a.y == b.y }
+        }
+        impl Eq for Point {}
+        impl Ord for Point {
+            fn cmp(a, b) { 0 }
+        }
+        "#,
+    );
+}
+
+// ── Protocol method call typing ─────────────────────────────────────────
+
+#[test]
+fn protocol_method_call_ok() {
+    common::typecheck_ok(
+        r#"
+        protocol Greet {
+            fn greet(self)
+        }
+        enum Animal {
+            Dog,
+        }
+        impl Greet for Animal {
+            fn greet(self) { "Woof!" }
+        }
+        let dog = Animal::Dog;
+        Greet::greet(dog);
+        "#,
+    );
+}
+
+#[test]
+fn protocol_method_call_with_return_type_propagates() {
+    common::typecheck_ok(
+        r#"
+        protocol Greet {
+            fn greet(self) -> String
+        }
+        enum Animal {
+            Dog,
+        }
+        impl Greet for Animal {
+            fn greet(self) -> String { "Woof!" }
+        }
+        let dog = Animal::Dog;
+        let greeting: String = Greet::greet(dog);
+        "#,
+    );
+}
+
+// ── Default method bodies ───────────────────────────────────────────────
+
+#[test]
+fn protocol_default_method_not_required_in_impl() {
+    common::typecheck_ok(
+        r#"
+        protocol Display {
+            fn to_string(self) -> String
+            fn display(self) { log(Display::to_string(self)) }
+        }
+        struct Point { x: isize, y: isize }
+        impl Display for Point {
+            fn to_string(self) -> String { "point" }
+        }
+        "#,
+    );
+}
+
+// ── Empty impl for constraint protocol ──────────────────────────────────
+
+#[test]
+fn empty_impl_for_constraint_protocol_with_no_methods_ok() {
+    common::typecheck_ok(
+        r#"
+        protocol PartialEq {
+            fn eq(self, other)
+        }
+        protocol Eq : PartialEq {}
+        struct Point { x: isize, y: isize }
+        impl PartialEq for Point {
+            fn eq(a, b) { true }
+        }
+        impl Eq for Point {}
+        "#,
+    );
+}
