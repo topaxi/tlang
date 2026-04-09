@@ -283,9 +283,9 @@ fn collect_expr_hints(expr: &hir::Expr, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
             // the piped-in LHS ends on a different line than the overall
             // expression, show the intermediate type at the end of the LHS
             // line so the user can see the value flowing into each step.
-            if ctx.pipeline_call_ids.contains(&call.hir_id) {
-                if let Some(lhs) = call.arguments.first() {
-                    if lhs.span.end_lc.line < expr.span.end_lc.line
+            if ctx.pipeline_call_ids.contains(&call.hir_id)
+                && let Some(lhs) = call.arguments.first()
+                    && lhs.span.end_lc.line < expr.span.end_lc.line
                         && !matches!(lhs.ty.kind, TyKind::Unknown)
                     {
                         push_hint(
@@ -296,8 +296,6 @@ fn collect_expr_hints(expr: &hir::Expr, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
                             InlayHintKind::ChainedPipeline,
                         );
                     }
-                }
-            }
             collect_expr_hints(&call.callee, ctx, hints);
             for arg in &call.arguments {
                 collect_expr_hints(arg, ctx, hints);
