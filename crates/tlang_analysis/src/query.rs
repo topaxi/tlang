@@ -37,7 +37,11 @@ impl ResolvedSymbol {
     pub fn hover_text(&self) -> String {
         let kind_label = self.def_kind.to_string();
         if let Some(arity) = self.def_kind.arity() {
-            format!("({kind_label}) {name}/{arity}", name = self.name)
+            if arity == u16::MAX {
+                format!("({kind_label}) {name}/*", name = self.name)
+            } else {
+                format!("({kind_label}) {name}/{arity}", name = self.name)
+            }
         } else if let Some(ty) = &self.type_info {
             format!("({kind_label}) {name}: {ty}", name = self.name)
         } else {
