@@ -224,10 +224,28 @@ module.exports = grammar({
     // =========================================================================
 
     type_annotation: ($) =>
+      choice(
+        $.function_type,
+        seq(
+          choice($.type_identifier, $.identifier),
+          repeat(seq('::', choice($.type_identifier, $.identifier))),
+          optional(seq('<', commaSep($.type_annotation), '>')),
+        ),
+      ),
+
+    function_type: ($) =>
       seq(
-        choice($.type_identifier, $.identifier),
-        repeat(seq('::', choice($.type_identifier, $.identifier))),
-        optional(seq('<', commaSep($.type_annotation), '>')),
+        'fn',
+        '(',
+        commaSep($.function_type_parameter),
+        ')',
+        optional(seq('->', field('return_type', $.type_annotation))),
+      ),
+
+    function_type_parameter: ($) =>
+      choice(
+        seq(field('name', $.identifier), ':', field('type', $.type_annotation)),
+        field('type', $.type_annotation),
       ),
 
     // =========================================================================

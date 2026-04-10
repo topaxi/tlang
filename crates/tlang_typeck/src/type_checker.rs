@@ -1447,8 +1447,7 @@ fn callee_name_str(callee: &hir::Expr) -> Option<String> {
 /// expression type) need to be compared purely by shape.
 fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
     match (a, b) {
-        (TyKind::Unknown, TyKind::Unknown)
-        | (TyKind::Never, TyKind::Never) => true,
+        (TyKind::Unknown, TyKind::Unknown) | (TyKind::Never, TyKind::Never) => true,
         (TyKind::Primitive(pa), TyKind::Primitive(pb)) => pa == pb,
         (TyKind::Fn(pa, ra), TyKind::Fn(pb, rb)) => {
             pa.len() == pb.len()
