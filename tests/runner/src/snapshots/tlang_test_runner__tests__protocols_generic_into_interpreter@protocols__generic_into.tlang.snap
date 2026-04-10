@@ -1,0 +1,20 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/protocols/generic_into.tlang
+---
+212
+0
+
+warning: Unused function `Into::into/1`
+  ┌─ [WORKSPACE_ROOT]/tests/protocols/generic_into.tlang:6:3
+  │
+6 │   fn into(c) { Fahrenheit { value: c.value * 9 / 5 + 32 } }
+  │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: Unused function `Into::into/1`
+   ┌─ [WORKSPACE_ROOT]/tests/protocols/generic_into.tlang:10:3
+   │
+10 │   fn into(f) { Celsius { value: (f.value - 32) * 5 / 9 } }
+   │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
