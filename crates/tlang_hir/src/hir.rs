@@ -844,18 +844,22 @@ impl PrimTy {
 
     /// Returns `true` for integer types (signed, unsigned, and pointer-sized).
     pub fn is_integer(self) -> bool {
+        self.is_signed_integer() || self.is_unsigned_integer()
+    }
+
+    /// Returns `true` for signed integer types (`i8`..`i64`, `isize`).
+    pub fn is_signed_integer(self) -> bool {
         matches!(
             self,
-            PrimTy::I8
-                | PrimTy::I16
-                | PrimTy::I32
-                | PrimTy::I64
-                | PrimTy::Isize
-                | PrimTy::U8
-                | PrimTy::U16
-                | PrimTy::U32
-                | PrimTy::U64
-                | PrimTy::Usize
+            PrimTy::I8 | PrimTy::I16 | PrimTy::I32 | PrimTy::I64 | PrimTy::Isize
+        )
+    }
+
+    /// Returns `true` for unsigned integer types (`u8`..`u64`, `usize`).
+    pub fn is_unsigned_integer(self) -> bool {
+        matches!(
+            self,
+            PrimTy::U8 | PrimTy::U16 | PrimTy::U32 | PrimTy::U64 | PrimTy::Usize
         )
     }
 

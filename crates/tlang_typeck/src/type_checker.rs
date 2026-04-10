@@ -1048,6 +1048,92 @@ impl TypeChecker {
         );
     }
 
+    // ── Conversion expression typing (`as` / `as?`) ─────────────────
+
+    /// Check an infallible `as` cast.  The result type is the target type
+    /// when the conversion is valid; otherwise an error is emitted.
+    ///
+    /// Rules:
+    /// - `unknown as T` → compile error (`CastOnUnknown`)
+    /// - numeric → numeric (widening, narrowing, int↔float, signed↔unsigned) → allowed
+    /// - anything else → `NoFromImpl` error
+    fn check_cast(&mut self, inner: &mut hir::Expr, target_ty: &hir::Ty, expr: &mut hir::Expr) {
+        self.visit_expr(inner, &mut ());
+
+        let source_kind = &inner.ty.kind;
+        let target_kind = &target_ty.kind;
+        let span = expr.span;
+
+        // `unknown as T` is always an error — use `as?` instead.
+        if matches!(source_kind, TyKind::Unknown) {
+            self.errors.push(TypeError::CastOnUnknown { span });
+            self.assign_expr_type(expr, target_kind.clone());
+            return;
+        }
+
+        match (source_kind, target_kind) {
+            // Numeric → Numeric conversions are always allowed via `as`:
+            // widening, narrowing (saturating), int→float, signed→unsigned.
+            (TyKind::Primitive(src), TyKind::Primitive(tgt))
+                if src.is_numeric() && tgt.is_numeric() =>
+            {
+                self.assign_expr_type(expr, target_kind.clone());
+            }
+            // Same type → identity cast, always fine.
+            _ if ty_kinds_compatible(source_kind, target_kind) => {
+                self.assign_expr_type(expr, target_kind.clone());
+            }
+            _ => {
+                self.errors.push(TypeError::NoFromImpl {
+                    from_ty: source_kind.to_string(),
+                    to_ty: target_kind.to_string(),
+                    span,
+                });
+                // Still assign the target type so downstream checking continues.
+                self.assign_expr_type(expr, target_kind.clone());
+            }
+        }
+    }
+
+    /// Check a fallible `as?` (try-cast).  This is how `unknown` enters
+    /// typed code: `unknown_val as? i64` is valid.
+    ///
+    /// Rules:
+    /// - `unknown as? T` → allowed (runtime check)
+    /// - float → int → allowed via `as?` (fails on NaN/infinity/out-of-range)
+    /// - any numeric → numeric → allowed
+    /// - any type → same type → allowed (identity)
+    ///
+    /// Pre-generics: the result type is the target type directly (simplified).
+    /// Once generics land, it should be `Result<T, ConversionError>`.
+    fn check_try_cast(&mut self, inner: &mut hir::Expr, target_ty: &hir::Ty, expr: &mut hir::Expr) {
+        self.visit_expr(inner, &mut ());
+
+        let source_kind = &inner.ty.kind;
+        let target_kind = &target_ty.kind;
+
+        match (source_kind, target_kind) {
+            // `unknown as? T` — the primary way to convert unknown values.
+            (TyKind::Unknown, _) => {
+                self.assign_expr_type(expr, target_kind.clone());
+            }
+            // Numeric → Numeric (includes float→int which may fail at runtime).
+            (TyKind::Primitive(src), TyKind::Primitive(tgt))
+                if src.is_numeric() && tgt.is_numeric() =>
+            {
+                self.assign_expr_type(expr, target_kind.clone());
+            }
+            // Same type → identity, always fine.
+            _ if ty_kinds_compatible(source_kind, target_kind) => {
+                self.assign_expr_type(expr, target_kind.clone());
+            }
+            // Any other conversion is allowed via `as?` (runtime check).
+            _ => {
+                self.assign_expr_type(expr, target_kind.clone());
+            }
+        }
+    }
+
     fn visit_call_expr(
         &mut self,
         call: &mut hir::CallExpression,
@@ -1341,6 +1427,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
         match &mut expr.kind {
             hir::ExprKind::Literal(lit) => {
@@ -1408,6 +1495,32 @@ impl<'hir> Visitor<'hir> for TypeChecker {
             hir::ExprKind::Implements(inner_expr, _path) => {
                 let hir_id = expr.hir_id;
                 self.visit_implements_expr(inner_expr, hir_id, &mut expr.ty);
+            }
+            hir::ExprKind::Cast(..) | hir::ExprKind::TryCast(..) => {
+                // Extract the inner data and check the cast; we reassemble
+                // after because `check_cast`/`check_try_cast` need mutable
+                // access to the inner expression and the outer expression.
+                let is_try_cast = matches!(expr.kind, hir::ExprKind::TryCast(..));
+                let (mut inner, target_ty) =
+                    match std::mem::replace(&mut expr.kind, hir::ExprKind::Wildcard) {
+                        hir::ExprKind::Cast(inner, ty) | hir::ExprKind::TryCast(inner, ty) => {
+                            (*inner, *ty)
+                        }
+                        _ => unreachable!(),
+                    };
+
+                if is_try_cast {
+                    self.check_try_cast(&mut inner, &target_ty, expr);
+                } else {
+                    self.check_cast(&mut inner, &target_ty, expr);
+                }
+
+                // Restore the original expression kind.
+                expr.kind = if is_try_cast {
+                    hir::ExprKind::TryCast(Box::new(inner), Box::new(target_ty))
+                } else {
+                    hir::ExprKind::Cast(Box::new(inner), Box::new(target_ty))
+                };
             }
             hir::ExprKind::List(elements) => {
                 for elem in elements.iter_mut() {
