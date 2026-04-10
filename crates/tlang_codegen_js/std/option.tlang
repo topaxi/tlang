@@ -1,4 +1,4 @@
-pub enum Option {
+pub enum Option<T> {
   Some(value),
   None,
 }

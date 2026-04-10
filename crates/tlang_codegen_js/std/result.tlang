@@ -1,4 +1,4 @@
-pub enum Result {
+pub enum Result<T, E> {
   Ok(value),
   Err(error),
 }

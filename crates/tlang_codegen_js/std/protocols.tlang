@@ -18,16 +18,16 @@ pub protocol Accepts {
   fn accepts(self, value)
 }
 
-pub protocol Iterable {
+pub protocol Iterable<T> {
   fn iter(self)
 }
 
-pub protocol Iterator {
-  fn next(self)
+pub protocol Iterator<T> {
+  fn next(self) -> Option<T>
 }
 
 pub protocol Display {
-  fn to_string(self) {
+  fn to_string(self) -> String {
     // Delegate to JavaScript's toString method by default
     self.toString()
   }

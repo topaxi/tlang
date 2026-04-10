@@ -25,11 +25,6 @@ export class $Protocol {
   $setImpl(Type, methods, typeArgs = null) {
     const key = typeArgs ? `${Type?.name ?? Type}::${typeArgs}` : Type;
     this.#impls.set(key, methods);
-    // Also store under Type alone when no typeArgs — preserves backwards
-    // compatibility for non-generic protocols.
-    if (typeArgs && !this.#impls.has(Type)) {
-      // Don't overwrite if a non-generic impl already exists.
-    }
   }
 
   $implements(value) {
