@@ -1621,6 +1621,7 @@ mod tests {
             hir_id: dummy_hir_id(),
             visibility: tlang_ast::node::Visibility::Private,
             name: dummy_name,
+            type_params: Vec::new(),
             parameters: params,
             params_span: tlang_span::Span::default(),
             return_type: Ty {

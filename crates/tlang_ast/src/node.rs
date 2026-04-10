@@ -114,12 +114,25 @@ pub struct ConstDeclaration {
     pub span: Span,
 }
 
+/// A type parameter in a generic declaration, e.g. `T` in `fn map<T>(...)`.
+///
+/// Future: may include constraint bounds (e.g. `T: Display`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct TypeParam {
+    pub id: NodeId,
+    pub name: Ident,
+    pub span: Span,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct FunctionDeclaration {
     pub id: NodeId,
     pub visibility: Visibility,
     pub name: Expr,
+    /// Type parameters for generic functions, e.g. `<T, U>` in `fn map<T, U>(...)`.
+    pub type_params: Vec<TypeParam>,
     pub parameters: Vec<FunctionParameter>,
     /// Span of the `(…)` parameter list, from `(` through `)` inclusive.
     /// Used to place return-type inlay hints right after `)`.
@@ -506,6 +519,8 @@ pub struct EnumVariant {
 pub struct EnumDeclaration {
     pub visibility: Visibility,
     pub name: Ident,
+    /// Type parameters for generic enums, e.g. `<T, E>` in `enum Result<T, E>`.
+    pub type_params: Vec<TypeParam>,
     pub variants: Vec<EnumVariant>,
     pub consts: Vec<ConstDeclaration>,
 }
@@ -542,6 +557,8 @@ impl Stmt {
 pub struct ProtocolDeclaration {
     pub visibility: Visibility,
     pub name: Ident,
+    /// Type parameters for generic protocols, e.g. `<T>` in `protocol Into<T>`.
+    pub type_params: Vec<TypeParam>,
     pub constraints: Vec<Path>,
     pub methods: Vec<ProtocolMethodSignature>,
     pub consts: Vec<ConstDeclaration>,
@@ -641,6 +658,8 @@ pub struct LetDeclaration {
 pub struct StructDeclaration {
     pub visibility: Visibility,
     pub name: Ident,
+    /// Type parameters for generic structs, e.g. `<T>` in `struct Pair<T>`.
+    pub type_params: Vec<TypeParam>,
     pub fields: Vec<StructField>,
     pub consts: Vec<ConstDeclaration>,
 }

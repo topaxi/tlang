@@ -1155,6 +1155,7 @@ impl Interpreter {
                     hir_id: method.hir_id,
                     visibility: Visibility::Private,
                     name: name_expr,
+                    type_params: Vec::new(),
                     parameters: method.parameters.clone(),
                     params_span: tlang_span::Span::default(),
                     return_type: method.return_type.clone(),

@@ -9,7 +9,7 @@ use tlang_ast::keyword::kw;
 use tlang_ast::node::{EnumPattern, FunctionDeclaration, Ident};
 use tlang_defs::{Def, DefIdAllocator, DefKind, DefScope};
 use tlang_hir as hir;
-use tlang_span::{HirId, HirIdAllocator, NodeId, Span};
+use tlang_span::{HirId, HirIdAllocator, NodeId, Span, TypeVarIdAllocator};
 
 /// Context for implicit self-dispatch in protocol default method implementations.
 ///
@@ -139,6 +139,7 @@ pub struct LoweringContext {
     /// [`hir::LowerResultMeta`] so that downstream passes can identify
     /// pipeline-originated calls without modifying the HIR structure.
     pub(crate) pipeline_call_ids: HashSet<HirId>,
+    type_var_id_allocator: TypeVarIdAllocator,
 }
 
 impl LoweringContext {
@@ -159,6 +160,7 @@ impl LoweringContext {
             protocol_dispatch_ctx: None,
             protocol_registry: HashMap::default(),
             pipeline_call_ids: HashSet::default(),
+            type_var_id_allocator: TypeVarIdAllocator::new(1),
         }
     }
 
@@ -522,6 +524,7 @@ impl LoweringContext {
                 hir_id,
                 visibility: decl.visibility,
                 name,
+                type_params: this.lower_type_params(&decl.type_params),
                 parameters,
                 params_span: decl.params_span,
                 return_type,
@@ -633,6 +636,23 @@ impl LoweringContext {
                 unreachable!("PatternKind::None should not be encountered, validate AST first")
             }
         }
+    }
+
+    /// Lower AST type parameters to HIR, allocating a fresh `TypeVarId` for each.
+    fn lower_type_params(&mut self, params: &[ast::node::TypeParam]) -> Vec<hir::TypeParam> {
+        params
+            .iter()
+            .map(|p| {
+                let hir_id = self.lower_node_id(p.id);
+                let type_var_id = self.type_var_id_allocator.next_id();
+                hir::TypeParam {
+                    hir_id,
+                    name: p.name,
+                    type_var_id,
+                    span: p.span,
+                }
+            })
+            .collect()
     }
 
     fn lower_ty(&mut self, node: Option<&ast::node::Ty>) -> hir::Ty {

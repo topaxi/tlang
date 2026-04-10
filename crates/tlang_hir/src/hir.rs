@@ -957,12 +957,25 @@ pub struct FunctionParameter {
     pub span: Span,
 }
 
+/// A type parameter in a generic declaration, e.g. `T` in `fn map<T>(...)`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct TypeParam {
+    pub hir_id: HirId,
+    pub name: Ident,
+    /// The `TypeVarId` used to represent this type parameter in `TyKind::Var`.
+    pub type_var_id: TypeVarId,
+    pub span: Span,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct FunctionDeclaration {
     pub hir_id: HirId,
     pub visibility: Visibility,
     pub name: Expr,
+    /// Type parameters for generic functions, e.g. `<T, U>` in `fn map<T, U>(...)`.
+    pub type_params: Vec<TypeParam>,
     pub parameters: Vec<FunctionParameter>,
     /// Span of the `(…)` parameter list, from `(` through `)` inclusive.
     /// Used to place return-type inlay hints right after `)`.
@@ -978,6 +991,7 @@ impl FunctionDeclaration {
             hir_id,
             visibility: Visibility::Private,
             name,
+            type_params: Vec::new(),
             parameters: params,
             params_span: Span::default(),
             return_type: Ty::default(),
@@ -1061,6 +1075,8 @@ pub struct StructDeclaration {
     pub hir_id: HirId,
     pub visibility: Visibility,
     pub name: Ident,
+    /// Type parameters for generic structs, e.g. `<T>` in `struct Pair<T>`.
+    pub type_params: Vec<TypeParam>,
     pub fields: Vec<StructField>,
     pub consts: Vec<ConstItem>,
 }
@@ -1079,6 +1095,8 @@ pub struct EnumDeclaration {
     pub hir_id: HirId,
     pub visibility: Visibility,
     pub name: Ident,
+    /// Type parameters for generic enums, e.g. `<T, E>` in `enum Result<T, E>`.
+    pub type_params: Vec<TypeParam>,
     pub variants: Vec<EnumVariant>,
     pub consts: Vec<ConstItem>,
 }
@@ -1113,6 +1131,8 @@ pub struct ProtocolDeclaration {
     pub hir_id: HirId,
     pub visibility: Visibility,
     pub name: Ident,
+    /// Type parameters for generic protocols, e.g. `<T>` in `protocol Into<T>`.
+    pub type_params: Vec<TypeParam>,
     pub constraints: Vec<Path>,
     pub methods: Vec<ProtocolMethodSignature>,
     pub consts: Vec<ConstItem>,

@@ -270,6 +270,7 @@ impl LoweringContext {
             hir_id: self.lower_node_id(node.id),
             visibility: decl.visibility,
             name: decl.name,
+            type_params: self.lower_type_params(&decl.type_params),
             fields: decl
                 .fields
                 .iter()
@@ -300,6 +301,7 @@ impl LoweringContext {
             hir_id: self.lower_node_id(node.id),
             visibility: decl.visibility,
             name: decl.name,
+            type_params: self.lower_type_params(&decl.type_params),
             variants: decl
                 .variants
                 .iter()
@@ -454,6 +456,7 @@ impl LoweringContext {
             hir_id: self.lower_node_id(node.id),
             visibility: decl.visibility,
             name: decl.name,
+            type_params: self.lower_type_params(&decl.type_params),
             constraints: decl
                 .constraints
                 .iter()
