@@ -1461,7 +1461,7 @@ fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
         (TyKind::Dict(ka, va), TyKind::Dict(kb, vb)) => {
             ty_kinds_compatible(&ka.kind, &kb.kind) && ty_kinds_compatible(&va.kind, &vb.kind)
         }
-        (TyKind::Path(pa), TyKind::Path(pb)) => pa.join("::") == pb.join("::"),
+        (TyKind::Path(pa), TyKind::Path(pb)) => pa == pb,
         (TyKind::Union(ua), TyKind::Union(ub)) => {
             ua.len() == ub.len()
                 && ua
