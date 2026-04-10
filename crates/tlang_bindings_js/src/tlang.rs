@@ -8,6 +8,7 @@ use tlang_codegen_js::generator::CodegenJS;
 use tlang_codegen_js::{
     JsAnfReturnOpt, JsAnfTransform, JsHirOptimizer, TailCallSelfReferenceValidation,
 };
+use tlang_core::vm::VM;
 use tlang_defs::{DefKind, DefScope};
 use tlang_diagnostics::{render_ice, render_parse_issues, render_semantic_diagnostics};
 use tlang_hir as hir;
@@ -167,7 +168,8 @@ impl Tlang {
                 tlang_analysis::configure_js_analyzer(&mut analyzer);
             }
             RunnerKind::Interpreter => {
-                tlang_analysis::configure_interpreter_analyzer(&mut analyzer);
+                let vm_symbols = VM::builtin_symbols();
+                analyzer.add_builtin_symbols_with_slots(&vm_symbols);
             }
         }
 

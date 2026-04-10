@@ -285,17 +285,17 @@ fn collect_expr_hints(expr: &hir::Expr, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
             // line so the user can see the value flowing into each step.
             if ctx.pipeline_call_ids.contains(&call.hir_id)
                 && let Some(lhs) = call.arguments.first()
-                    && lhs.span.end_lc.line < expr.span.end_lc.line
-                        && !matches!(lhs.ty.kind, TyKind::Unknown)
-                    {
-                        push_hint(
-                            hints,
-                            ctx.range,
-                            lhs.span.end_lc,
-                            format!(": {}", lhs.ty.kind),
-                            InlayHintKind::ChainedPipeline,
-                        );
-                    }
+                && lhs.span.end_lc.line < expr.span.end_lc.line
+                && !matches!(lhs.ty.kind, TyKind::Unknown)
+            {
+                push_hint(
+                    hints,
+                    ctx.range,
+                    lhs.span.end_lc,
+                    format!(": {}", lhs.ty.kind),
+                    InlayHintKind::ChainedPipeline,
+                );
+            }
             collect_expr_hints(&call.callee, ctx, hints);
             for arg in &call.arguments {
                 collect_expr_hints(arg, ctx, hints);
