@@ -1056,7 +1056,7 @@ impl TypeChecker {
     /// Rules:
     /// - `unknown as T` → compile error (`CastOnUnknown`)
     /// - numeric → numeric (widening, narrowing, int↔float, signed↔unsigned) → allowed
-    /// - anything else → `NoFromImpl` error
+    /// - anything else → check for `Into<target>` impl, or `NoIntoImpl` error
     fn check_cast(&mut self, inner: &mut hir::Expr, target_ty: &hir::Ty, expr: &mut hir::Expr) {
         self.visit_expr(inner, &mut ());
 
@@ -1084,13 +1084,20 @@ impl TypeChecker {
                 self.assign_expr_type(expr, target_kind.clone());
             }
             _ => {
-                self.errors.push(TypeError::NoFromImpl {
-                    from_ty: source_kind.to_string(),
-                    to_ty: target_kind.to_string(),
-                    span,
-                });
-                // Still assign the target type so downstream checking continues.
-                self.assign_expr_type(expr, target_kind.clone());
+                // Check whether an `Into<target>` implementation is registered
+                // for the source type.  If so, allow the cast.
+                let source_name = source_kind.to_string();
+                if self.type_table.has_impl("Into", &source_name) {
+                    self.assign_expr_type(expr, target_kind.clone());
+                } else {
+                    self.errors.push(TypeError::NoIntoImpl {
+                        from_ty: source_name,
+                        to_ty: target_kind.to_string(),
+                        span,
+                    });
+                    // Still assign the target type so downstream checking continues.
+                    self.assign_expr_type(expr, target_kind.clone());
+                }
             }
         }
     }
@@ -1104,36 +1111,19 @@ impl TypeChecker {
     /// - any numeric → numeric → allowed
     /// - any type → same type → allowed (identity)
     ///
-    /// At runtime, `as?` returns a `Result` (Ok on success, Err on failure).
-    /// Pre-generics: the *type-checker* assigns the target type directly
-    /// so downstream code can use the value without unwrapping.  Once
-    /// generics land, it should be `Result<T, ConversionError>`.
-    fn check_try_cast(&mut self, inner: &mut hir::Expr, target_ty: &hir::Ty, expr: &mut hir::Expr) {
+    /// At runtime, `as?` always returns a `Result` (Ok on success, Err on
+    /// failure), so the type-checker assigns `Result` as the expression type.
+    fn check_try_cast(
+        &mut self,
+        inner: &mut hir::Expr,
+        _target_ty: &hir::Ty,
+        expr: &mut hir::Expr,
+    ) {
         self.visit_expr(inner, &mut ());
 
-        let source_kind = &inner.ty.kind;
-        let target_kind = &target_ty.kind;
-
-        match (source_kind, target_kind) {
-            // `unknown as? T` — the primary way to convert unknown values.
-            (TyKind::Unknown, _) => {
-                self.assign_expr_type(expr, target_kind.clone());
-            }
-            // Numeric → Numeric (includes float→int which may fail at runtime).
-            (TyKind::Primitive(src), TyKind::Primitive(tgt))
-                if src.is_numeric() && tgt.is_numeric() =>
-            {
-                self.assign_expr_type(expr, target_kind.clone());
-            }
-            // Same type → identity, always fine.
-            _ if ty_kinds_compatible(source_kind, target_kind) => {
-                self.assign_expr_type(expr, target_kind.clone());
-            }
-            // Any other conversion is allowed via `as?` (runtime check).
-            _ => {
-                self.assign_expr_type(expr, target_kind.clone());
-            }
-        }
+        // `as?` always produces a `Result` regardless of the conversion path.
+        let result_ty = Self::builtin_type_path("Result");
+        self.assign_expr_type(expr, result_ty);
     }
 
     fn visit_call_expr(

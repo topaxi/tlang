@@ -324,9 +324,8 @@ impl<'a> InnerCodegen<'a> {
     /// Generate a try-cast expression (`as?`).
     ///
     /// Dispatches through the `TryInto` protocol: `TryInto::try_into(value, "targetType")`.
-    /// For builtin numeric types in JavaScript this wraps in `Result.Ok`
-    /// since JS numeric conversions always succeed. User-defined
-    /// `TryInto` implementations may return `Result.Err`.
+    /// The `TryInto` implementation is expected to return a `Result`
+    /// (Ok on success, Err on failure).
     fn generate_try_cast_expr(&mut self, inner: &hir::Expr, target_ty: &hir::Ty) -> Expression<'a> {
         let value = self.generate_expr(inner);
         let try_into_fn = self.static_member_expr(

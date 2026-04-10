@@ -429,6 +429,10 @@ impl Interpreter {
     /// Evaluate `expr as? Type` — dispatches through the `TryInto` protocol
     /// if an implementation exists for the value's type, otherwise falls
     /// back to the builtin fallible numeric conversion.
+    ///
+    /// The `TryInto` protocol signature requires implementations to return
+    /// `Result<T, String>`, so both the protocol dispatch path and the
+    /// builtin fallback consistently return a `Result`.
     fn eval_try_cast(
         &self,
         state: &mut VMState,

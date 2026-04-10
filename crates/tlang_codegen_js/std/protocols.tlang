@@ -38,5 +38,5 @@ pub protocol Into<T> {
 }
 
 pub protocol TryInto<T> {
-  fn try_into(self) -> T
+  fn try_into(self) -> Result<T, String>
 }

@@ -1428,7 +1428,7 @@ fn cast_string_to_int_error() {
     let errs = common::typecheck_errors(r#"let x = "hello"; let y = x as i64;"#);
     assert_eq!(errs.len(), 1);
     assert!(
-        errs[0].contains("no `From<String>` implementation for `i64`"),
+        errs[0].contains("no `Into<i64>` implementation for `String`"),
         "unexpected: {}",
         errs[0]
     );
@@ -1439,7 +1439,7 @@ fn cast_bool_to_int_error() {
     let errs = common::typecheck_errors("let x = true; let y = x as i64;");
     assert_eq!(errs.len(), 1);
     assert!(
-        errs[0].contains("no `From<bool>` implementation for `i64`"),
+        errs[0].contains("no `Into<i64>` implementation for `bool`"),
         "unexpected: {}",
         errs[0]
     );

@@ -15,8 +15,8 @@ pub enum TypeError {
     },
     /// An attempted cast on an `unknown` type, which is not permitted.
     CastOnUnknown { span: Span },
-    /// No `From` implementation exists for an infallible `as` cast.
-    NoFromImpl {
+    /// No `Into` implementation exists for an infallible `as` cast.
+    NoIntoImpl {
         from_ty: String,
         to_ty: String,
         span: Span,
@@ -96,7 +96,7 @@ impl TypeError {
         match self {
             TypeError::TypeMismatch { span, .. }
             | TypeError::CastOnUnknown { span }
-            | TypeError::NoFromImpl { span, .. }
+            | TypeError::NoIntoImpl { span, .. }
             | TypeError::InvalidBinaryOp { span, .. }
             | TypeError::InvalidUnaryOp { span, .. }
             | TypeError::UnknownInStrictContext { span, .. }
@@ -120,8 +120,8 @@ impl TypeError {
             TypeError::CastOnUnknown { .. } => {
                 "cannot use `as` cast on `unknown` type; use `as?` instead".to_string()
             }
-            TypeError::NoFromImpl { from_ty, to_ty, .. } => {
-                format!("no `From<{from_ty}>` implementation for `{to_ty}`")
+            TypeError::NoIntoImpl { from_ty, to_ty, .. } => {
+                format!("no `Into<{to_ty}>` implementation for `{from_ty}`")
             }
             TypeError::InvalidBinaryOp { op, lhs, rhs, .. } => {
                 format!("cannot apply operator `{op}` to types `{lhs}` and `{rhs}`")
