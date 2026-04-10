@@ -25,9 +25,7 @@ impl<'a> InnerCodegen<'a> {
                 // Mutual tail call (not self-referencing) → regular call
                 self.generate_call_expression(call_expr)
             }
-            hir::ExprKind::Cast(inner, target_ty) => {
-                self.generate_cast_expr(inner, target_ty)
-            }
+            hir::ExprKind::Cast(inner, target_ty) => self.generate_cast_expr(inner, target_ty),
             hir::ExprKind::TryCast(inner, target_ty) => {
                 self.generate_try_cast_expr(inner, target_ty)
             }
@@ -329,11 +327,7 @@ impl<'a> InnerCodegen<'a> {
     /// For builtin numeric types in JavaScript this wraps in `Result.Ok`
     /// since JS numeric conversions always succeed. User-defined
     /// `TryInto` implementations may return `Result.Err`.
-    fn generate_try_cast_expr(
-        &mut self,
-        inner: &hir::Expr,
-        target_ty: &hir::Ty,
-    ) -> Expression<'a> {
+    fn generate_try_cast_expr(&mut self, inner: &hir::Expr, target_ty: &hir::Ty) -> Expression<'a> {
         let value = self.generate_expr(inner);
         let try_into_fn = self.static_member_expr(
             self.ident_expr(&crate::generator::CodegenJS::protocol_js_name("TryInto")),

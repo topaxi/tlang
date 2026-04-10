@@ -448,8 +448,7 @@ impl Interpreter {
                 return EvalResult::Value(self.eval_call_object(state, fn_value, &[value]));
             }
             // Also try non-generic fallback.
-            if let Some(fn_value) =
-                state.get_protocol_impl(try_into_id, type_shape_key, "try_into")
+            if let Some(fn_value) = state.get_protocol_impl(try_into_id, type_shape_key, "try_into")
             {
                 return EvalResult::Value(self.eval_call_object(state, fn_value, &[value]));
             }
