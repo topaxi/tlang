@@ -543,6 +543,8 @@ impl Interpreter {
             hir::PrimTy::U64 | hir::PrimTy::Usize => try_f64_to_unsigned(f, u64::MAX as f64)
                 .map(TlangValue::U64)
                 .ok_or_else(|| format!("cannot convert {f} to u64")),
+            // Truncate to f32 precision, then widen back to f64 for storage
+            // (TlangValue::F32 wraps an f64 internally).
             hir::PrimTy::F32 => Ok(TlangValue::F32(f as f32 as f64)),
             hir::PrimTy::F64 => Ok(TlangValue::F64(f)),
             hir::PrimTy::Bool => Ok(TlangValue::Bool(value.is_truthy())),

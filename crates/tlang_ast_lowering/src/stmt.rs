@@ -500,8 +500,11 @@ impl LoweringContext {
                 assert!(
                     ty.parameters.is_empty(),
                     "parameterized impl-block protocol type arguments are not yet supported: \
-                     lowering would drop nested type arguments from `{:?}`",
-                    ty.kind
+                     lowering would drop nested type arguments from `{:?}` \
+                     in `impl {} for {}`",
+                    ty.kind,
+                    impl_block.protocol_name,
+                    impl_block.target_type,
                 );
                 self.lower_ty(Some(ty))
             })
