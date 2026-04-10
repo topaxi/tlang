@@ -24,6 +24,7 @@ Module(
             ),
           ),
         ),
+        type_params: [],
         constraints: [],
         methods: [
           ProtocolMethodSignature(

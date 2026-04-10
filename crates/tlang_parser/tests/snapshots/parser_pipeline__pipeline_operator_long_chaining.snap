@@ -203,6 +203,7 @@ Module(
                                     ),
                                   ),
                                 ),
+                                type_params: [],
                                 parameters: [
                                   FunctionParameter(
                                     pattern: Pat(
@@ -539,6 +540,7 @@ Module(
                                 ),
                               ),
                             ),
+                            type_params: [],
                             parameters: [
                               FunctionParameter(
                                 pattern: Pat(
@@ -913,6 +915,7 @@ Module(
                             ),
                           ),
                         ),
+                        type_params: [],
                         parameters: [
                           FunctionParameter(
                             pattern: Pat(
