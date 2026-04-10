@@ -9,7 +9,7 @@ use tlang_ast::keyword::kw;
 use tlang_ast::node::{EnumPattern, FunctionDeclaration, Ident};
 use tlang_defs::{Def, DefIdAllocator, DefKind, DefScope};
 use tlang_hir as hir;
-use tlang_span::{HirId, HirIdAllocator, NodeId, Span, TypeVarIdAllocator};
+use tlang_span::{HirId, HirIdAllocator, NodeId, Span, TypeVarId, TypeVarIdAllocator};
 
 /// Context for implicit self-dispatch in protocol default method implementations.
 ///
@@ -140,6 +140,10 @@ pub struct LoweringContext {
     /// pipeline-originated calls without modifying the HIR structure.
     pub(crate) pipeline_call_ids: HashSet<HirId>,
     type_var_id_allocator: TypeVarIdAllocator,
+    /// Stack of active type parameter scopes. Each entry maps type parameter
+    /// names to their `TypeVarId`s. Pushed when entering a generic declaration
+    /// (function, struct, enum, protocol) and popped when leaving.
+    type_param_scopes: Vec<HashMap<String, TypeVarId>>,
 }
 
 impl LoweringContext {
@@ -161,6 +165,7 @@ impl LoweringContext {
             protocol_registry: HashMap::default(),
             pipeline_call_ids: HashSet::default(),
             type_var_id_allocator: TypeVarIdAllocator::new(1),
+            type_param_scopes: Vec::new(),
         }
     }
 
@@ -512,6 +517,10 @@ impl LoweringContext {
             let hir_id = this.lower_node_id(decl.id);
             let name = this.lower_expr(&decl.name);
 
+            // Push type parameter scope *before* lowering parameters, return
+            // type and body so that type annotations can resolve `T` → Var(id).
+            let type_params = this.lower_type_params(&decl.type_params);
+
             let parameters = decl
                 .parameters
                 .iter()
@@ -520,11 +529,13 @@ impl LoweringContext {
             let body = this.lower_block_in_current_scope(&decl.body);
             let return_type = this.lower_ty(decl.return_type_annotation.as_ref());
 
+            this.pop_type_param_scope();
+
             hir::FunctionDeclaration {
                 hir_id,
                 visibility: decl.visibility,
                 name,
-                type_params: this.lower_type_params(&decl.type_params),
+                type_params,
                 parameters,
                 params_span: decl.params_span,
                 return_type,
@@ -638,13 +649,20 @@ impl LoweringContext {
         }
     }
 
-    /// Lower AST type parameters to HIR, allocating a fresh `TypeVarId` for each.
+    /// Lower AST type parameters to HIR, allocating a fresh `TypeVarId` for
+    /// each. Also pushes a type parameter scope so that `lower_ty_path` can
+    /// resolve type parameter names (e.g. `T`) to `TyKind::Var(id)`.
+    ///
+    /// **Must** be paired with a call to [`pop_type_param_scope`] after lowering
+    /// the body that uses these type parameters.
     fn lower_type_params(&mut self, params: &[ast::node::TypeParam]) -> Vec<hir::TypeParam> {
-        params
+        let mut scope = HashMap::new();
+        let hir_params: Vec<_> = params
             .iter()
             .map(|p| {
                 let hir_id = self.lower_node_id(p.id);
                 let type_var_id = self.type_var_id_allocator.next_id();
+                scope.insert(p.name.as_str().to_string(), type_var_id);
                 hir::TypeParam {
                     hir_id,
                     name: p.name,
@@ -652,7 +670,27 @@ impl LoweringContext {
                     span: p.span,
                 }
             })
-            .collect()
+            .collect();
+        self.type_param_scopes.push(scope);
+        hir_params
+    }
+
+    /// Pop the most recently pushed type parameter scope. Must be called after
+    /// lowering the body that was covered by the corresponding
+    /// [`lower_type_params`] call.
+    fn pop_type_param_scope(&mut self) {
+        self.type_param_scopes.pop();
+    }
+
+    /// Look up a single-segment name in the active type parameter scopes.
+    /// Returns the `TypeVarId` if found (innermost scope wins).
+    fn resolve_type_param(&self, name: &str) -> Option<TypeVarId> {
+        for scope in self.type_param_scopes.iter().rev() {
+            if let Some(&id) = scope.get(name) {
+                return Some(id);
+            }
+        }
+        None
     }
 
     fn lower_ty(&mut self, node: Option<&ast::node::Ty>) -> hir::Ty {
@@ -696,12 +734,16 @@ impl LoweringContext {
         }
     }
 
-    /// Lower a type path, mapping known primitive names to `TyKind::Primitive`.
+    /// Lower a type path, mapping known primitive names to `TyKind::Primitive`
+    /// and type parameter names to `TyKind::Var`.
     fn lower_ty_path(&mut self, path: &ast::node::Path) -> hir::TyKind {
         if path.segments.len() == 1 {
             let name = path.segments[0].as_str();
             if let Some(prim) = Self::name_to_prim_ty(name) {
                 return hir::TyKind::Primitive(prim);
+            }
+            if let Some(type_var_id) = self.resolve_type_param(name) {
+                return hir::TyKind::Var(type_var_id);
             }
         }
         hir::TyKind::Path(self.lower_path(path))

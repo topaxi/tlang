@@ -266,11 +266,12 @@ impl LoweringContext {
         node: &ast::node::Stmt,
         decl: &ast::node::StructDeclaration,
     ) -> hir::Stmt {
+        let type_params = self.lower_type_params(&decl.type_params);
         let hir_decl = hir::StructDeclaration {
             hir_id: self.lower_node_id(node.id),
             visibility: decl.visibility,
             name: decl.name,
-            type_params: self.lower_type_params(&decl.type_params),
+            type_params,
             fields: decl
                 .fields
                 .iter()
@@ -282,6 +283,7 @@ impl LoweringContext {
                 .map(|c| self.lower_const_item(c))
                 .collect(),
         };
+        self.pop_type_param_scope();
 
         hir::Stmt {
             hir_id: self.lower_node_id(node.id),
@@ -297,11 +299,12 @@ impl LoweringContext {
         node: &ast::node::Stmt,
         decl: &ast::node::EnumDeclaration,
     ) -> hir::Stmt {
+        let type_params = self.lower_type_params(&decl.type_params);
         let decl = hir::EnumDeclaration {
             hir_id: self.lower_node_id(node.id),
             visibility: decl.visibility,
             name: decl.name,
-            type_params: self.lower_type_params(&decl.type_params),
+            type_params,
             variants: decl
                 .variants
                 .iter()
@@ -326,6 +329,7 @@ impl LoweringContext {
                 .map(|c| self.lower_const_item(c))
                 .collect(),
         };
+        self.pop_type_param_scope();
 
         hir::Stmt {
             hir_id: self.lower_node_id(node.id),
@@ -341,6 +345,9 @@ impl LoweringContext {
         node: &ast::node::Stmt,
         decl: &ast::node::ProtocolDeclaration,
     ) -> hir::Stmt {
+        // Push type parameter scope before lowering methods/constraints.
+        let type_params = self.lower_type_params(&decl.type_params);
+
         // Build the method dispatch map for this protocol.  It maps method name →
         // the Ident of the protocol that declares it, covering both this protocol's
         // own methods and all methods from transitively-reachable constraint
@@ -456,7 +463,7 @@ impl LoweringContext {
             hir_id: self.lower_node_id(node.id),
             visibility: decl.visibility,
             name: decl.name,
-            type_params: self.lower_type_params(&decl.type_params),
+            type_params,
             constraints: decl
                 .constraints
                 .iter()
@@ -469,6 +476,7 @@ impl LoweringContext {
                 .map(|c| self.lower_const_item(c))
                 .collect(),
         };
+        self.pop_type_param_scope();
 
         hir::Stmt {
             hir_id: self.lower_node_id(node.id),

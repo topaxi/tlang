@@ -1,0 +1,206 @@
+---
+source: crates/tlang_parser/tests/parser_generics.rs
+expression: "parse!\n(indoc::indoc!\n{\"\n        protocol Into<T> {\n            fn into(self) -> T\n        }\n    \"})"
+---
+Module(
+  id: 2,
+  statements: [
+    Stmt(
+      id: 7,
+      kind: ProtocolDeclaration(ProtocolDeclaration(
+        visibility: Private,
+        name: Ident(
+          name: "Into",
+          span: Span(
+            start: 9,
+            end: 13,
+            start_lc: LineColumn(
+              line: 0,
+              column: 9,
+            ),
+            end_lc: LineColumn(
+              line: 0,
+              column: 13,
+            ),
+          ),
+        ),
+        type_params: [
+          TypeParam(
+            id: 3,
+            name: Ident(
+              name: "T",
+              span: Span(
+                start: 14,
+                end: 15,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 14,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 15,
+                ),
+              ),
+            ),
+            span: Span(
+              start: 14,
+              end: 15,
+              start_lc: LineColumn(
+                line: 0,
+                column: 14,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 15,
+              ),
+            ),
+          ),
+        ],
+        constraints: [],
+        methods: [
+          ProtocolMethodSignature(
+            id: 6,
+            name: Ident(
+              name: "into",
+              span: Span(
+                start: 26,
+                end: 30,
+                start_lc: LineColumn(
+                  line: 1,
+                  column: 8,
+                ),
+                end_lc: LineColumn(
+                  line: 1,
+                  column: 12,
+                ),
+              ),
+            ),
+            parameters: [
+              FunctionParameter(
+                pattern: Pat(
+                  id: 4,
+                  kind: _Self,
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: 31,
+                    end: 35,
+                    start_lc: LineColumn(
+                      line: 1,
+                      column: 13,
+                    ),
+                    end_lc: LineColumn(
+                      line: 1,
+                      column: 17,
+                    ),
+                  ),
+                ),
+                type_annotation: None,
+                span: Span(
+                  start: 31,
+                  end: 35,
+                  start_lc: LineColumn(
+                    line: 1,
+                    column: 13,
+                  ),
+                  end_lc: LineColumn(
+                    line: 1,
+                    column: 17,
+                  ),
+                ),
+              ),
+            ],
+            return_type_annotation: Some(Ty(
+              id: 5,
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "T",
+                    span: Span(
+                      start: 40,
+                      end: 41,
+                      start_lc: LineColumn(
+                        line: 1,
+                        column: 22,
+                      ),
+                      end_lc: LineColumn(
+                        line: 1,
+                        column: 23,
+                      ),
+                    ),
+                  ),
+                ],
+                res: Unresolved,
+                span: Span(
+                  start: 40,
+                  end: 41,
+                  start_lc: LineColumn(
+                    line: 1,
+                    column: 22,
+                  ),
+                  end_lc: LineColumn(
+                    line: 1,
+                    column: 23,
+                  ),
+                ),
+              )),
+              parameters: [],
+              span: Span(
+                start: 40,
+                end: 41,
+                start_lc: LineColumn(
+                  line: 1,
+                  column: 22,
+                ),
+                end_lc: LineColumn(
+                  line: 1,
+                  column: 23,
+                ),
+              ),
+            )),
+            body: None,
+            span: Span(
+              start: 23,
+              end: 41,
+              start_lc: LineColumn(
+                line: 1,
+                column: 5,
+              ),
+              end_lc: LineColumn(
+                line: 1,
+                column: 23,
+              ),
+            ),
+          ),
+        ],
+        consts: [],
+      )),
+      span: Span(
+        start: 0,
+        end: 43,
+        start_lc: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end_lc: LineColumn(
+          line: 2,
+          column: 2,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: 0,
+    end: 43,
+    start_lc: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end_lc: LineColumn(
+      line: 2,
+      column: 2,
+    ),
+  ),
+)
