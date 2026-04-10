@@ -26,7 +26,7 @@ impl<'a> InnerCodegen<'a> {
                 self.generate_call_expression(call_expr)
             }
             hir::ExprKind::Cast(inner, _) => self.generate_expr(inner),
-            hir::ExprKind::TryCast(..) => self.unsupported_expr("try cast expressions", expr.span),
+            hir::ExprKind::TryCast(inner, _) => self.generate_try_cast_expr(inner),
             hir::ExprKind::FieldAccess(base, field) => {
                 self.generate_field_access_expression(base, field)
             }
@@ -298,6 +298,16 @@ impl<'a> InnerCodegen<'a> {
         let has_impl = self.static_member_expr(protocol_obj, "$implements");
         let value = self.generate_expr(value_expr);
         self.call_expr(has_impl, vec![Argument::from(value)])
+    }
+
+    /// Generate a try-cast expression (`as?`).
+    ///
+    /// In JavaScript, all numbers are f64 so numeric conversions always
+    /// succeed.  We wrap the inner expression in `Result.Ok(value)`.
+    fn generate_try_cast_expr(&mut self, inner: &hir::Expr) -> Expression<'a> {
+        let value = self.generate_expr(inner);
+        let result_ok = self.static_member_expr(self.ident_expr("Result"), "Ok");
+        self.call_expr(result_ok, vec![Argument::from(value)])
     }
 
     fn generate_unary_op(&mut self, op: &ast::UnaryOp, expr: &hir::Expr) -> Expression<'a> {
