@@ -2293,10 +2293,10 @@ fn saturate_to_i64(f: f64, min: f64, max: f64) -> i64 {
     if f.is_nan() {
         return 0;
     }
-    if f <= min {
+    if f < min {
         return min as i64;
     }
-    if f >= max {
+    if f > max {
         return max as i64;
     }
     f as i64
@@ -2307,7 +2307,7 @@ fn saturate_to_u64(f: f64, max: f64) -> u64 {
     if f.is_nan() || f < 0.0 {
         return 0;
     }
-    if f >= max {
+    if f > max {
         return max as u64;
     }
     f as u64

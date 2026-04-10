@@ -1104,8 +1104,10 @@ impl TypeChecker {
     /// - any numeric → numeric → allowed
     /// - any type → same type → allowed (identity)
     ///
-    /// Pre-generics: the result type is the target type directly (simplified).
-    /// Once generics land, it should be `Result<T, ConversionError>`.
+    /// At runtime, `as?` returns a `Result` (Ok on success, Err on failure).
+    /// Pre-generics: the *type-checker* assigns the target type directly
+    /// so downstream code can use the value without unwrapping.  Once
+    /// generics land, it should be `Result<T, ConversionError>`.
     fn check_try_cast(&mut self, inner: &mut hir::Expr, target_ty: &hir::Ty, expr: &mut hir::Expr) {
         self.visit_expr(inner, &mut ());
 
