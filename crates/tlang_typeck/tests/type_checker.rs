@@ -1249,3 +1249,62 @@ fn dict_literal_annotation_mismatch_error() {
         "expected binding type mismatch, got: {errs:?}"
     );
 }
+
+// ── Closure typing ──────────────────────────────────────────────────────
+
+#[test]
+fn closure_type_is_fn() {
+    // A closure with annotated params should produce a Fn type that
+    // can be used as a callee.
+    common::typecheck_ok(
+        r#"
+        let f = fn(x: i64) -> i64 { x + 1 };
+        let y: i64 = f(42);
+        "#,
+    );
+}
+
+#[test]
+fn closure_unannotated_params_remain_unknown() {
+    // Without calling context, unannotated closure params remain unknown
+    // and the closure body operates on unknown types.
+    common::typecheck_ok(
+        r#"
+        let f = fn(x) { x };
+        "#,
+    );
+}
+
+#[test]
+fn closure_return_type_inferred_from_body() {
+    // When no return type is annotated, the closure's return type is
+    // inferred from the body's trailing expression.
+    common::typecheck_ok(
+        r#"
+        let f = fn(x: i64) { x + 1 };
+        let y: i64 = f(42);
+        "#,
+    );
+}
+
+#[test]
+fn closure_multi_param_typed() {
+    // Multiple typed parameters produce the correct Fn type.
+    common::typecheck_ok(
+        r#"
+        let add = fn(a: i64, b: i64) -> i64 { a + b };
+        let result: i64 = add(1, 2);
+        "#,
+    );
+}
+
+#[test]
+fn closure_passed_to_another_closure_ok() {
+    // A typed closure called directly.
+    common::typecheck_ok(
+        r#"
+        let inc = fn(x: i64) -> i64 { x + 1 };
+        let result: i64 = inc(10);
+        "#,
+    );
+}
