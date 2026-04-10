@@ -496,7 +496,15 @@ impl LoweringContext {
         let type_arguments: Vec<hir::Ty> = impl_block
             .type_arguments
             .iter()
-            .map(|ty| self.lower_ty(Some(ty)))
+            .map(|ty| {
+                assert!(
+                    ty.parameters.is_empty(),
+                    "parameterized impl-block protocol type arguments are not yet supported: \
+                     lowering would drop nested type arguments from `{:?}`",
+                    ty.kind
+                );
+                self.lower_ty(Some(ty))
+            })
             .collect();
         let target_type = self.lower_path(&impl_block.target_type);
 

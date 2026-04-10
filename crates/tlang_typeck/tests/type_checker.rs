@@ -1498,3 +1498,42 @@ fn cast_result_type_mismatch_in_binding() {
         errs[0]
     );
 }
+
+#[test]
+fn cast_with_matching_into_impl_ok() {
+    // User-defined `impl Into<Target> for Source` allows `as` cast.
+    common::typecheck_ok(
+        r#"
+        protocol Into<T> { fn into(self) -> T }
+        struct Celsius { degrees: f64 }
+        struct Fahrenheit { degrees: f64 }
+        impl Into<Fahrenheit> for Celsius {
+            fn into(self) { Fahrenheit { degrees: self.degrees * 1.8 + 32.0 } }
+        }
+        let c = Celsius { degrees: 100.0 };
+        let f = c as Fahrenheit;
+        "#,
+    );
+}
+
+#[test]
+fn cast_with_wrong_into_target_error() {
+    // `impl Into<Wrapper> for Wrapper` should NOT allow `x as i64`.
+    let errs = common::typecheck_errors(
+        r#"
+        protocol Into<T> { fn into(self) -> T }
+        struct Wrapper { value: i64 }
+        impl Into<Wrapper> for Wrapper {
+            fn into(self) { Wrapper { value: self.value } }
+        }
+        let x: Wrapper = Wrapper { value: 1 };
+        let y = x as i64;
+        "#,
+    );
+    assert_eq!(errs.len(), 1, "expected exactly 1 error, got: {errs:?}");
+    assert!(
+        errs[0].contains("no `Into<i64>` implementation for `Wrapper`"),
+        "unexpected: {}",
+        errs[0]
+    );
+}

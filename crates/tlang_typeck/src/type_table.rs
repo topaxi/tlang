@@ -59,6 +59,8 @@ pub struct ProtocolInfo {
 pub struct ImplInfo {
     pub protocol_name: String,
     pub target_type_name: String,
+    /// Protocol type-argument keys (e.g. `["i64"]` for `impl Into<i64> for String`).
+    pub protocol_type_args: Vec<String>,
 }
 
 /// Maps `HirId → TypeInfo` for supplementary type data (function signatures,
@@ -141,5 +143,22 @@ impl TypeTable {
         self.impl_info
             .iter()
             .any(|i| i.protocol_name == protocol_name && i.target_type_name == target_type_name)
+    }
+
+    /// Check whether `impl Protocol<TypeArg> for Type` has been registered.
+    ///
+    /// This is stricter than `has_impl` — it also requires that the protocol
+    /// type-argument list contains the given key (e.g. `"i64"` for `Into<i64>`).
+    pub fn has_impl_with_type_arg(
+        &self,
+        protocol_name: &str,
+        target_type_name: &str,
+        type_arg: &str,
+    ) -> bool {
+        self.impl_info.iter().any(|i| {
+            i.protocol_name == protocol_name
+                && i.target_type_name == target_type_name
+                && i.protocol_type_args.iter().any(|a| a == type_arg)
+        })
     }
 }

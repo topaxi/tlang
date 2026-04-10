@@ -508,7 +508,9 @@ impl Interpreter {
     /// Fallible conversion — returns Ok(converted) or Err(message).
     fn try_convert_value(value: TlangValue, target: &hir::TyKind) -> Result<TlangValue, String> {
         let hir::TyKind::Primitive(prim) = target else {
-            return Ok(value);
+            return Err(format!(
+                "cannot try-convert value {value:?} to non-primitive type {target:?}"
+            ));
         };
 
         let f = value.as_f64();
@@ -541,7 +543,8 @@ impl Interpreter {
             hir::PrimTy::U64 | hir::PrimTy::Usize => try_f64_to_unsigned(f, u64::MAX as f64)
                 .map(TlangValue::U64)
                 .ok_or_else(|| format!("cannot convert {f} to u64")),
-            hir::PrimTy::F32 | hir::PrimTy::F64 => Ok(TlangValue::F64(f)),
+            hir::PrimTy::F32 => Ok(TlangValue::F32(f as f32 as f64)),
+            hir::PrimTy::F64 => Ok(TlangValue::F64(f)),
             hir::PrimTy::Bool => Ok(TlangValue::Bool(value.is_truthy())),
             _ => Ok(value),
         }

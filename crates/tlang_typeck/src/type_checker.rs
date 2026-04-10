@@ -965,6 +965,11 @@ impl TypeChecker {
                     self.type_table.insert_impl_info(ImplInfo {
                         protocol_name: impl_block.protocol_name.join("::"),
                         target_type_name: impl_block.target_type.join("::"),
+                        protocol_type_args: impl_block
+                            .type_arguments
+                            .iter()
+                            .map(|ty| ty.kind.to_string())
+                            .collect(),
                     });
                 }
                 _ => {}
@@ -1085,14 +1090,20 @@ impl TypeChecker {
             }
             _ => {
                 // Check whether an `Into<target>` implementation is registered
-                // for the source type.  If so, allow the cast.
+                // for the source type.  We require the specific type-argument
+                // match so that e.g. `impl Into<bool> for String` does not
+                // allow `"x" as i64`.
                 let source_name = source_kind.to_string();
-                if self.type_table.has_impl("Into", &source_name) {
+                let target_name = target_kind.to_string();
+                if self
+                    .type_table
+                    .has_impl_with_type_arg("Into", &source_name, &target_name)
+                {
                     self.assign_expr_type(expr, target_kind.clone());
                 } else {
                     self.errors.push(TypeError::NoIntoImpl {
                         from_ty: source_name,
-                        to_ty: target_kind.to_string(),
+                        to_ty: target_name,
                         span,
                     });
                     // Still assign the target type so downstream checking continues.
