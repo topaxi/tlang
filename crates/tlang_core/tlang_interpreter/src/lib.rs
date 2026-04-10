@@ -408,9 +408,7 @@ impl Interpreter {
         // Try protocol-based conversion first
         if let Some(into_id) = state.protocol_id_by_name("Into") {
             let type_shape_key = state.type_shape_key_of(value);
-            if let Some(fn_value) =
-                state.get_protocol_impl(into_id, type_shape_key, "into")
-            {
+            if let Some(fn_value) = state.get_protocol_impl(into_id, type_shape_key, "into") {
                 return EvalResult::Value(self.eval_call_object(state, fn_value, &[value]));
             }
         }
@@ -433,8 +431,7 @@ impl Interpreter {
         // Try protocol-based conversion first
         if let Some(try_into_id) = state.protocol_id_by_name("TryInto") {
             let type_shape_key = state.type_shape_key_of(value);
-            if let Some(fn_value) =
-                state.get_protocol_impl(try_into_id, type_shape_key, "try_into")
+            if let Some(fn_value) = state.get_protocol_impl(try_into_id, type_shape_key, "try_into")
             {
                 return EvalResult::Value(self.eval_call_object(state, fn_value, &[value]));
             }
