@@ -1154,6 +1154,8 @@ pub struct ProtocolMethodSignature {
 pub struct ImplBlock {
     pub hir_id: HirId,
     pub protocol_name: Path,
+    /// Type arguments for generic protocols, e.g. `<i64>` in `impl Into<i64> for String`.
+    pub type_arguments: Vec<Ty>,
     pub target_type: Path,
     pub methods: Vec<FunctionDeclaration>,
     pub apply_methods: Vec<Ident>,

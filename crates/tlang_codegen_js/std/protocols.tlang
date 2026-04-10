@@ -33,10 +33,10 @@ pub protocol Display {
   }
 }
 
-pub protocol Into {
-  fn into(self)
+pub protocol Into<T> {
+  fn into(self) -> T
 }
 
-pub protocol TryInto {
-  fn try_into(self)
+pub protocol TryInto<T> {
+  fn try_into(self) -> T
 }

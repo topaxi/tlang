@@ -493,6 +493,11 @@ impl LoweringContext {
         impl_block: &ast::node::ImplBlock,
     ) -> hir::Stmt {
         let protocol_name = self.lower_path(&impl_block.protocol_name);
+        let type_arguments: Vec<hir::Ty> = impl_block
+            .type_arguments
+            .iter()
+            .map(|ty| self.lower_ty(Some(ty)))
+            .collect();
         let target_type = self.lower_path(&impl_block.target_type);
 
         // Group methods by name so multi-clause methods get lowered via pattern matching.
@@ -524,6 +529,7 @@ impl LoweringContext {
         let hir_impl = hir::ImplBlock {
             hir_id: self.lower_node_id(node.id),
             protocol_name,
+            type_arguments,
             target_type,
             methods,
             apply_methods: impl_block.apply_methods.clone(),

@@ -479,7 +479,7 @@ impl<'a> InnerCodegen<'a> {
 
         let mut stmts = Vec::new();
 
-        // $impl($Protocol, Type, { method: fn, ... })
+        // $impl($Protocol, Type, { method: fn, ... }, typeArgs?)
         let props: Vec<ObjectPropertyKind<'a>> = impl_block
             .methods
             .iter()
@@ -510,14 +510,25 @@ impl<'a> InnerCodegen<'a> {
         let methods_obj = self
             .ast
             .expression_object(SPAN, self.ast.vec_from_iter(props));
-        let impl_call = self.call_expr(
-            self.ident_expr("$impl"),
-            vec![
-                Argument::from(self.ident_expr(&js_protocol_name)),
-                Argument::from(self.ident_expr(&js_type_constructor)),
-                Argument::from(methods_obj),
-            ],
-        );
+        let mut impl_args = vec![
+            Argument::from(self.ident_expr(&js_protocol_name)),
+            Argument::from(self.ident_expr(&js_type_constructor)),
+            Argument::from(methods_obj),
+        ];
+
+        // For generic protocols (e.g. `impl Into<i64> for String`), pass the
+        // type argument key as the fourth argument to $impl.
+        if !impl_block.type_arguments.is_empty() {
+            let type_arg_key = impl_block
+                .type_arguments
+                .iter()
+                .map(|ty| format!("{}", ty.kind))
+                .collect::<Vec<_>>()
+                .join(",");
+            impl_args.push(Argument::from(self.str_expr(&type_arg_key)));
+        }
+
+        let impl_call = self.call_expr(self.ident_expr("$impl"), impl_args);
         stmts.push(self.expr_stmt(impl_call));
 
         for apply_ident in &impl_block.apply_methods {

@@ -405,9 +405,18 @@ impl Interpreter {
     fn eval_cast(&self, state: &mut VMState, inner: &hir::Expr, target_ty: &hir::Ty) -> EvalResult {
         let value = eval_value!(state, self.eval_expr(state, inner));
 
-        // Try protocol-based conversion first
+        // Try protocol-based conversion first.
+        // For generic `Into<T>`, look up `into<target_type>` (type-qualified method).
         if let Some(into_id) = state.protocol_id_by_name("Into") {
             let type_shape_key = state.type_shape_key_of(value);
+            let qualified_method = format!("into<{}>", target_ty.kind);
+            if let Some(fn_value) =
+                state.get_protocol_impl(into_id, type_shape_key, &qualified_method)
+            {
+                return EvalResult::Value(self.eval_call_object(state, fn_value, &[value]));
+            }
+            // Also try non-generic fallback (for backwards compatibility with
+            // non-generic Into impls).
             if let Some(fn_value) = state.get_protocol_impl(into_id, type_shape_key, "into") {
                 return EvalResult::Value(self.eval_call_object(state, fn_value, &[value]));
             }
@@ -428,10 +437,19 @@ impl Interpreter {
     ) -> EvalResult {
         let value = eval_value!(state, self.eval_expr(state, inner));
 
-        // Try protocol-based conversion first
+        // Try protocol-based conversion first.
+        // For generic `TryInto<T>`, look up `try_into<target_type>`.
         if let Some(try_into_id) = state.protocol_id_by_name("TryInto") {
             let type_shape_key = state.type_shape_key_of(value);
-            if let Some(fn_value) = state.get_protocol_impl(try_into_id, type_shape_key, "try_into")
+            let qualified_method = format!("try_into<{}>", target_ty.kind);
+            if let Some(fn_value) =
+                state.get_protocol_impl(try_into_id, type_shape_key, &qualified_method)
+            {
+                return EvalResult::Value(self.eval_call_object(state, fn_value, &[value]));
+            }
+            // Also try non-generic fallback.
+            if let Some(fn_value) =
+                state.get_protocol_impl(try_into_id, type_shape_key, "try_into")
             {
                 return EvalResult::Value(self.eval_call_object(state, fn_value, &[value]));
             }
@@ -1208,6 +1226,19 @@ impl Interpreter {
                 ))
             });
 
+        // Build a type argument suffix for generic protocol impls (e.g. "<i64>").
+        let type_arg_suffix = if impl_block.type_arguments.is_empty() {
+            String::new()
+        } else {
+            let args = impl_block
+                .type_arguments
+                .iter()
+                .map(|ty| format!("{}", ty.kind))
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("<{args}>")
+        };
+
         for method in &impl_block.methods {
             // Register the function declaration so it can be called
             state.set_fn_decl(method.hir_id, Rc::new(method.clone()));
@@ -1218,10 +1249,12 @@ impl Interpreter {
                 hir::ExprKind::FieldAccess(_, ident) => ident.to_string(),
                 _ => unreachable!(),
             };
+            // Encode type arguments in the method name for generic dispatch.
+            let qualified_method = format!("{method_name}{type_arg_suffix}");
             state.register_protocol_impl(
                 protocol_id,
                 target_type_shape_key,
-                &method_name,
+                &qualified_method,
                 fn_value,
             );
         }

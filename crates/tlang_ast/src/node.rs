@@ -579,6 +579,8 @@ pub struct ProtocolMethodSignature {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ImplBlock {
     pub protocol_name: Path,
+    /// Type arguments for generic protocols, e.g. `<i64>` in `impl Into<i64> for String`.
+    pub type_arguments: Vec<Ty>,
     pub target_type: Path,
     pub methods: Vec<FunctionDeclaration>,
     pub apply_methods: Vec<Ident>,

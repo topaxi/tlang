@@ -22,8 +22,14 @@ export class $Protocol {
     }
   }
 
-  $setImpl(Type, methods) {
-    this.#impls.set(Type, methods);
+  $setImpl(Type, methods, typeArgs = null) {
+    const key = typeArgs ? `${Type?.name ?? Type}::${typeArgs}` : Type;
+    this.#impls.set(key, methods);
+    // Also store under Type alone when no typeArgs — preserves backwards
+    // compatibility for non-generic protocols.
+    if (typeArgs && !this.#impls.has(Type)) {
+      // Don't overwrite if a non-generic impl already exists.
+    }
   }
 
   $implements(value) {
@@ -41,7 +47,25 @@ export class $Protocol {
 
   #call(methodName, self, ...args) {
     const Type = self?.constructor;
-    const impl = this.#impls.get(Type) ?? this.#def;
+
+    // If the last argument is a string type-arg key (passed by the compiler
+    // for generic protocol dispatch like `Into<i64>`), try a type-parameterized
+    // lookup first.
+    let impl;
+    const lastArg = args[args.length - 1];
+    if (typeof lastArg === 'string' && args.length > 0) {
+      const typeArgKey = `${Type?.name ?? Type}::${lastArg}`;
+      impl = this.#impls.get(typeArgKey);
+      if (impl) {
+        // Remove the type-arg key from the argument list before calling the method.
+        args = args.slice(0, -1);
+      }
+    }
+
+    if (!impl) {
+      impl = this.#impls.get(Type) ?? this.#def;
+    }
+
     const method = impl[methodName] ?? this.#def[methodName];
 
     return method.call(impl, self, ...args);
@@ -53,8 +77,8 @@ export function $protocol(...constraintsAndDef) {
   return new $Protocol(def, constraintsAndDef);
 }
 
-export function $impl(protocol, Type, methods) {
-  protocol.$setImpl(Type, methods);
+export function $impl(protocol, Type, methods, typeArgs) {
+  protocol.$setImpl(Type, methods, typeArgs);
 }
 
 export function $installMethod(proto, methodName, dispatch) {

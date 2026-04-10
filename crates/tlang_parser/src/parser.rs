@@ -673,6 +673,7 @@ impl<'src> Parser<'src> {
     fn parse_impl_block(&mut self) -> Stmt {
         self.consume_keyword_token(Keyword::Impl);
         let protocol_name = self.parse_path();
+        let type_arguments = self.parse_type_annotation_parameters();
         self.consume_keyword_token(Keyword::For);
         let target_type = self.parse_path();
         self.consume_token(TokenKind::LBrace);
@@ -727,6 +728,7 @@ impl<'src> Parser<'src> {
             self.unique_id(),
             ImplBlock(Box::new(ImplBlock {
                 protocol_name,
+                type_arguments,
                 target_type,
                 methods,
                 apply_methods,
