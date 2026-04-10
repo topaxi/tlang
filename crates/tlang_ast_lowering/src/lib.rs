@@ -654,6 +654,11 @@ impl LoweringContext {
                         })
                         .collect(),
                 ),
+                ast::node::TyKind::Fn(params, ret) => {
+                    let param_tys = params.iter().map(|p| self.lower_ty(Some(&p.ty))).collect();
+                    let ret_ty = self.lower_ty(Some(ret));
+                    hir::TyKind::Fn(param_tys, Box::new(ret_ty))
+                }
                 ast::node::TyKind::Unknown => hir::TyKind::Unknown,
             };
             let res = self.node_id_to_hir_id.get(&node.id).copied();

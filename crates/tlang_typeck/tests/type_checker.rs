@@ -1249,3 +1249,133 @@ fn dict_literal_annotation_mismatch_error() {
         "expected binding type mismatch, got: {errs:?}"
     );
 }
+
+// ── Closure typing ──────────────────────────────────────────────────────
+
+#[test]
+fn closure_type_is_fn() {
+    // A closure with annotated params should produce a Fn type that
+    // can be used as a callee.
+    common::typecheck_ok(
+        r#"
+        let f = fn(x: i64) -> i64 { x + 1 };
+        let y: i64 = f(42);
+        "#,
+    );
+}
+
+#[test]
+fn closure_unannotated_params_remain_unknown() {
+    // Without calling context, unannotated closure params remain unknown
+    // and the closure body operates on unknown types.
+    common::typecheck_ok(
+        r#"
+        let f = fn(x) { x };
+        "#,
+    );
+}
+
+#[test]
+fn closure_return_type_inferred_from_body() {
+    // When no return type is annotated, the closure's return type is
+    // inferred from the body's trailing expression.
+    common::typecheck_ok(
+        r#"
+        let f = fn(x: i64) { x + 1 };
+        let y: i64 = f(42);
+        "#,
+    );
+}
+
+#[test]
+fn closure_multi_param_typed() {
+    // Multiple typed parameters produce the correct Fn type.
+    common::typecheck_ok(
+        r#"
+        let add = fn(a: i64, b: i64) -> i64 { a + b };
+        let result: i64 = add(1, 2);
+        "#,
+    );
+}
+
+#[test]
+fn closure_called_directly_ok() {
+    // A typed closure called directly.
+    common::typecheck_ok(
+        r#"
+        let inc = fn(x: i64) -> i64 { x + 1 };
+        let result: i64 = inc(10);
+        "#,
+    );
+}
+
+// ── Function type annotations & bidirectional inference ─────────────────
+
+#[test]
+fn fn_type_annotation_on_binding() {
+    // A binding with a function-type annotation should accept a closure.
+    common::typecheck_ok(
+        r#"
+        let f: fn(i64) -> i64 = fn(x: i64) { x + 1 };
+        let result: i64 = f(42);
+        "#,
+    );
+}
+
+#[test]
+fn fn_type_annotation_on_param_enables_call() {
+    // A function parameter with a function-type annotation should be callable
+    // inside the function body.
+    common::typecheck_ok(
+        r#"
+        fn call_fn(f: fn(i64) -> i64, x: i64) -> i64 { f(x) }
+        let result: i64 = call_fn(fn(x: i64) { x + 1 }, 42);
+        "#,
+    );
+}
+
+#[test]
+fn bidirectional_inference_fills_closure_params() {
+    // When a closure is passed to a function that expects fn(i64) -> i64,
+    // the unannotated closure parameter `x` should be inferred as i64.
+    common::typecheck_ok(
+        r#"
+        fn call_fn(f: fn(i64) -> i64, x: i64) -> i64 { f(x) }
+        let result: i64 = call_fn(fn(x) { x + 1 }, 42);
+        "#,
+    );
+}
+
+#[test]
+fn bidirectional_inference_multi_param() {
+    // Multiple closure params inferred from the callee's function type.
+    common::typecheck_ok(
+        r#"
+        fn combine(f: fn(i64, i64) -> i64, a: i64, b: i64) -> i64 { f(a, b) }
+        let result: i64 = combine(fn(x, y) { x + y }, 1, 2);
+        "#,
+    );
+}
+
+#[test]
+fn bidirectional_inference_preserves_annotated_closure_params() {
+    // Explicit type annotations on closure params are not overridden
+    // by the expected function type.
+    common::typecheck_ok(
+        r#"
+        fn call_fn(f: fn(i64) -> i64, x: i64) -> i64 { f(x) }
+        let result: i64 = call_fn(fn(x: i64) { x + 1 }, 42);
+        "#,
+    );
+}
+
+#[test]
+fn fn_type_named_params_annotation() {
+    // Named parameters in a function type annotation should work.
+    common::typecheck_ok(
+        r#"
+        let f: fn(value: i64) -> i64 = fn(x: i64) { x + 1 };
+        let result: i64 = f(42);
+        "#,
+    );
+}

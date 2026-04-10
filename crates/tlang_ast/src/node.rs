@@ -660,6 +660,19 @@ pub enum TyKind {
     Unknown,
     Path(Path),
     Union(Vec<Path>),
+    /// Function type: `fn(name: Type, …) -> RetType`.
+    /// Stores the parameter types and the return type.
+    Fn(Vec<FunctionTypeParam>, Box<Ty>),
+}
+
+/// A single parameter in a function type annotation (e.g. `value: usize`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct FunctionTypeParam {
+    /// Optional parameter name (e.g. `value` in `value: usize`).
+    pub name: Option<Ident>,
+    /// The parameter type.
+    pub ty: Ty,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

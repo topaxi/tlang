@@ -1,0 +1,20 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/functions/closures/typed_closures.tlang
+---
+=== Typed Closures Demo ===
+10
+11
+14
+100
+42
+30
+11
+12
+7
+12
+30
+200
+30

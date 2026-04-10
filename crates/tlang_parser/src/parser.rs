@@ -2,7 +2,7 @@ use tlang_ast::keyword::{Keyword, kw};
 use tlang_ast::node::{
     self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ConstDeclaration,
     ElseClause, EnumDeclaration, EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression,
-    FunctionDeclaration, FunctionParameter, Ident, IfElseExpression, ImplBlock,
+    FunctionDeclaration, FunctionParameter, FunctionTypeParam, Ident, IfElseExpression, ImplBlock,
     IndexAccessExpression, LetDeclaration, MatchArm, MatchExpression, ModDeclaration, Module,
     OperatorInfo, Pat, Path, ProtocolDeclaration, ProtocolMethodSignature, Stmt, StmtKind,
     StructDeclaration, StructField, Ty, TyKind, UnaryOp, UseDeclaration, UseItem, Visibility,
@@ -1695,10 +1695,16 @@ impl<'src> Parser<'src> {
                 | TokenKind::GreaterThan
                 | TokenKind::LessThan
                 | TokenKind::PathSeparator
+                | TokenKind::Keyword(Keyword::Fn)
         )
     }
 
     fn parse_type_annotation(&mut self) -> Ty {
+        // Function type annotation: `fn(name: Type, …) -> RetType`
+        if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Fn)) {
+            return self.parse_function_type_annotation();
+        }
+
         expect_token_matches!(self, "type annotation", TokenKind::Identifier);
 
         match self.current_token_kind() {
@@ -1713,6 +1719,61 @@ impl<'src> Parser<'src> {
                     .with_span(span)
             }
             _ => Ty::new_unknown(self.unique_id()),
+        }
+    }
+
+    /// Parse a function type annotation: `fn(name: Type, …) -> RetType`.
+    ///
+    /// The parameter names are optional — `fn(i64) -> bool` is also valid.
+    fn parse_function_type_annotation(&mut self) -> Ty {
+        let mut span = self.create_span_from_current_token();
+        self.consume_keyword_token(Keyword::Fn);
+        self.consume_token(TokenKind::LParen);
+
+        let mut params = Vec::new();
+        let mut first = true;
+        while self.not_at_closing(TokenKind::RParen) {
+            if first {
+                first = false;
+            } else {
+                self.consume_token(TokenKind::Comma);
+                if matches!(self.current_token_kind(), TokenKind::RParen) {
+                    break;
+                }
+            }
+
+            // Disambiguate `name: Type` vs bare `Type`:
+            // peek ahead to see if we have `Ident Colon`.
+            let (name, ty) = if matches!(self.current_token_kind(), TokenKind::Identifier)
+                && self.peek_token_kind() == TokenKind::Colon
+            {
+                let name = self.parse_identifier();
+                self.consume_token(TokenKind::Colon);
+                let ty = self.parse_type_annotation();
+                (Some(name), ty)
+            } else {
+                let ty = self.parse_type_annotation();
+                (None, ty)
+            };
+
+            params.push(FunctionTypeParam { name, ty });
+        }
+        self.consume_token(TokenKind::RParen);
+
+        let return_type = if matches!(self.current_token_kind(), TokenKind::Arrow) {
+            self.advance();
+            self.parse_type_annotation()
+        } else {
+            Ty::new_unknown(self.unique_id())
+        };
+
+        self.end_span_from_previous_token(&mut span);
+
+        Ty {
+            id: self.unique_id(),
+            kind: TyKind::Fn(params, Box::new(return_type)),
+            parameters: vec![],
+            span,
         }
     }
 

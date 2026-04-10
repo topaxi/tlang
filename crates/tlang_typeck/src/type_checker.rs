@@ -350,7 +350,7 @@ impl TypeChecker {
             return;
         }
 
-        if declared_ty.kind != *expr_ty {
+        if !ty_kinds_compatible(&declared_ty.kind, expr_ty) {
             self.errors.push(TypeError::BindingTypeMismatch {
                 declared: declared_ty.kind.to_string(),
                 actual: expr_ty.to_string(),
@@ -412,7 +412,7 @@ impl TypeChecker {
             return;
         }
 
-        if declared_ret != body_ty {
+        if !ty_kinds_compatible(declared_ret, body_ty) {
             self.errors.push(TypeError::ReturnTypeMismatch {
                 expected: declared_ret.to_string(),
                 actual: body_ty.to_string(),
@@ -501,7 +501,7 @@ impl TypeChecker {
                             {
                                 continue;
                             }
-                            if arg.ty.kind != param_ty.kind {
+                            if !ty_kinds_compatible(&arg.ty.kind, &param_ty.kind) {
                                 let param_name = callee_name
                                     .as_deref()
                                     .map(|n| format!("arg{i} of `{n}`"))
@@ -524,7 +524,7 @@ impl TypeChecker {
                         {
                             continue;
                         }
-                        if arg.ty.kind != param_ty.kind {
+                        if !ty_kinds_compatible(&arg.ty.kind, &param_ty.kind) {
                             let param_name = callee_name
                                 .as_deref()
                                 .map(|n| format!("arg{i} of `{n}`"))
@@ -599,7 +599,7 @@ impl TypeChecker {
             return; // Unknown value — skip.
         }
 
-        if expected != actual {
+        if !ty_kinds_compatible(expected, actual) {
             self.errors.push(TypeError::ReturnTypeMismatch {
                 expected: expected.to_string(),
                 actual: actual.to_string(),
@@ -1055,10 +1055,23 @@ impl TypeChecker {
         expr_span: tlang_span::Span,
         expr_ty: &mut Ty,
     ) {
-        for arg in &mut call.arguments {
+        // Visit callee first so its type is available for bidirectional
+        // inference into closure arguments.
+        self.visit_expr(&mut call.callee, &mut ());
+        let callee_fn_ty = self.resolve_callee_type(&call.callee);
+
+        // Visit each argument.  When the callee has a known `Fn` type and
+        // the argument is a closure, push the expected parameter types into
+        // unannotated closure parameters before visiting the closure body.
+        for (i, arg) in call.arguments.iter_mut().enumerate() {
+            if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind
+                && let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty
+                && let Some(expected_arg_ty) = param_tys.get(i)
+            {
+                Self::apply_expected_closure_types(decl, &expected_arg_ty.kind);
+            }
             self.visit_expr(arg, &mut ());
         }
-        self.visit_expr(&mut call.callee, &mut ());
 
         let result_ty = self.check_call(call, expr_span);
         expr_ty.kind = result_ty.clone();
@@ -1071,6 +1084,23 @@ impl TypeChecker {
                 },
             },
         );
+    }
+
+    /// Push expected parameter types from a `Fn(…) → …` into a closure's
+    /// unannotated parameters (bidirectional inference).
+    fn apply_expected_closure_types(decl: &mut hir::FunctionDeclaration, expected: &TyKind) {
+        if let TyKind::Fn(expected_params, expected_ret) = expected {
+            for (param, expected_ty) in decl.parameters.iter_mut().zip(expected_params.iter()) {
+                if matches!(param.type_annotation.kind, TyKind::Unknown) {
+                    param.type_annotation = expected_ty.clone();
+                }
+            }
+            // If the closure has no return type annotation, push the expected
+            // return type so the body can be checked against it.
+            if matches!(decl.return_type.kind, TyKind::Unknown) {
+                decl.return_type = (**expected_ret).clone();
+            }
+        }
     }
 
     /// Visit a FunctionExpression (closure): register parameters, visit
@@ -1406,5 +1436,178 @@ fn callee_name_str(callee: &hir::Expr) -> Option<String> {
     match &callee.kind {
         hir::ExprKind::Path(path) => Some(path.join("::")),
         _ => None,
+    }
+}
+
+/// Compare two [`TyKind`] values structurally, ignoring metadata
+/// (`res`, `span`) inside nested [`Ty`] nodes.
+///
+/// This is used for type compatibility checking where two types produced
+/// from different source locations (e.g. an annotation vs an inferred
+/// expression type) need to be compared purely by shape.
+fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
+    match (a, b) {
+        (TyKind::Unknown, TyKind::Unknown) | (TyKind::Never, TyKind::Never) => true,
+        (TyKind::Primitive(pa), TyKind::Primitive(pb)) => pa == pb,
+        (TyKind::Fn(pa, ra), TyKind::Fn(pb, rb)) => {
+            pa.len() == pb.len()
+                && pa
+                    .iter()
+                    .zip(pb.iter())
+                    .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
+                && ty_kinds_compatible(&ra.kind, &rb.kind)
+        }
+        (TyKind::Slice(a), TyKind::Slice(b)) => ty_kinds_compatible(&a.kind, &b.kind),
+        (TyKind::Dict(ka, va), TyKind::Dict(kb, vb)) => {
+            ty_kinds_compatible(&ka.kind, &kb.kind) && ty_kinds_compatible(&va.kind, &vb.kind)
+        }
+        (TyKind::Path(pa), TyKind::Path(pb)) => pa == pb,
+        (TyKind::Union(ua), TyKind::Union(ub)) => {
+            ua.len() == ub.len()
+                && ua
+                    .iter()
+                    .zip(ub.iter())
+                    .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
+        }
+        (TyKind::Var(a), TyKind::Var(b)) => a == b,
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tlang_ast::node::Ident;
+
+    fn dummy_hir_id() -> tlang_span::HirId {
+        tlang_span::HirId::new(1)
+    }
+
+    fn make_param(name: &str, ty_kind: TyKind) -> hir::FunctionParameter {
+        hir::FunctionParameter {
+            hir_id: dummy_hir_id(),
+            name: Ident::new(name, tlang_span::Span::default()),
+            type_annotation: Ty {
+                kind: ty_kind,
+                ..Ty::default()
+            },
+            span: tlang_span::Span::default(),
+        }
+    }
+
+    fn make_fn_decl(params: Vec<hir::FunctionParameter>, ret: TyKind) -> hir::FunctionDeclaration {
+        let dummy_name = hir::Expr {
+            hir_id: dummy_hir_id(),
+            kind: hir::ExprKind::Wildcard,
+            ty: Ty::default(),
+            span: tlang_span::Span::default(),
+        };
+        hir::FunctionDeclaration {
+            hir_id: dummy_hir_id(),
+            visibility: tlang_ast::node::Visibility::Private,
+            name: dummy_name,
+            parameters: params,
+            params_span: tlang_span::Span::default(),
+            return_type: Ty {
+                kind: ret,
+                ..Ty::default()
+            },
+            body: hir::Block::new(dummy_hir_id(), vec![], None, tlang_span::Span::default()),
+            span: tlang_span::Span::default(),
+        }
+    }
+
+    #[test]
+    fn apply_expected_closure_types_fills_unknown_params() {
+        let mut decl = make_fn_decl(
+            vec![
+                make_param("x", TyKind::Unknown),
+                make_param("y", TyKind::Unknown),
+            ],
+            TyKind::Unknown,
+        );
+
+        let expected = TyKind::Fn(
+            vec![
+                Ty {
+                    kind: TyKind::Primitive(PrimTy::I64),
+                    ..Ty::default()
+                },
+                Ty {
+                    kind: TyKind::Primitive(PrimTy::Bool),
+                    ..Ty::default()
+                },
+            ],
+            Box::new(Ty {
+                kind: TyKind::Primitive(PrimTy::String),
+                ..Ty::default()
+            }),
+        );
+
+        TypeChecker::apply_expected_closure_types(&mut decl, &expected);
+
+        assert_eq!(
+            decl.parameters[0].type_annotation.kind,
+            TyKind::Primitive(PrimTy::I64)
+        );
+        assert_eq!(
+            decl.parameters[1].type_annotation.kind,
+            TyKind::Primitive(PrimTy::Bool)
+        );
+        assert_eq!(decl.return_type.kind, TyKind::Primitive(PrimTy::String));
+    }
+
+    #[test]
+    fn apply_expected_closure_types_preserves_annotated_params() {
+        let mut decl = make_fn_decl(
+            vec![
+                make_param("x", TyKind::Primitive(PrimTy::F64)),
+                make_param("y", TyKind::Unknown),
+            ],
+            TyKind::Primitive(PrimTy::I64),
+        );
+
+        let expected = TyKind::Fn(
+            vec![
+                Ty {
+                    kind: TyKind::Primitive(PrimTy::I64),
+                    ..Ty::default()
+                },
+                Ty {
+                    kind: TyKind::Primitive(PrimTy::Bool),
+                    ..Ty::default()
+                },
+            ],
+            Box::new(Ty {
+                kind: TyKind::Primitive(PrimTy::String),
+                ..Ty::default()
+            }),
+        );
+
+        TypeChecker::apply_expected_closure_types(&mut decl, &expected);
+
+        // Annotated param should NOT be overridden.
+        assert_eq!(
+            decl.parameters[0].type_annotation.kind,
+            TyKind::Primitive(PrimTy::F64)
+        );
+        // Unannotated param should be filled.
+        assert_eq!(
+            decl.parameters[1].type_annotation.kind,
+            TyKind::Primitive(PrimTy::Bool)
+        );
+        // Annotated return type should NOT be overridden.
+        assert_eq!(decl.return_type.kind, TyKind::Primitive(PrimTy::I64));
+    }
+
+    #[test]
+    fn apply_expected_closure_types_noop_for_non_fn() {
+        let mut decl = make_fn_decl(vec![make_param("x", TyKind::Unknown)], TyKind::Unknown);
+
+        // When expected is not a Fn type, nothing should change.
+        TypeChecker::apply_expected_closure_types(&mut decl, &TyKind::Primitive(PrimTy::I64));
+
+        assert_eq!(decl.parameters[0].type_annotation.kind, TyKind::Unknown);
+        assert_eq!(decl.return_type.kind, TyKind::Unknown);
     }
 }

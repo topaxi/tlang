@@ -34,6 +34,7 @@ fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
 
 - **Pattern Matching**: Powerful pattern matching in function definitions and control flow
 - **Tail Call Optimization**: Efficient recursion with the `rec` keyword
+- **Function Types**: First-class function type annotations with bidirectional type inference
 - **Algebraic Data Types**: Built-in `Option` and `Result` types, plus custom enums
 - **Struct System**: Define data structures with associated methods
 - **Pipeline Operator**: Functional composition with `|>` operator
@@ -104,6 +105,20 @@ let none_x = Option::None;
 
 some_x.is_some() |> log();  // true
 some_x.unwrap() |> log();   // 10
+```
+
+### Function Type Annotations and Typed Closures
+```tlang
+// Function parameters can be annotated with function types
+fn call_fn(f: fn(i64) -> i64, x: i64) -> i64 { f(x) }
+
+// Typed closures stored in variables
+let double: fn(i64) -> i64 = fn(x: i64) { x * 2 };
+call_fn(double, 7) |> log();  // 14
+
+// Bidirectional inference: unannotated closure parameters
+// are inferred from the expected function type
+call_fn(fn(x) { x + 1 }, 41) |> log();  // 42
 ```
 
 ## Development Setup

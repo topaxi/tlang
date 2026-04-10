@@ -1,0 +1,486 @@
+---
+source: crates/tlang_parser/tests/parser_types.rs
+expression: "parse! (\"let f: fn(i64) = fn(x: i64) { log(x) };\")"
+---
+Module(
+  id: 2,
+  statements: [
+    Stmt(
+      id: 17,
+      kind: Let(LetDeclaration(
+        pattern: Pat(
+          id: 3,
+          kind: Identifier(Ident(
+            name: "f",
+            span: Span(
+              start: 4,
+              end: 5,
+              start_lc: LineColumn(
+                line: 0,
+                column: 4,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 5,
+              ),
+            ),
+          )),
+          leading_comments: [],
+          trailing_comments: [],
+          span: Span(
+            start: 4,
+            end: 5,
+            start_lc: LineColumn(
+              line: 0,
+              column: 4,
+            ),
+            end_lc: LineColumn(
+              line: 0,
+              column: 5,
+            ),
+          ),
+        ),
+        expression: Expr(
+          id: 15,
+          kind: FunctionExpression(FunctionDeclaration(
+            id: 16,
+            visibility: Private,
+            name: Expr(
+              id: 7,
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "anonymous",
+                    span: Span(
+                      start: 0,
+                      end: 0,
+                      start_lc: LineColumn(
+                        line: 0,
+                        column: 0,
+                      ),
+                      end_lc: LineColumn(
+                        line: 0,
+                        column: 0,
+                      ),
+                    ),
+                  ),
+                ],
+                res: Unresolved,
+                span: Span(
+                  start: 0,
+                  end: 0,
+                  start_lc: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end_lc: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                ),
+              )),
+              leading_comments: [],
+              trailing_comments: [],
+              span: Span(
+                start: 0,
+                end: 0,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+              ),
+            ),
+            parameters: [
+              FunctionParameter(
+                pattern: Pat(
+                  id: 8,
+                  kind: Identifier(Ident(
+                    name: "x",
+                    span: Span(
+                      start: 20,
+                      end: 21,
+                      start_lc: LineColumn(
+                        line: 0,
+                        column: 20,
+                      ),
+                      end_lc: LineColumn(
+                        line: 0,
+                        column: 21,
+                      ),
+                    ),
+                  )),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: 20,
+                    end: 21,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 20,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 21,
+                    ),
+                  ),
+                ),
+                type_annotation: Some(Ty(
+                  id: 9,
+                  kind: Path(Path(
+                    segments: [
+                      Ident(
+                        name: "i64",
+                        span: Span(
+                          start: 23,
+                          end: 26,
+                          start_lc: LineColumn(
+                            line: 0,
+                            column: 23,
+                          ),
+                          end_lc: LineColumn(
+                            line: 0,
+                            column: 26,
+                          ),
+                        ),
+                      ),
+                    ],
+                    res: Unresolved,
+                    span: Span(
+                      start: 23,
+                      end: 26,
+                      start_lc: LineColumn(
+                        line: 0,
+                        column: 23,
+                      ),
+                      end_lc: LineColumn(
+                        line: 0,
+                        column: 26,
+                      ),
+                    ),
+                  )),
+                  parameters: [],
+                  span: Span(
+                    start: 23,
+                    end: 26,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 23,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 26,
+                    ),
+                  ),
+                )),
+                span: Span(
+                  start: 20,
+                  end: 26,
+                  start_lc: LineColumn(
+                    line: 0,
+                    column: 20,
+                  ),
+                  end_lc: LineColumn(
+                    line: 0,
+                    column: 26,
+                  ),
+                ),
+              ),
+            ],
+            params_span: Span(
+              start: 19,
+              end: 27,
+              start_lc: LineColumn(
+                line: 0,
+                column: 19,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 27,
+              ),
+            ),
+            guard: None,
+            return_type_annotation: None,
+            body: Block(
+              id: 14,
+              statements: [],
+              expression: Some(Expr(
+                id: 13,
+                kind: Call(CallExpression(
+                  callee: Expr(
+                    id: 11,
+                    kind: Path(Path(
+                      segments: [
+                        Ident(
+                          name: "log",
+                          span: Span(
+                            start: 30,
+                            end: 33,
+                            start_lc: LineColumn(
+                              line: 0,
+                              column: 30,
+                            ),
+                            end_lc: LineColumn(
+                              line: 0,
+                              column: 33,
+                            ),
+                          ),
+                        ),
+                      ],
+                      res: Unresolved,
+                      span: Span(
+                        start: 30,
+                        end: 33,
+                        start_lc: LineColumn(
+                          line: 0,
+                          column: 30,
+                        ),
+                        end_lc: LineColumn(
+                          line: 0,
+                          column: 33,
+                        ),
+                      ),
+                    )),
+                    leading_comments: [],
+                    trailing_comments: [],
+                    span: Span(
+                      start: 30,
+                      end: 33,
+                      start_lc: LineColumn(
+                        line: 0,
+                        column: 30,
+                      ),
+                      end_lc: LineColumn(
+                        line: 0,
+                        column: 33,
+                      ),
+                    ),
+                  ),
+                  arguments: [
+                    Expr(
+                      id: 12,
+                      kind: Path(Path(
+                        segments: [
+                          Ident(
+                            name: "x",
+                            span: Span(
+                              start: 34,
+                              end: 35,
+                              start_lc: LineColumn(
+                                line: 0,
+                                column: 34,
+                              ),
+                              end_lc: LineColumn(
+                                line: 0,
+                                column: 35,
+                              ),
+                            ),
+                          ),
+                        ],
+                        res: Unresolved,
+                        span: Span(
+                          start: 34,
+                          end: 35,
+                          start_lc: LineColumn(
+                            line: 0,
+                            column: 34,
+                          ),
+                          end_lc: LineColumn(
+                            line: 0,
+                            column: 35,
+                          ),
+                        ),
+                      )),
+                      leading_comments: [],
+                      trailing_comments: [],
+                      span: Span(
+                        start: 34,
+                        end: 35,
+                        start_lc: LineColumn(
+                          line: 0,
+                          column: 34,
+                        ),
+                        end_lc: LineColumn(
+                          line: 0,
+                          column: 35,
+                        ),
+                      ),
+                    ),
+                  ],
+                )),
+                leading_comments: [],
+                trailing_comments: [],
+                span: Span(
+                  start: 30,
+                  end: 36,
+                  start_lc: LineColumn(
+                    line: 0,
+                    column: 30,
+                  ),
+                  end_lc: LineColumn(
+                    line: 0,
+                    column: 36,
+                  ),
+                ),
+              )),
+              span: Span(
+                start: 28,
+                end: 38,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 28,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 38,
+                ),
+              ),
+            ),
+            leading_comments: [],
+            trailing_comments: [],
+            span: Span(
+              start: 17,
+              end: 38,
+              start_lc: LineColumn(
+                line: 0,
+                column: 17,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 38,
+              ),
+            ),
+          )),
+          leading_comments: [],
+          trailing_comments: [],
+          span: Span(
+            start: 17,
+            end: 38,
+            start_lc: LineColumn(
+              line: 0,
+              column: 17,
+            ),
+            end_lc: LineColumn(
+              line: 0,
+              column: 38,
+            ),
+          ),
+        ),
+        type_annotation: Some(Ty(
+          id: 6,
+          kind: Fn([
+            FunctionTypeParam(
+              name: None,
+              ty: Ty(
+                id: 4,
+                kind: Path(Path(
+                  segments: [
+                    Ident(
+                      name: "i64",
+                      span: Span(
+                        start: 10,
+                        end: 13,
+                        start_lc: LineColumn(
+                          line: 0,
+                          column: 10,
+                        ),
+                        end_lc: LineColumn(
+                          line: 0,
+                          column: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                  res: Unresolved,
+                  span: Span(
+                    start: 10,
+                    end: 13,
+                    start_lc: LineColumn(
+                      line: 0,
+                      column: 10,
+                    ),
+                    end_lc: LineColumn(
+                      line: 0,
+                      column: 13,
+                    ),
+                  ),
+                )),
+                parameters: [],
+                span: Span(
+                  start: 10,
+                  end: 13,
+                  start_lc: LineColumn(
+                    line: 0,
+                    column: 10,
+                  ),
+                  end_lc: LineColumn(
+                    line: 0,
+                    column: 13,
+                  ),
+                ),
+              ),
+            ),
+          ], Ty(
+            id: 5,
+            kind: Unknown,
+            parameters: [],
+            span: Span(
+              start: 0,
+              end: 0,
+              start_lc: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+            ),
+          )),
+          parameters: [],
+          span: Span(
+            start: 7,
+            end: 14,
+            start_lc: LineColumn(
+              line: 0,
+              column: 7,
+            ),
+            end_lc: LineColumn(
+              line: 0,
+              column: 14,
+            ),
+          ),
+        )),
+      )),
+      span: Span(
+        start: 0,
+        end: 39,
+        start_lc: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end_lc: LineColumn(
+          line: 0,
+          column: 39,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: 0,
+    end: 39,
+    start_lc: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end_lc: LineColumn(
+      line: 0,
+      column: 39,
+    ),
+  ),
+)

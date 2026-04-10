@@ -1,0 +1,31 @@
+// Function type annotations let you specify callback types explicitly.
+// Syntax: fn(param: Type, ...) -> ReturnType
+
+// A higher-order function with typed callback parameter
+fn call_fn(f: fn(i64) -> i64, x: i64) -> i64 { f(x) }
+
+// compose_fns(fn(i64) -> i64, fn(i64) -> i64) -> fn(i64) -> i64
+fn compose_fns(f: fn(i64) -> i64, g: fn(i64) -> i64) -> fn(i64) -> i64 {
+    fn(x: i64) -> i64 { f(g(x)) }
+}
+
+// Typed closures stored in variables
+let double: fn(i64) -> i64 = fn(x: i64) { x * 2 };
+let inc: fn(i64) -> i64 = fn(x: i64) { x + 1 };
+
+call_fn(double, 7) |> log();       // 14
+call_fn(inc, 99) |> log();         // 100
+
+// Bidirectional type inference:
+// unannotated closure parameters are inferred from the expected fn type.
+call_fn(fn(x) { x + 1 }, 41) |> log();     // 42
+
+// Function composition with typed closures
+let double_then_inc = compose_fns(inc, double);
+double_then_inc(5) |> log();  // 11: (5 * 2) + 1
+
+// Multi-parameter typed callbacks
+fn combine(f: fn(i64, i64) -> i64, a: i64, b: i64) -> i64 { f(a, b) }
+
+combine(fn(a, b) { a + b }, 10, 20) |> log();  // 30
+combine(fn(a, b) { a * b }, 10, 20) |> log();  // 200
