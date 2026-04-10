@@ -1308,3 +1308,74 @@ fn closure_called_directly_ok() {
         "#,
     );
 }
+
+// ── Function type annotations & bidirectional inference ─────────────────
+
+#[test]
+fn fn_type_annotation_on_binding() {
+    // A binding with a function-type annotation should accept a closure.
+    common::typecheck_ok(
+        r#"
+        let f: fn(i64) -> i64 = fn(x: i64) { x + 1 };
+        let result: i64 = f(42);
+        "#,
+    );
+}
+
+#[test]
+fn fn_type_annotation_on_param_enables_call() {
+    // A function parameter with a function-type annotation should be callable
+    // inside the function body.
+    common::typecheck_ok(
+        r#"
+        fn call_fn(f: fn(i64) -> i64, x: i64) -> i64 { f(x) }
+        let result: i64 = call_fn(fn(x: i64) { x + 1 }, 42);
+        "#,
+    );
+}
+
+#[test]
+fn bidirectional_inference_fills_closure_params() {
+    // When a closure is passed to a function that expects fn(i64) -> i64,
+    // the unannotated closure parameter `x` should be inferred as i64.
+    common::typecheck_ok(
+        r#"
+        fn call_fn(f: fn(i64) -> i64, x: i64) -> i64 { f(x) }
+        let result: i64 = call_fn(fn(x) { x + 1 }, 42);
+        "#,
+    );
+}
+
+#[test]
+fn bidirectional_inference_multi_param() {
+    // Multiple closure params inferred from the callee's function type.
+    common::typecheck_ok(
+        r#"
+        fn combine(f: fn(i64, i64) -> i64, a: i64, b: i64) -> i64 { f(a, b) }
+        let result: i64 = combine(fn(x, y) { x + y }, 1, 2);
+        "#,
+    );
+}
+
+#[test]
+fn bidirectional_inference_preserves_annotated_closure_params() {
+    // Explicit type annotations on closure params are not overridden
+    // by the expected function type.
+    common::typecheck_ok(
+        r#"
+        fn call_fn(f: fn(i64) -> i64, x: i64) -> i64 { f(x) }
+        let result: i64 = call_fn(fn(x: i64) { x + 1 }, 42);
+        "#,
+    );
+}
+
+#[test]
+fn fn_type_named_params_annotation() {
+    // Named parameters in a function type annotation should work.
+    common::typecheck_ok(
+        r#"
+        let f: fn(value: i64) -> i64 = fn(x: i64) { x + 1 };
+        let result: i64 = f(42);
+        "#,
+    );
+}

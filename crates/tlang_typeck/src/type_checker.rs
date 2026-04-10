@@ -350,7 +350,7 @@ impl TypeChecker {
             return;
         }
 
-        if declared_ty.kind != *expr_ty {
+        if !ty_kinds_compatible(&declared_ty.kind, expr_ty) {
             self.errors.push(TypeError::BindingTypeMismatch {
                 declared: declared_ty.kind.to_string(),
                 actual: expr_ty.to_string(),
@@ -412,7 +412,7 @@ impl TypeChecker {
             return;
         }
 
-        if declared_ret != body_ty {
+        if !ty_kinds_compatible(declared_ret, body_ty) {
             self.errors.push(TypeError::ReturnTypeMismatch {
                 expected: declared_ret.to_string(),
                 actual: body_ty.to_string(),
@@ -501,7 +501,7 @@ impl TypeChecker {
                             {
                                 continue;
                             }
-                            if arg.ty.kind != param_ty.kind {
+                            if !ty_kinds_compatible(&arg.ty.kind, &param_ty.kind) {
                                 let param_name = callee_name
                                     .as_deref()
                                     .map(|n| format!("arg{i} of `{n}`"))
@@ -524,7 +524,7 @@ impl TypeChecker {
                         {
                             continue;
                         }
-                        if arg.ty.kind != param_ty.kind {
+                        if !ty_kinds_compatible(&arg.ty.kind, &param_ty.kind) {
                             let param_name = callee_name
                                 .as_deref()
                                 .map(|n| format!("arg{i} of `{n}`"))
@@ -599,7 +599,7 @@ impl TypeChecker {
             return; // Unknown value — skip.
         }
 
-        if expected != actual {
+        if !ty_kinds_compatible(expected, actual) {
             self.errors.push(TypeError::ReturnTypeMismatch {
                 expected: expected.to_string(),
                 actual: actual.to_string(),
@@ -1436,6 +1436,42 @@ fn callee_name_str(callee: &hir::Expr) -> Option<String> {
     match &callee.kind {
         hir::ExprKind::Path(path) => Some(path.join("::")),
         _ => None,
+    }
+}
+
+/// Compare two [`TyKind`] values structurally, ignoring metadata
+/// (`res`, `span`) inside nested [`Ty`] nodes.
+///
+/// This is used for type compatibility checking where two types produced
+/// from different source locations (e.g. an annotation vs an inferred
+/// expression type) need to be compared purely by shape.
+fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
+    match (a, b) {
+        (TyKind::Unknown, TyKind::Unknown)
+        | (TyKind::Never, TyKind::Never) => true,
+        (TyKind::Primitive(pa), TyKind::Primitive(pb)) => pa == pb,
+        (TyKind::Fn(pa, ra), TyKind::Fn(pb, rb)) => {
+            pa.len() == pb.len()
+                && pa
+                    .iter()
+                    .zip(pb.iter())
+                    .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
+                && ty_kinds_compatible(&ra.kind, &rb.kind)
+        }
+        (TyKind::Slice(a), TyKind::Slice(b)) => ty_kinds_compatible(&a.kind, &b.kind),
+        (TyKind::Dict(ka, va), TyKind::Dict(kb, vb)) => {
+            ty_kinds_compatible(&ka.kind, &kb.kind) && ty_kinds_compatible(&va.kind, &vb.kind)
+        }
+        (TyKind::Path(pa), TyKind::Path(pb)) => pa.join("::") == pb.join("::"),
+        (TyKind::Union(ua), TyKind::Union(ub)) => {
+            ua.len() == ub.len()
+                && ua
+                    .iter()
+                    .zip(ub.iter())
+                    .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
+        }
+        (TyKind::Var(a), TyKind::Var(b)) => a == b,
+        _ => false,
     }
 }
 

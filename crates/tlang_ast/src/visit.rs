@@ -179,6 +179,12 @@ pub fn walk_ty<'ast, V: Visitor<'ast>>(visitor: &mut V, ty: &'ast node::Ty, ctx:
     for ty in &ty.parameters {
         visitor.visit_ty(ty, ctx);
     }
+    if let node::TyKind::Fn(params, ret_ty) = &ty.kind {
+        for param in params {
+            visitor.visit_ty(&param.ty, ctx);
+        }
+        visitor.visit_ty(ret_ty, ctx);
+    }
 }
 
 pub fn walk_block<'ast, V: Visitor<'ast>>(

@@ -201,6 +201,12 @@ impl<'ast> Visitor<'ast> for NodeFinder {
                 }
             }
             node::TyKind::Unknown => {}
+            node::TyKind::Fn(params, ret) => {
+                for param in params {
+                    self.visit_ty(&param.ty, &mut ());
+                }
+                self.visit_ty(ret, &mut ());
+            }
         }
         // Still walk generic type parameters.
         for param in &ty.parameters {
