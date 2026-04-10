@@ -132,6 +132,10 @@ pub static BUILTINS: &[JsBuiltin] = &[
     JsBuiltin::semantic("Iterator::next", DefKind::ProtocolMethod(1)),
     JsBuiltin::semantic("Display", DefKind::Protocol),
     JsBuiltin::semantic("Display::to_string", DefKind::ProtocolMethod(1)),
+    JsBuiltin::semantic("Into", DefKind::Protocol),
+    JsBuiltin::semantic("Into::into", DefKind::ProtocolMethod(1)),
+    JsBuiltin::semantic("TryInto", DefKind::Protocol),
+    JsBuiltin::semantic("TryInto::try_into", DefKind::ProtocolMethod(1)),
     // ── Temporal ───────────────────────────────────────────────────────────
     JsBuiltin::semantic("Temporal", DefKind::Module),
     JsBuiltin::mapped("Temporal::Now", "Temporal.Now", DefKind::Module),

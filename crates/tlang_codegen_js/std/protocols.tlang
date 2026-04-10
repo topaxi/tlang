@@ -32,3 +32,11 @@ pub protocol Display {
     self.toString()
   }
 }
+
+pub protocol Into {
+  fn into(self)
+}
+
+pub protocol TryInto {
+  fn try_into(self)
+}

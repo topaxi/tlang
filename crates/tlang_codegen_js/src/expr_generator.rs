@@ -25,7 +25,7 @@ impl<'a> InnerCodegen<'a> {
                 // Mutual tail call (not self-referencing) → regular call
                 self.generate_call_expression(call_expr)
             }
-            hir::ExprKind::Cast(inner, _) => self.generate_expr(inner),
+            hir::ExprKind::Cast(inner, _) => self.generate_cast_expr(inner),
             hir::ExprKind::TryCast(inner, _) => self.generate_try_cast_expr(inner),
             hir::ExprKind::FieldAccess(base, field) => {
                 self.generate_field_access_expression(base, field)
@@ -300,14 +300,34 @@ impl<'a> InnerCodegen<'a> {
         self.call_expr(has_impl, vec![Argument::from(value)])
     }
 
+    /// Generate a cast expression (`as`).
+    ///
+    /// Dispatches through the `Into` protocol: `Into::into(value)`.
+    /// For builtin numeric types in JavaScript this is effectively
+    /// a no-op since JS has a single number type, but user-defined
+    /// `Into` implementations will be called.
+    fn generate_cast_expr(&mut self, inner: &hir::Expr) -> Expression<'a> {
+        let value = self.generate_expr(inner);
+        let into_fn = self.static_member_expr(
+            self.ident_expr(&crate::generator::CodegenJS::protocol_js_name("Into")),
+            "into",
+        );
+        self.call_expr(into_fn, vec![Argument::from(value)])
+    }
+
     /// Generate a try-cast expression (`as?`).
     ///
-    /// In JavaScript, all numbers are f64 so numeric conversions always
-    /// succeed.  We wrap the inner expression in `Result.Ok(value)`.
+    /// Dispatches through the `TryInto` protocol: `TryInto::try_into(value)`.
+    /// For builtin numeric types in JavaScript this wraps in `Result.Ok`
+    /// since JS numeric conversions always succeed. User-defined
+    /// `TryInto` implementations may return `Result.Err`.
     fn generate_try_cast_expr(&mut self, inner: &hir::Expr) -> Expression<'a> {
         let value = self.generate_expr(inner);
-        let result_ok = self.static_member_expr(self.ident_expr("Result"), "Ok");
-        self.call_expr(result_ok, vec![Argument::from(value)])
+        let try_into_fn = self.static_member_expr(
+            self.ident_expr(&crate::generator::CodegenJS::protocol_js_name("TryInto")),
+            "try_into",
+        );
+        self.call_expr(try_into_fn, vec![Argument::from(value)])
     }
 
     fn generate_unary_op(&mut self, op: &ast::UnaryOp, expr: &hir::Expr) -> Expression<'a> {

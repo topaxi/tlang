@@ -399,13 +399,29 @@ impl Interpreter {
 
     // ── Cast / TryCast evaluation ───────────────────────────────────
 
-    /// Evaluate `expr as Type` — infallible, saturating numeric conversion.
+    /// Evaluate `expr as Type` — dispatches through the `Into` protocol
+    /// if an implementation exists for the value's type, otherwise falls
+    /// back to the builtin saturating numeric conversion.
     fn eval_cast(&self, state: &mut VMState, inner: &hir::Expr, target_ty: &hir::Ty) -> EvalResult {
         let value = eval_value!(state, self.eval_expr(state, inner));
+
+        // Try protocol-based conversion first
+        if let Some(into_id) = state.protocol_id_by_name("Into") {
+            let type_shape_key = state.type_shape_key_of(value);
+            if let Some(fn_value) =
+                state.get_protocol_impl(into_id, type_shape_key, "into")
+            {
+                return EvalResult::Value(self.eval_call_object(state, fn_value, &[value]));
+            }
+        }
+
+        // Builtin fallback: saturating numeric conversion
         EvalResult::Value(Self::convert_value(value, &target_ty.kind))
     }
 
-    /// Evaluate `expr as? Type` — fallible conversion, returns Result::Ok or Result::Err.
+    /// Evaluate `expr as? Type` — dispatches through the `TryInto` protocol
+    /// if an implementation exists for the value's type, otherwise falls
+    /// back to the builtin fallible numeric conversion.
     fn eval_try_cast(
         &self,
         state: &mut VMState,
@@ -413,6 +429,18 @@ impl Interpreter {
         target_ty: &hir::Ty,
     ) -> EvalResult {
         let value = eval_value!(state, self.eval_expr(state, inner));
+
+        // Try protocol-based conversion first
+        if let Some(try_into_id) = state.protocol_id_by_name("TryInto") {
+            let type_shape_key = state.type_shape_key_of(value);
+            if let Some(fn_value) =
+                state.get_protocol_impl(try_into_id, type_shape_key, "try_into")
+            {
+                return EvalResult::Value(self.eval_call_object(state, fn_value, &[value]));
+            }
+        }
+
+        // Builtin fallback: fallible numeric conversion
         match Self::try_convert_value(value, &target_ty.kind) {
             Ok(converted) => {
                 let result = state.new_enum(state.heap.builtin_shapes.result, 0, vec![converted]);
