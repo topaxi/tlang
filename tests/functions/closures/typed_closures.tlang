@@ -1,0 +1,65 @@
+// Tests function type annotations and typed closures
+// Demonstrates: fn type annotations, higher-order typed functions, bidirectional inference
+
+// ── Function type annotations on parameters ──────────────────────────────
+
+// A higher-order function with a typed callback parameter
+fn call_fn(f: fn(i64) -> i64, x: i64) -> i64 { f(x) }
+
+// Multiple typed function parameters
+fn compose_fns(f: fn(i64) -> i64, g: fn(i64) -> i64) -> fn(i64) -> i64 {
+    fn(x: i64) -> i64 { f(g(x)) }
+}
+
+// ── Basic typed closures ─────────────────────────────────────────────────
+
+let double: fn(i64) -> i64 = fn(x: i64) -> i64 { x * 2 };
+let inc: fn(i64) -> i64 = fn(x: i64) -> i64 { x + 1 };
+
+log("=== Typed Closures Demo ===");
+
+// Call typed closures directly
+double(5) |> log();    // 10
+inc(10) |> log();      // 11
+
+// Pass typed closures to higher-order functions
+call_fn(double, 7) |> log();  // 14
+call_fn(inc, 99) |> log();    // 100
+
+// ── Bidirectional inference ──────────────────────────────────────────────
+// When a closure is passed to a function with a typed fn parameter,
+// unannotated closure parameters are inferred from the expected type.
+
+call_fn(fn(x) { x + 1 }, 41) |> log();     // 42
+call_fn(fn(x) { x * 3 }, 10) |> log();     // 30
+
+// ── Function composition with typed closures ─────────────────────────────
+
+let double_then_inc = compose_fns(inc, double);
+double_then_inc(5) |> log();  // 11: (5 * 2) + 1
+
+let inc_then_double = compose_fns(double, inc);
+inc_then_double(5) |> log();  // 12: (5 + 1) * 2
+
+// ── Multi-parameter typed callbacks ──────────────────────────────────────
+
+fn combine(f: fn(i64, i64) -> i64, a: i64, b: i64) -> i64 { f(a, b) }
+
+combine(fn(a: i64, b: i64) -> i64 { a + b }, 3, 4) |> log();  // 7
+combine(fn(a: i64, b: i64) -> i64 { a * b }, 3, 4) |> log();  // 12
+
+// Bidirectional inference with multiple params
+combine(fn(a, b) { a + b }, 10, 20) |> log();  // 30
+combine(fn(a, b) { a * b }, 10, 20) |> log();  // 200
+
+// ── Named parameters in function types ──────────────────────────────────
+
+fn fold_sum(items: fn(i64) -> i64, n: i64) -> i64 {
+    if n <= 0 { 0 }
+    else { items(n) + fold_sum(items, n - 1) }
+}
+
+// Named parameter types for documentation clarity
+let square: fn(value: i64) -> i64 = fn(x: i64) -> i64 { x * x };
+fold_sum(square, 4) |> log();  // 30: 16 + 9 + 4 + 1
+
