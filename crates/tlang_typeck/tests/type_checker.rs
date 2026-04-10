@@ -1299,7 +1299,7 @@ fn closure_multi_param_typed() {
 }
 
 #[test]
-fn closure_passed_to_another_closure_ok() {
+fn closure_called_directly_ok() {
     // A typed closure called directly.
     common::typecheck_ok(
         r#"

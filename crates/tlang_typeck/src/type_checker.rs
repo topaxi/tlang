@@ -1066,9 +1066,9 @@ impl TypeChecker {
         for (i, arg) in call.arguments.iter_mut().enumerate() {
             if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind
                 && let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty
-                && let Some(expected_param) = param_tys.get(i)
+                && let Some(expected_arg_ty) = param_tys.get(i)
             {
-                Self::apply_expected_closure_types(decl, &expected_param.kind);
+                Self::apply_expected_closure_types(decl, &expected_arg_ty.kind);
             }
             self.visit_expr(arg, &mut ());
         }
