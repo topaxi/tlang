@@ -95,6 +95,22 @@ pub fn resolve_symbol(
             // Base is a type name itself (e.g. `Vector.add` or `Option.map`)
             let qualified = format!("{}::{}", base_name, found.name);
             index.get_closest_by_name(found.scope_id, &qualified, found.span)
+        })
+        .or_else(|| {
+            // Fallback for hovering on a member/field name in a declaration
+            // context (e.g. `to_string` in `protocol Display { fn to_string(…) }`
+            // or `x` in `struct Vector { x: i64 }`).  The bare name is not in the
+            // symbol table but the qualified name (`Display::to_string`,
+            // `Vector::x`) is.
+            //
+            // Only attempt this when `find_node` explicitly flagged the identifier
+            // as being in a declaration-name context, to avoid mis-resolving
+            // undefined locals to an unrelated `Type::member` in scope.
+            if found.is_declaration_name {
+                index.find_member_by_suffix(found.scope_id, &found.name, found.span)
+            } else {
+                None
+            }
         })?;
 
     Some(ResolvedSymbol {
@@ -357,6 +373,59 @@ mod tests {
         assert!(
             resolved.is_some(),
             "method 'is_some' in 'self.is_some' should resolve"
+        );
+    }
+
+    #[test]
+    fn resolve_protocol_declaration_name() {
+        // Hovering on the protocol name should resolve to `DefKind::Protocol`.
+        let source = "protocol Display {\n    fn to_string(self) { \"\" }\n}";
+        // `Display` starts at col 9 on line 0
+        let resolved = setup_and_resolve(source, 0, 9);
+        assert!(resolved.is_some(), "protocol name 'Display' should resolve");
+        let resolved = resolved.unwrap();
+        assert_eq!(resolved.name, "Display");
+        assert_eq!(
+            resolved.def_kind,
+            tlang_defs::DefKind::Protocol,
+            "should resolve to DefKind::Protocol"
+        );
+    }
+
+    #[test]
+    fn resolve_protocol_method_in_signature() {
+        // Hovering on method name inside a protocol declaration.
+        let source = "protocol Display {\n    fn to_string(self) { \"\" }\n}";
+        // `to_string` starts at col 7 on line 1 (0-based)
+        let resolved = setup_and_resolve(source, 1, 7);
+        assert!(
+            resolved.is_some(),
+            "protocol method 'to_string' should resolve"
+        );
+        let resolved = resolved.unwrap();
+        assert_eq!(resolved.name, "to_string");
+        assert!(
+            resolved.def_kind.arity().is_some(),
+            "protocol method should have an arity"
+        );
+    }
+
+    #[test]
+    fn resolve_protocol_name_in_impl_block() {
+        // Hovering on the protocol name in `impl Display for MyType` should resolve.
+        let source = "protocol Display {\n    fn to_string(self) { \"\" }\n}\nstruct MyType {}\nimpl Display for MyType {\n    fn to_string(self) { \"\" }\n}";
+        // `Display` in `impl Display for MyType` is on line 4, col 5 (0-based)
+        let resolved = setup_and_resolve(source, 4, 5);
+        assert!(
+            resolved.is_some(),
+            "protocol name 'Display' in impl block should resolve"
+        );
+        let resolved = resolved.unwrap();
+        assert_eq!(resolved.name, "Display");
+        assert_eq!(
+            resolved.def_kind,
+            tlang_defs::DefKind::Protocol,
+            "should resolve to DefKind::Protocol"
         );
     }
 }

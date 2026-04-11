@@ -23,6 +23,12 @@ pub struct FoundNode {
     /// `v1.add`), this holds the name of the base expression (e.g. `"v1"`).
     /// Used by the query layer to attempt qualified method lookup.
     pub field_base: Option<String>,
+    /// Set when the cursor is on a declaration-context identifier that is not
+    /// directly in the symbol table under its bare name (e.g. a method name
+    /// inside `protocol Display { fn to_string(…) }` or a field name inside
+    /// `struct Vector { x: i64 }`).  When `true`, the query layer may attempt
+    /// a qualified member-suffix lookup (`Type::name`) as a fallback.
+    pub is_declaration_name: bool,
 }
 
 /// Walk the AST to find the identifier at the given `(line, column)` position.
@@ -40,6 +46,7 @@ pub fn find_node_at_position(module: &Module, line: u32, column: u32) -> Option<
         target: LineColumn::new(line, column),
         scope_stack: vec![module.id],
         result: None,
+        in_declaration_name_context: false,
     };
     finder.visit_module(module, &mut ());
     finder.result
@@ -50,6 +57,9 @@ struct NodeFinder {
     target: LineColumn,
     scope_stack: Vec<NodeId>,
     result: Option<FoundNode>,
+    /// True when currently visiting a declaration-name context where bare
+    /// identifiers should be resolved via qualified member-suffix lookup.
+    in_declaration_name_context: bool,
 }
 
 impl NodeFinder {
@@ -83,6 +93,7 @@ impl NodeFinder {
                 span: *span,
                 scope_id: self.current_scope(),
                 field_base: None,
+                is_declaration_name: self.in_declaration_name_context,
             });
         }
     }
@@ -94,8 +105,17 @@ impl NodeFinder {
                 span: *span,
                 scope_id: self.current_scope(),
                 field_base: Some(base_name),
+                is_declaration_name: false,
             });
         }
+    }
+
+    /// Run `f` with `in_declaration_name_context` set to `true`, then restore.
+    fn with_declaration_name_context<F: FnOnce(&mut Self)>(&mut self, f: F) {
+        let prev = self.in_declaration_name_context;
+        self.in_declaration_name_context = true;
+        f(self);
+        self.in_declaration_name_context = prev;
     }
 
     /// Extract a simple name from an expression (for field access base tracking).
@@ -151,11 +171,97 @@ impl<'ast> Visitor<'ast> for NodeFinder {
         visit::walk_module(self, module, ctx);
     }
 
+    fn visit_struct_decl(&mut self, decl: &'ast node::StructDeclaration, ctx: &mut ()) {
+        // The struct name itself is just a normal identifier.
+        self.visit_ident(&decl.name, ctx);
+        // Field names are declaration-name context: bare `x` maps to `Struct::x`.
+        for node::StructField { name, ty, .. } in &decl.fields {
+            self.with_declaration_name_context(|s| s.visit_ident(name, &mut ()));
+            self.visit_ty(ty, ctx);
+        }
+        for const_decl in &decl.consts {
+            self.visit_ident(&const_decl.name, ctx);
+            self.visit_expr(&const_decl.expression, ctx);
+        }
+    }
+
     fn visit_stmt(&mut self, statement: &'ast node::Stmt, ctx: &mut ()) {
         // Only descend into statements whose span contains the cursor.
-        if self.contains_position(&statement.span) {
-            visit::walk_stmt(self, statement, ctx);
+        if !self.contains_position(&statement.span) {
+            return;
         }
+        // For protocol declarations, visit method names in declaration-name
+        // context so that `resolve_symbol` knows to fall back to a
+        // qualified-member-suffix lookup when the bare name isn't in scope.
+        if let node::StmtKind::ProtocolDeclaration(ref decl) = statement.kind {
+            self.visit_ident(&decl.name, ctx);
+            for constraint in &decl.constraints {
+                self.visit_path(constraint, ctx);
+            }
+            for type_param in &decl.type_params {
+                self.visit_ident(&type_param.name, ctx);
+            }
+            for assoc_type in &decl.associated_types {
+                self.with_declaration_name_context(|s| s.visit_ident(&assoc_type.name, &mut ()));
+                for type_param in &assoc_type.type_params {
+                    self.visit_ident(&type_param.name, ctx);
+                }
+            }
+            for method in &decl.methods {
+                self.with_declaration_name_context(|s| s.visit_ident(&method.name, &mut ()));
+                for type_param in &method.type_params {
+                    self.visit_ident(&type_param.name, ctx);
+                }
+                for param in &method.parameters {
+                    self.visit_fn_param(param, ctx);
+                }
+                if let Some(ref ret_ty) = method.return_type_annotation {
+                    self.visit_fn_ret_ty(ret_ty, ctx);
+                }
+                if let Some(ref body) = method.body {
+                    self.enter_scope(body.id, ctx);
+                    visit::walk_block(self, &body.statements, &body.expression, ctx);
+                    self.leave_scope(body.id, ctx);
+                }
+            }
+            for const_decl in &decl.consts {
+                self.visit_ident(&const_decl.name, ctx);
+                self.visit_expr(&const_decl.expression, ctx);
+            }
+            return;
+        }
+        // For impl blocks, visit type params and where predicate names in
+        // declaration-name context.
+        if let node::StmtKind::ImplBlock(ref impl_block) = statement.kind {
+            for type_param in &impl_block.type_params {
+                self.visit_ident(&type_param.name, ctx);
+            }
+            self.visit_path(&impl_block.protocol_name, ctx);
+            for ty_arg in &impl_block.type_arguments {
+                self.visit_ty(ty_arg, ctx);
+            }
+            self.visit_path(&impl_block.target_type, ctx);
+            if let Some(ref where_clause) = impl_block.where_clause {
+                for predicate in &where_clause.predicates {
+                    self.visit_ident(&predicate.name, ctx);
+                    for bound in &predicate.bounds {
+                        self.visit_ty(bound, ctx);
+                    }
+                }
+            }
+            for assoc_type in &impl_block.associated_types {
+                self.with_declaration_name_context(|s| s.visit_ident(&assoc_type.name, &mut ()));
+                for type_param in &assoc_type.type_params {
+                    self.visit_ident(&type_param.name, ctx);
+                }
+                self.visit_ty(&assoc_type.ty, ctx);
+            }
+            for decl in &impl_block.methods {
+                self.visit_fn_decl(decl, ctx);
+            }
+            return;
+        }
+        visit::walk_stmt(self, statement, ctx);
     }
 
     fn visit_expr(&mut self, expression: &'ast node::Expr, ctx: &mut ()) {

@@ -152,23 +152,52 @@ TypeAnnotation {
 
 //!protocoldeclaration
 
+TypeParamList {
+  "<" commaSep1<TypeParam> ">"
+}
+
+TypeParam { identifier }
+
+AssociatedTypeDeclaration {
+  kw<"type"> identifier TypeParamList? semi
+}
+
+AssociatedTypeBinding {
+  kw<"type"> identifier TypeParamList? "=" TypeAnnotation semi
+}
+
 ProtocolDeclaration {
-  kw<"pub">? kw<"protocol"> identifier "{" ProtocolMethodSignature* "}"
+  kw<"pub">? kw<"protocol"> identifier TypeParamList?
+  (":" TypeAnnotation ("+" TypeAnnotation)*)?
+  "{" (ProtocolMethodSignature | AssociatedTypeDeclaration)* "}"
 }
 
 ProtocolMethodSignature {
-  kw<"fn"> identifier ParamList
+  kw<"fn"> identifier TypeParamList? ParamList ("->" TypeAnnotation)? Block?
 }
 
 //!implblock
 
 ImplBlock {
-  kw<"impl"> identifier kw<"for"> identifier "{" ImplItem* "}"
+  kw<"impl"> TypeParamList?
+  TypeAnnotation
+  kw<"for"> TypeAnnotation
+  WhereClause?
+  "{" ImplItem* "}"
+}
+
+WhereClause {
+  kw<"where"> commaSep1<WherePredicate>
+}
+
+WherePredicate {
+  identifier ":" TypeAnnotation ("+" TypeAnnotation)*
 }
 
 ImplItem {
   FunctionDeclaration |
-  ApplyStatement
+  ApplyStatement |
+  AssociatedTypeBinding
 }
 
 ApplyStatement {
