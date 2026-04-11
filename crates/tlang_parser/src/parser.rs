@@ -712,35 +712,34 @@ impl<'src> Parser<'src> {
         let mut predicates = Vec::new();
 
         loop {
-            let mut predicate_span = self.create_span_from_current_token();
-            let name = self.parse_identifier();
-            self.consume_token(TokenKind::Colon);
-
-            let mut bounds = vec![self.parse_type_annotation()];
-            while matches!(self.current_token_kind(), TokenKind::Plus) {
-                self.advance();
-                bounds.push(self.parse_type_annotation());
+            predicates.push(self.parse_where_predicate());
+            if !matches!(self.current_token_kind(), TokenKind::Comma) {
+                break;
             }
 
-            self.end_span_from_previous_token(&mut predicate_span);
-            predicates.push(WherePredicate {
-                name,
-                bounds,
-                span: predicate_span,
-            });
-
-            if matches!(self.current_token_kind(), TokenKind::Comma) {
-                self.advance();
-                if matches!(self.current_token_kind(), TokenKind::LBrace) {
-                    break;
-                }
-            } else {
+            self.advance();
+            if matches!(self.current_token_kind(), TokenKind::LBrace) {
                 break;
             }
         }
 
         self.end_span_from_previous_token(&mut span);
         Some(WhereClause { predicates, span })
+    }
+
+    fn parse_where_predicate(&mut self) -> WherePredicate {
+        let mut span = self.create_span_from_current_token();
+        let name = self.parse_identifier();
+        self.consume_token(TokenKind::Colon);
+
+        let mut bounds = vec![self.parse_type_annotation()];
+        while matches!(self.current_token_kind(), TokenKind::Plus) {
+            self.advance();
+            bounds.push(self.parse_type_annotation());
+        }
+
+        self.end_span_from_previous_token(&mut span);
+        WherePredicate { name, bounds, span }
     }
 
     fn parse_associated_type_binding(&mut self) -> AssociatedTypeBinding {
