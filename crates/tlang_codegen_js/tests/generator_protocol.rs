@@ -287,6 +287,27 @@ fn test_concrete_impl_still_uses_type_constructor() {
     );
 }
 
+/// Generic impls on concrete target types must still pass the concrete
+/// Type constructor instead of being treated like blanket impls.
+#[test]
+fn test_generic_impl_on_concrete_type_still_uses_type_constructor() {
+    let output = compile!(indoc! {"
+        protocol Into<T> {
+            fn into(self)
+        }
+
+        struct Text { value: isize }
+
+        impl<T> Into<T> for Text {
+            fn into(self) { self.value }
+        }
+    "});
+    assert!(
+        output.contains("$impl($Into, Text,"),
+        "generic impl for concrete type should pass actual Type, but got:\n{output}"
+    );
+}
+
 // ── Variable declaration with list destructuring (rest pattern) ────────────────
 
 #[test]

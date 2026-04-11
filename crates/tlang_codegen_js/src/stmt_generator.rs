@@ -463,12 +463,17 @@ impl<'a> InnerCodegen<'a> {
         let protocol_name = impl_block.protocol_name.to_string();
         let target_type = impl_block.target_type.to_string();
         let js_protocol_name = CodegenJS::protocol_js_name(&protocol_name);
-        let is_blanket = !impl_block.type_params.is_empty();
+        // Blanket impls are impls whose target type is a type parameter
+        // (e.g. `impl<T> Protocol for T`). Generic impls on a concrete target
+        // type (e.g. `impl<T> Into<T> for String`) are NOT blanket impls.
+        let is_blanket = impl_block
+            .type_params
+            .iter()
+            .any(|tp| tp.name.as_str() == target_type);
 
-        // For blanket impls (e.g. `impl<T> Protocol for T where T: Bound`),
-        // pass `null` as the Type argument so it registers as a default/wildcard
-        // impl in the JS runtime. For concrete impls, resolve the target type
-        // to a JS constructor.
+        // For blanket impls, pass `null` as the Type argument so it registers
+        // as a default/wildcard impl in the JS runtime. For concrete impls,
+        // resolve the target type to a JS constructor.
         let js_type_constructor = if is_blanket {
             None
         } else {

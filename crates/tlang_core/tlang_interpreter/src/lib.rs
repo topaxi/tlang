@@ -1218,10 +1218,17 @@ impl Interpreter {
                 ))
             });
 
-        // Blanket impls (non-empty type_params) use Wildcard as their target
+        // Blanket impls are impls whose target type is a type parameter
+        // (e.g. `impl<T> Protocol for T`). These use Wildcard as their target
         // type key, so they act as fallback impls for any type that doesn't have
         // a more specific (concrete) impl registered.
-        let is_blanket = !impl_block.type_params.is_empty();
+        // Generic impls on a concrete target type (e.g. `impl<T> Into<T> for String`)
+        // are NOT blanket impls — they apply only to the named target type.
+        let target_type_name = impl_block.target_type.to_string();
+        let is_blanket = impl_block
+            .type_params
+            .iter()
+            .any(|tp| tp.name.as_str() == target_type_name);
         let target_type_shape_key = if is_blanket {
             ShapeKey::Wildcard
         } else {
