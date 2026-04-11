@@ -1,9 +1,3 @@
-// map(a[], fn(a) -> b) -> b[]
-fn map([], _) { [] }
-fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
-
-fn square(x) { x ** 2 }
-
 [1, 2, 3, 4, 5]
-|> map(square)
+|> map(fn square(x) { x ** 2 })
 |> log();

@@ -63,9 +63,6 @@ fn html(parts, values) {
 
 // ── Utility functions ───────────────────────────────────────────────────────
 
-fn map([], _) { [] }
-fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
-
 fn join_html([]) { SafeHtml::Html("") }
 fn join_html([x, ...xs]) { SafeHtml::Html(render(x) + render(join_html(xs))) }
 
