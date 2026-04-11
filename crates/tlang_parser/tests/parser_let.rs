@@ -12,6 +12,12 @@ fn test_panic_on_keyword_as_identifier() {
 }
 
 #[test]
+fn test_contextual_keywords_as_identifiers() {
+    assert_parses!("let type = 1; type;");
+    assert_parses!("let where = 1; where;");
+}
+
+#[test]
 fn test_list_pattern() {
     assert_parses!("let [x, y] = [1, 2];");
     assert_parser_snapshot!("let [x, y, ...z] = [1, 2, 3, 4];");

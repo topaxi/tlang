@@ -560,8 +560,18 @@ pub struct ProtocolDeclaration {
     /// Type parameters for generic protocols, e.g. `<T>` in `protocol Into<T>`.
     pub type_params: Vec<TypeParam>,
     pub constraints: Vec<Path>,
+    pub associated_types: Vec<AssociatedTypeDeclaration>,
     pub methods: Vec<ProtocolMethodSignature>,
     pub consts: Vec<ConstDeclaration>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct AssociatedTypeDeclaration {
+    pub id: NodeId,
+    pub name: Ident,
+    pub type_params: Vec<TypeParam>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -569,6 +579,7 @@ pub struct ProtocolDeclaration {
 pub struct ProtocolMethodSignature {
     pub id: NodeId,
     pub name: Ident,
+    pub type_params: Vec<TypeParam>,
     pub parameters: Vec<FunctionParameter>,
     pub return_type_annotation: Option<Ty>,
     pub body: Option<Block>,
@@ -577,11 +588,39 @@ pub struct ProtocolMethodSignature {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct AssociatedTypeBinding {
+    pub id: NodeId,
+    pub name: Ident,
+    pub type_params: Vec<TypeParam>,
+    pub ty: Ty,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct WherePredicate {
+    pub name: Ident,
+    pub bounds: Vec<Ty>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct WhereClause {
+    pub predicates: Vec<WherePredicate>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ImplBlock {
+    pub type_params: Vec<TypeParam>,
     pub protocol_name: Path,
     /// Type arguments for generic protocols, e.g. `<i64>` in `impl Into<i64> for String`.
     pub type_arguments: Vec<Ty>,
     pub target_type: Path,
+    pub where_clause: Option<WhereClause>,
+    pub associated_types: Vec<AssociatedTypeBinding>,
     pub methods: Vec<FunctionDeclaration>,
     pub apply_methods: Vec<Ident>,
 }

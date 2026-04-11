@@ -1,12 +1,13 @@
 use tlang_ast::keyword::{Keyword, kw};
 use tlang_ast::node::{
-    self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ConstDeclaration,
-    ElseClause, EnumDeclaration, EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression,
-    FunctionDeclaration, FunctionParameter, FunctionTypeParam, Ident, IfElseExpression, ImplBlock,
+    self, AssociatedTypeBinding, AssociatedTypeDeclaration, Associativity, BinaryOpExpression,
+    BinaryOpKind, Block, CallExpression, ConstDeclaration, ElseClause, EnumDeclaration,
+    EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression, FunctionDeclaration,
+    FunctionParameter, FunctionTypeParam, Ident, IfElseExpression, ImplBlock,
     IndexAccessExpression, LetDeclaration, MatchArm, MatchExpression, ModDeclaration, Module,
     OperatorInfo, Pat, Path, ProtocolDeclaration, ProtocolMethodSignature, Stmt, StmtKind,
     StructDeclaration, StructField, Ty, TyKind, TypeParam, UnaryOp, UseDeclaration, UseItem,
-    Visibility,
+    Visibility, WhereClause, WherePredicate,
 };
 use tlang_ast::token::{CommentKind, CommentToken, Literal, TaggedStringPart, Token, TokenKind};
 use tlang_lexer::Lexer;
@@ -181,8 +182,27 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::Keyword(expected));
     }
 
+    /// Returns `true` for tokens that may legally be parsed as identifiers.
+    ///
+    /// `type` and `where` are contextual keywords for protocol syntax, but they
+    /// remain valid identifiers in ordinary expression, pattern, and binding
+    /// positions to preserve existing programs.
+    fn is_contextual_identifier_token(token: TokenKind) -> bool {
+        matches!(
+            token,
+            TokenKind::Identifier
+                | TokenKind::Keyword(Keyword::Type)
+                | TokenKind::Keyword(Keyword::Where)
+        )
+    }
+
     fn parse_identifier(&mut self) -> Ident {
-        expect_token_matches!(self, TokenKind::Identifier);
+        expect_token_matches!(
+            self,
+            TokenKind::Identifier
+                | TokenKind::Keyword(Keyword::Type)
+                | TokenKind::Keyword(Keyword::Where)
+        );
 
         let current_token = self.advance();
         let name = self.lexer.span_text(current_token.span);
@@ -623,9 +643,17 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::LBrace);
         let mut methods = Vec::new();
         let mut consts = Vec::new();
+        let mut associated_types = Vec::new();
         while self.not_at_closing(TokenKind::RBrace) {
-            if let Some(item_visibility) = self.try_parse_const_item_visibility() {
+            if matches!(
+                self.current_token_kind(),
+                TokenKind::SingleLineComment | TokenKind::MultiLineComment
+            ) {
+                self.parse_comments();
+            } else if let Some(item_visibility) = self.try_parse_const_item_visibility() {
                 consts.push(self.parse_const_item(item_visibility));
+            } else if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Type)) {
+                associated_types.push(self.parse_associated_type_declaration());
             } else {
                 methods.push(self.parse_protocol_method_signature());
             }
@@ -638,16 +666,35 @@ impl<'src> Parser<'src> {
                 name,
                 type_params,
                 constraints,
+                associated_types,
                 methods,
                 consts,
             }))
         )
     }
 
+    /// Parse an associated type declaration inside a protocol body, such as
+    /// `type Wrapped<T, U>`.
+    fn parse_associated_type_declaration(&mut self) -> AssociatedTypeDeclaration {
+        let mut span = self.create_span_from_current_token();
+        self.consume_keyword_token(Keyword::Type);
+        let name = self.parse_identifier();
+        let type_params = self.parse_type_params();
+        self.consume_optional_semicolon();
+        self.end_span_from_previous_token(&mut span);
+        AssociatedTypeDeclaration {
+            id: self.unique_id(),
+            name,
+            type_params,
+            span,
+        }
+    }
+
     fn parse_protocol_method_signature(&mut self) -> ProtocolMethodSignature {
         let mut span = self.create_span_from_current_token();
         self.consume_keyword_token(Keyword::Fn);
         let name = self.parse_identifier();
+        let type_params = self.parse_type_params();
         self.expect_token(TokenKind::LParen);
         let (parameters, _params_span) = self.parse_parameter_list();
         let return_type = self.parse_return_type();
@@ -663,6 +710,7 @@ impl<'src> Parser<'src> {
         ProtocolMethodSignature {
             id: self.unique_id(),
             name,
+            type_params,
             parameters,
             return_type_annotation: return_type,
             body,
@@ -670,24 +718,98 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parse an optional impl-level where clause like
+    /// `where T: Bound1 + Bound2, U: Bound3`.
+    ///
+    /// Returns `None` when no `where` keyword is present.
+    fn parse_where_clause(&mut self) -> Option<WhereClause> {
+        if !matches!(
+            self.current_token_kind(),
+            TokenKind::Keyword(Keyword::Where)
+        ) {
+            return None;
+        }
+
+        let mut span = self.create_span_from_current_token();
+        self.consume_keyword_token(Keyword::Where);
+        let mut predicates = Vec::new();
+
+        loop {
+            predicates.push(self.parse_where_predicate());
+            if !matches!(self.current_token_kind(), TokenKind::Comma) {
+                break;
+            }
+            self.advance();
+        }
+
+        self.end_span_from_previous_token(&mut span);
+        Some(WhereClause { predicates, span })
+    }
+
+    /// Parse a single where-clause predicate like `T: Display + Clone`.
+    fn parse_where_predicate(&mut self) -> WherePredicate {
+        let mut span = self.create_span_from_current_token();
+        let name = self.parse_identifier();
+        self.consume_token(TokenKind::Colon);
+
+        let mut bounds = vec![self.parse_type_annotation()];
+        while matches!(self.current_token_kind(), TokenKind::Plus) {
+            self.advance();
+            bounds.push(self.parse_type_annotation());
+        }
+
+        self.end_span_from_previous_token(&mut span);
+        WherePredicate { name, bounds, span }
+    }
+
+    /// Parse an associated type binding inside an impl block, such as
+    /// `type Wrapped<T> = ConcreteType<T>`.
+    fn parse_associated_type_binding(&mut self) -> AssociatedTypeBinding {
+        let mut span = self.create_span_from_current_token();
+        self.consume_keyword_token(Keyword::Type);
+        let name = self.parse_identifier();
+        let type_params = self.parse_type_params();
+        self.consume_token(TokenKind::EqualSign);
+        let ty = self.parse_type_annotation();
+        self.consume_optional_semicolon();
+        self.end_span_from_previous_token(&mut span);
+        AssociatedTypeBinding {
+            id: self.unique_id(),
+            name,
+            type_params,
+            ty,
+            span,
+        }
+    }
+
+    fn consume_optional_semicolon(&mut self) {
+        if matches!(self.current_token_kind(), TokenKind::Semicolon) {
+            self.advance();
+        }
+    }
+
     fn parse_impl_block(&mut self) -> Stmt {
         self.consume_keyword_token(Keyword::Impl);
+        let type_params = self.parse_type_params();
         let protocol_name = self.parse_path();
         let type_arguments = self.parse_type_annotation_parameters();
         self.consume_keyword_token(Keyword::For);
         let target_type = self.parse_path();
+        let where_clause = self.parse_where_clause();
         self.consume_token(TokenKind::LBrace);
         let mut methods = Vec::new();
         let mut apply_methods = Vec::new();
+        let mut associated_types = Vec::new();
         while matches!(
             self.current_token_kind(),
             TokenKind::Keyword(Keyword::Fn)
                 | TokenKind::Keyword(Keyword::Apply)
+                | TokenKind::Keyword(Keyword::Type)
                 | TokenKind::SingleLineComment
                 | TokenKind::MultiLineComment
         ) {
             // Consume stray comments so the loop makes progress even if no
-            // fn/apply follows.
+            // fn/apply/type follows.
             if matches!(
                 self.current_token_kind(),
                 TokenKind::SingleLineComment | TokenKind::MultiLineComment
@@ -707,6 +829,8 @@ impl<'src> Parser<'src> {
                     apply_methods.push(self.parse_identifier());
                 }
                 self.consume_token(TokenKind::Semicolon);
+            } else if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Type)) {
+                associated_types.push(self.parse_associated_type_binding());
             } else {
                 let fn_stmt = self.parse_function_declaration(Visibility::Private);
                 match fn_stmt.kind {
@@ -727,9 +851,12 @@ impl<'src> Parser<'src> {
         node::stmt!(
             self.unique_id(),
             ImplBlock(Box::new(ImplBlock {
+                type_params,
                 protocol_name,
                 type_arguments,
                 target_type,
+                where_clause,
+                associated_types,
                 methods,
                 apply_methods,
             }))
@@ -1185,7 +1312,7 @@ impl<'src> Parser<'src> {
         // If immediately closed or the first token is a identifier followed by a colon or comma,
         // we assume we are parsing a dict.
         let is_dict = matches!(self.current_token_kind(), TokenKind::RBrace)
-            || (matches!(self.current_token_kind(), TokenKind::Identifier)
+            || (Self::is_contextual_identifier_token(self.current_token_kind())
                 && matches!(self.peek_token_kind(), TokenKind::Colon | TokenKind::Comma));
         if is_dict {
             let elements = self.parse_dict_elements();
@@ -1532,6 +1659,7 @@ impl<'src> Parser<'src> {
                         | Keyword::_Self
                 )
                 | TokenKind::Identifier
+                | TokenKind::Keyword(Keyword::Type | Keyword::Where)
                 | TokenKind::Literal(_)
                 | TokenKind::TaggedStringStart(_)
         );
@@ -1566,7 +1694,7 @@ impl<'src> Parser<'src> {
             TokenKind::Literal(_) => self.parse_literal_expression(),
             TokenKind::TaggedStringStart(_) => self.parse_tagged_string_expression(),
             TokenKind::Keyword(Keyword::_Self) => self.parse_self_expression(),
-            TokenKind::Identifier => self.parse_identifier_expr(),
+            token if Self::is_contextual_identifier_token(token) => self.parse_identifier_expr(),
             _ => {
                 // `expect_token_matches!` above already pushed an error and advanced
                 // past the unexpected token.  Return a placeholder so the caller
@@ -1717,7 +1845,7 @@ impl<'src> Parser<'src> {
         expect_token_matches!(self, "type annotation", TokenKind::Identifier);
 
         match self.current_token_kind() {
-            TokenKind::Identifier => {
+            token if Self::is_contextual_identifier_token(token) => {
                 let mut span = self.create_span_from_current_token();
                 let identifier = self.parse_path();
                 let parameters = self.parse_type_annotation_parameters();
@@ -1753,7 +1881,7 @@ impl<'src> Parser<'src> {
 
             // Disambiguate `name: Type` vs bare `Type`:
             // peek ahead to see if we have `Ident Colon`.
-            let (name, ty) = if matches!(self.current_token_kind(), TokenKind::Identifier)
+            let (name, ty) = if Self::is_contextual_identifier_token(self.current_token_kind())
                 && self.peek_token_kind() == TokenKind::Colon
             {
                 let name = self.parse_identifier();
@@ -1857,7 +1985,7 @@ impl<'src> Parser<'src> {
     fn parse_function_expression(&mut self) -> Expr {
         let mut span = self.create_span_from_current_token();
         self.consume_keyword_token(Keyword::Fn);
-        let name = if matches!(self.current_token_kind(), TokenKind::Identifier) {
+        let name = if Self::is_contextual_identifier_token(self.current_token_kind()) {
             self.parse_single_identifier()
         } else {
             node::expr!(
@@ -1999,7 +2127,7 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            if matches!(self.current_token_kind(), TokenKind::Identifier) {
+            if Self::is_contextual_identifier_token(self.current_token_kind()) {
                 let node = self.parse_function_name();
 
                 if name.is_some()
@@ -2261,6 +2389,7 @@ impl<'src> Parser<'src> {
             "literal, identifier or list extraction",
             TokenKind::Literal(_)
                 | TokenKind::Identifier
+                | TokenKind::Keyword(Keyword::Type | Keyword::Where)
                 | TokenKind::Keyword(Keyword::Underscore | Keyword::_Self)
                 | TokenKind::LBracket
         );
@@ -2281,7 +2410,7 @@ impl<'src> Parser<'src> {
             }
             // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
             // Simple identifiers will be used as is and mapped to a function parameter.
-            TokenKind::Identifier => match self.peek_token_kind() {
+            token if Self::is_contextual_identifier_token(token) => match self.peek_token_kind() {
                 TokenKind::PathSeparator => self.parse_enum_extraction(),
                 TokenKind::LParen | TokenKind::LBrace => self.parse_enum_extraction(),
                 _ => self.parse_identifier_pattern(),
