@@ -575,30 +575,36 @@ impl<'a> InnerCodegen<'a> {
         stmts.push(self.expr_stmt(impl_call));
 
         // Apply methods — only for concrete impls, not blanket impls.
-        for apply_ident in &impl_block.apply_methods {
-            let method_name = apply_ident.as_str();
-            let js_type_name = js_type_constructor.as_deref().unwrap_or(&target_type);
-            // Builtin types have no HirId — applying protocol methods to them
-            // is not allowed to preserve backwards compatibility.
-            assert!(
-                impl_block.target_type.res.hir_id().is_some(),
-                "Cannot use 'apply' for built-in type '{target_type}': \
-                 applying methods to built-in types is not allowed to preserve backwards compatibility"
-            );
-            let proto = format!("{js_type_name}.prototype");
+        // Blanket impls cannot install methods on a specific prototype since
+        // their target type is a type parameter, not a concrete type.
+        if !is_blanket {
+            for apply_ident in &impl_block.apply_methods {
+                let method_name = apply_ident.as_str();
+                let js_type_name = js_type_constructor.as_deref().unwrap_or(&target_type);
+                // Builtin types have no HirId — applying protocol methods to them
+                // is not allowed to preserve backwards compatibility.
+                assert!(
+                    impl_block.target_type.res.hir_id().is_some(),
+                    "Cannot use 'apply' for built-in type '{target_type}': \
+                     applying methods to built-in types is not allowed to preserve backwards compatibility"
+                );
+                let proto = format!("{js_type_name}.prototype");
 
-            // $installMethod(TargetType.prototype, "methodName", $Protocol.methodName);
-            let install_call = self.call_expr(
-                self.ident_expr("$installMethod"),
-                vec![
-                    Argument::from(self.ident_expr(&proto)),
-                    Argument::from(self.str_expr(method_name)),
-                    Argument::from(
-                        self.static_member_expr(self.ident_expr(&js_protocol_name), method_name),
-                    ),
-                ],
-            );
-            stmts.push(self.expr_stmt(install_call));
+                // $installMethod(TargetType.prototype, "methodName", $Protocol.methodName);
+                let install_call =
+                    self.call_expr(
+                        self.ident_expr("$installMethod"),
+                        vec![
+                            Argument::from(self.ident_expr(&proto)),
+                            Argument::from(self.str_expr(method_name)),
+                            Argument::from(self.static_member_expr(
+                                self.ident_expr(&js_protocol_name),
+                                method_name,
+                            )),
+                        ],
+                    );
+                stmts.push(self.expr_stmt(install_call));
+            }
         }
 
         stmts
