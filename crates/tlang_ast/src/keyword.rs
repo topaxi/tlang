@@ -29,6 +29,8 @@ define_keywords! {
     Protocol => "protocol",
     Impl => "impl",
     Apply => "apply",
+    Where => "where",
+    Type => "type",
 
     Pub => "pub",
     Mod => "mod",

@@ -1,12 +1,13 @@
 use tlang_ast::keyword::{Keyword, kw};
 use tlang_ast::node::{
-    self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ConstDeclaration,
-    ElseClause, EnumDeclaration, EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression,
-    FunctionDeclaration, FunctionParameter, FunctionTypeParam, Ident, IfElseExpression, ImplBlock,
+    self, AssociatedTypeBinding, AssociatedTypeDeclaration, Associativity, BinaryOpExpression,
+    BinaryOpKind, Block, CallExpression, ConstDeclaration, ElseClause, EnumDeclaration,
+    EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression, FunctionDeclaration,
+    FunctionParameter, FunctionTypeParam, Ident, IfElseExpression, ImplBlock,
     IndexAccessExpression, LetDeclaration, MatchArm, MatchExpression, ModDeclaration, Module,
     OperatorInfo, Pat, Path, ProtocolDeclaration, ProtocolMethodSignature, Stmt, StmtKind,
     StructDeclaration, StructField, Ty, TyKind, TypeParam, UnaryOp, UseDeclaration, UseItem,
-    Visibility,
+    Visibility, WhereClause, WherePredicate,
 };
 use tlang_ast::token::{CommentKind, CommentToken, Literal, TaggedStringPart, Token, TokenKind};
 use tlang_lexer::Lexer;
@@ -623,9 +624,17 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::LBrace);
         let mut methods = Vec::new();
         let mut consts = Vec::new();
+        let mut associated_types = Vec::new();
         while self.not_at_closing(TokenKind::RBrace) {
-            if let Some(item_visibility) = self.try_parse_const_item_visibility() {
+            if matches!(
+                self.current_token_kind(),
+                TokenKind::SingleLineComment | TokenKind::MultiLineComment
+            ) {
+                self.parse_comments();
+            } else if let Some(item_visibility) = self.try_parse_const_item_visibility() {
                 consts.push(self.parse_const_item(item_visibility));
+            } else if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Type)) {
+                associated_types.push(self.parse_associated_type_declaration());
             } else {
                 methods.push(self.parse_protocol_method_signature());
             }
@@ -638,16 +647,35 @@ impl<'src> Parser<'src> {
                 name,
                 type_params,
                 constraints,
+                associated_types,
                 methods,
                 consts,
             }))
         )
     }
 
+    fn parse_associated_type_declaration(&mut self) -> AssociatedTypeDeclaration {
+        let mut span = self.create_span_from_current_token();
+        self.consume_keyword_token(Keyword::Type);
+        let name = self.parse_identifier();
+        let type_params = self.parse_type_params();
+        if matches!(self.current_token_kind(), TokenKind::Semicolon) {
+            self.advance();
+        }
+        self.end_span_from_previous_token(&mut span);
+        AssociatedTypeDeclaration {
+            id: self.unique_id(),
+            name,
+            type_params,
+            span,
+        }
+    }
+
     fn parse_protocol_method_signature(&mut self) -> ProtocolMethodSignature {
         let mut span = self.create_span_from_current_token();
         self.consume_keyword_token(Keyword::Fn);
         let name = self.parse_identifier();
+        let type_params = self.parse_type_params();
         self.expect_token(TokenKind::LParen);
         let (parameters, _params_span) = self.parse_parameter_list();
         let return_type = self.parse_return_type();
@@ -663,6 +691,7 @@ impl<'src> Parser<'src> {
         ProtocolMethodSignature {
             id: self.unique_id(),
             name,
+            type_params,
             parameters,
             return_type_annotation: return_type,
             body,
@@ -670,24 +699,92 @@ impl<'src> Parser<'src> {
         }
     }
 
+    fn parse_where_clause(&mut self) -> Option<WhereClause> {
+        if !matches!(
+            self.current_token_kind(),
+            TokenKind::Keyword(Keyword::Where)
+        ) {
+            return None;
+        }
+
+        let mut span = self.create_span_from_current_token();
+        self.consume_keyword_token(Keyword::Where);
+        let mut predicates = Vec::new();
+
+        loop {
+            let mut predicate_span = self.create_span_from_current_token();
+            let name = self.parse_identifier();
+            self.consume_token(TokenKind::Colon);
+
+            let mut bounds = vec![self.parse_type_annotation()];
+            while matches!(self.current_token_kind(), TokenKind::Plus) {
+                self.advance();
+                bounds.push(self.parse_type_annotation());
+            }
+
+            self.end_span_from_previous_token(&mut predicate_span);
+            predicates.push(WherePredicate {
+                name,
+                bounds,
+                span: predicate_span,
+            });
+
+            if matches!(self.current_token_kind(), TokenKind::Comma) {
+                self.advance();
+                if matches!(self.current_token_kind(), TokenKind::LBrace) {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        self.end_span_from_previous_token(&mut span);
+        Some(WhereClause { predicates, span })
+    }
+
+    fn parse_associated_type_binding(&mut self) -> AssociatedTypeBinding {
+        let mut span = self.create_span_from_current_token();
+        self.consume_keyword_token(Keyword::Type);
+        let name = self.parse_identifier();
+        let type_params = self.parse_type_params();
+        self.consume_token(TokenKind::EqualSign);
+        let ty = self.parse_type_annotation();
+        if matches!(self.current_token_kind(), TokenKind::Semicolon) {
+            self.advance();
+        }
+        self.end_span_from_previous_token(&mut span);
+        AssociatedTypeBinding {
+            id: self.unique_id(),
+            name,
+            type_params,
+            ty,
+            span,
+        }
+    }
+
     fn parse_impl_block(&mut self) -> Stmt {
         self.consume_keyword_token(Keyword::Impl);
+        let type_params = self.parse_type_params();
         let protocol_name = self.parse_path();
         let type_arguments = self.parse_type_annotation_parameters();
         self.consume_keyword_token(Keyword::For);
         let target_type = self.parse_path();
+        let where_clause = self.parse_where_clause();
         self.consume_token(TokenKind::LBrace);
         let mut methods = Vec::new();
         let mut apply_methods = Vec::new();
+        let mut associated_types = Vec::new();
         while matches!(
             self.current_token_kind(),
             TokenKind::Keyword(Keyword::Fn)
                 | TokenKind::Keyword(Keyword::Apply)
+                | TokenKind::Keyword(Keyword::Type)
                 | TokenKind::SingleLineComment
                 | TokenKind::MultiLineComment
         ) {
             // Consume stray comments so the loop makes progress even if no
-            // fn/apply follows.
+            // fn/apply/type follows.
             if matches!(
                 self.current_token_kind(),
                 TokenKind::SingleLineComment | TokenKind::MultiLineComment
@@ -707,6 +804,8 @@ impl<'src> Parser<'src> {
                     apply_methods.push(self.parse_identifier());
                 }
                 self.consume_token(TokenKind::Semicolon);
+            } else if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Type)) {
+                associated_types.push(self.parse_associated_type_binding());
             } else {
                 let fn_stmt = self.parse_function_declaration(Visibility::Private);
                 match fn_stmt.kind {
@@ -727,9 +826,12 @@ impl<'src> Parser<'src> {
         node::stmt!(
             self.unique_id(),
             ImplBlock(Box::new(ImplBlock {
+                type_params,
                 protocol_name,
                 type_arguments,
                 target_type,
+                where_clause,
+                associated_types,
                 methods,
                 apply_methods,
             }))

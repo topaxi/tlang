@@ -57,6 +57,7 @@ Module(
           ),
         ],
         constraints: [],
+        associated_types: [],
         methods: [
           ProtocolMethodSignature(
             id: 6,
@@ -75,6 +76,7 @@ Module(
                 ),
               ),
             ),
+            type_params: [],
             parameters: [
               FunctionParameter(
                 pattern: Pat(
