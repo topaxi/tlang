@@ -33,8 +33,6 @@ pub struct SemanticAnalysisContext {
     pub protocol_associated_types: HashMap<String, Vec<String>>,
     /// Tracks associated type bindings per impl: (protocol, type) → list of bound names.
     pub impl_associated_type_bindings: Vec<(String, String, Vec<String>, Span)>,
-    /// Where clause predicates per impl: (protocol, type, predicates, span).
-    pub impl_where_predicates: Vec<(String, String, Vec<(String, Vec<String>)>, Span)>,
 }
 
 impl SemanticAnalysisContext {
@@ -50,7 +48,6 @@ impl SemanticAnalysisContext {
             protocol_impls: Vec::new(),
             protocol_associated_types: HashMap::new(),
             impl_associated_type_bindings: Vec::new(),
-            impl_where_predicates: Vec::new(),
         }
     }
 

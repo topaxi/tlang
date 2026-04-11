@@ -849,15 +849,17 @@ impl TypeChecker {
             for pred in &wc.predicates {
                 for bound in &pred.bounds {
                     let bound_name = bound.kind.to_string();
-                    // Validate that the bound refers to a known protocol.
-                    if self.type_table.get_protocol_info(&bound_name).is_none()
-                        && !matches!(bound.kind, hir::TyKind::Fn(..))
-                    {
-                        self.errors.push(TypeError::UnknownWhereClauseBound {
-                            type_param: pred.name.as_str().to_string(),
-                            bound: bound_name,
-                            span: pred.span,
-                        });
+                    // Validate that the bound refers to a known protocol path.
+                    match &bound.kind {
+                        hir::TyKind::Path(..)
+                            if self.type_table.get_protocol_info(&bound_name).is_some() => {}
+                        _ => {
+                            self.errors.push(TypeError::UnknownWhereClauseBound {
+                                type_param: pred.name.as_str().to_string(),
+                                bound: bound_name,
+                                span: pred.span,
+                            });
+                        }
                     }
                 }
             }

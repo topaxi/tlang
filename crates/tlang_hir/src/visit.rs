@@ -165,6 +165,9 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
         }
         hir::StmtKind::ImplBlock(impl_block) => {
             visitor.visit_path(&mut impl_block.protocol_name, ctx);
+            for ty_arg in &mut impl_block.type_arguments {
+                visitor.visit_ty(ty_arg, ctx);
+            }
             visitor.visit_path(&mut impl_block.target_type, ctx);
             if let Some(wc) = &mut impl_block.where_clause {
                 for pred in &mut wc.predicates {

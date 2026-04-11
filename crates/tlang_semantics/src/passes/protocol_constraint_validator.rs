@@ -82,8 +82,8 @@ impl SemanticAnalysisPass for ProtocolConstraintValidator {
             }
         }
 
-        // Validate associated type bindings: check that every required
-        // associated type from the protocol has a corresponding binding.
+        // Validate associated type bindings: check that no unexpected
+        // associated types are provided (i.e. binding names not declared by the protocol).
         for (protocol_name, target_type, binding_names, impl_span) in
             &ctx.impl_associated_type_bindings
         {

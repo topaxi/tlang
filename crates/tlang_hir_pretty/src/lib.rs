@@ -228,6 +228,16 @@ impl HirPretty {
                     self.push_indent();
                     self.push_str("type ");
                     self.push_str(assoc_ty.name.as_str());
+                    if !assoc_ty.type_params.is_empty() {
+                        self.push_char('<');
+                        for (i, tp) in assoc_ty.type_params.iter().enumerate() {
+                            if i > 0 {
+                                self.push_str(", ");
+                            }
+                            self.push_str(tp.name.as_str());
+                        }
+                        self.push_char('>');
+                    }
                     self.push_newline();
                 }
                 for method in &decl.methods {
@@ -265,6 +275,16 @@ impl HirPretty {
                     self.push_str("> ");
                 }
                 self.push_str(&impl_block.protocol_name.to_string());
+                if !impl_block.type_arguments.is_empty() {
+                    self.push_char('<');
+                    for (i, ty) in impl_block.type_arguments.iter().enumerate() {
+                        if i > 0 {
+                            self.push_str(", ");
+                        }
+                        self.print_ty(ty);
+                    }
+                    self.push_char('>');
+                }
                 self.push_str(" for ");
                 self.push_str(&impl_block.target_type.to_string());
                 if let Some(wc) = &impl_block.where_clause {
@@ -290,6 +310,16 @@ impl HirPretty {
                     self.push_indent();
                     self.push_str("type ");
                     self.push_str(assoc_ty.name.as_str());
+                    if !assoc_ty.type_params.is_empty() {
+                        self.push_char('<');
+                        for (i, tp) in assoc_ty.type_params.iter().enumerate() {
+                            if i > 0 {
+                                self.push_str(", ");
+                            }
+                            self.push_str(tp.name.as_str());
+                        }
+                        self.push_char('>');
+                    }
                     self.push_str(" = ");
                     self.print_ty(&assoc_ty.ty);
                     self.push_newline();

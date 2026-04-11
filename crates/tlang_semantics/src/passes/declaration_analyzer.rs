@@ -144,32 +144,6 @@ impl DeclarationAnalyzer {
             ));
         }
 
-        // Track where clause predicates for validation
-        if let Some(wc) = &impl_block.where_clause {
-            let predicates: Vec<(String, Vec<String>)> = wc
-                .predicates
-                .iter()
-                .map(|pred| {
-                    (
-                        pred.name.to_string(),
-                        pred.bounds
-                            .iter()
-                            .filter_map(|b| match &b.kind {
-                                tlang_ast::node::TyKind::Path(p) => Some(p.to_string()),
-                                _ => None,
-                            })
-                            .collect(),
-                    )
-                })
-                .collect();
-            ctx.impl_where_predicates.push((
-                protocol_name.clone(),
-                target_type,
-                predicates,
-                impl_block.protocol_name.span,
-            ));
-        }
-
         for method in &impl_block.methods {
             // Register the protocol-qualified path (e.g., Greet::greet)
             let Some(method_name) = method.name() else {

@@ -205,17 +205,14 @@ impl TypeTable {
                 .map(|(_, ty)| ty.clone());
         }
 
-        // Fall back to blanket impls.
-        let blanket = self
-            .impl_info
-            .iter()
-            .find(|i| i.protocol_name == protocol_name && i.is_blanket);
-        blanket.and_then(|info| {
-            info.associated_type_bindings
-                .iter()
-                .find(|(name, _)| name == assoc_type_name)
-                .map(|(_, ty)| ty.clone())
-        })
+        // Fall back to blanket impls that apply to the requested target type.
+        self.find_blanket_impl_for(protocol_name, target_type_name)
+            .and_then(|info| {
+                info.associated_type_bindings
+                    .iter()
+                    .find(|(name, _)| name == assoc_type_name)
+                    .map(|(_, ty)| ty.clone())
+            })
     }
 
     /// Find a blanket impl for a protocol that could apply to a given target
