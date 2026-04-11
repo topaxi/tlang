@@ -77,6 +77,26 @@ impl SemanticAnalysisPass for ProtocolConstraintValidator {
             }
         }
 
+        // Validate associated type bindings: check that every required
+        // associated type from the protocol has a corresponding binding.
+        for (protocol_name, target_type, binding_names, impl_span) in
+            &ctx.impl_associated_type_bindings
+        {
+            if let Some(proto_assoc_types) = ctx.protocol_associated_types.get(protocol_name) {
+                for bound_name in binding_names {
+                    if !proto_assoc_types.iter().any(|n| n == bound_name) {
+                        diagnostics.push(diagnostic::error_at!(
+                            *impl_span,
+                            "unexpected associated type `{}` in impl `{}` for `{}`",
+                            bound_name,
+                            protocol_name,
+                            target_type,
+                        ));
+                    }
+                }
+            }
+        }
+
         for diag in diagnostics {
             ctx.add_diagnostic(diag);
         }

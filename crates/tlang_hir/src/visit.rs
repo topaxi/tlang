@@ -166,6 +166,16 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
         hir::StmtKind::ImplBlock(impl_block) => {
             visitor.visit_path(&mut impl_block.protocol_name, ctx);
             visitor.visit_path(&mut impl_block.target_type, ctx);
+            if let Some(wc) = &mut impl_block.where_clause {
+                for pred in &mut wc.predicates {
+                    for bound in &mut pred.bounds {
+                        visitor.visit_ty(bound, ctx);
+                    }
+                }
+            }
+            for assoc_ty in &mut impl_block.associated_types {
+                visitor.visit_ty(&mut assoc_ty.ty, ctx);
+            }
             for decl in &mut impl_block.methods {
                 // Skip visiting method name — it's in declaration position and
                 // not resolvable as a standalone path (only Protocol::method is).

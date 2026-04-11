@@ -124,9 +124,50 @@ impl DeclarationAnalyzer {
         // Track this impl for constraint validation (including span for diagnostics)
         ctx.protocol_impls.push((
             protocol_name.clone(),
-            target_type,
+            target_type.clone(),
             impl_block.protocol_name.span,
         ));
+
+        // Track associated type bindings for validation
+        let binding_names: Vec<String> = impl_block
+            .associated_types
+            .iter()
+            .map(|at| at.name.to_string())
+            .collect();
+        if !binding_names.is_empty() {
+            ctx.impl_associated_type_bindings.push((
+                protocol_name.clone(),
+                target_type.clone(),
+                binding_names,
+                impl_block.protocol_name.span,
+            ));
+        }
+
+        // Track where clause predicates for validation
+        if let Some(wc) = &impl_block.where_clause {
+            let predicates: Vec<(String, Vec<String>)> = wc
+                .predicates
+                .iter()
+                .map(|pred| {
+                    (
+                        pred.name.to_string(),
+                        pred.bounds
+                            .iter()
+                            .filter_map(|b| match &b.kind {
+                                tlang_ast::node::TyKind::Path(p) => Some(p.to_string()),
+                                _ => None,
+                            })
+                            .collect(),
+                    )
+                })
+                .collect();
+            ctx.impl_where_predicates.push((
+                protocol_name.clone(),
+                target_type,
+                predicates,
+                impl_block.protocol_name.span,
+            ));
+        }
 
         for method in &impl_block.methods {
             // Register the protocol-qualified path (e.g., Greet::greet)
@@ -406,6 +447,15 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                 ctx.protocol_constraints.insert(
                     decl.name.to_string(),
                     decl.constraints.iter().map(|c| c.to_string()).collect(),
+                );
+
+                // Register protocol associated types
+                ctx.protocol_associated_types.insert(
+                    decl.name.to_string(),
+                    decl.associated_types
+                        .iter()
+                        .map(|at| at.name.to_string())
+                        .collect(),
                 );
 
                 // Register protocol const members with qualified names

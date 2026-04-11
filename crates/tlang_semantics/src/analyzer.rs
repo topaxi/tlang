@@ -29,6 +29,12 @@ pub struct SemanticAnalysisContext {
     /// Tracks which (protocol, type) pairs have impl blocks, along with the
     /// span of the impl block for use in diagnostics.
     pub protocol_impls: Vec<(String, String, Span)>,
+    /// Maps protocol name → list of associated type names.
+    pub protocol_associated_types: HashMap<String, Vec<String>>,
+    /// Tracks associated type bindings per impl: (protocol, type) → list of bound names.
+    pub impl_associated_type_bindings: Vec<(String, String, Vec<String>, Span)>,
+    /// Where clause predicates per impl: (protocol, type, predicates, span).
+    pub impl_where_predicates: Vec<(String, String, Vec<(String, Vec<String>)>, Span)>,
 }
 
 impl SemanticAnalysisContext {
@@ -42,6 +48,9 @@ impl SemanticAnalysisContext {
             diagnostics: Vec::new(),
             protocol_constraints: HashMap::new(),
             protocol_impls: Vec::new(),
+            protocol_associated_types: HashMap::new(),
+            impl_associated_type_bindings: Vec::new(),
+            impl_where_predicates: Vec::new(),
         }
     }
 

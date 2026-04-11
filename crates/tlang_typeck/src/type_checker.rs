@@ -10,7 +10,8 @@ use tlang_hir_opt::hir_opt::{HirOptContext, HirOptError, HirPass};
 use crate::builtin_types;
 use crate::builtins;
 use crate::type_table::{
-    EnumInfo, ImplInfo, ProtocolInfo, ProtocolMethodInfo, StructInfo, VariantInfo,
+    AssociatedTypeInfo, EnumInfo, ImplInfo, ProtocolInfo, ProtocolMethodInfo, StructInfo,
+    VariantInfo,
 };
 use crate::typing_context::TypingContext;
 use crate::{TypeError, TypeInfo, TypeTable};
@@ -785,10 +786,19 @@ impl TypeChecker {
             })
             .collect();
         let constraints: Vec<String> = decl.constraints.iter().map(|c| c.join("::")).collect();
+        let associated_types: Vec<AssociatedTypeInfo> = decl
+            .associated_types
+            .iter()
+            .map(|at| AssociatedTypeInfo {
+                name: at.name,
+                type_param_count: at.type_params.len(),
+            })
+            .collect();
         self.type_table.insert_protocol_info(ProtocolInfo {
             name: decl.name,
             methods,
             constraints,
+            associated_types,
         });
 
         // Register each protocol method signature in the type table so
@@ -834,6 +844,25 @@ impl TypeChecker {
             }
         }
 
+        // Validate where clause predicates for blanket impls.
+        if let Some(wc) = &impl_block.where_clause {
+            for pred in &wc.predicates {
+                for bound in &pred.bounds {
+                    let bound_name = bound.kind.to_string();
+                    // Validate that the bound refers to a known protocol.
+                    if self.type_table.get_protocol_info(&bound_name).is_none()
+                        && !matches!(bound.kind, hir::TyKind::Fn(..))
+                    {
+                        self.errors.push(TypeError::UnknownWhereClauseBound {
+                            type_param: pred.name.as_str().to_string(),
+                            bound: bound_name,
+                            span: pred.span,
+                        });
+                    }
+                }
+            }
+        }
+
         // Collect names of methods present in the impl.
         // `apply` directives only install the method on the target type;
         // they do not count toward satisfying the protocol contract.
@@ -865,15 +894,55 @@ impl TypeChecker {
                 }
             }
 
-            // Check constraint protocols.
-            for constraint in &proto_info.constraints {
-                if !self.type_table.has_impl(constraint, &target_type_name) {
+            // Check constraint protocols (skip for blanket impls since
+            // constraints are deferred to instantiation sites).
+            if impl_block.type_params.is_empty() {
+                for constraint in &proto_info.constraints {
+                    if !self.type_table.has_impl(constraint, &target_type_name) {
+                        let span = impl_block.target_type.span;
+                        self.errors.push(TypeError::MissingConstraintImpl {
+                            constraint: constraint.clone(),
+                            protocol: protocol_name.clone(),
+                            target_type: target_type_name.clone(),
+                            span,
+                        });
+                    }
+                }
+            }
+
+            // Validate associated type bindings: every required associated type
+            // must have a binding, and no extra bindings are allowed.
+            let impl_assoc_names: Vec<String> = impl_block
+                .associated_types
+                .iter()
+                .map(|at| at.name.as_str().to_string())
+                .collect();
+
+            for proto_assoc in &proto_info.associated_types {
+                let name = proto_assoc.name.as_str();
+                if !impl_assoc_names.iter().any(|n| n == name) {
                     let span = impl_block.target_type.span;
-                    self.errors.push(TypeError::MissingConstraintImpl {
-                        constraint: constraint.clone(),
+                    self.errors.push(TypeError::MissingAssociatedType {
+                        name: name.to_string(),
                         protocol: protocol_name.clone(),
                         target_type: target_type_name.clone(),
                         span,
+                    });
+                }
+            }
+
+            let proto_assoc_names: Vec<String> = proto_info
+                .associated_types
+                .iter()
+                .map(|at| at.name.as_str().to_string())
+                .collect();
+            for at in &impl_block.associated_types {
+                let name = at.name.as_str();
+                if !proto_assoc_names.iter().any(|n| n == name) {
+                    self.errors.push(TypeError::UnexpectedAssociatedType {
+                        name: name.to_string(),
+                        protocol: protocol_name.clone(),
+                        span: at.span,
                     });
                 }
             }
@@ -962,6 +1031,27 @@ impl TypeChecker {
                     }
                 }
                 hir::StmtKind::ImplBlock(impl_block) => {
+                    let is_blanket = !impl_block.type_params.is_empty();
+                    let where_predicates: Vec<(String, Vec<String>)> = impl_block
+                        .where_clause
+                        .as_ref()
+                        .map(|wc| {
+                            wc.predicates
+                                .iter()
+                                .map(|pred| {
+                                    (
+                                        pred.name.as_str().to_string(),
+                                        pred.bounds.iter().map(|b| b.kind.to_string()).collect(),
+                                    )
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    let associated_type_bindings: Vec<(String, String)> = impl_block
+                        .associated_types
+                        .iter()
+                        .map(|at| (at.name.as_str().to_string(), at.ty.kind.to_string()))
+                        .collect();
                     self.type_table.insert_impl_info(ImplInfo {
                         protocol_name: impl_block.protocol_name.join("::"),
                         target_type_name: impl_block.target_type.join("::"),
@@ -970,6 +1060,9 @@ impl TypeChecker {
                             .iter()
                             .map(|ty| ty.kind.to_string())
                             .collect(),
+                        is_blanket,
+                        where_predicates,
+                        associated_type_bindings,
                     });
                 }
                 _ => {}

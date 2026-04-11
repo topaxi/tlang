@@ -1134,8 +1134,48 @@ pub struct ProtocolDeclaration {
     /// Type parameters for generic protocols, e.g. `<T>` in `protocol Into<T>`.
     pub type_params: Vec<TypeParam>,
     pub constraints: Vec<Path>,
+    /// Associated type declarations, e.g. `type Wrapped` or `type Item<T>`.
+    pub associated_types: Vec<AssociatedTypeDeclaration>,
     pub methods: Vec<ProtocolMethodSignature>,
     pub consts: Vec<ConstItem>,
+}
+
+/// An associated type declaration inside a protocol body, e.g. `type Wrapped<T>`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct AssociatedTypeDeclaration {
+    pub hir_id: HirId,
+    pub name: Ident,
+    pub type_params: Vec<TypeParam>,
+    pub span: Span,
+}
+
+/// An associated type binding inside an impl block, e.g. `type Wrapped<T> = ConcreteType<T>`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct AssociatedTypeBinding {
+    pub hir_id: HirId,
+    pub name: Ident,
+    pub type_params: Vec<TypeParam>,
+    pub ty: Ty,
+    pub span: Span,
+}
+
+/// A single where-clause predicate, e.g. `T: Display + Clone`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct WherePredicate {
+    pub name: Ident,
+    pub bounds: Vec<Ty>,
+    pub span: Span,
+}
+
+/// A where clause containing one or more predicates.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct WhereClause {
+    pub predicates: Vec<WherePredicate>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1153,10 +1193,16 @@ pub struct ProtocolMethodSignature {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ImplBlock {
     pub hir_id: HirId,
+    /// Impl-level type parameters, e.g. `<T, U>` in `impl<T, U> Protocol for T`.
+    pub type_params: Vec<TypeParam>,
     pub protocol_name: Path,
     /// Type arguments for generic protocols, e.g. `<i64>` in `impl Into<i64> for String`.
     pub type_arguments: Vec<Ty>,
     pub target_type: Path,
+    /// Where clause constraints, e.g. `where T: Iterator`.
+    pub where_clause: Option<WhereClause>,
+    /// Associated type bindings, e.g. `type Wrapped = Option`.
+    pub associated_types: Vec<AssociatedTypeBinding>,
     pub methods: Vec<FunctionDeclaration>,
     pub apply_methods: Vec<Ident>,
 }
