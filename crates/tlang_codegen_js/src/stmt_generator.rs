@@ -538,9 +538,16 @@ impl<'a> InnerCodegen<'a> {
             Argument::from(methods_obj),
         ];
 
-        // For generic protocols (e.g. `impl Into<i64> for String`), pass the
-        // type argument key as the fourth argument to $impl.
-        if !impl_block.type_arguments.is_empty() {
+        // For generic protocols with concrete type arguments (e.g. `impl Into<i64> for String`),
+        // pass the type argument key as the fourth argument to $impl.
+        // Skip type-arg keying for impls where all type arguments are type variables
+        // (e.g. `impl<T> Functor<T> for Option<T>`) — those are resolved generically and
+        // should not be keyed by a type-var placeholder.
+        let type_args_are_concrete = impl_block
+            .type_arguments
+            .iter()
+            .all(|ty| !matches!(ty.kind, hir::TyKind::Var(_)));
+        if !impl_block.type_arguments.is_empty() && type_args_are_concrete {
             let type_arg_key = impl_block
                 .type_arguments
                 .iter()

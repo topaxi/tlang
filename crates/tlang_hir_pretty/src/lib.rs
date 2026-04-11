@@ -287,6 +287,16 @@ impl HirPretty {
                 }
                 self.push_str(" for ");
                 self.push_str(&impl_block.target_type.to_string());
+                if !impl_block.target_type_arguments.is_empty() {
+                    self.push_char('<');
+                    for (i, ty) in impl_block.target_type_arguments.iter().enumerate() {
+                        if i > 0 {
+                            self.push_str(", ");
+                        }
+                        self.print_ty(ty);
+                    }
+                    self.push_char('>');
+                }
                 if let Some(wc) = &impl_block.where_clause {
                     self.push_str(" where ");
                     for (i, pred) in wc.predicates.iter().enumerate() {

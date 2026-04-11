@@ -520,6 +520,11 @@ impl LoweringContext {
             })
             .collect();
         let target_type = self.lower_path(&impl_block.target_type);
+        let target_type_arguments: Vec<hir::Ty> = impl_block
+            .target_type_arguments
+            .iter()
+            .map(|ty| self.lower_ty(Some(ty)))
+            .collect();
 
         let where_clause = impl_block
             .where_clause
@@ -566,6 +571,7 @@ impl LoweringContext {
             protocol_name,
             type_arguments,
             target_type,
+            target_type_arguments,
             where_clause,
             associated_types,
             methods,
