@@ -659,9 +659,7 @@ impl<'src> Parser<'src> {
         self.consume_keyword_token(Keyword::Type);
         let name = self.parse_identifier();
         let type_params = self.parse_type_params();
-        if matches!(self.current_token_kind(), TokenKind::Semicolon) {
-            self.advance();
-        }
+        self.consume_optional_semicolon();
         self.end_span_from_previous_token(&mut span);
         AssociatedTypeDeclaration {
             id: self.unique_id(),
@@ -716,11 +714,7 @@ impl<'src> Parser<'src> {
             if !matches!(self.current_token_kind(), TokenKind::Comma) {
                 break;
             }
-
             self.advance();
-            if matches!(self.current_token_kind(), TokenKind::LBrace) {
-                break;
-            }
         }
 
         self.end_span_from_previous_token(&mut span);
@@ -749,9 +743,7 @@ impl<'src> Parser<'src> {
         let type_params = self.parse_type_params();
         self.consume_token(TokenKind::EqualSign);
         let ty = self.parse_type_annotation();
-        if matches!(self.current_token_kind(), TokenKind::Semicolon) {
-            self.advance();
-        }
+        self.consume_optional_semicolon();
         self.end_span_from_previous_token(&mut span);
         AssociatedTypeBinding {
             id: self.unique_id(),
@@ -759,6 +751,12 @@ impl<'src> Parser<'src> {
             type_params,
             ty,
             span,
+        }
+    }
+
+    fn consume_optional_semicolon(&mut self) {
+        if matches!(self.current_token_kind(), TokenKind::Semicolon) {
+            self.advance();
         }
     }
 
