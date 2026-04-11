@@ -242,8 +242,20 @@ pub fn walk_stmt<'ast, V: Visitor<'ast>>(
         node::StmtKind::EnumDeclaration(decl) => visitor.visit_enum_decl(decl, ctx),
         node::StmtKind::ProtocolDeclaration(decl) => {
             visitor.visit_ident(&decl.name, ctx);
+            for constraint in &decl.constraints {
+                visitor.visit_path(constraint, ctx);
+            }
+            for assoc_type in &decl.associated_types {
+                visitor.visit_ident(&assoc_type.name, ctx);
+            }
             for method in &decl.methods {
                 visitor.visit_ident(&method.name, ctx);
+                for param in &method.parameters {
+                    visitor.visit_fn_param(param, ctx);
+                }
+                if let Some(ref ret_ty) = method.return_type_annotation {
+                    visitor.visit_fn_ret_ty(ret_ty, ctx);
+                }
             }
             for const_decl in &decl.consts {
                 visitor.visit_ident(&const_decl.name, ctx);
@@ -251,6 +263,22 @@ pub fn walk_stmt<'ast, V: Visitor<'ast>>(
             }
         }
         node::StmtKind::ImplBlock(impl_block) => {
+            visitor.visit_path(&impl_block.protocol_name, ctx);
+            for ty_arg in &impl_block.type_arguments {
+                visitor.visit_ty(ty_arg, ctx);
+            }
+            visitor.visit_path(&impl_block.target_type, ctx);
+            if let Some(ref where_clause) = impl_block.where_clause {
+                for predicate in &where_clause.predicates {
+                    for bound in &predicate.bounds {
+                        visitor.visit_ty(bound, ctx);
+                    }
+                }
+            }
+            for assoc_type in &impl_block.associated_types {
+                visitor.visit_ident(&assoc_type.name, ctx);
+                visitor.visit_ty(&assoc_type.ty, ctx);
+            }
             for decl in &impl_block.methods {
                 visitor.visit_fn_decl(decl, ctx);
             }

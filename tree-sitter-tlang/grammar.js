@@ -189,13 +189,50 @@ module.exports = grammar({
         optional(field('visibility', $.visibility_modifier)),
         'protocol',
         field('name', $.type_identifier),
+        optional(field('type_params', $.type_param_list)),
+        optional(seq(':', field('constraint', $.type_annotation), repeat(seq('+', field('constraint', $.type_annotation))))),
         '{',
-        repeat($.protocol_method_signature),
+        repeat(
+          choice(
+            $.protocol_method_signature,
+            $.associated_type_declaration,
+          ),
+        ),
         '}',
       ),
 
+    type_param_list: ($) =>
+      seq('<', commaSep1($.type_param), '>'),
+
+    type_param: ($) => field('name', $.type_identifier),
+
+    associated_type_declaration: ($) =>
+      seq(
+        'type',
+        field('name', $.type_identifier),
+        optional(field('type_params', $.type_param_list)),
+        optional(';'),
+      ),
+
+    associated_type_binding: ($) =>
+      seq(
+        'type',
+        field('name', $.type_identifier),
+        optional(field('type_params', $.type_param_list)),
+        '=',
+        field('type', $.type_annotation),
+        optional(';'),
+      ),
+
     protocol_method_signature: ($) =>
-      seq('fn', field('name', $.identifier), $.parameter_list),
+      seq(
+        'fn',
+        field('name', $.identifier),
+        optional(field('type_params', $.type_param_list)),
+        $.parameter_list,
+        optional(seq('->', field('return_type', $.type_annotation))),
+        optional(field('body', $.block)),
+      ),
 
     // =========================================================================
     // Impl Block
@@ -204,15 +241,30 @@ module.exports = grammar({
     impl_block: ($) =>
       seq(
         'impl',
+        optional(field('type_params', $.type_param_list)),
         field('protocol', $.type_identifier),
+        optional(seq('<', commaSep1(field('type_argument', $.type_annotation)), '>')),
         'for',
         field('type', $.type_identifier),
+        optional(field('where_clause', $.where_clause)),
         '{',
         repeat($.impl_item),
         '}',
       ),
 
-    impl_item: ($) => choice($.function_declaration, $.apply_statement),
+    where_clause: ($) =>
+      seq('where', commaSep1($.where_predicate)),
+
+    where_predicate: ($) =>
+      seq(
+        field('name', $.type_identifier),
+        ':',
+        field('bound', $.type_annotation),
+        repeat(seq('+', field('bound', $.type_annotation))),
+      ),
+
+    impl_item: ($) =>
+      choice($.function_declaration, $.apply_statement, $.associated_type_binding),
 
     apply_statement: ($) =>
       seq('apply', commaSep1(field('method', $.identifier)), optional(';')),

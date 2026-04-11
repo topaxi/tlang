@@ -212,7 +212,45 @@ impl SymbolIndex {
         items
     }
 
-    /// Find a method/function or struct field symbol whose qualified name ends
+    /// Collect completion items for methods of a given protocol.
+    ///
+    /// Searches all scopes for symbols whose qualified name starts with
+    /// `protocol_name::` and have a `ProtocolMethod` kind.  Returns items with
+    /// just the method name as the label (not the qualified `Protocol::method`
+    /// form).
+    pub fn collect_protocol_completions(&self, protocol_name: &str) -> Vec<CompletionItem> {
+        let prefix = format!("{protocol_name}::");
+        let mut seen = HashSet::new();
+        let mut items = Vec::new();
+
+        for entries in self.scopes.values() {
+            for entry in entries {
+                if !entry.name.starts_with(prefix.as_str()) {
+                    continue;
+                }
+                if !matches!(entry.kind, DefKind::ProtocolMethod(_)) {
+                    continue;
+                }
+                let method_name = &entry.name[prefix.len()..];
+                if method_name.is_empty() {
+                    continue;
+                }
+                let item = CompletionItem {
+                    label: method_name.to_string(),
+                    kind: entry.kind,
+                    detail: completion_detail(entry.kind),
+                };
+                let key = (item.label.clone(), item.detail.clone());
+                if seen.insert(key) {
+                    items.push(item);
+                }
+            }
+        }
+
+        items.sort_by(|a, b| a.label.cmp(&b.label));
+        items
+    }
+
     /// with `::member_name`.
     ///
     /// This is used as a fallback when the cursor is on a field expression
@@ -453,6 +491,34 @@ mod tests {
         assert!(
             labels.contains(&"is_some"),
             "should include `is_some`, got: {labels:?}"
+        );
+    }
+
+    #[test]
+    fn protocol_completions_include_default_methods() {
+        let source = "protocol Display {\n    fn to_string(self) { \"\" }\n    fn print(self) { log(to_string) }\n}";
+        let result = crate::analyze(source, |_| {});
+        assert!(result.parse_issues.is_empty());
+        let index = SymbolIndex::from_analyzer(&result.analyzer);
+        let methods = index.collect_protocol_completions("Display");
+        let labels: Vec<&str> = methods.iter().map(|m| m.label.as_str()).collect();
+        assert!(
+            labels.contains(&"to_string"),
+            "should include `to_string`, got: {labels:?}"
+        );
+        assert!(
+            labels.contains(&"print"),
+            "should include `print`, got: {labels:?}"
+        );
+    }
+
+    #[test]
+    fn protocol_completions_empty_for_unknown_protocol() {
+        let index = index_for("fn add(a, b) { a + b }");
+        let methods = index.collect_protocol_completions("Display");
+        assert!(
+            methods.is_empty(),
+            "should be empty for unknown protocol, got: {methods:?}"
         );
     }
 }
