@@ -1139,6 +1139,153 @@ fn empty_impl_for_constraint_protocol_with_no_methods_ok() {
     );
 }
 
+// ── Associated types ────────────────────────────────────────────────────
+
+#[test]
+fn protocol_with_associated_type_no_errors() {
+    common::typecheck_ok(
+        r#"
+        protocol Functor {
+            type Wrapped
+            fn map(self, f)
+        }
+        "#,
+    );
+}
+
+#[test]
+fn impl_associated_type_binding_ok() {
+    common::typecheck_ok(
+        r#"
+        protocol Functor {
+            type Wrapped
+            fn map(self, f)
+        }
+        struct MyBox { value: i64 }
+        impl Functor for MyBox {
+            type Wrapped = MyBox
+            fn map(self, f) { MyBox { value: f(self.value) } }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn impl_missing_associated_type_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        protocol Functor {
+            type Wrapped
+            fn map(self, f)
+        }
+        struct MyBox { value: i64 }
+        impl Functor for MyBox {
+            fn map(self, f) { MyBox { value: f(self.value) } }
+        }
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("missing associated type `Wrapped`") && e.contains("Functor")),
+        "expected missing associated type error, got: {errs:?}"
+    );
+}
+
+#[test]
+fn impl_unexpected_associated_type_error() {
+    // Like the constraint test above, semantic analysis catches this before
+    // the type checker runs. We verify the semantic pass diagnoses it.
+    let (mut ast, _parse_meta) = tlang_parser::Parser::from_source(
+        r#"
+        protocol Greet {
+            fn greet(self)
+        }
+        struct Dog { name: String }
+        impl Greet for Dog {
+            type Output = String
+            fn greet(self) { "Woof!" }
+        }
+        "#,
+    )
+    .parse()
+    .unwrap();
+    let mut semantic_analyzer = tlang_semantics::SemanticAnalyzer::default();
+    let result = semantic_analyzer.analyze(&mut ast);
+    assert!(
+        result.is_err(),
+        "expected semantic analysis to catch unexpected associated type"
+    );
+    let diagnostics = result.unwrap_err();
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.message().contains("unexpected associated type `Output`")),
+        "expected unexpected associated type error, got: {diagnostics:?}"
+    );
+}
+
+// ── Blanket impls and where clauses ─────────────────────────────────────
+
+#[test]
+fn blanket_impl_with_where_clause_ok() {
+    common::typecheck_ok(
+        r#"
+        protocol Iterator {
+            fn next(self)
+        }
+        protocol Functor {
+            fn map(self, f)
+        }
+        impl<I> Functor for I
+        where
+            I: Iterator
+        {
+            fn map(self, f) { f(self) }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn blanket_impl_where_clause_unknown_bound_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        protocol Functor {
+            fn map(self, f)
+        }
+        impl<I> Functor for I
+        where
+            I: NonExistentProtocol
+        {
+            fn map(self, f) { f(self) }
+        }
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("unknown bound `NonExistentProtocol`")),
+        "expected unknown bound error, got: {errs:?}"
+    );
+}
+
+#[test]
+fn blanket_impl_does_not_require_direct_constraint_check() {
+    // A blanket impl should not require constraint protocols to be
+    // checked against the type parameter (since constraints are deferred
+    // to instantiation sites).
+    common::typecheck_ok(
+        r#"
+        protocol PartialEq {
+            fn eq(self, other)
+        }
+        protocol Eq : PartialEq {}
+        impl<T> Eq for T {
+            fn eq(self, other) { true }
+        }
+        "#,
+    );
+}
+
 // ── List literal type inference ─────────────────────────────────────────
 
 #[test]

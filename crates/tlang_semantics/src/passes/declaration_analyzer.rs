@@ -124,9 +124,25 @@ impl DeclarationAnalyzer {
         // Track this impl for constraint validation (including span for diagnostics)
         ctx.protocol_impls.push((
             protocol_name.clone(),
-            target_type,
+            target_type.clone(),
             impl_block.protocol_name.span,
+            !impl_block.type_params.is_empty(),
         ));
+
+        // Track associated type bindings for validation
+        let binding_names: Vec<String> = impl_block
+            .associated_types
+            .iter()
+            .map(|at| at.name.to_string())
+            .collect();
+        if !binding_names.is_empty() {
+            ctx.impl_associated_type_bindings.push((
+                protocol_name.clone(),
+                target_type.clone(),
+                binding_names,
+                impl_block.protocol_name.span,
+            ));
+        }
 
         for method in &impl_block.methods {
             // Register the protocol-qualified path (e.g., Greet::greet)
@@ -406,6 +422,15 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                 ctx.protocol_constraints.insert(
                     decl.name.to_string(),
                     decl.constraints.iter().map(|c| c.to_string()).collect(),
+                );
+
+                // Register protocol associated types
+                ctx.protocol_associated_types.insert(
+                    decl.name.to_string(),
+                    decl.associated_types
+                        .iter()
+                        .map(|at| at.name.to_string())
+                        .collect(),
                 );
 
                 // Register protocol const members with qualified names

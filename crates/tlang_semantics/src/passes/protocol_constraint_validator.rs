@@ -41,14 +41,19 @@ impl SemanticAnalysisPass for ProtocolConstraintValidator {
         let impl_set: HashSet<(String, String)> = ctx
             .protocol_impls
             .iter()
-            .map(|(p, t, _span)| (p.clone(), t.clone()))
+            .map(|(p, t, _span, _is_blanket)| (p.clone(), t.clone()))
             .collect();
 
         // Collect diagnostics separately to avoid borrowing ctx mutably while reading it
         let mut diagnostics = Vec::new();
 
-        // For each impl block, check that all transitive constraints are satisfied
-        for (protocol_name, target_type, impl_span) in &ctx.protocol_impls {
+        // For each impl block, check that all transitive constraints are satisfied.
+        // Skip blanket impls since constraints are deferred to instantiation sites.
+        for (protocol_name, target_type, impl_span, is_blanket) in &ctx.protocol_impls {
+            if *is_blanket {
+                continue;
+            }
+
             let mut required = HashSet::new();
             Self::collect_transitive_constraints(
                 protocol_name,
@@ -74,6 +79,26 @@ impl SemanticAnalysisPass for ProtocolConstraintValidator {
                     required_protocol,
                     target_type,
                 ));
+            }
+        }
+
+        // Validate associated type bindings: check that no unexpected
+        // associated types are provided (i.e. binding names not declared by the protocol).
+        for (protocol_name, target_type, binding_names, impl_span) in
+            &ctx.impl_associated_type_bindings
+        {
+            if let Some(proto_assoc_types) = ctx.protocol_associated_types.get(protocol_name) {
+                for bound_name in binding_names {
+                    if !proto_assoc_types.iter().any(|n| n == bound_name) {
+                        diagnostics.push(diagnostic::error_at!(
+                            *impl_span,
+                            "unexpected associated type `{}` in impl `{}` for `{}`",
+                            bound_name,
+                            protocol_name,
+                            target_type,
+                        ));
+                    }
+                }
             }
         }
 

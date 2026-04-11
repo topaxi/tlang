@@ -45,6 +45,13 @@ pub struct ProtocolMethodInfo {
     pub has_default_body: bool,
 }
 
+/// Metadata for an associated type declared in a protocol.
+#[derive(Debug, Clone)]
+pub struct AssociatedTypeInfo {
+    pub name: Ident,
+    pub type_param_count: usize,
+}
+
 /// Metadata for a protocol declaration, including required methods and
 /// constraint protocols.
 #[derive(Debug, Clone)]
@@ -52,6 +59,8 @@ pub struct ProtocolInfo {
     pub name: Ident,
     pub methods: Vec<ProtocolMethodInfo>,
     pub constraints: Vec<String>,
+    /// Associated types declared in this protocol.
+    pub associated_types: Vec<AssociatedTypeInfo>,
 }
 
 /// Records that `impl Protocol for Type` has been declared.
@@ -61,6 +70,12 @@ pub struct ImplInfo {
     pub target_type_name: String,
     /// Protocol type-argument keys (e.g. `["i64"]` for `impl Into<i64> for String`).
     pub protocol_type_args: Vec<String>,
+    /// Whether this is a blanket impl (has impl-level type parameters).
+    pub is_blanket: bool,
+    /// Where clause predicates (type name → list of bound protocol names).
+    pub where_predicates: Vec<(String, Vec<String>)>,
+    /// Associated type bindings (name → concrete type as string).
+    pub associated_type_bindings: Vec<(String, String)>,
 }
 
 /// Maps `HirId → TypeInfo` for supplementary type data (function signatures,
@@ -165,5 +180,65 @@ impl TypeTable {
                 && i.target_type_name == target_type_name
                 && i.protocol_type_args.iter().any(|a| a == type_arg)
         })
+    }
+
+    /// Resolve an associated type binding for a given protocol and target type.
+    ///
+    /// Returns the concrete type string if found in a concrete or blanket impl.
+    pub fn resolve_associated_type(
+        &self,
+        protocol_name: &str,
+        target_type_name: &str,
+        assoc_type_name: &str,
+    ) -> Option<String> {
+        // Prefer concrete impls over blanket impls.
+        let concrete = self.impl_info.iter().find(|i| {
+            i.protocol_name == protocol_name
+                && i.target_type_name == target_type_name
+                && !i.is_blanket
+        });
+        if let Some(info) = concrete {
+            return info
+                .associated_type_bindings
+                .iter()
+                .find(|(name, _)| name == assoc_type_name)
+                .map(|(_, ty)| ty.clone());
+        }
+
+        // Fall back to blanket impls that apply to the requested target type.
+        self.find_blanket_impl_for(protocol_name, target_type_name)
+            .and_then(|info| {
+                info.associated_type_bindings
+                    .iter()
+                    .find(|(name, _)| name == assoc_type_name)
+                    .map(|(_, ty)| ty.clone())
+            })
+    }
+
+    /// Find a blanket impl for a protocol that could apply to a given target
+    /// type, checking where clause predicates against registered impls.
+    pub fn find_blanket_impl_for(
+        &self,
+        protocol_name: &str,
+        target_type_name: &str,
+    ) -> Option<&ImplInfo> {
+        self.impl_info.iter().find(|i| {
+            i.protocol_name == protocol_name
+                && i.is_blanket
+                && self.blanket_impl_matches(i, target_type_name)
+        })
+    }
+
+    /// Check whether a blanket impl's where clause predicates are satisfied
+    /// for the given target type.
+    fn blanket_impl_matches(&self, impl_info: &ImplInfo, target_type_name: &str) -> bool {
+        for (_type_param, bounds) in &impl_info.where_predicates {
+            for bound in bounds {
+                if !self.has_impl(bound, target_type_name) {
+                    return false;
+                }
+            }
+        }
+        true
     }
 }

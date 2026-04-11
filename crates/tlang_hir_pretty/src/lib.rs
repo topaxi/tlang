@@ -169,6 +169,7 @@ impl HirPretty {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn print_stmt(&mut self, stmt: &hir::Stmt) {
         self.push_indent();
         self.print_comments(&stmt.leading_comments);
@@ -223,6 +224,22 @@ impl HirPretty {
                 self.push_str(" {");
                 self.push_newline();
                 self.inc_indent();
+                for assoc_ty in &decl.associated_types {
+                    self.push_indent();
+                    self.push_str("type ");
+                    self.push_str(assoc_ty.name.as_str());
+                    if !assoc_ty.type_params.is_empty() {
+                        self.push_char('<');
+                        for (i, tp) in assoc_ty.type_params.iter().enumerate() {
+                            if i > 0 {
+                                self.push_str(", ");
+                            }
+                            self.push_str(tp.name.as_str());
+                        }
+                        self.push_char('>');
+                    }
+                    self.push_newline();
+                }
                 for method in &decl.methods {
                     self.push_indent();
                     self.push_str("fn ");
@@ -247,12 +264,66 @@ impl HirPretty {
             }
             hir::StmtKind::ImplBlock(impl_block) => {
                 self.push_str("impl ");
+                if !impl_block.type_params.is_empty() {
+                    self.push_char('<');
+                    for (i, tp) in impl_block.type_params.iter().enumerate() {
+                        if i > 0 {
+                            self.push_str(", ");
+                        }
+                        self.push_str(tp.name.as_str());
+                    }
+                    self.push_str("> ");
+                }
                 self.push_str(&impl_block.protocol_name.to_string());
+                if !impl_block.type_arguments.is_empty() {
+                    self.push_char('<');
+                    for (i, ty) in impl_block.type_arguments.iter().enumerate() {
+                        if i > 0 {
+                            self.push_str(", ");
+                        }
+                        self.print_ty(ty);
+                    }
+                    self.push_char('>');
+                }
                 self.push_str(" for ");
                 self.push_str(&impl_block.target_type.to_string());
+                if let Some(wc) = &impl_block.where_clause {
+                    self.push_str(" where ");
+                    for (i, pred) in wc.predicates.iter().enumerate() {
+                        if i > 0 {
+                            self.push_str(", ");
+                        }
+                        self.push_str(pred.name.as_str());
+                        self.push_str(": ");
+                        for (j, bound) in pred.bounds.iter().enumerate() {
+                            if j > 0 {
+                                self.push_str(" + ");
+                            }
+                            self.print_ty(bound);
+                        }
+                    }
+                }
                 self.push_str(" {");
                 self.push_newline();
                 self.inc_indent();
+                for assoc_ty in &impl_block.associated_types {
+                    self.push_indent();
+                    self.push_str("type ");
+                    self.push_str(assoc_ty.name.as_str());
+                    if !assoc_ty.type_params.is_empty() {
+                        self.push_char('<');
+                        for (i, tp) in assoc_ty.type_params.iter().enumerate() {
+                            if i > 0 {
+                                self.push_str(", ");
+                            }
+                            self.push_str(tp.name.as_str());
+                        }
+                        self.push_char('>');
+                    }
+                    self.push_str(" = ");
+                    self.print_ty(&assoc_ty.ty);
+                    self.push_newline();
+                }
                 for method in &impl_block.methods {
                     self.push_indent();
                     self.print_function_declaration(method);

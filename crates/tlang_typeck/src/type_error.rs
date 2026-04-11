@@ -88,6 +88,26 @@ pub enum TypeError {
         target_type: String,
         span: Span,
     },
+    /// A required associated type is missing from an impl block.
+    MissingAssociatedType {
+        name: String,
+        protocol: String,
+        target_type: String,
+        span: Span,
+    },
+    /// An associated type binding in an impl block does not correspond to
+    /// any associated type declared in the protocol.
+    UnexpectedAssociatedType {
+        name: String,
+        protocol: String,
+        span: Span,
+    },
+    /// A where clause bound refers to an unknown protocol.
+    UnknownWhereClauseBound {
+        type_param: String,
+        bound: String,
+        span: Span,
+    },
 }
 
 impl TypeError {
@@ -107,11 +127,15 @@ impl TypeError {
             | TypeError::UnknownField { span, .. }
             | TypeError::MissingProtocolMethod { span, .. }
             | TypeError::MissingConstraintImpl { span, .. }
-            | TypeError::ApplyConflict { span, .. } => *span,
+            | TypeError::ApplyConflict { span, .. }
+            | TypeError::MissingAssociatedType { span, .. }
+            | TypeError::UnexpectedAssociatedType { span, .. }
+            | TypeError::UnknownWhereClauseBound { span, .. } => *span,
         }
     }
 
     /// A human-readable message describing the error.
+    #[allow(clippy::too_many_lines)]
     pub fn message(&self) -> String {
         match self {
             TypeError::TypeMismatch {
@@ -199,6 +223,24 @@ impl TypeError {
                 ..
             } => {
                 format!("`apply {method}`: method `{method}` is already defined on `{target_type}`")
+            }
+            TypeError::MissingAssociatedType {
+                name,
+                protocol,
+                target_type,
+                ..
+            } => {
+                format!("missing associated type `{name}` in impl `{protocol}` for `{target_type}`")
+            }
+            TypeError::UnexpectedAssociatedType { name, protocol, .. } => {
+                format!(
+                    "unexpected associated type `{name}`: protocol `{protocol}` does not declare it"
+                )
+            }
+            TypeError::UnknownWhereClauseBound {
+                type_param, bound, ..
+            } => {
+                format!("unknown bound `{bound}` in where clause for type parameter `{type_param}`")
             }
         }
     }

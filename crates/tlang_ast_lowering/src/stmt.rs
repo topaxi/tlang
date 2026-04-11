@@ -469,6 +469,11 @@ impl LoweringContext {
                 .iter()
                 .map(|c| self.lower_path(c))
                 .collect(),
+            associated_types: decl
+                .associated_types
+                .iter()
+                .map(|at| self.lower_associated_type_decl(at))
+                .collect(),
             methods,
             consts: decl
                 .consts
@@ -492,6 +497,11 @@ impl LoweringContext {
         node: &ast::node::Stmt,
         impl_block: &ast::node::ImplBlock,
     ) -> hir::Stmt {
+        // Lower impl-level type parameters. `lower_type_params` pushes a
+        // type param scope automatically; the matching `pop_type_param_scope`
+        // call is at the end of this function (after lowering methods).
+        let type_params = self.lower_type_params(&impl_block.type_params);
+
         let protocol_name = self.lower_path(&impl_block.protocol_name);
         let type_arguments: Vec<hir::Ty> = impl_block
             .type_arguments
@@ -510,6 +520,17 @@ impl LoweringContext {
             })
             .collect();
         let target_type = self.lower_path(&impl_block.target_type);
+
+        let where_clause = impl_block
+            .where_clause
+            .as_ref()
+            .map(|wc| self.lower_where_clause(wc));
+
+        let associated_types: Vec<hir::AssociatedTypeBinding> = impl_block
+            .associated_types
+            .iter()
+            .map(|at| self.lower_associated_type_binding(at))
+            .collect();
 
         // Group methods by name so multi-clause methods get lowered via pattern matching.
         // Use name_or_invalid() for grouping only — any error for invalid names will be
@@ -537,11 +558,16 @@ impl LoweringContext {
             })
             .collect();
 
+        self.pop_type_param_scope();
+
         let hir_impl = hir::ImplBlock {
             hir_id: self.lower_node_id(node.id),
+            type_params,
             protocol_name,
             type_arguments,
             target_type,
+            where_clause,
+            associated_types,
             methods,
             apply_methods: impl_block.apply_methods.clone(),
         };
@@ -552,6 +578,52 @@ impl LoweringContext {
             span: node.span,
             leading_comments: node.leading_comments.clone(),
             trailing_comments: node.trailing_comments.clone(),
+        }
+    }
+
+    fn lower_associated_type_decl(
+        &mut self,
+        at: &ast::node::AssociatedTypeDeclaration,
+    ) -> hir::AssociatedTypeDeclaration {
+        let type_params = self.lower_type_params(&at.type_params);
+        let decl = hir::AssociatedTypeDeclaration {
+            hir_id: self.lower_node_id(at.id),
+            name: at.name,
+            type_params,
+            span: at.span,
+        };
+        self.pop_type_param_scope();
+        decl
+    }
+
+    fn lower_associated_type_binding(
+        &mut self,
+        at: &ast::node::AssociatedTypeBinding,
+    ) -> hir::AssociatedTypeBinding {
+        let type_params = self.lower_type_params(&at.type_params);
+        let binding = hir::AssociatedTypeBinding {
+            hir_id: self.lower_node_id(at.id),
+            name: at.name,
+            type_params,
+            ty: self.lower_ty(Some(&at.ty)),
+            span: at.span,
+        };
+        self.pop_type_param_scope();
+        binding
+    }
+
+    fn lower_where_clause(&mut self, wc: &ast::node::WhereClause) -> hir::WhereClause {
+        hir::WhereClause {
+            predicates: wc
+                .predicates
+                .iter()
+                .map(|pred| hir::WherePredicate {
+                    name: pred.name,
+                    bounds: pred.bounds.iter().map(|b| self.lower_ty(Some(b))).collect(),
+                    span: pred.span,
+                })
+                .collect(),
+            span: wc.span,
         }
     }
 
