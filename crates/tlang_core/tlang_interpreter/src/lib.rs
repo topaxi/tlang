@@ -1258,19 +1258,13 @@ impl Interpreter {
         // For blanket impls with where-clause constraints, register the
         // constraint requirements so the runtime can verify them during
         // dispatch.
-        if is_blanket {
-            if let Some(where_clause) = &impl_block.where_clause {
-                for pred in &where_clause.predicates {
-                    for bound in &pred.bounds {
-                        let bound_protocol_name = bound.kind.to_string();
-                        if let Some(bound_protocol_id) =
-                            state.protocol_id_by_name(&bound_protocol_name)
-                        {
-                            state.register_blanket_impl_constraint(
-                                protocol_id,
-                                bound_protocol_id,
-                            );
-                        }
+        if is_blanket && let Some(where_clause) = &impl_block.where_clause {
+            for pred in &where_clause.predicates {
+                for bound in &pred.bounds {
+                    let bound_protocol_name = bound.kind.to_string();
+                    if let Some(bound_protocol_id) = state.protocol_id_by_name(&bound_protocol_name)
+                    {
+                        state.register_blanket_impl_constraint(protocol_id, bound_protocol_id);
                     }
                 }
             }

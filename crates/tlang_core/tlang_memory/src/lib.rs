@@ -216,6 +216,7 @@ impl NativeProtocolImplDef {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub const fn with_metadata(
         protocol: &'static str,
         type_name: &'static str,

@@ -205,13 +205,12 @@ impl Program {
 
         // Fallback to wildcard/blanket impl — but only if the target type
         // satisfies any where-clause constraints registered for the blanket impl.
-        if let Some(wildcard_val) = self
-            .protocol_impls
-            .get(&(protocol, ShapeKey::Wildcard, method.to_string()))
+        if let Some(wildcard_val) =
+            self.protocol_impls
+                .get(&(protocol, ShapeKey::Wildcard, method.to_string()))
+            && self.blanket_impl_satisfies_constraints(protocol, target_type)
         {
-            if self.blanket_impl_satisfies_constraints(protocol, target_type) {
-                return Some(*wildcard_val);
-            }
+            return Some(*wildcard_val);
         }
 
         None
@@ -266,5 +265,122 @@ impl Program {
 
     pub fn get_protocol_for_method(&self, method_name: &str) -> Option<ProtocolId> {
         self.protocol_method_to_protocol.get(method_name).copied()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shape::{ProtocolId, ShapeKey};
+    use crate::value::TlangValue;
+
+    fn dummy_fn_value() -> TlangValue {
+        // Use a non-nil value to represent a function in tests
+        TlangValue::Bool(true)
+    }
+
+    #[test]
+    fn concrete_impl_takes_priority_over_blanket() {
+        let mut program = Program::new();
+        let proto_id = ProtocolId::Native(0);
+        let constraint_id = ProtocolId::Native(1);
+        let target_key = ShapeKey::from(tlang_span::HirId::new(42));
+
+        program.register_protocol(proto_id, "Functor".into(), vec!["map".into()], vec![]);
+        program.register_protocol(
+            constraint_id,
+            "Iterator".into(),
+            vec!["next".into()],
+            vec![],
+        );
+
+        // Register blanket impl with constraint
+        let blanket_fn = dummy_fn_value();
+        program.register_protocol_impl(proto_id, ShapeKey::Wildcard, "map", blanket_fn);
+        program.register_blanket_impl_constraint(proto_id, constraint_id);
+
+        // Register concrete impl for the target type
+        let concrete_fn = TlangValue::Bool(false); // distinct from blanket_fn
+        program.register_protocol_impl(proto_id, target_key, "map", concrete_fn);
+
+        // Also mark the target as implementing the constraint
+        program.register_protocol_impl(constraint_id, target_key, "next", dummy_fn_value());
+
+        // Concrete impl should take priority
+        let result = program.get_protocol_impl(proto_id, Some(target_key), "map");
+        assert_eq!(result, Some(concrete_fn));
+    }
+
+    #[test]
+    fn blanket_impl_falls_back_when_constraints_satisfied() {
+        let mut program = Program::new();
+        let proto_id = ProtocolId::Native(0);
+        let constraint_id = ProtocolId::Native(1);
+        let target_key = ShapeKey::from(tlang_span::HirId::new(42));
+
+        program.register_protocol(proto_id, "Functor".into(), vec!["map".into()], vec![]);
+        program.register_protocol(
+            constraint_id,
+            "Iterator".into(),
+            vec!["next".into()],
+            vec![],
+        );
+
+        // Register blanket impl with constraint
+        let blanket_fn = dummy_fn_value();
+        program.register_protocol_impl(proto_id, ShapeKey::Wildcard, "map", blanket_fn);
+        program.register_blanket_impl_constraint(proto_id, constraint_id);
+
+        // Register the constraint protocol for the target type
+        program.register_protocol_impl(constraint_id, target_key, "next", dummy_fn_value());
+
+        // No concrete impl for target_key → should fall back to blanket
+        let result = program.get_protocol_impl(proto_id, Some(target_key), "map");
+        assert_eq!(result, Some(blanket_fn));
+    }
+
+    #[test]
+    fn blanket_impl_rejected_when_constraint_not_satisfied() {
+        let mut program = Program::new();
+        let proto_id = ProtocolId::Native(0);
+        let constraint_id = ProtocolId::Native(1);
+        let target_key = ShapeKey::from(tlang_span::HirId::new(42));
+
+        program.register_protocol(proto_id, "Functor".into(), vec!["map".into()], vec![]);
+        program.register_protocol(
+            constraint_id,
+            "Iterator".into(),
+            vec!["next".into()],
+            vec![],
+        );
+
+        // Register blanket impl with constraint
+        let blanket_fn = dummy_fn_value();
+        program.register_protocol_impl(proto_id, ShapeKey::Wildcard, "map", blanket_fn);
+        program.register_blanket_impl_constraint(proto_id, constraint_id);
+
+        // Do NOT register the constraint protocol for the target type
+
+        // Should return None — blanket impl not applicable
+        let result = program.get_protocol_impl(proto_id, Some(target_key), "map");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn blanket_impl_without_constraints_applies_unconditionally() {
+        let mut program = Program::new();
+        let proto_id = ProtocolId::Native(0);
+        let target_key = ShapeKey::from(tlang_span::HirId::new(42));
+
+        program.register_protocol(proto_id, "Display".into(), vec!["to_string".into()], vec![]);
+
+        // Register blanket impl without constraints
+        let blanket_fn = dummy_fn_value();
+        program.register_protocol_impl(proto_id, ShapeKey::Wildcard, "to_string", blanket_fn);
+        // No blanket_impl_constraint registered
+
+        // Should apply unconditionally
+        let result = program.get_protocol_impl(proto_id, Some(target_key), "to_string");
+        assert_eq!(result, Some(blanket_fn));
     }
 }

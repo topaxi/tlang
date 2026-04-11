@@ -458,6 +458,7 @@ impl<'a> InnerCodegen<'a> {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn generate_impl_block(&mut self, impl_block: &hir::ImplBlock) -> Vec<Statement<'a>> {
         let protocol_name = impl_block.protocol_name.to_string();
         let target_type = impl_block.target_type.to_string();
@@ -547,29 +548,26 @@ impl<'a> InnerCodegen<'a> {
         // For blanket impls with where-clause constraints, pass constraint
         // protocol references as additional arguments so the JS runtime can
         // check them during dispatch.
-        if is_blanket {
-            if let Some(where_clause) = &impl_block.where_clause {
-                let constraint_names: Vec<String> = where_clause
-                    .predicates
-                    .iter()
-                    .flat_map(|pred| {
-                        pred.bounds
-                            .iter()
-                            .map(|b| CodegenJS::protocol_js_name(&b.kind.to_string()))
-                    })
-                    .collect();
-                if !constraint_names.is_empty() {
-                    // Build an array of constraint protocol references.
-                    let constraint_elements: Vec<_> = constraint_names
+        if is_blanket && let Some(where_clause) = &impl_block.where_clause {
+            let constraint_names: Vec<String> = where_clause
+                .predicates
+                .iter()
+                .flat_map(|pred| {
+                    pred.bounds
                         .iter()
-                        .map(|name| ArrayExpressionElement::from(self.ident_expr(name)))
-                        .collect();
-                    let constraints_array = self.ast.expression_array(
-                        SPAN,
-                        self.ast.vec_from_iter(constraint_elements),
-                    );
-                    impl_args.push(Argument::from(constraints_array));
-                }
+                        .map(|b| CodegenJS::protocol_js_name(&b.kind.to_string()))
+                })
+                .collect();
+            if !constraint_names.is_empty() {
+                // Build an array of constraint protocol references.
+                let constraint_elements: Vec<_> = constraint_names
+                    .iter()
+                    .map(|name| ArrayExpressionElement::from(self.ident_expr(name)))
+                    .collect();
+                let constraints_array = self
+                    .ast
+                    .expression_array(SPAN, self.ast.vec_from_iter(constraint_elements));
+                impl_args.push(Argument::from(constraints_array));
             }
         }
 

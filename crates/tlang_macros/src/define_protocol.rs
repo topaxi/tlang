@@ -8,6 +8,7 @@ struct ProtocolMethod {
     params: Vec<Ident>,
     arity: u16,
     /// Method-level type parameter names, e.g. `["U"]` for `fn map<U>(this, f)`.
+    #[allow(dead_code)]
     type_params: Vec<Ident>,
     /// Optional default implementation body (raw token stream between braces).
     default_body: Option<proc_macro2::TokenStream>,
@@ -75,7 +76,10 @@ impl Parse for DefineProtocolInput {
                 // Parse optional method-level type parameters: `<U>`
                 let method_type_params = if methods_content.peek(Token![<]) {
                     methods_content.parse::<Token![<]>()?;
-                    let params = syn::punctuated::Punctuated::<Ident, Token![,]>::parse_separated_nonempty(&methods_content)?;
+                    let params =
+                        syn::punctuated::Punctuated::<Ident, Token![,]>::parse_separated_nonempty(
+                            &methods_content,
+                        )?;
                     methods_content.parse::<Token![>]>()?;
                     params.into_iter().collect()
                 } else {
@@ -122,6 +126,7 @@ impl Parse for DefineProtocolInput {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 pub(crate) fn generate_define_protocol(input: TokenStream) -> TokenStream {
     let def = syn::parse_macro_input!(input as DefineProtocolInput);
 

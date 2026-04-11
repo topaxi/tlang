@@ -213,6 +213,80 @@ fn test_implements_operator() {
     assert!(output.contains("$Drawable.$implements(w)"));
 }
 
+// ── Blanket impl blocks ───────────────────────────────────────────────────────
+
+/// A blanket impl (`impl<T> Protocol for T`) should pass `null` as the
+/// Type argument to `$impl`, indicating it's a wildcard/default impl.
+#[test]
+fn test_blanket_impl_passes_null_type() {
+    let output = compile!(indoc! {"
+        protocol Showable {
+            fn show(self)
+        }
+
+        impl<T> Showable for T {
+            fn show(self) { self }
+        }
+    "});
+    assert!(
+        output.contains("$impl($Showable, null,"),
+        "blanket impl should pass null as Type, but got:\n{output}"
+    );
+    assert!(output.contains("show:"));
+}
+
+/// A blanket impl with where clause constraints should pass the constraint
+/// protocol references as an array argument to `$impl`.
+#[test]
+fn test_blanket_impl_with_where_clause_passes_constraints() {
+    let output = compile!(indoc! {"
+        protocol Iterable {
+            fn iter(self)
+        }
+
+        protocol Mappable {
+            fn map(self, f)
+        }
+
+        impl<I> Mappable for I
+        where
+            I: Iterable
+        {
+            fn map(self, f) { f(self) }
+        }
+    "});
+    assert!(
+        output.contains("$impl($Mappable, null,"),
+        "blanket impl should pass null as Type, but got:\n{output}"
+    );
+    // Should include constraints array with $Iterable reference
+    assert!(
+        output.contains("$Iterable"),
+        "blanket impl with where clause should reference $Iterable, but got:\n{output}"
+    );
+}
+
+/// Concrete impls should still generate normal `$impl` calls with the
+/// actual Type constructor (no null).
+#[test]
+fn test_concrete_impl_still_uses_type_constructor() {
+    let output = compile!(indoc! {"
+        protocol Showable {
+            fn show(self)
+        }
+
+        struct Point { x: isize, y: isize }
+
+        impl Showable for Point {
+            fn show(self) { self.x }
+        }
+    "});
+    assert!(
+        output.contains("$impl($Showable, Point,"),
+        "concrete impl should pass actual Type, but got:\n{output}"
+    );
+}
+
 // ── Variable declaration with list destructuring (rest pattern) ────────────────
 
 #[test]
