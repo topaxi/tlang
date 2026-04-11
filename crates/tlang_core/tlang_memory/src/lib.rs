@@ -88,11 +88,34 @@ inventory::collect!(NativeFnDef);
 pub struct NativeProtocolDef {
     name: &'static str,
     methods: &'static [(&'static str, u16)], // (method_name, arity)
+    /// Protocol-level type parameter names, e.g. `["T"]` for `Functor<T>`.
+    type_params: &'static [&'static str],
+    /// Associated type names declared by this protocol, e.g. `["Wrapped"]`.
+    associated_types: &'static [&'static str],
 }
 
 impl NativeProtocolDef {
     pub const fn new(name: &'static str, methods: &'static [(&'static str, u16)]) -> Self {
-        Self { name, methods }
+        Self {
+            name,
+            methods,
+            type_params: &[],
+            associated_types: &[],
+        }
+    }
+
+    pub const fn with_metadata(
+        name: &'static str,
+        methods: &'static [(&'static str, u16)],
+        type_params: &'static [&'static str],
+        associated_types: &'static [&'static str],
+    ) -> Self {
+        Self {
+            name,
+            methods,
+            type_params,
+            associated_types,
+        }
     }
 
     pub const fn name(&self) -> &'static str {
@@ -101,6 +124,14 @@ impl NativeProtocolDef {
 
     pub const fn methods(&self) -> &'static [(&'static str, u16)] {
         self.methods
+    }
+
+    pub const fn type_params(&self) -> &'static [&'static str] {
+        self.type_params
+    }
+
+    pub const fn associated_types(&self) -> &'static [&'static str] {
+        self.associated_types
     }
 }
 
@@ -157,6 +188,12 @@ pub struct NativeProtocolImplDef {
     method: &'static str,
     function: fn(&mut VMState, &[TlangValue]) -> NativeFnReturn,
     priority: u8,
+    /// Impl-level type parameter names (non-empty for blanket impls).
+    impl_type_params: &'static [&'static str],
+    /// Where-clause bounds: `(type_param, bound_protocol)` pairs.
+    where_clause_bounds: &'static [(&'static str, &'static str)],
+    /// Associated type bindings: `(assoc_type_name, concrete_type_name)` pairs.
+    associated_type_bindings: &'static [(&'static str, &'static str)],
 }
 
 impl NativeProtocolImplDef {
@@ -173,6 +210,31 @@ impl NativeProtocolImplDef {
             method,
             function,
             priority,
+            impl_type_params: &[],
+            where_clause_bounds: &[],
+            associated_type_bindings: &[],
+        }
+    }
+
+    pub const fn with_metadata(
+        protocol: &'static str,
+        type_name: &'static str,
+        method: &'static str,
+        function: fn(&mut VMState, &[TlangValue]) -> NativeFnReturn,
+        priority: u8,
+        impl_type_params: &'static [&'static str],
+        where_clause_bounds: &'static [(&'static str, &'static str)],
+        associated_type_bindings: &'static [(&'static str, &'static str)],
+    ) -> Self {
+        Self {
+            protocol,
+            type_name,
+            method,
+            function,
+            priority,
+            impl_type_params,
+            where_clause_bounds,
+            associated_type_bindings,
         }
     }
 
@@ -194,6 +256,23 @@ impl NativeProtocolImplDef {
 
     pub const fn priority(&self) -> u8 {
         self.priority
+    }
+
+    pub const fn impl_type_params(&self) -> &'static [&'static str] {
+        self.impl_type_params
+    }
+
+    pub const fn where_clause_bounds(&self) -> &'static [(&'static str, &'static str)] {
+        self.where_clause_bounds
+    }
+
+    pub const fn associated_type_bindings(&self) -> &'static [(&'static str, &'static str)] {
+        self.associated_type_bindings
+    }
+
+    /// Whether this impl is a blanket impl (has impl-level type parameters).
+    pub const fn is_blanket(&self) -> bool {
+        !self.impl_type_params.is_empty()
     }
 }
 

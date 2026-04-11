@@ -462,19 +462,29 @@ impl<'a> InnerCodegen<'a> {
         let protocol_name = impl_block.protocol_name.to_string();
         let target_type = impl_block.target_type.to_string();
         let js_protocol_name = CodegenJS::protocol_js_name(&protocol_name);
-        // Use the resolved HirId to distinguish user-defined types (which have a
-        // HirId) from builtin/unresolved types (which do not). For builtin
-        // types consult the centralized registry to obtain the correct JS
-        // constructor name — e.g. tlang `List` maps to JavaScript's `Array`.
-        let js_type_constructor = if let Some(hir_id) = impl_block.target_type.res.hir_id() {
-            self.name_map
-                .resolve(hir_id)
-                .map(String::from)
-                .unwrap_or_else(|| target_type.clone())
+        let is_blanket = !impl_block.type_params.is_empty();
+
+        // For blanket impls (e.g. `impl<T> Protocol for T where T: Bound`),
+        // pass `null` as the Type argument so it registers as a default/wildcard
+        // impl in the JS runtime. For concrete impls, resolve the target type
+        // to a JS constructor.
+        let js_type_constructor = if is_blanket {
+            None
         } else {
-            builtins::builtin_type_js_constructor(&target_type)
-                .map(String::from)
-                .unwrap_or_else(|| target_type.clone())
+            // Use the resolved HirId to distinguish user-defined types (which have a
+            // HirId) from builtin/unresolved types (which do not). For builtin
+            // types consult the centralized registry to obtain the correct JS
+            // constructor name — e.g. tlang `List` maps to JavaScript's `Array`.
+            Some(if let Some(hir_id) = impl_block.target_type.res.hir_id() {
+                self.name_map
+                    .resolve(hir_id)
+                    .map(String::from)
+                    .unwrap_or_else(|| target_type.clone())
+            } else {
+                builtins::builtin_type_js_constructor(&target_type)
+                    .map(String::from)
+                    .unwrap_or_else(|| target_type.clone())
+            })
         };
 
         let mut stmts = Vec::new();
@@ -510,9 +520,15 @@ impl<'a> InnerCodegen<'a> {
         let methods_obj = self
             .ast
             .expression_object(SPAN, self.ast.vec_from_iter(props));
+
+        let type_arg: Expression<'a> = match &js_type_constructor {
+            Some(name) => self.ident_expr(name),
+            None => self.ast.expression_null_literal(SPAN),
+        };
+
         let mut impl_args = vec![
             Argument::from(self.ident_expr(&js_protocol_name)),
-            Argument::from(self.ident_expr(&js_type_constructor)),
+            Argument::from(type_arg),
             Argument::from(methods_obj),
         ];
 
@@ -528,11 +544,42 @@ impl<'a> InnerCodegen<'a> {
             impl_args.push(Argument::from(self.str_expr(&type_arg_key)));
         }
 
+        // For blanket impls with where-clause constraints, pass constraint
+        // protocol references as additional arguments so the JS runtime can
+        // check them during dispatch.
+        if is_blanket {
+            if let Some(where_clause) = &impl_block.where_clause {
+                let constraint_names: Vec<String> = where_clause
+                    .predicates
+                    .iter()
+                    .flat_map(|pred| {
+                        pred.bounds
+                            .iter()
+                            .map(|b| CodegenJS::protocol_js_name(&b.kind.to_string()))
+                    })
+                    .collect();
+                if !constraint_names.is_empty() {
+                    // Build an array of constraint protocol references.
+                    let constraint_elements: Vec<_> = constraint_names
+                        .iter()
+                        .map(|name| ArrayExpressionElement::from(self.ident_expr(name)))
+                        .collect();
+                    let constraints_array = self.ast.expression_array(
+                        SPAN,
+                        self.ast.vec_from_iter(constraint_elements),
+                    );
+                    impl_args.push(Argument::from(constraints_array));
+                }
+            }
+        }
+
         let impl_call = self.call_expr(self.ident_expr("$impl"), impl_args);
         stmts.push(self.expr_stmt(impl_call));
 
+        // Apply methods — only for concrete impls, not blanket impls.
         for apply_ident in &impl_block.apply_methods {
             let method_name = apply_ident.as_str();
+            let js_type_name = js_type_constructor.as_deref().unwrap_or(&target_type);
             // Builtin types have no HirId — applying protocol methods to them
             // is not allowed to preserve backwards compatibility.
             assert!(
@@ -540,7 +587,7 @@ impl<'a> InnerCodegen<'a> {
                 "Cannot use 'apply' for built-in type '{target_type}': \
                  applying methods to built-in types is not allowed to preserve backwards compatibility"
             );
-            let proto = format!("{js_type_constructor}.prototype");
+            let proto = format!("{js_type_name}.prototype");
 
             // $installMethod(TargetType.prototype, "methodName", $Protocol.methodName);
             let install_call = self.call_expr(

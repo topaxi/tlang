@@ -35,6 +35,11 @@ pub struct Program {
     /// via `impl Protocol for Type`. Used for O(1) `implements` checks without
     /// iterating over method-level entries.
     pub(crate) protocol_type_impls: HashSet<(ProtocolId, ShapeKey)>,
+    /// Blanket impl constraints: when a blanket impl of protocol A requires
+    /// that the target type also implements protocol B, we store `(A, B)`.
+    /// During dispatch, if no concrete impl exists for the target type, we
+    /// check whether all required constraint protocols are satisfied.
+    pub(crate) blanket_impl_constraints: HashMap<ProtocolId, Vec<ProtocolId>>,
     /// Name-based index for looking up protocol IDs by name at call sites
     pub(crate) protocol_name_to_id: HashMap<String, ProtocolId>,
     /// HirIds of expressions whose values are compile-time constants (e.g. tagged
@@ -60,6 +65,7 @@ impl Program {
             protocol_method_to_protocol: HashMap::new(),
             protocol_impls: HashMap::new(),
             protocol_type_impls: HashSet::new(),
+            blanket_impl_constraints: HashMap::new(),
             protocol_name_to_id: HashMap::new(),
             constant_pool_ids: HashSet::new(),
             constant_pool: HashMap::new(),
@@ -169,6 +175,19 @@ impl Program {
             .insert((protocol, target_type, method.to_string()), fn_value);
     }
 
+    /// Register a blanket impl constraint: protocol `protocol_id` has a blanket
+    /// impl that requires the target type to also implement `constraint_id`.
+    pub fn register_blanket_impl_constraint(
+        &mut self,
+        protocol_id: ProtocolId,
+        constraint_id: ProtocolId,
+    ) {
+        self.blanket_impl_constraints
+            .entry(protocol_id)
+            .or_default()
+            .push(constraint_id);
+    }
+
     pub fn get_protocol_impl(
         &self,
         protocol: ProtocolId,
@@ -183,10 +202,40 @@ impl Program {
         {
             return Some(*val);
         }
-        // Fallback to default/wildcard impl
-        self.protocol_impls
+
+        // Fallback to wildcard/blanket impl — but only if the target type
+        // satisfies any where-clause constraints registered for the blanket impl.
+        if let Some(wildcard_val) = self
+            .protocol_impls
             .get(&(protocol, ShapeKey::Wildcard, method.to_string()))
-            .copied()
+        {
+            if self.blanket_impl_satisfies_constraints(protocol, target_type) {
+                return Some(*wildcard_val);
+            }
+        }
+
+        None
+    }
+
+    /// Check whether the blanket impl constraints for `protocol` are satisfied
+    /// by the given `target_type`. If no constraints are registered, the
+    /// blanket impl applies unconditionally.
+    fn blanket_impl_satisfies_constraints(
+        &self,
+        protocol: ProtocolId,
+        target_type: Option<ShapeKey>,
+    ) -> bool {
+        let Some(constraints) = self.blanket_impl_constraints.get(&protocol) else {
+            // No constraints registered → blanket impl applies unconditionally
+            return true;
+        };
+        let Some(key) = target_type else {
+            // Unknown target type with constraints → can't verify → reject
+            return false;
+        };
+        constraints
+            .iter()
+            .all(|&constraint_id| self.has_protocol_impl_for_type(constraint_id, key))
     }
 
     /// Lookup a concrete (type-specific) protocol impl, without falling back
