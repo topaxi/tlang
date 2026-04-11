@@ -25,6 +25,8 @@ export class $Protocol {
   #def;
   #impls = new Map();
   #constraints;
+  /** @type {{ methods: object, constraints: $Protocol[] } | null} */
+  #blanketImpl = null;
 
   constructor(def, constraints = []) {
     this.#def = def;
@@ -35,14 +37,25 @@ export class $Protocol {
     }
   }
 
-  $setImpl(Type, methods, typeArgs = null) {
+  $setImpl(Type, methods, typeArgs = null, constraints = null) {
+    if (Type === null) {
+      // Blanket impl — store separately with its constraint protocols.
+      this.#blanketImpl = { methods, constraints: constraints ?? [] };
+      return;
+    }
     const key = typeArgs ? `${Type?.name ?? Type}::${typeArgs}` : Type;
     this.#impls.set(key, methods);
   }
 
   $implements(value) {
     const Type = value?.constructor;
-    return this.#impls.has(Type);
+    if (this.#impls.has(Type)) return true;
+    // Check blanket impl: if all constraint protocols are satisfied, this
+    // protocol is considered implemented.
+    if (this.#blanketImpl) {
+      return this.#blanketImpl.constraints.every((c) => c.$implements(value));
+    }
+    return false;
   }
 
   $getConstraints() {
@@ -70,8 +83,22 @@ export class $Protocol {
       }
     }
 
+    // Concrete impl takes priority (specificity: concrete > blanket > default).
     if (!impl) {
-      impl = this.#impls.get(Type) ?? this.#def;
+      impl = this.#impls.get(Type);
+    }
+
+    // Blanket impl fallback: use if all constraint protocols are satisfied.
+    if (!impl && this.#blanketImpl) {
+      const blanket = this.#blanketImpl;
+      if (blanket.constraints.length === 0 || blanket.constraints.every((c) => c.$implements(self))) {
+        impl = blanket.methods;
+      }
+    }
+
+    // Final fallback: default methods from the protocol definition.
+    if (!impl) {
+      impl = this.#def;
     }
 
     const method = impl[methodName] ?? this.#def[methodName];
@@ -85,8 +112,8 @@ export function $protocol(...constraintsAndDef) {
   return new $Protocol(def, constraintsAndDef);
 }
 
-export function $impl(protocol, Type, methods, typeArgs) {
-  protocol.$setImpl(Type, methods, typeArgs);
+export function $impl(protocol, Type, methods, typeArgs, constraints) {
+  protocol.$setImpl(Type, methods, typeArgs, constraints);
 }
 
 export function $installMethod(proto, methodName, dispatch) {

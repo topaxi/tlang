@@ -1218,21 +1218,36 @@ impl Interpreter {
                 ))
             });
 
-        let target_type_shape_key = impl_block
-            .target_type
-            .res
-            .hir_id()
-            .map(ShapeKey::from)
-            .or_else(|| {
-                // Fallback to name-based shape lookup for native types
-                state.lookup_builtin_shape(&impl_block.target_type.to_string())
-            })
-            .unwrap_or_else(|| {
-                state.panic(format!(
-                    "Type `{}` not found for protocol implementation",
-                    impl_block.target_type
-                ))
-            });
+        // Blanket impls are impls whose target type is a type parameter
+        // (e.g. `impl<T> Protocol for T`). These use Wildcard as their target
+        // type key, so they act as fallback impls for any type that doesn't have
+        // a more specific (concrete) impl registered.
+        // Generic impls on a concrete target type (e.g. `impl<T> Into<T> for String`)
+        // are NOT blanket impls — they apply only to the named target type.
+        let target_type_name = impl_block.target_type.to_string();
+        let is_blanket = impl_block
+            .type_params
+            .iter()
+            .any(|tp| tp.name.as_str() == target_type_name);
+        let target_type_shape_key = if is_blanket {
+            ShapeKey::Wildcard
+        } else {
+            impl_block
+                .target_type
+                .res
+                .hir_id()
+                .map(ShapeKey::from)
+                .or_else(|| {
+                    // Fallback to name-based shape lookup for native types
+                    state.lookup_builtin_shape(&impl_block.target_type.to_string())
+                })
+                .unwrap_or_else(|| {
+                    state.panic(format!(
+                        "Type `{}` not found for protocol implementation",
+                        impl_block.target_type
+                    ))
+                })
+        };
 
         // Build a type argument suffix for generic protocol impls (e.g. "<i64>").
         let type_arg_suffix = if impl_block.type_arguments.is_empty() {
@@ -1246,6 +1261,21 @@ impl Interpreter {
                 .join(",");
             format!("<{args}>")
         };
+
+        // For blanket impls with where-clause constraints, register the
+        // constraint requirements so the runtime can verify them during
+        // dispatch.
+        if is_blanket && let Some(where_clause) = &impl_block.where_clause {
+            for pred in &where_clause.predicates {
+                for bound in &pred.bounds {
+                    let bound_protocol_name = bound.kind.to_string();
+                    if let Some(bound_protocol_id) = state.protocol_id_by_name(&bound_protocol_name)
+                    {
+                        state.register_blanket_impl_constraint(protocol_id, bound_protocol_id);
+                    }
+                }
+            }
+        }
 
         for method in &impl_block.methods {
             // Register the function declaration so it can be called

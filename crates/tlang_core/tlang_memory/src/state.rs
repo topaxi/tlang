@@ -607,6 +607,15 @@ impl VMState {
             .has_protocol_impl_for_type(protocol, target_type)
     }
 
+    pub fn register_blanket_impl_constraint(
+        &mut self,
+        protocol_id: ProtocolId,
+        constraint_id: ProtocolId,
+    ) {
+        self.program
+            .register_blanket_impl_constraint(protocol_id, constraint_id);
+    }
+
     pub fn lookup_builtin_shape(&self, name: &str) -> Option<ShapeKey> {
         self.heap.builtin_shapes.lookup(name)
     }

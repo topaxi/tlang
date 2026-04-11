@@ -5,7 +5,8 @@ tlang_macros::define_protocol! {
     Truthy {
         fn truthy(this);
     }
-    Functor {
+    Functor<T> {
+        type Wrapped;
         fn map(this, f);
     }
     Accepts {
@@ -14,7 +15,7 @@ tlang_macros::define_protocol! {
     Iterable {
         fn iter(this);
     }
-    Iterator {
+    Iterator<T> {
         fn next(this);
     }
     Display {
@@ -23,10 +24,10 @@ tlang_macros::define_protocol! {
             vm.new_string(s)
         }
     }
-    Into {
+    Into<T> {
         fn into(this);
     }
-    TryInto {
+    TryInto<T> {
         fn try_into(this);
     }
 }
