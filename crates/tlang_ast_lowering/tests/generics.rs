@@ -132,3 +132,130 @@ fn test_non_generic_fn_type_unchanged() {
     );
     assert_eq!(decl.return_type.kind, TyKind::Primitive(hir::PrimTy::I64));
 }
+
+// ── Associated types and where clauses lowering ─────────────────────────
+
+#[test]
+fn test_protocol_associated_type_lowered() {
+    let module = common::hir_from_str(
+        "protocol Functor {
+            type Wrapped
+            fn map(self, f)
+        }",
+    );
+
+    let stmt = &module.block.stmts[0];
+    let decl = match &stmt.kind {
+        hir::StmtKind::ProtocolDeclaration(decl) => decl,
+        other => panic!("expected ProtocolDeclaration, got {other:?}"),
+    };
+
+    assert_eq!(decl.associated_types.len(), 1);
+    assert_eq!(decl.associated_types[0].name.as_str(), "Wrapped");
+    assert!(decl.associated_types[0].type_params.is_empty());
+    assert_eq!(decl.methods.len(), 1);
+}
+
+#[test]
+fn test_protocol_associated_type_with_type_params_lowered() {
+    let module = common::hir_from_str(
+        "protocol Container {
+            type Item<T>
+            fn get(self)
+        }",
+    );
+
+    let stmt = &module.block.stmts[0];
+    let decl = match &stmt.kind {
+        hir::StmtKind::ProtocolDeclaration(decl) => decl,
+        other => panic!("expected ProtocolDeclaration, got {other:?}"),
+    };
+
+    assert_eq!(decl.associated_types.len(), 1);
+    assert_eq!(decl.associated_types[0].name.as_str(), "Item");
+    assert_eq!(decl.associated_types[0].type_params.len(), 1);
+    assert_eq!(decl.associated_types[0].type_params[0].name.as_str(), "T");
+}
+
+#[test]
+fn test_impl_block_type_params_lowered() {
+    let module = common::hir_from_str(
+        "protocol Functor {
+            fn map(self, f)
+        }
+        impl<T> Functor for T {
+            fn map(self, f) { f(self) }
+        }",
+    );
+
+    let stmt = &module.block.stmts[1];
+    let impl_block = match &stmt.kind {
+        hir::StmtKind::ImplBlock(ib) => ib,
+        other => panic!("expected ImplBlock, got {other:?}"),
+    };
+
+    assert_eq!(impl_block.type_params.len(), 1);
+    assert_eq!(impl_block.type_params[0].name.as_str(), "T");
+}
+
+#[test]
+fn test_impl_block_where_clause_lowered() {
+    let module = common::hir_from_str(
+        "protocol Iterator {
+            fn next(self)
+        }
+        protocol Functor {
+            fn map(self, f)
+        }
+        impl<I> Functor for I
+        where
+            I: Iterator
+        {
+            fn map(self, f) { f(self) }
+        }",
+    );
+
+    let stmt = &module.block.stmts[2];
+    let impl_block = match &stmt.kind {
+        hir::StmtKind::ImplBlock(ib) => ib,
+        other => panic!("expected ImplBlock, got {other:?}"),
+    };
+
+    assert_eq!(impl_block.type_params.len(), 1);
+    let wc = impl_block
+        .where_clause
+        .as_ref()
+        .expect("expected where clause");
+    assert_eq!(wc.predicates.len(), 1);
+    assert_eq!(wc.predicates[0].name.as_str(), "I");
+    assert_eq!(wc.predicates[0].bounds.len(), 1);
+}
+
+#[test]
+fn test_impl_block_associated_type_binding_lowered() {
+    let module = common::hir_from_str(
+        "protocol Functor {
+            type Wrapped
+            fn map(self, f)
+        }
+        impl Functor for List {
+            type Wrapped = List
+            fn map(self, f) { f(self) }
+        }",
+    );
+
+    let stmt = &module.block.stmts[1];
+    let impl_block = match &stmt.kind {
+        hir::StmtKind::ImplBlock(ib) => ib,
+        other => panic!("expected ImplBlock, got {other:?}"),
+    };
+
+    assert_eq!(impl_block.associated_types.len(), 1);
+    assert_eq!(impl_block.associated_types[0].name.as_str(), "Wrapped");
+    // The type should be a Path pointing to "List"
+    assert!(
+        matches!(&impl_block.associated_types[0].ty.kind, TyKind::Path(p) if p.to_string() == "List"),
+        "expected Path(List), got {:?}",
+        impl_block.associated_types[0].ty.kind
+    );
+}

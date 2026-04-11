@@ -126,6 +126,7 @@ impl DeclarationAnalyzer {
             protocol_name.clone(),
             target_type.clone(),
             impl_block.protocol_name.span,
+            !impl_block.type_params.is_empty(),
         ));
 
         // Track associated type bindings for validation

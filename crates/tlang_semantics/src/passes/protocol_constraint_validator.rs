@@ -41,14 +41,19 @@ impl SemanticAnalysisPass for ProtocolConstraintValidator {
         let impl_set: HashSet<(String, String)> = ctx
             .protocol_impls
             .iter()
-            .map(|(p, t, _span)| (p.clone(), t.clone()))
+            .map(|(p, t, _span, _is_blanket)| (p.clone(), t.clone()))
             .collect();
 
         // Collect diagnostics separately to avoid borrowing ctx mutably while reading it
         let mut diagnostics = Vec::new();
 
-        // For each impl block, check that all transitive constraints are satisfied
-        for (protocol_name, target_type, impl_span) in &ctx.protocol_impls {
+        // For each impl block, check that all transitive constraints are satisfied.
+        // Skip blanket impls since constraints are deferred to instantiation sites.
+        for (protocol_name, target_type, impl_span, is_blanket) in &ctx.protocol_impls {
+            if *is_blanket {
+                continue;
+            }
+
             let mut required = HashSet::new();
             Self::collect_transitive_constraints(
                 protocol_name,
