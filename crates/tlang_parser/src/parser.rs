@@ -182,8 +182,22 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::Keyword(expected));
     }
 
+    fn is_contextual_identifier_token(token: TokenKind) -> bool {
+        matches!(
+            token,
+            TokenKind::Identifier
+                | TokenKind::Keyword(Keyword::Type)
+                | TokenKind::Keyword(Keyword::Where)
+        )
+    }
+
     fn parse_identifier(&mut self) -> Ident {
-        expect_token_matches!(self, TokenKind::Identifier);
+        expect_token_matches!(
+            self,
+            TokenKind::Identifier
+                | TokenKind::Keyword(Keyword::Type)
+                | TokenKind::Keyword(Keyword::Where)
+        );
 
         let current_token = self.advance();
         let name = self.lexer.span_text(current_token.span);
@@ -1284,7 +1298,7 @@ impl<'src> Parser<'src> {
         // If immediately closed or the first token is a identifier followed by a colon or comma,
         // we assume we are parsing a dict.
         let is_dict = matches!(self.current_token_kind(), TokenKind::RBrace)
-            || (matches!(self.current_token_kind(), TokenKind::Identifier)
+            || (Self::is_contextual_identifier_token(self.current_token_kind())
                 && matches!(self.peek_token_kind(), TokenKind::Colon | TokenKind::Comma));
         if is_dict {
             let elements = self.parse_dict_elements();
@@ -1631,6 +1645,7 @@ impl<'src> Parser<'src> {
                         | Keyword::_Self
                 )
                 | TokenKind::Identifier
+                | TokenKind::Keyword(Keyword::Type | Keyword::Where)
                 | TokenKind::Literal(_)
                 | TokenKind::TaggedStringStart(_)
         );
@@ -1665,7 +1680,7 @@ impl<'src> Parser<'src> {
             TokenKind::Literal(_) => self.parse_literal_expression(),
             TokenKind::TaggedStringStart(_) => self.parse_tagged_string_expression(),
             TokenKind::Keyword(Keyword::_Self) => self.parse_self_expression(),
-            TokenKind::Identifier => self.parse_identifier_expr(),
+            token if Self::is_contextual_identifier_token(token) => self.parse_identifier_expr(),
             _ => {
                 // `expect_token_matches!` above already pushed an error and advanced
                 // past the unexpected token.  Return a placeholder so the caller
@@ -1816,7 +1831,7 @@ impl<'src> Parser<'src> {
         expect_token_matches!(self, "type annotation", TokenKind::Identifier);
 
         match self.current_token_kind() {
-            TokenKind::Identifier => {
+            token if Self::is_contextual_identifier_token(token) => {
                 let mut span = self.create_span_from_current_token();
                 let identifier = self.parse_path();
                 let parameters = self.parse_type_annotation_parameters();
@@ -1852,7 +1867,7 @@ impl<'src> Parser<'src> {
 
             // Disambiguate `name: Type` vs bare `Type`:
             // peek ahead to see if we have `Ident Colon`.
-            let (name, ty) = if matches!(self.current_token_kind(), TokenKind::Identifier)
+            let (name, ty) = if Self::is_contextual_identifier_token(self.current_token_kind())
                 && self.peek_token_kind() == TokenKind::Colon
             {
                 let name = self.parse_identifier();
@@ -1956,7 +1971,7 @@ impl<'src> Parser<'src> {
     fn parse_function_expression(&mut self) -> Expr {
         let mut span = self.create_span_from_current_token();
         self.consume_keyword_token(Keyword::Fn);
-        let name = if matches!(self.current_token_kind(), TokenKind::Identifier) {
+        let name = if Self::is_contextual_identifier_token(self.current_token_kind()) {
             self.parse_single_identifier()
         } else {
             node::expr!(
@@ -2098,7 +2113,7 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            if matches!(self.current_token_kind(), TokenKind::Identifier) {
+            if Self::is_contextual_identifier_token(self.current_token_kind()) {
                 let node = self.parse_function_name();
 
                 if name.is_some()
@@ -2360,6 +2375,7 @@ impl<'src> Parser<'src> {
             "literal, identifier or list extraction",
             TokenKind::Literal(_)
                 | TokenKind::Identifier
+                | TokenKind::Keyword(Keyword::Type | Keyword::Where)
                 | TokenKind::Keyword(Keyword::Underscore | Keyword::_Self)
                 | TokenKind::LBracket
         );
@@ -2380,7 +2396,7 @@ impl<'src> Parser<'src> {
             }
             // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
             // Simple identifiers will be used as is and mapped to a function parameter.
-            TokenKind::Identifier => match self.peek_token_kind() {
+            token if Self::is_contextual_identifier_token(token) => match self.peek_token_kind() {
                 TokenKind::PathSeparator => self.parse_enum_extraction(),
                 TokenKind::LParen | TokenKind::LBrace => self.parse_enum_extraction(),
                 _ => self.parse_identifier_pattern(),
