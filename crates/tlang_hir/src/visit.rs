@@ -77,6 +77,7 @@ pub fn walk_block<'hir, V: Visitor<'hir>>(
     visitor.leave_scope(block.hir_id, ctx);
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn walk_stmt<'hir, V: Visitor<'hir>>(
     visitor: &mut V,
     stmt: &'hir mut hir::Stmt,

@@ -135,6 +135,7 @@ impl TypeError {
     }
 
     /// A human-readable message describing the error.
+    #[allow(clippy::too_many_lines)]
     pub fn message(&self) -> String {
         match self {
             TypeError::TypeMismatch {

@@ -827,6 +827,7 @@ impl TypeChecker {
     ///
     /// Note: impl registrations are handled by the pre-scan in `check_module`,
     /// so constraint checking is order-independent.
+    #[allow(clippy::too_many_lines)]
     fn check_impl_block(&mut self, impl_block: &mut hir::ImplBlock) {
         let protocol_name = impl_block.protocol_name.join("::");
         let target_type_name = impl_block.target_type.join("::");
