@@ -965,6 +965,11 @@ impl TypeChecker {
                     self.type_table.insert_impl_info(ImplInfo {
                         protocol_name: impl_block.protocol_name.join("::"),
                         target_type_name: impl_block.target_type.join("::"),
+                        protocol_type_args: impl_block
+                            .type_arguments
+                            .iter()
+                            .map(|ty| ty.kind.to_string())
+                            .collect(),
                     });
                 }
                 _ => {}
@@ -1046,6 +1051,90 @@ impl TypeChecker {
                 },
             },
         );
+    }
+
+    // ── Conversion expression typing (`as` / `as?`) ─────────────────
+
+    /// Check an infallible `as` cast.  The result type is the target type
+    /// when the conversion is valid; otherwise an error is emitted.
+    ///
+    /// Rules:
+    /// - `unknown as T` → compile error (`CastOnUnknown`)
+    /// - numeric → numeric (widening, narrowing, int↔float, signed↔unsigned) → allowed
+    /// - anything else → check for `Into<target>` impl, or `NoIntoImpl` error
+    fn check_cast(&mut self, inner: &mut hir::Expr, target_ty: &hir::Ty, expr: &mut hir::Expr) {
+        self.visit_expr(inner, &mut ());
+
+        let source_kind = &inner.ty.kind;
+        let target_kind = &target_ty.kind;
+        let span = expr.span;
+
+        // `unknown as T` is always an error — use `as?` instead.
+        if matches!(source_kind, TyKind::Unknown) {
+            self.errors.push(TypeError::CastOnUnknown { span });
+            self.assign_expr_type(expr, target_kind.clone());
+            return;
+        }
+
+        match (source_kind, target_kind) {
+            // Numeric → Numeric conversions are always allowed via `as`:
+            // widening, narrowing (saturating), int→float, signed→unsigned.
+            (TyKind::Primitive(src), TyKind::Primitive(tgt))
+                if src.is_numeric() && tgt.is_numeric() =>
+            {
+                self.assign_expr_type(expr, target_kind.clone());
+            }
+            // Same type → identity cast, always fine.
+            _ if ty_kinds_compatible(source_kind, target_kind) => {
+                self.assign_expr_type(expr, target_kind.clone());
+            }
+            _ => {
+                // Check whether an `Into<target>` implementation is registered
+                // for the source type.  We require the specific type-argument
+                // match so that e.g. `impl Into<bool> for String` does not
+                // allow `"x" as i64`.
+                let source_name = source_kind.to_string();
+                let target_name = target_kind.to_string();
+                if self
+                    .type_table
+                    .has_impl_with_type_arg("Into", &source_name, &target_name)
+                {
+                    self.assign_expr_type(expr, target_kind.clone());
+                } else {
+                    self.errors.push(TypeError::NoIntoImpl {
+                        from_ty: source_name,
+                        to_ty: target_name,
+                        span,
+                    });
+                    // Still assign the target type so downstream checking continues.
+                    self.assign_expr_type(expr, target_kind.clone());
+                }
+            }
+        }
+    }
+
+    /// Check a fallible `as?` (try-cast).  This is how `unknown` enters
+    /// typed code: `unknown_val as? i64` is valid.
+    ///
+    /// Rules:
+    /// - `unknown as? T` → allowed (runtime check)
+    /// - float → int → allowed via `as?` (fails on NaN/infinity/out-of-range)
+    /// - any numeric → numeric → allowed
+    /// - any type → same type → allowed (identity)
+    ///
+    /// At runtime, `as?` always returns a `Result` (Ok on success, Err on
+    /// failure), so the type-checker assigns `Result` as the expression type.
+    fn check_try_cast(
+        &mut self,
+        inner: &mut hir::Expr,
+        _target_ty: &hir::Ty,
+        expr: &mut hir::Expr,
+    ) {
+        self.visit_expr(inner, &mut ());
+
+        // `as?` always produces a `Result` regardless of the conversion path.
+        let result_ty = Self::builtin_type_path("Result");
+        self.assign_expr_type(expr, result_ty);
     }
 
     fn visit_call_expr(
@@ -1341,6 +1430,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
         match &mut expr.kind {
             hir::ExprKind::Literal(lit) => {
@@ -1408,6 +1498,32 @@ impl<'hir> Visitor<'hir> for TypeChecker {
             hir::ExprKind::Implements(inner_expr, _path) => {
                 let hir_id = expr.hir_id;
                 self.visit_implements_expr(inner_expr, hir_id, &mut expr.ty);
+            }
+            hir::ExprKind::Cast(..) | hir::ExprKind::TryCast(..) => {
+                // Extract the inner data and check the cast; we reassemble
+                // after because `check_cast`/`check_try_cast` need mutable
+                // access to the inner expression and the outer expression.
+                let is_try_cast = matches!(expr.kind, hir::ExprKind::TryCast(..));
+                let (mut inner, target_ty) =
+                    match std::mem::replace(&mut expr.kind, hir::ExprKind::Wildcard) {
+                        hir::ExprKind::Cast(inner, ty) | hir::ExprKind::TryCast(inner, ty) => {
+                            (*inner, *ty)
+                        }
+                        _ => unreachable!(),
+                    };
+
+                if is_try_cast {
+                    self.check_try_cast(&mut inner, &target_ty, expr);
+                } else {
+                    self.check_cast(&mut inner, &target_ty, expr);
+                }
+
+                // Restore the original expression kind.
+                expr.kind = if is_try_cast {
+                    hir::ExprKind::TryCast(Box::new(inner), Box::new(target_ty))
+                } else {
+                    hir::ExprKind::Cast(Box::new(inner), Box::new(target_ty))
+                };
             }
             hir::ExprKind::List(elements) => {
                 for elem in elements.iter_mut() {
@@ -1506,6 +1622,7 @@ mod tests {
             hir_id: dummy_hir_id(),
             visibility: tlang_ast::node::Visibility::Private,
             name: dummy_name,
+            type_params: Vec::new(),
             parameters: params,
             params_span: tlang_span::Span::default(),
             return_type: Ty {

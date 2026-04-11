@@ -24,6 +24,7 @@ Module(
             ),
           ),
         ),
+        type_params: [],
         fields: [
           StructField(
             id: 4,

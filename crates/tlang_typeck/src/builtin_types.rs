@@ -5,10 +5,12 @@ use tlang_span::Span;
 /// Builtin collection type names recognised by the type checker.
 pub const LIST: &str = "List";
 pub const DICT: &str = "Dict";
+pub const RESULT: &str = "Result";
+pub const OPTION: &str = "Option";
 
 /// Returns `true` if `name` is a builtin collection type name.
 pub fn is_builtin_type(name: &str) -> bool {
-    matches!(name, LIST | DICT)
+    matches!(name, LIST | DICT | RESULT | OPTION)
 }
 
 /// Construct the canonical `TyKind` for a builtin collection type name.

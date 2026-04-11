@@ -345,11 +345,8 @@ impl Interpreter {
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(state, *op, lhs, rhs),
             hir::ExprKind::Call(call_expr) => self.eval_call(state, call_expr),
             hir::ExprKind::TailCall(call_expr) => self.eval_tail_call(state, call_expr),
-            hir::ExprKind::Cast(_expr, _ty) => {
-                state.panic("Cast expressions are not yet supported by the interpreter".to_string())
-            }
-            hir::ExprKind::TryCast(_expr, _ty) => state
-                .panic("Try-cast expressions are not yet supported by the interpreter".to_string()),
+            hir::ExprKind::Cast(inner, target_ty) => self.eval_cast(state, inner, target_ty),
+            hir::ExprKind::TryCast(inner, target_ty) => self.eval_try_cast(state, inner, target_ty),
             hir::ExprKind::Unary(op, expr) => self.eval_unary(state, *op, expr),
             hir::ExprKind::IfElse(condition, consequence, else_clauses) => {
                 self.eval_if_else(state, condition, consequence, else_clauses)
@@ -397,6 +394,161 @@ impl Interpreter {
                 "Let expressions are only valid in match guards and if expressions".to_string(),
             ),
             hir::ExprKind::Wildcard => state.panic("Wildcard not allowed here".to_string()),
+        }
+    }
+
+    // ── Cast / TryCast evaluation ───────────────────────────────────
+
+    /// Evaluate `expr as Type` — dispatches through the `Into` protocol
+    /// if an implementation exists for the value's type, otherwise falls
+    /// back to the builtin saturating numeric conversion.
+    fn eval_cast(&self, state: &mut VMState, inner: &hir::Expr, target_ty: &hir::Ty) -> EvalResult {
+        let value = eval_value!(state, self.eval_expr(state, inner));
+
+        // Try protocol-based conversion first.
+        // For generic `Into<T>`, look up `into<target_type>` (type-qualified method).
+        if let Some(into_id) = state.protocol_id_by_name("Into") {
+            let type_shape_key = state.type_shape_key_of(value);
+            let qualified_method = format!("into<{}>", target_ty.kind);
+            if let Some(fn_value) =
+                state.get_protocol_impl(into_id, type_shape_key, &qualified_method)
+            {
+                return EvalResult::Value(self.eval_call_object(state, fn_value, &[value]));
+            }
+            // Also try non-generic fallback (for backwards compatibility with
+            // non-generic Into impls).
+            if let Some(fn_value) = state.get_protocol_impl(into_id, type_shape_key, "into") {
+                return EvalResult::Value(self.eval_call_object(state, fn_value, &[value]));
+            }
+        }
+
+        // Builtin fallback: saturating numeric conversion
+        EvalResult::Value(Self::convert_value(value, &target_ty.kind))
+    }
+
+    /// Evaluate `expr as? Type` — dispatches through the `TryInto` protocol
+    /// if an implementation exists for the value's type, otherwise falls
+    /// back to the builtin fallible numeric conversion.
+    ///
+    /// The `TryInto` protocol signature requires implementations to return
+    /// `Result<T, String>`, so both the protocol dispatch path and the
+    /// builtin fallback consistently return a `Result`.
+    fn eval_try_cast(
+        &self,
+        state: &mut VMState,
+        inner: &hir::Expr,
+        target_ty: &hir::Ty,
+    ) -> EvalResult {
+        let value = eval_value!(state, self.eval_expr(state, inner));
+
+        // Try protocol-based conversion first.
+        // For generic `TryInto<T>`, look up `try_into<target_type>`.
+        if let Some(try_into_id) = state.protocol_id_by_name("TryInto") {
+            let type_shape_key = state.type_shape_key_of(value);
+            let qualified_method = format!("try_into<{}>", target_ty.kind);
+            if let Some(fn_value) =
+                state.get_protocol_impl(try_into_id, type_shape_key, &qualified_method)
+            {
+                return EvalResult::Value(self.eval_call_object(state, fn_value, &[value]));
+            }
+            // Also try non-generic fallback.
+            if let Some(fn_value) = state.get_protocol_impl(try_into_id, type_shape_key, "try_into")
+            {
+                return EvalResult::Value(self.eval_call_object(state, fn_value, &[value]));
+            }
+        }
+
+        // Builtin fallback: fallible numeric conversion
+        match Self::try_convert_value(value, &target_ty.kind) {
+            Ok(converted) => {
+                let result = state.new_enum(state.heap.builtin_shapes.result, 0, vec![converted]);
+                EvalResult::Value(result)
+            }
+            Err(err_msg) => {
+                let err_str = state.new_string(err_msg);
+                let result = state.new_enum(state.heap.builtin_shapes.result, 1, vec![err_str]);
+                EvalResult::Value(result)
+            }
+        }
+    }
+
+    /// Infallible numeric conversion with saturating semantics.
+    fn convert_value(value: TlangValue, target: &hir::TyKind) -> TlangValue {
+        let hir::TyKind::Primitive(prim) = target else {
+            // Non-primitive target: identity (pass-through)
+            return value;
+        };
+
+        let f = value.as_f64();
+
+        match prim {
+            hir::PrimTy::I8 => TlangValue::I8(saturate_to_i64(f, i8::MIN as f64, i8::MAX as f64)),
+            hir::PrimTy::I16 => {
+                TlangValue::I16(saturate_to_i64(f, i16::MIN as f64, i16::MAX as f64))
+            }
+            hir::PrimTy::I32 => {
+                TlangValue::I32(saturate_to_i64(f, i32::MIN as f64, i32::MAX as f64))
+            }
+            hir::PrimTy::I64 | hir::PrimTy::Isize => {
+                TlangValue::I64(saturate_to_i64(f, i64::MIN as f64, i64::MAX as f64))
+            }
+            hir::PrimTy::U8 => TlangValue::U8(saturate_to_u64(f, u8::MAX as f64)),
+            hir::PrimTy::U16 => TlangValue::U16(saturate_to_u64(f, u16::MAX as f64)),
+            hir::PrimTy::U32 => TlangValue::U32(saturate_to_u64(f, u32::MAX as f64)),
+            hir::PrimTy::U64 | hir::PrimTy::Usize => {
+                TlangValue::U64(saturate_to_u64(f, u64::MAX as f64))
+            }
+            hir::PrimTy::F32 => TlangValue::F32(f as f32 as f64),
+            hir::PrimTy::F64 => TlangValue::F64(f),
+            hir::PrimTy::Bool => TlangValue::Bool(value.is_truthy()),
+            _ => value,
+        }
+    }
+
+    /// Fallible conversion — returns Ok(converted) or Err(message).
+    fn try_convert_value(value: TlangValue, target: &hir::TyKind) -> Result<TlangValue, String> {
+        let hir::TyKind::Primitive(prim) = target else {
+            return Err(format!(
+                "cannot try-convert value {value:?} to non-primitive type {target:?}"
+            ));
+        };
+
+        let f = value.as_f64();
+
+        match prim {
+            // Float → Int: fail on NaN, infinity, or out-of-range
+            hir::PrimTy::I8 => try_f64_to_signed(f, i8::MIN as f64, i8::MAX as f64)
+                .map(TlangValue::I8)
+                .ok_or_else(|| format!("cannot convert {f} to i8")),
+            hir::PrimTy::I16 => try_f64_to_signed(f, i16::MIN as f64, i16::MAX as f64)
+                .map(TlangValue::I16)
+                .ok_or_else(|| format!("cannot convert {f} to i16")),
+            hir::PrimTy::I32 => try_f64_to_signed(f, i32::MIN as f64, i32::MAX as f64)
+                .map(TlangValue::I32)
+                .ok_or_else(|| format!("cannot convert {f} to i32")),
+            hir::PrimTy::I64 | hir::PrimTy::Isize => {
+                try_f64_to_signed(f, i64::MIN as f64, i64::MAX as f64)
+                    .map(TlangValue::I64)
+                    .ok_or_else(|| format!("cannot convert {f} to i64"))
+            }
+            hir::PrimTy::U8 => try_f64_to_unsigned(f, u8::MAX as f64)
+                .map(TlangValue::U8)
+                .ok_or_else(|| format!("cannot convert {f} to u8")),
+            hir::PrimTy::U16 => try_f64_to_unsigned(f, u16::MAX as f64)
+                .map(TlangValue::U16)
+                .ok_or_else(|| format!("cannot convert {f} to u16")),
+            hir::PrimTy::U32 => try_f64_to_unsigned(f, u32::MAX as f64)
+                .map(TlangValue::U32)
+                .ok_or_else(|| format!("cannot convert {f} to u32")),
+            hir::PrimTy::U64 | hir::PrimTy::Usize => try_f64_to_unsigned(f, u64::MAX as f64)
+                .map(TlangValue::U64)
+                .ok_or_else(|| format!("cannot convert {f} to u64")),
+            // Truncate to f32 precision, then widen back to f64 for storage
+            // (TlangValue::F32 wraps an f64 internally).
+            hir::PrimTy::F32 => Ok(TlangValue::F32(f as f32 as f64)),
+            hir::PrimTy::F64 => Ok(TlangValue::F64(f)),
+            hir::PrimTy::Bool => Ok(TlangValue::Bool(value.is_truthy())),
+            _ => Ok(value),
         }
     }
 
@@ -1029,6 +1181,7 @@ impl Interpreter {
                     hir_id: method.hir_id,
                     visibility: Visibility::Private,
                     name: name_expr,
+                    type_params: Vec::new(),
                     parameters: method.parameters.clone(),
                     params_span: tlang_span::Span::default(),
                     return_type: method.return_type.clone(),
@@ -1081,6 +1234,19 @@ impl Interpreter {
                 ))
             });
 
+        // Build a type argument suffix for generic protocol impls (e.g. "<i64>").
+        let type_arg_suffix = if impl_block.type_arguments.is_empty() {
+            String::new()
+        } else {
+            let args = impl_block
+                .type_arguments
+                .iter()
+                .map(|ty| format!("{}", ty.kind))
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("<{args}>")
+        };
+
         for method in &impl_block.methods {
             // Register the function declaration so it can be called
             state.set_fn_decl(method.hir_id, Rc::new(method.clone()));
@@ -1091,10 +1257,12 @@ impl Interpreter {
                 hir::ExprKind::FieldAccess(_, ident) => ident.to_string(),
                 _ => unreachable!(),
             };
+            // Encode type arguments in the method name for generic dispatch.
+            let qualified_method = format!("{method_name}{type_arg_suffix}");
             state.register_protocol_impl(
                 protocol_id,
                 target_type_shape_key,
-                &method_name,
+                &qualified_method,
                 fn_value,
             );
         }
@@ -2183,6 +2351,51 @@ impl Interpreter {
             }
         }
     }
+}
+
+// ── Numeric cast helpers ────────────────────────────────────────────
+
+/// Saturating conversion from f64 to i64, clamped to [min, max].
+fn saturate_to_i64(f: f64, min: f64, max: f64) -> i64 {
+    if f.is_nan() {
+        return 0;
+    }
+    if f < min {
+        return min as i64;
+    }
+    if f > max {
+        return max as i64;
+    }
+    f as i64
+}
+
+/// Saturating conversion from f64 to u64, clamped to [0, max].
+fn saturate_to_u64(f: f64, max: f64) -> u64 {
+    if f.is_nan() || f < 0.0 {
+        return 0;
+    }
+    if f > max {
+        return max as u64;
+    }
+    f as u64
+}
+
+/// Fallible f64 → i64 conversion.  Returns `None` for NaN, infinity,
+/// or out-of-range values.
+fn try_f64_to_signed(f: f64, min: f64, max: f64) -> Option<i64> {
+    if f.is_nan() || f.is_infinite() || f < min || f > max {
+        return None;
+    }
+    Some(f as i64)
+}
+
+/// Fallible f64 → u64 conversion.  Returns `None` for NaN, infinity,
+/// or negative / out-of-range values.
+fn try_f64_to_unsigned(f: f64, max: f64) -> Option<u64> {
+    if f.is_nan() || f.is_infinite() || f < 0.0 || f > max {
+        return None;
+    }
+    Some(f as u64)
 }
 
 #[cfg(test)]
@@ -3694,5 +3907,48 @@ mod tests {
             vec!["6", "11", "7"],
             "Expected [6, 11, 7]: {output:?}"
         );
+    }
+
+    // ── Cast / TryCast ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_cast_int_to_float() {
+        let mut t = interpreter("");
+        assert_matches!(t.eval("42 as f64"), TlangValue::F64(f) if (f - 42.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_cast_float_to_int_saturating() {
+        let mut t = interpreter("");
+        // Normal float → i64 (truncation)
+        assert_matches!(t.eval("3.9 as i64"), TlangValue::I64(3));
+    }
+
+    #[test]
+    fn test_cast_identity() {
+        let mut t = interpreter("");
+        assert_matches!(t.eval("42 as i64"), TlangValue::I64(42));
+    }
+
+    #[test]
+    fn test_cast_negative_to_unsigned_saturates_to_zero() {
+        let mut t = interpreter("");
+        assert_matches!(t.eval("-5 as u64"), TlangValue::U64(0));
+    }
+
+    #[test]
+    fn test_try_cast_int_ok() {
+        let mut t = interpreter("");
+        let result = t.eval("42 as? i64");
+        let s = t.state_mut().stringify(result);
+        assert_eq!(s, "Result::Ok(0: 42)");
+    }
+
+    #[test]
+    fn test_try_cast_nan_to_int_err() {
+        let mut t = interpreter("");
+        let result = t.eval("(0.0 / 0.0) as? i64");
+        let s = t.state_mut().stringify(result);
+        assert!(s.starts_with("Result::Err("), "expected Err, got: {s}");
     }
 }

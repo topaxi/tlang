@@ -1,5 +1,5 @@
-pub enum Option {
-  Some(value),
+pub enum Option<T> {
+  Some(T),
   None,
 }
 

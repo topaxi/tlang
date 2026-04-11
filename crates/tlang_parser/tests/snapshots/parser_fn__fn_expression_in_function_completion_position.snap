@@ -59,6 +59,7 @@ Module(
             ),
           ),
         ),
+        type_params: [],
         parameters: [],
         params_span: Span(
           start: 6,
@@ -131,6 +132,7 @@ Module(
                   ),
                 ),
               ),
+              type_params: [],
               parameters: [],
               params_span: Span(
                 start: 17,

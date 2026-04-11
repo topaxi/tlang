@@ -1379,3 +1379,161 @@ fn fn_type_named_params_annotation() {
         "#,
     );
 }
+
+// ── Conversion expressions (`as` / `as?`) ──────────────────────────────
+
+#[test]
+fn cast_int_widening_ok() {
+    common::typecheck_ok("let x: i32 = 1 as i32; let y = x as i64;");
+}
+
+#[test]
+fn cast_int_narrowing_ok() {
+    common::typecheck_ok("let x = 42; let y = x as i32;");
+}
+
+#[test]
+fn cast_int_to_float_ok() {
+    common::typecheck_ok("let x = 42; let y = x as f64;");
+}
+
+#[test]
+fn cast_float_to_float_ok() {
+    common::typecheck_ok("let x = 3.14; let y = x as f32;");
+}
+
+#[test]
+fn cast_signed_to_unsigned_ok() {
+    common::typecheck_ok("let x = 42; let y = x as u64;");
+}
+
+#[test]
+fn cast_unsigned_to_signed_ok() {
+    common::typecheck_ok("let x: u32 = 1 as u32; let y = x as i64;");
+}
+
+#[test]
+fn cast_unknown_error() {
+    let errs = common::typecheck_errors("fn f(x) { let y = x as i64; }");
+    assert_eq!(errs.len(), 1);
+    assert!(
+        errs[0].contains("cannot use `as` cast on `unknown`"),
+        "unexpected: {}",
+        errs[0]
+    );
+}
+
+#[test]
+fn cast_string_to_int_error() {
+    let errs = common::typecheck_errors(r#"let x = "hello"; let y = x as i64;"#);
+    assert_eq!(errs.len(), 1);
+    assert!(
+        errs[0].contains("no `Into<i64>` implementation for `String`"),
+        "unexpected: {}",
+        errs[0]
+    );
+}
+
+#[test]
+fn cast_bool_to_int_error() {
+    let errs = common::typecheck_errors("let x = true; let y = x as i64;");
+    assert_eq!(errs.len(), 1);
+    assert!(
+        errs[0].contains("no `Into<i64>` implementation for `bool`"),
+        "unexpected: {}",
+        errs[0]
+    );
+}
+
+#[test]
+fn cast_identity_ok() {
+    common::typecheck_ok("let x = 42; let y = x as i64;");
+}
+
+#[test]
+fn try_cast_unknown_ok() {
+    // `as?` is how unknown enters typed code.
+    common::typecheck_ok("fn f(x) { let y = x as? i64; }");
+}
+
+#[test]
+fn try_cast_float_to_int_ok() {
+    common::typecheck_ok("let x = 3.14; let y = x as? i64;");
+}
+
+#[test]
+fn try_cast_numeric_ok() {
+    common::typecheck_ok("let x = 42; let y = x as? f64;");
+}
+
+#[test]
+fn try_cast_identity_ok() {
+    common::typecheck_ok("let x = 42; let y = x as? i64;");
+}
+
+#[test]
+fn cast_result_type_propagates_to_binding() {
+    // The result of `as` should be the target type, usable in typed bindings.
+    common::typecheck_ok(
+        r#"
+        let x = 42;
+        let y: i32 = x as i32;
+        "#,
+    );
+}
+
+#[test]
+fn cast_result_type_mismatch_in_binding() {
+    // The result type of `x as i32` is `i32`, not `i64`.
+    let errs = common::typecheck_errors(
+        r#"
+        let x = 42;
+        let y: i64 = x as i32;
+        "#,
+    );
+    assert_eq!(errs.len(), 1);
+    assert!(
+        errs[0].contains("type mismatch in binding"),
+        "unexpected: {}",
+        errs[0]
+    );
+}
+
+#[test]
+fn cast_with_matching_into_impl_ok() {
+    // User-defined `impl Into<Target> for Source` allows `as` cast.
+    common::typecheck_ok(
+        r#"
+        protocol Into<T> { fn into(self) -> T }
+        struct Celsius { degrees: f64 }
+        struct Fahrenheit { degrees: f64 }
+        impl Into<Fahrenheit> for Celsius {
+            fn into(self) { Fahrenheit { degrees: self.degrees * 1.8 + 32.0 } }
+        }
+        let c = Celsius { degrees: 100.0 };
+        let f = c as Fahrenheit;
+        "#,
+    );
+}
+
+#[test]
+fn cast_with_wrong_into_target_error() {
+    // `impl Into<Wrapper> for Wrapper` should NOT allow `x as i64`.
+    let errs = common::typecheck_errors(
+        r#"
+        protocol Into<T> { fn into(self) -> T }
+        struct Wrapper { value: i64 }
+        impl Into<Wrapper> for Wrapper {
+            fn into(self) { Wrapper { value: self.value } }
+        }
+        let x: Wrapper = Wrapper { value: 1 };
+        let y = x as i64;
+        "#,
+    );
+    assert_eq!(errs.len(), 1, "expected exactly 1 error, got: {errs:?}");
+    assert!(
+        errs[0].contains("no `Into<i64>` implementation for `Wrapper`"),
+        "unexpected: {}",
+        errs[0]
+    );
+}

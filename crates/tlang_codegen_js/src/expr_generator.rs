@@ -25,8 +25,10 @@ impl<'a> InnerCodegen<'a> {
                 // Mutual tail call (not self-referencing) → regular call
                 self.generate_call_expression(call_expr)
             }
-            hir::ExprKind::Cast(inner, _) => self.generate_expr(inner),
-            hir::ExprKind::TryCast(..) => self.unsupported_expr("try cast expressions", expr.span),
+            hir::ExprKind::Cast(inner, target_ty) => self.generate_cast_expr(inner, target_ty),
+            hir::ExprKind::TryCast(inner, target_ty) => {
+                self.generate_try_cast_expr(inner, target_ty)
+            }
             hir::ExprKind::FieldAccess(base, field) => {
                 self.generate_field_access_expression(base, field)
             }
@@ -298,6 +300,50 @@ impl<'a> InnerCodegen<'a> {
         let has_impl = self.static_member_expr(protocol_obj, "$implements");
         let value = self.generate_expr(value_expr);
         self.call_expr(has_impl, vec![Argument::from(value)])
+    }
+
+    /// Generate a cast expression (`as`).
+    ///
+    /// Dispatches through the `Into` protocol: `Into::into(value, "targetType")`.
+    /// For builtin numeric types in JavaScript this is effectively
+    /// a no-op since JS has a single number type, but user-defined
+    /// `Into` implementations will be called.
+    fn generate_cast_expr(&mut self, inner: &hir::Expr, target_ty: &hir::Ty) -> Expression<'a> {
+        let value = self.generate_expr(inner);
+        let into_fn = self.static_member_expr(
+            self.ident_expr(&crate::generator::CodegenJS::protocol_js_name("Into")),
+            "into",
+        );
+        let mut args = vec![Argument::from(value)];
+        // Pass the target type as a sentinel-wrapped key for generic protocol dispatch.
+        let type_key = format!("{}", target_ty.kind);
+        let sentinel = self.call_expr(
+            self.ident_expr("$typeArg"),
+            vec![Argument::from(self.str_expr(&type_key))],
+        );
+        args.push(Argument::from(sentinel));
+        self.call_expr(into_fn, args)
+    }
+
+    /// Generate a try-cast expression (`as?`).
+    ///
+    /// Dispatches through the `TryInto` protocol: `TryInto::try_into(value, "targetType")`.
+    /// The `TryInto` implementation is expected to return a `Result`
+    /// (Ok on success, Err on failure).
+    fn generate_try_cast_expr(&mut self, inner: &hir::Expr, target_ty: &hir::Ty) -> Expression<'a> {
+        let value = self.generate_expr(inner);
+        let try_into_fn = self.static_member_expr(
+            self.ident_expr(&crate::generator::CodegenJS::protocol_js_name("TryInto")),
+            "try_into",
+        );
+        let mut args = vec![Argument::from(value)];
+        let type_key = format!("{}", target_ty.kind);
+        let sentinel = self.call_expr(
+            self.ident_expr("$typeArg"),
+            vec![Argument::from(self.str_expr(&type_key))],
+        );
+        args.push(Argument::from(sentinel));
+        self.call_expr(try_into_fn, args)
     }
 
     fn generate_unary_op(&mut self, op: &ast::UnaryOp, expr: &hir::Expr) -> Expression<'a> {

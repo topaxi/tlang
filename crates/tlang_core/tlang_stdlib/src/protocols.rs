@@ -23,6 +23,12 @@ tlang_macros::define_protocol! {
             vm.new_string(s)
         }
     }
+    Into {
+        fn into(this);
+    }
+    TryInto {
+        fn try_into(this);
+    }
 }
 
 /// Global map protocol dispatch function.

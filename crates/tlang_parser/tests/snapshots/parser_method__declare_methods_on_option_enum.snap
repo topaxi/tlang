@@ -24,6 +24,7 @@ Module(
             ),
           ),
         ),
+        type_params: [],
         variants: [
           EnumVariant(
             id: 5,
@@ -244,6 +245,7 @@ Module(
               ),
             ),
           ),
+          type_params: [],
           parameters: [
             FunctionParameter(
               pattern: Pat(
@@ -491,6 +493,7 @@ Module(
               ),
             ),
           ),
+          type_params: [],
           parameters: [
             FunctionParameter(
               pattern: Pat(
@@ -705,6 +708,7 @@ Module(
               ),
             ),
           ),
+          type_params: [],
           parameters: [
             FunctionParameter(
               pattern: Pat(
@@ -908,6 +912,7 @@ Module(
               ),
             ),
           ),
+          type_params: [],
           parameters: [
             FunctionParameter(
               pattern: Pat(
@@ -1174,6 +1179,7 @@ Module(
               ),
             ),
           ),
+          type_params: [],
           parameters: [
             FunctionParameter(
               pattern: Pat(
@@ -1426,6 +1432,7 @@ Module(
               ),
             ),
           ),
+          type_params: [],
           parameters: [
             FunctionParameter(
               pattern: Pat(
@@ -1939,6 +1946,7 @@ Module(
               ),
             ),
           ),
+          type_params: [],
           parameters: [
             FunctionParameter(
               pattern: Pat(

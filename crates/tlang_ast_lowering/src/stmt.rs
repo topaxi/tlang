@@ -266,10 +266,12 @@ impl LoweringContext {
         node: &ast::node::Stmt,
         decl: &ast::node::StructDeclaration,
     ) -> hir::Stmt {
+        let type_params = self.lower_type_params(&decl.type_params);
         let hir_decl = hir::StructDeclaration {
             hir_id: self.lower_node_id(node.id),
             visibility: decl.visibility,
             name: decl.name,
+            type_params,
             fields: decl
                 .fields
                 .iter()
@@ -281,6 +283,7 @@ impl LoweringContext {
                 .map(|c| self.lower_const_item(c))
                 .collect(),
         };
+        self.pop_type_param_scope();
 
         hir::Stmt {
             hir_id: self.lower_node_id(node.id),
@@ -296,10 +299,12 @@ impl LoweringContext {
         node: &ast::node::Stmt,
         decl: &ast::node::EnumDeclaration,
     ) -> hir::Stmt {
+        let type_params = self.lower_type_params(&decl.type_params);
         let decl = hir::EnumDeclaration {
             hir_id: self.lower_node_id(node.id),
             visibility: decl.visibility,
             name: decl.name,
+            type_params,
             variants: decl
                 .variants
                 .iter()
@@ -324,6 +329,7 @@ impl LoweringContext {
                 .map(|c| self.lower_const_item(c))
                 .collect(),
         };
+        self.pop_type_param_scope();
 
         hir::Stmt {
             hir_id: self.lower_node_id(node.id),
@@ -339,6 +345,9 @@ impl LoweringContext {
         node: &ast::node::Stmt,
         decl: &ast::node::ProtocolDeclaration,
     ) -> hir::Stmt {
+        // Push type parameter scope before lowering methods/constraints.
+        let type_params = self.lower_type_params(&decl.type_params);
+
         // Build the method dispatch map for this protocol.  It maps method name →
         // the Ident of the protocol that declares it, covering both this protocol's
         // own methods and all methods from transitively-reachable constraint
@@ -454,6 +463,7 @@ impl LoweringContext {
             hir_id: self.lower_node_id(node.id),
             visibility: decl.visibility,
             name: decl.name,
+            type_params,
             constraints: decl
                 .constraints
                 .iter()
@@ -466,6 +476,7 @@ impl LoweringContext {
                 .map(|c| self.lower_const_item(c))
                 .collect(),
         };
+        self.pop_type_param_scope();
 
         hir::Stmt {
             hir_id: self.lower_node_id(node.id),
@@ -482,6 +493,22 @@ impl LoweringContext {
         impl_block: &ast::node::ImplBlock,
     ) -> hir::Stmt {
         let protocol_name = self.lower_path(&impl_block.protocol_name);
+        let type_arguments: Vec<hir::Ty> = impl_block
+            .type_arguments
+            .iter()
+            .map(|ty| {
+                assert!(
+                    ty.parameters.is_empty(),
+                    "parameterized impl-block protocol type arguments are not yet supported: \
+                     lowering would drop nested type arguments from `{:?}` \
+                     in `impl {} for {}`",
+                    ty.kind,
+                    impl_block.protocol_name,
+                    impl_block.target_type,
+                );
+                self.lower_ty(Some(ty))
+            })
+            .collect();
         let target_type = self.lower_path(&impl_block.target_type);
 
         // Group methods by name so multi-clause methods get lowered via pattern matching.
@@ -513,6 +540,7 @@ impl LoweringContext {
         let hir_impl = hir::ImplBlock {
             hir_id: self.lower_node_id(node.id),
             protocol_name,
+            type_arguments,
             target_type,
             methods,
             apply_methods: impl_block.apply_methods.clone(),

@@ -306,6 +306,7 @@ fn fold_function_declaration<F: Folder>(
         hir_id: decl.hir_id,
         visibility: decl.visibility,
         name: folder.fold_expr(decl.name),
+        type_params: decl.type_params,
         parameters: decl.parameters,
         params_span: decl.params_span,
         return_type: folder.fold_ty(decl.return_type),

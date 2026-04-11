@@ -5,7 +5,8 @@ use tlang_ast::node::{
     FunctionDeclaration, FunctionParameter, FunctionTypeParam, Ident, IfElseExpression, ImplBlock,
     IndexAccessExpression, LetDeclaration, MatchArm, MatchExpression, ModDeclaration, Module,
     OperatorInfo, Pat, Path, ProtocolDeclaration, ProtocolMethodSignature, Stmt, StmtKind,
-    StructDeclaration, StructField, Ty, TyKind, UnaryOp, UseDeclaration, UseItem, Visibility,
+    StructDeclaration, StructField, Ty, TyKind, TypeParam, UnaryOp, UseDeclaration, UseItem,
+    Visibility,
 };
 use tlang_ast::token::{CommentKind, CommentToken, Literal, TaggedStringPart, Token, TokenKind};
 use tlang_lexer::Lexer;
@@ -441,6 +442,7 @@ impl<'src> Parser<'src> {
     fn parse_struct_declaration(&mut self, visibility: Visibility) -> Stmt {
         self.consume_keyword_token(Keyword::Struct);
         let name = self.parse_identifier();
+        let type_params = self.parse_type_params();
         self.consume_token(TokenKind::LBrace);
         let mut fields = Vec::with_capacity(2);
         let mut consts = Vec::new();
@@ -461,6 +463,7 @@ impl<'src> Parser<'src> {
             StructDeclaration(Box::new(StructDeclaration {
                 visibility,
                 name,
+                type_params,
                 fields,
                 consts,
             }))
@@ -482,6 +485,7 @@ impl<'src> Parser<'src> {
         self.consume_keyword_token(Keyword::Enum);
 
         let name = self.parse_identifier();
+        let type_params = self.parse_type_params();
         self.consume_token(TokenKind::LBrace);
         let mut variants = Vec::with_capacity(2);
         let mut consts = Vec::new();
@@ -502,6 +506,7 @@ impl<'src> Parser<'src> {
             EnumDeclaration(Box::new(EnumDeclaration {
                 visibility,
                 name,
+                type_params,
                 variants,
                 consts,
             }))
@@ -600,6 +605,7 @@ impl<'src> Parser<'src> {
     fn parse_protocol_declaration(&mut self, visibility: Visibility) -> Stmt {
         self.consume_keyword_token(Keyword::Protocol);
         let name = self.parse_identifier();
+        let type_params = self.parse_type_params();
 
         // Parse optional constraint list: `: A + B + C`
         let constraints = if matches!(self.current_token_kind(), TokenKind::Colon) {
@@ -630,6 +636,7 @@ impl<'src> Parser<'src> {
             ProtocolDeclaration(Box::new(ProtocolDeclaration {
                 visibility,
                 name,
+                type_params,
                 constraints,
                 methods,
                 consts,
@@ -666,6 +673,7 @@ impl<'src> Parser<'src> {
     fn parse_impl_block(&mut self) -> Stmt {
         self.consume_keyword_token(Keyword::Impl);
         let protocol_name = self.parse_path();
+        let type_arguments = self.parse_type_annotation_parameters();
         self.consume_keyword_token(Keyword::For);
         let target_type = self.parse_path();
         self.consume_token(TokenKind::LBrace);
@@ -720,6 +728,7 @@ impl<'src> Parser<'src> {
             self.unique_id(),
             ImplBlock(Box::new(ImplBlock {
                 protocol_name,
+                type_arguments,
                 target_type,
                 methods,
                 apply_methods,
@@ -1805,6 +1814,37 @@ impl<'src> Parser<'src> {
         parameters
     }
 
+    /// Parse a type parameter list `<T, U, V>` for generic declarations.
+    ///
+    /// Returns an empty vec when no `<` follows the current position.
+    fn parse_type_params(&mut self) -> Vec<TypeParam> {
+        let mut type_params = Vec::new();
+
+        if !matches!(self.current_token_kind(), TokenKind::LessThan) {
+            return type_params;
+        }
+
+        self.advance(); // consume `<`
+
+        while self.not_at_closing(TokenKind::GreaterThan) {
+            let mut span = self.create_span_from_current_token();
+            let name = self.parse_identifier();
+            self.end_span_from_previous_token(&mut span);
+            type_params.push(TypeParam {
+                id: self.unique_id(),
+                name,
+                span,
+            });
+            if matches!(self.current_token_kind(), TokenKind::Comma) {
+                self.advance();
+            }
+        }
+
+        self.consume_token(TokenKind::GreaterThan);
+
+        type_params
+    }
+
     fn parse_return_type(&mut self) -> Option<Ty> {
         if matches!(self.current_token_kind(), TokenKind::Arrow) {
             self.advance();
@@ -1841,6 +1881,7 @@ impl<'src> Parser<'src> {
                 id: self.unique_id(),
                 visibility: Visibility::Private,
                 name,
+                type_params: vec![],
                 parameters,
                 params_span,
                 body,
@@ -1917,6 +1958,7 @@ impl<'src> Parser<'src> {
         let mut name: Option<Expr> = None;
         let mut declarations: Vec<FunctionDeclaration> = Vec::new();
         let mut clause_visibility = visibility;
+        let mut type_params: Vec<TypeParam> = Vec::new();
 
         while matches!(
             self.current_token_kind(),
@@ -1994,6 +2036,11 @@ impl<'src> Parser<'src> {
                 break;
             }
 
+            // Parse type parameters on the first clause only.
+            if declarations.is_empty() {
+                type_params = self.parse_type_params();
+            }
+
             self.expect_token(TokenKind::LParen);
             let (parameters, params_span) = self.parse_parameter_list();
             let guard = self.parse_guard_clause();
@@ -2010,6 +2057,7 @@ impl<'src> Parser<'src> {
                 id: self.unique_id(),
                 visibility: clause_visibility,
                 name: fn_name,
+                type_params: type_params.clone(),
                 parameters,
                 params_span,
                 guard,

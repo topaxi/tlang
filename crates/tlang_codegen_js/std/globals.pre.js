@@ -1,3 +1,16 @@
+export const $typeArgSymbol = Symbol('$typeArg');
+
+/**
+ * Wraps a string type-argument key in an object tagged with a Symbol so that
+ * normal string arguments can never be interpreted as type-args during generic
+ * protocol dispatch.
+ * @param {string} key
+ * @returns {{ [$typeArgSymbol]: true, key: string }}
+ */
+export function $typeArg(key) {
+  return { [$typeArgSymbol]: true, key };
+}
+
 export function panic(msg) {
   throw new Error(msg);
 }
@@ -22,8 +35,9 @@ export class $Protocol {
     }
   }
 
-  $setImpl(Type, methods) {
-    this.#impls.set(Type, methods);
+  $setImpl(Type, methods, typeArgs = null) {
+    const key = typeArgs ? `${Type?.name ?? Type}::${typeArgs}` : Type;
+    this.#impls.set(key, methods);
   }
 
   $implements(value) {
@@ -41,7 +55,25 @@ export class $Protocol {
 
   #call(methodName, self, ...args) {
     const Type = self?.constructor;
-    const impl = this.#impls.get(Type) ?? this.#def;
+
+    // If the last argument is a type-arg sentinel (tagged with $typeArgSymbol
+    // by the compiler for generic protocol dispatch like `Into<i64>`), try a
+    // type-parameterized lookup first.
+    let impl;
+    const lastArg = args[args.length - 1];
+    if (lastArg != null && lastArg[$typeArgSymbol] === true && args.length > 0) {
+      const typeArgKey = `${Type?.name ?? Type}::${lastArg.key}`;
+      impl = this.#impls.get(typeArgKey);
+      if (impl) {
+        // Remove the type-arg sentinel from the argument list before calling the method.
+        args = args.slice(0, -1);
+      }
+    }
+
+    if (!impl) {
+      impl = this.#impls.get(Type) ?? this.#def;
+    }
+
     const method = impl[methodName] ?? this.#def[methodName];
 
     return method.call(impl, self, ...args);
@@ -53,8 +85,8 @@ export function $protocol(...constraintsAndDef) {
   return new $Protocol(def, constraintsAndDef);
 }
 
-export function $impl(protocol, Type, methods) {
-  protocol.$setImpl(Type, methods);
+export function $impl(protocol, Type, methods, typeArgs) {
+  protocol.$setImpl(Type, methods, typeArgs);
 }
 
 export function $installMethod(proto, methodName, dispatch) {

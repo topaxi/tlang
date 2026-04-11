@@ -1,0 +1,19 @@
+// Test generic Into<T> protocol
+struct Celsius { value: int }
+struct Fahrenheit { value: int }
+
+impl Into<Fahrenheit> for Celsius {
+  fn into(c) { Fahrenheit { value: c.value * 9 / 5 + 32 } }
+}
+
+impl Into<Celsius> for Fahrenheit {
+  fn into(f) { Celsius { value: (f.value - 32) * 5 / 9 } }
+}
+
+let boiling = Celsius { value: 100 };
+let f = boiling as Fahrenheit;
+f.value |> log();
+
+let freezing_f = Fahrenheit { value: 32 };
+let c = freezing_f as Celsius;
+c.value |> log();

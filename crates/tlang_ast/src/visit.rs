@@ -695,6 +695,7 @@ mod tests {
                     Span::default(),
                 )]))),
             ),
+            type_params: vec![],
             parameters: vec![node::FunctionParameter {
                 pattern: node::Pat::new(
                     NodeId::new(3),

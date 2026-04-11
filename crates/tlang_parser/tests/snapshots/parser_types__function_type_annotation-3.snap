@@ -94,6 +94,7 @@ Module(
                 ),
               ),
             ),
+            type_params: [],
             parameters: [
               FunctionParameter(
                 pattern: Pat(

@@ -1,0 +1,253 @@
+---
+source: crates/tlang_parser/tests/parser_generics.rs
+expression: "parse!\n(indoc::indoc!\n{\"\n        struct Pair<T, U> {\n            first: T,\n            second: U,\n        }\n    \"})"
+---
+Module(
+  id: 2,
+  statements: [
+    Stmt(
+      id: 9,
+      kind: StructDeclaration(StructDeclaration(
+        visibility: Private,
+        name: Ident(
+          name: "Pair",
+          span: Span(
+            start: 7,
+            end: 11,
+            start_lc: LineColumn(
+              line: 0,
+              column: 7,
+            ),
+            end_lc: LineColumn(
+              line: 0,
+              column: 11,
+            ),
+          ),
+        ),
+        type_params: [
+          TypeParam(
+            id: 3,
+            name: Ident(
+              name: "T",
+              span: Span(
+                start: 12,
+                end: 13,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 12,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 13,
+                ),
+              ),
+            ),
+            span: Span(
+              start: 12,
+              end: 13,
+              start_lc: LineColumn(
+                line: 0,
+                column: 12,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 13,
+              ),
+            ),
+          ),
+          TypeParam(
+            id: 4,
+            name: Ident(
+              name: "U",
+              span: Span(
+                start: 15,
+                end: 16,
+                start_lc: LineColumn(
+                  line: 0,
+                  column: 15,
+                ),
+                end_lc: LineColumn(
+                  line: 0,
+                  column: 16,
+                ),
+              ),
+            ),
+            span: Span(
+              start: 15,
+              end: 16,
+              start_lc: LineColumn(
+                line: 0,
+                column: 15,
+              ),
+              end_lc: LineColumn(
+                line: 0,
+                column: 16,
+              ),
+            ),
+          ),
+        ],
+        fields: [
+          StructField(
+            id: 6,
+            name: Ident(
+              name: "first",
+              span: Span(
+                start: 24,
+                end: 29,
+                start_lc: LineColumn(
+                  line: 1,
+                  column: 5,
+                ),
+                end_lc: LineColumn(
+                  line: 1,
+                  column: 10,
+                ),
+              ),
+            ),
+            ty: Ty(
+              id: 5,
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "T",
+                    span: Span(
+                      start: 31,
+                      end: 32,
+                      start_lc: LineColumn(
+                        line: 1,
+                        column: 12,
+                      ),
+                      end_lc: LineColumn(
+                        line: 1,
+                        column: 13,
+                      ),
+                    ),
+                  ),
+                ],
+                res: Unresolved,
+                span: Span(
+                  start: 31,
+                  end: 32,
+                  start_lc: LineColumn(
+                    line: 1,
+                    column: 12,
+                  ),
+                  end_lc: LineColumn(
+                    line: 1,
+                    column: 13,
+                  ),
+                ),
+              )),
+              parameters: [],
+              span: Span(
+                start: 31,
+                end: 32,
+                start_lc: LineColumn(
+                  line: 1,
+                  column: 12,
+                ),
+                end_lc: LineColumn(
+                  line: 1,
+                  column: 13,
+                ),
+              ),
+            ),
+          ),
+          StructField(
+            id: 8,
+            name: Ident(
+              name: "second",
+              span: Span(
+                start: 38,
+                end: 44,
+                start_lc: LineColumn(
+                  line: 2,
+                  column: 5,
+                ),
+                end_lc: LineColumn(
+                  line: 2,
+                  column: 11,
+                ),
+              ),
+            ),
+            ty: Ty(
+              id: 7,
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "U",
+                    span: Span(
+                      start: 46,
+                      end: 47,
+                      start_lc: LineColumn(
+                        line: 2,
+                        column: 13,
+                      ),
+                      end_lc: LineColumn(
+                        line: 2,
+                        column: 14,
+                      ),
+                    ),
+                  ),
+                ],
+                res: Unresolved,
+                span: Span(
+                  start: 46,
+                  end: 47,
+                  start_lc: LineColumn(
+                    line: 2,
+                    column: 13,
+                  ),
+                  end_lc: LineColumn(
+                    line: 2,
+                    column: 14,
+                  ),
+                ),
+              )),
+              parameters: [],
+              span: Span(
+                start: 46,
+                end: 47,
+                start_lc: LineColumn(
+                  line: 2,
+                  column: 13,
+                ),
+                end_lc: LineColumn(
+                  line: 2,
+                  column: 14,
+                ),
+              ),
+            ),
+          ),
+        ],
+        consts: [],
+      )),
+      span: Span(
+        start: 0,
+        end: 50,
+        start_lc: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end_lc: LineColumn(
+          line: 3,
+          column: 2,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: 0,
+    end: 50,
+    start_lc: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end_lc: LineColumn(
+      line: 3,
+      column: 2,
+    ),
+  ),
+)
