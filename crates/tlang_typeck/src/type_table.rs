@@ -235,7 +235,7 @@ impl TypeTable {
     /// Check whether a blanket impl's where clause predicates are satisfied
     /// for the given target type.
     fn blanket_impl_matches(&self, impl_info: &ImplInfo, target_type_name: &str) -> bool {
-        for (_, bounds) in &impl_info.where_predicates {
+        for (_type_param, bounds) in &impl_info.where_predicates {
             for bound in bounds {
                 if !self.has_impl(bound, target_type_name) {
                     return false;

@@ -497,8 +497,9 @@ impl LoweringContext {
         node: &ast::node::Stmt,
         impl_block: &ast::node::ImplBlock,
     ) -> hir::Stmt {
-        // Lower impl-level type parameters and push a scope so that
-        // type param names are resolvable inside the impl body.
+        // Lower impl-level type parameters. `lower_type_params` pushes a
+        // type param scope automatically; the matching `pop_type_param_scope`
+        // call is at the end of this function (after lowering methods).
         let type_params = self.lower_type_params(&impl_block.type_params);
 
         let protocol_name = self.lower_path(&impl_block.protocol_name);
