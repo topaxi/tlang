@@ -182,6 +182,11 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::Keyword(expected));
     }
 
+    /// Returns `true` for tokens that may legally be parsed as identifiers.
+    ///
+    /// `type` and `where` are contextual keywords for protocol syntax, but they
+    /// remain valid identifiers in ordinary expression, pattern, and binding
+    /// positions to preserve existing programs.
     fn is_contextual_identifier_token(token: TokenKind) -> bool {
         matches!(
             token,
@@ -668,6 +673,8 @@ impl<'src> Parser<'src> {
         )
     }
 
+    /// Parse an associated type declaration inside a protocol body, such as
+    /// `type Wrapped<T, U>`.
     fn parse_associated_type_declaration(&mut self) -> AssociatedTypeDeclaration {
         let mut span = self.create_span_from_current_token();
         self.consume_keyword_token(Keyword::Type);
@@ -711,6 +718,10 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parse an optional impl-level where clause like
+    /// `where T: Bound1 + Bound2, U: Bound3`.
+    ///
+    /// Returns `None` when no `where` keyword is present.
     fn parse_where_clause(&mut self) -> Option<WhereClause> {
         if !matches!(
             self.current_token_kind(),
@@ -735,6 +746,7 @@ impl<'src> Parser<'src> {
         Some(WhereClause { predicates, span })
     }
 
+    /// Parse a single where-clause predicate like `T: Display + Clone`.
     fn parse_where_predicate(&mut self) -> WherePredicate {
         let mut span = self.create_span_from_current_token();
         let name = self.parse_identifier();
@@ -750,6 +762,8 @@ impl<'src> Parser<'src> {
         WherePredicate { name, bounds, span }
     }
 
+    /// Parse an associated type binding inside an impl block, such as
+    /// `type Wrapped<T> = ConcreteType<T>`.
     fn parse_associated_type_binding(&mut self) -> AssociatedTypeBinding {
         let mut span = self.create_span_from_current_token();
         self.consume_keyword_token(Keyword::Type);
