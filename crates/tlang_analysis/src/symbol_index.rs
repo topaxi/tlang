@@ -251,6 +251,7 @@ impl SymbolIndex {
         items
     }
 
+    /// Find a method/function or struct field symbol whose qualified name ends
     /// with `::member_name`.
     ///
     /// This is used as a fallback when the cursor is on a field expression
