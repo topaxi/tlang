@@ -5,13 +5,13 @@ mod common;
 
 #[test]
 fn test_cast_dispatches_through_into_protocol() {
-    // `as` dispatches through the Into protocol: Into::into(value, "target_type")
+    // `as` dispatches through the Into protocol: Into::into(value, $typeArg("target_type"))
     let output = compile!(indoc! {"
         fn convert(x) { x as i64 }
     "});
     let expected_output = indoc! {"
         function convert(x) {
-            return $Into.into(x, \"i64\");
+            return $Into.into(x, $typeArg(\"i64\"));
         }
     "};
     assert_eq!(output, expected_output);
@@ -19,13 +19,13 @@ fn test_cast_dispatches_through_into_protocol() {
 
 #[test]
 fn test_try_cast_dispatches_through_try_into_protocol() {
-    // `as?` dispatches through the TryInto protocol: TryInto::try_into(value, "target_type")
+    // `as?` dispatches through the TryInto protocol: TryInto::try_into(value, $typeArg("target_type"))
     let output = compile!(indoc! {"
         fn try_convert(x) { x as? i64 }
     "});
     let expected_output = indoc! {"
         function try_convert(x) {
-            return $TryInto.try_into(x, \"i64\");
+            return $TryInto.try_into(x, $typeArg(\"i64\"));
         }
     "};
     assert_eq!(output, expected_output);
@@ -41,7 +41,7 @@ fn test_cast_in_let_binding() {
     "});
     let expected_output = indoc! {"
         function f(x) {
-            let y = $Into.into(x, \"i64\");
+            let y = $Into.into(x, $typeArg(\"i64\"));
             return y;
         }
     "};
@@ -58,7 +58,7 @@ fn test_try_cast_in_let_binding() {
     "});
     let expected_output = indoc! {"
         function f(x) {
-            let y = $TryInto.try_into(x, \"i64\");
+            let y = $TryInto.try_into(x, $typeArg(\"i64\"));
             return y;
         }
     "};

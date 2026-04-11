@@ -498,7 +498,7 @@ impl Interpreter {
             hir::PrimTy::U64 | hir::PrimTy::Usize => {
                 TlangValue::U64(saturate_to_u64(f, u64::MAX as f64))
             }
-            hir::PrimTy::F32 => TlangValue::F32(f),
+            hir::PrimTy::F32 => TlangValue::F32(f as f32 as f64),
             hir::PrimTy::F64 => TlangValue::F64(f),
             hir::PrimTy::Bool => TlangValue::Bool(value.is_truthy()),
             _ => value,

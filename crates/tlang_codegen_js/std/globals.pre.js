@@ -1,3 +1,16 @@
+export const $typeArgSymbol = Symbol('$typeArg');
+
+/**
+ * Wraps a string type-argument key in an object tagged with a Symbol so that
+ * normal string arguments can never be interpreted as type-args during generic
+ * protocol dispatch.
+ * @param {string} key
+ * @returns {{ [$typeArgSymbol]: true, key: string }}
+ */
+export function $typeArg(key) {
+  return { [$typeArgSymbol]: true, key };
+}
+
 export function panic(msg) {
   throw new Error(msg);
 }
@@ -43,16 +56,16 @@ export class $Protocol {
   #call(methodName, self, ...args) {
     const Type = self?.constructor;
 
-    // If the last argument is a string type-arg key (passed by the compiler
-    // for generic protocol dispatch like `Into<i64>`), try a type-parameterized
-    // lookup first.
+    // If the last argument is a type-arg sentinel (tagged with $typeArgSymbol
+    // by the compiler for generic protocol dispatch like `Into<i64>`), try a
+    // type-parameterized lookup first.
     let impl;
     const lastArg = args[args.length - 1];
-    if (typeof lastArg === 'string' && args.length > 0) {
-      const typeArgKey = `${Type?.name ?? Type}::${lastArg}`;
+    if (lastArg != null && lastArg[$typeArgSymbol] === true && args.length > 0) {
+      const typeArgKey = `${Type?.name ?? Type}::${lastArg.key}`;
       impl = this.#impls.get(typeArgKey);
       if (impl) {
-        // Remove the type-arg key from the argument list before calling the method.
+        // Remove the type-arg sentinel from the argument list before calling the method.
         args = args.slice(0, -1);
       }
     }

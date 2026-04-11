@@ -315,9 +315,13 @@ impl<'a> InnerCodegen<'a> {
             "into",
         );
         let mut args = vec![Argument::from(value)];
-        // Pass the target type as a string key for generic protocol dispatch.
+        // Pass the target type as a sentinel-wrapped key for generic protocol dispatch.
         let type_key = format!("{}", target_ty.kind);
-        args.push(Argument::from(self.str_expr(&type_key)));
+        let sentinel = self.call_expr(
+            self.ident_expr("$typeArg"),
+            vec![Argument::from(self.str_expr(&type_key))],
+        );
+        args.push(Argument::from(sentinel));
         self.call_expr(into_fn, args)
     }
 
@@ -334,7 +338,11 @@ impl<'a> InnerCodegen<'a> {
         );
         let mut args = vec![Argument::from(value)];
         let type_key = format!("{}", target_ty.kind);
-        args.push(Argument::from(self.str_expr(&type_key)));
+        let sentinel = self.call_expr(
+            self.ident_expr("$typeArg"),
+            vec![Argument::from(self.str_expr(&type_key))],
+        );
+        args.push(Argument::from(sentinel));
         self.call_expr(try_into_fn, args)
     }
 
