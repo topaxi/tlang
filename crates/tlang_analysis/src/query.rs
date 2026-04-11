@@ -97,13 +97,16 @@ pub fn resolve_symbol(
             index.get_closest_by_name(found.scope_id, &qualified, found.span)
         })
         .or_else(|| {
-            // Fallback for hovering on a method or field name in a declaration
+            // Fallback for hovering on a member/field name in a declaration
             // context (e.g. `to_string` in `protocol Display { fn to_string(…) }`
-            // or `x` in `struct Vector { x: i64 }`) — the bare name is not in the
+            // or `x` in `struct Vector { x: i64 }`).  The bare name is not in the
             // symbol table but the qualified name (`Display::to_string`,
-            // `Vector::x`) is.  Only attempt this when there is no field-base,
-            // to avoid double-searching the already-covered field-access path.
-            if found.field_base.is_none() {
+            // `Vector::x`) is.
+            //
+            // Only attempt this when `find_node` explicitly flagged the identifier
+            // as being in a declaration-name context, to avoid mis-resolving
+            // undefined locals to an unrelated `Type::member` in scope.
+            if found.is_declaration_name {
                 index.find_member_by_suffix(found.scope_id, &found.name, found.span)
             } else {
                 None

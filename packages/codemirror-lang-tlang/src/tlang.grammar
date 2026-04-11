@@ -180,8 +180,8 @@ ProtocolMethodSignature {
 
 ImplBlock {
   kw<"impl"> TypeParamList?
-  identifier ("<" commaSep1<TypeAnnotation> ">")?
-  kw<"for"> identifier
+  TypeAnnotation
+  kw<"for"> TypeAnnotation
   WhereClause?
   "{" ImplItem* "}"
 }

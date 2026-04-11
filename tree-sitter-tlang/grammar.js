@@ -204,7 +204,8 @@ module.exports = grammar({
     type_param_list: ($) =>
       seq('<', commaSep1($.type_param), '>'),
 
-    type_param: ($) => field('name', $.type_identifier),
+    type_param: ($) =>
+      field('name', choice($.identifier, $.type_identifier)),
 
     associated_type_declaration: ($) =>
       seq(
@@ -242,10 +243,9 @@ module.exports = grammar({
       seq(
         'impl',
         optional(field('type_params', $.type_param_list)),
-        field('protocol', $.type_identifier),
-        optional(seq('<', commaSep1(field('type_argument', $.type_annotation)), '>')),
+        field('protocol', $.type_annotation),
         'for',
-        field('type', $.type_identifier),
+        field('type', $.type_annotation),
         optional(field('where_clause', $.where_clause)),
         '{',
         repeat($.impl_item),
@@ -257,7 +257,7 @@ module.exports = grammar({
 
     where_predicate: ($) =>
       seq(
-        field('name', $.type_identifier),
+        field('name', choice($.identifier, $.type_identifier)),
         ':',
         field('bound', $.type_annotation),
         repeat(seq('+', field('bound', $.type_annotation))),
