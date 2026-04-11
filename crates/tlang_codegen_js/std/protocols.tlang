@@ -19,7 +19,7 @@ pub protocol Accepts {
 }
 
 pub protocol Iterable<T> {
-  fn iter(self)
+  fn iter(self) -> Iterator<T>
 }
 
 pub protocol Iterator<T> {
