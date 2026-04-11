@@ -9,6 +9,7 @@ import {
   tlangLanguageSupport,
   type HoverProvider,
   type GotoDefinitionProvider,
+  type SignatureHelpProvider,
 } from 'codemirror-lang-tlang';
 import { inlayHints, type InlayHintSource } from 'codemirror-inlay-hints';
 import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
@@ -90,6 +91,9 @@ export class TCodeMirror extends LitElement {
   gotoDefinitionProvider?: GotoDefinitionProvider;
 
   @property({ attribute: false })
+  signatureHelpProvider?: SignatureHelpProvider;
+
+  @property({ attribute: false })
   inlayHintSource?: InlayHintSource;
 
   @hostListener('keyup')
@@ -117,6 +121,7 @@ export class TCodeMirror extends LitElement {
       markdownLanguage,
       hoverProvider: this.hoverProvider,
       gotoDefinitionProvider: this.gotoDefinitionProvider,
+      signatureHelpProvider: this.signatureHelpProvider,
     });
   }
 
@@ -214,7 +219,8 @@ export class TCodeMirror extends LitElement {
       if (
         this.language === 'tlang' &&
         (changedProperties.has('hoverProvider') ||
-          changedProperties.has('gotoDefinitionProvider'))
+          changedProperties.has('gotoDefinitionProvider') ||
+          changedProperties.has('signatureHelpProvider'))
       ) {
         this.view.dispatch({
           effects: this.tlangLangCompartment.reconfigure(

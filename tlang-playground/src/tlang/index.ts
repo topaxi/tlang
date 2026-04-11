@@ -7,6 +7,7 @@ export {
   Tlang,
   type CodemirrorDiagnostic,
   type CodemirrorCompletion,
+  type CodemirrorSignatureHelp,
   type Runner,
   type JsHirPrettyOptions,
   type JsOptimizationOptions,

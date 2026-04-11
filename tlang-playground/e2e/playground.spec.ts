@@ -9,6 +9,49 @@ async function openOptimizationSettings(page: Page) {
   await page.getByLabel('Optimization Settings').click();
 }
 
+async function updateEditorState(
+  page: Page,
+  state: { source?: string; selection?: number },
+) {
+  await page.evaluate(({ source, selection }) => {
+    const playground = document.querySelector('tlang-playground');
+    if (!playground?.shadowRoot) throw new Error('no playground shadowRoot');
+
+    const codemirror = playground.shadowRoot.querySelector('t-codemirror');
+    if (!codemirror?.shadowRoot) throw new Error('no codemirror shadowRoot');
+
+    const cmEditor = codemirror.shadowRoot.querySelector('.cm-editor');
+    if (!cmEditor) throw new Error('no .cm-editor element');
+
+    const content = cmEditor.querySelector('.cm-content');
+    if (!content) throw new Error('no .cm-content element');
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const view = (content as any).cmTile?.root?.view;
+    if (!view) throw new Error('no EditorView');
+
+    const transaction: {
+      changes?: { from: number; to: number; insert: string };
+      selection?: { anchor: number };
+    } = {};
+
+    if (source !== undefined) {
+      transaction.changes = {
+        from: 0,
+        to: view.state.doc.length,
+        insert: source,
+      };
+    }
+
+    if (selection !== undefined) {
+      transaction.selection = { anchor: selection };
+    }
+
+    view.focus();
+    view.dispatch(transaction);
+  }, state);
+}
+
 function optimizationRadio(page: Page, label: 'Minimal' | 'Full') {
   return page.locator('t-menuitem-radio').filter({ hasText: label });
 }
@@ -639,5 +682,34 @@ test.describe('Hover tooltip', () => {
     // Move away from the editor content entirely
     await page.mouse.move(0, 0);
     await expect(tooltip).not.toBeVisible({ timeout: 5000 });
+  });
+});
+
+test.describe('Signature help', () => {
+  test('shows function signature help and updates the active parameter', async ({
+    page,
+  }) => {
+    await gotoPlayground(page);
+
+    const source = 'fn add(a, b) { a + b }\nadd(1, 2);';
+    const firstArg = source.indexOf('1');
+    const secondArg = source.indexOf('2');
+
+    await updateEditorState(page, { source, selection: firstArg });
+
+    const tooltip = page.locator('.cm-tooltip-tlang-signature-help');
+    await expect(tooltip).toBeVisible({ timeout: 5000 });
+    await expect(
+      tooltip.locator('.cm-tlang-signature-help-label'),
+    ).toContainText('add(a: unknown, b: unknown) -> unknown');
+    await expect(
+      tooltip.locator('.cm-tlang-signature-help-param-active'),
+    ).toHaveText('a: unknown');
+
+    await updateEditorState(page, { selection: secondArg });
+
+    await expect(
+      tooltip.locator('.cm-tlang-signature-help-param-active'),
+    ).toHaveText('b: unknown');
   });
 });

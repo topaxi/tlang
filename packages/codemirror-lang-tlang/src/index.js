@@ -9,7 +9,7 @@ import {
 import { styleTags, tags as t } from '@lezer/highlight';
 import { parseMixed } from '@lezer/common';
 import { completeFromList } from '@codemirror/autocomplete';
-import { hoverTooltip, EditorView } from '@codemirror/view';
+import { hoverTooltip, EditorView, ViewPlugin } from '@codemirror/view';
 
 let parserWithMetadata = parser.configure({
   props: [
@@ -156,6 +156,23 @@ export const tlangCompletion = tlangLanguage.data.of({
  *
  * @typedef {(pos: number) => HoverInfo | null} HoverProvider
  * @typedef {(pos: number) => DefinitionLocation | null} GotoDefinitionProvider
+ *
+ * @typedef {{
+ *   label: string,
+ * }} SignatureParameterInformation
+ *
+ * @typedef {{
+ *   label: string,
+ *   parameters: SignatureParameterInformation[],
+ * }} SignatureInformation
+ *
+ * @typedef {{
+ *   signatures: SignatureInformation[],
+ *   activeSignature: number,
+ *   activeParameter: number,
+ * }} SignatureHelp
+ *
+ * @typedef {(pos: number) => SignatureHelp | null | Promise<SignatureHelp | null>} SignatureHelpProvider
  */
 
 /**
@@ -169,6 +186,7 @@ export const tlangCompletion = tlangLanguage.data.of({
  *   markdownLanguage?: import('@codemirror/language').Language,
  *   hoverProvider?: HoverProvider,
  *   gotoDefinitionProvider?: GotoDefinitionProvider,
+ *   signatureHelpProvider?: SignatureHelpProvider,
  * }} [options]
  */
 export function tlangLanguageSupport(options = {}) {
@@ -184,6 +202,10 @@ export function tlangLanguageSupport(options = {}) {
 
   if (options.gotoDefinitionProvider) {
     extensions.push(tlangGotoDefinition(options.gotoDefinitionProvider));
+  }
+
+  if (options.signatureHelpProvider) {
+    extensions.push(tlangSignatureHelp(options.signatureHelpProvider));
   }
 
   return new LanguageSupport(lang, extensions);
@@ -236,6 +258,251 @@ function tlangGotoDefinition(provider) {
       return true;
     },
   });
+}
+
+const signatureHelpTheme = EditorView.baseTheme({
+  '.cm-editor': {
+    position: 'relative',
+  },
+  '.cm-tooltip.cm-tooltip-tlang-signature-help': {
+    maxWidth: 'min(36rem, calc(100vw - 2rem))',
+  },
+  '.cm-tlang-signature-help': {
+    fontFamily: 'var(--t-font-family-mono, monospace)',
+    fontSize: '0.85em',
+    padding: '4px 8px',
+  },
+  '.cm-tlang-signature-help-overload': {
+    opacity: '0.7',
+    marginBottom: '2px',
+    fontSize: '0.9em',
+  },
+  '.cm-tlang-signature-help-param-active': {
+    fontWeight: '700',
+    textDecoration: 'underline',
+  },
+});
+
+/**
+ * Create a CodeMirror signature-help tooltip extension using the given provider.
+ *
+ * @param {SignatureHelpProvider} provider
+ */
+export function tlangSignatureHelp(provider) {
+  return [
+    signatureHelpTheme,
+    ViewPlugin.fromClass(
+      class {
+        /** @type {ReturnType<typeof setTimeout> | null} */
+        timeout = null;
+        version = 0;
+
+        /**
+         * @param {EditorView} view
+         */
+        constructor(view) {
+          this.view = view;
+          this.dom = document.createElement('div');
+          this.dom.className = 'cm-tooltip cm-tooltip-tlang-signature-help';
+          this.dom.style.position = 'absolute';
+          this.dom.style.display = 'none';
+          this.dom.setAttribute('role', 'tooltip');
+          this.view.dom.append(this.dom);
+
+          this.handleGeometryChange = () => this.schedule();
+          this.view.scrollDOM.addEventListener(
+            'scroll',
+            this.handleGeometryChange,
+            {
+              passive: true,
+            },
+          );
+          window.addEventListener('resize', this.handleGeometryChange);
+
+          this.schedule();
+        }
+
+        /**
+         * @param {import('@codemirror/view').ViewUpdate} update
+         */
+        update(update) {
+          if (
+            update.docChanged ||
+            update.selectionSet ||
+            update.focusChanged ||
+            update.geometryChanged ||
+            update.viewportChanged
+          ) {
+            this.schedule();
+          }
+        }
+
+        destroy() {
+          if (this.timeout !== null) clearTimeout(this.timeout);
+          this.version++;
+          this.view.scrollDOM.removeEventListener(
+            'scroll',
+            this.handleGeometryChange,
+          );
+          window.removeEventListener('resize', this.handleGeometryChange);
+          this.dom.remove();
+        }
+
+        schedule() {
+          if (this.timeout !== null) clearTimeout(this.timeout);
+          this.timeout = setTimeout(() => {
+            this.timeout = null;
+            void this.run();
+          }, 75);
+        }
+
+        async run() {
+          const version = ++this.version;
+          const selection = this.view.state.selection.main;
+
+          if (!this.view.hasFocus || !selection.empty) {
+            this.clear();
+            return;
+          }
+
+          const pos = selection.head;
+          const help = await Promise.resolve(provider(pos));
+
+          if (version !== this.version) return;
+
+          if (!help || help.signatures.length === 0) {
+            this.clear();
+            return;
+          }
+
+          const activeSignature = clampIndex(
+            help.activeSignature,
+            help.signatures.length,
+          );
+          const signature = help.signatures[activeSignature];
+          const activeParameter = clampIndex(
+            help.activeParameter,
+            signature.parameters.length,
+          );
+
+          this.dom.replaceChildren(
+            renderSignatureHelpDom(
+              help.signatures,
+              activeSignature,
+              activeParameter,
+            ),
+          );
+          this.positionTooltip(pos);
+        }
+
+        clear() {
+          this.dom.style.display = 'none';
+        }
+
+        positionTooltip(pos) {
+          const coords = this.view.coordsAtPos(pos);
+          if (!coords) {
+            this.clear();
+            return;
+          }
+
+          const editorRect = this.view.dom.getBoundingClientRect();
+          this.dom.style.display = 'block';
+          this.dom.style.visibility = 'hidden';
+
+          const maxLeft = Math.max(
+            0,
+            this.view.dom.clientWidth - this.dom.offsetWidth - 8,
+          );
+          const left = Math.max(
+            0,
+            Math.min(coords.left - editorRect.left, maxLeft),
+          );
+
+          let top = coords.top - editorRect.top - this.dom.offsetHeight - 8;
+          if (top < 0) {
+            top = coords.bottom - editorRect.top + 8;
+          }
+
+          this.dom.style.left = `${left}px`;
+          this.dom.style.top = `${top}px`;
+          this.dom.style.visibility = 'visible';
+        }
+      },
+    ),
+  ];
+}
+
+/**
+ * @param {number} index
+ * @param {number} length
+ */
+function clampIndex(index, length) {
+  if (length === 0) return 0;
+  return Math.max(0, Math.min(index, length - 1));
+}
+
+/**
+ * @param {SignatureInformation[]} signatures
+ * @param {number} activeSignature
+ * @param {number} activeParameter
+ */
+function renderSignatureHelpDom(signatures, activeSignature, activeParameter) {
+  const container = document.createElement('div');
+  container.className = 'cm-tlang-signature-help';
+
+  if (signatures.length > 1) {
+    const overload = document.createElement('div');
+    overload.className = 'cm-tlang-signature-help-overload';
+    overload.textContent = `${activeSignature + 1} of ${signatures.length}`;
+    container.append(overload);
+  }
+
+  const label = document.createElement('div');
+  label.className = 'cm-tlang-signature-help-label';
+  appendSignatureLabel(label, signatures[activeSignature], activeParameter);
+  container.append(label);
+
+  return container;
+}
+
+/**
+ * @param {HTMLElement} target
+ * @param {SignatureInformation} signature
+ * @param {number} activeParameter
+ */
+function appendSignatureLabel(target, signature, activeParameter) {
+  if (signature.parameters.length === 0) {
+    target.textContent = signature.label;
+    return;
+  }
+
+  let searchFrom = 0;
+
+  for (const [index, parameter] of signature.parameters.entries()) {
+    const paramIndex = signature.label.indexOf(parameter.label, searchFrom);
+
+    if (paramIndex === -1) {
+      target.textContent = signature.label;
+      return;
+    }
+
+    target.append(
+      document.createTextNode(signature.label.slice(searchFrom, paramIndex)),
+    );
+
+    const span = document.createElement('span');
+    span.textContent = parameter.label;
+
+    if (index === activeParameter) {
+      span.className = 'cm-tlang-signature-help-param-active';
+    }
+
+    target.append(span);
+    searchFrom = paramIndex + parameter.label.length;
+  }
+
+  target.append(document.createTextNode(signature.label.slice(searchFrom)));
 }
 
 /**

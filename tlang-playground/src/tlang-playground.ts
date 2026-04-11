@@ -382,6 +382,9 @@ export class TlangPlayground extends LitElement {
   private readonly gotoDefinitionProvider = (pos: number) =>
     this.tlang.getDefinitionLocation(pos);
 
+  private readonly signatureHelpProvider = (pos: number) =>
+    this.tlang.getSignatureHelp(pos);
+
   // The inlay hint source ignores the `code` argument because the playground
   // already keeps `TlangController` in sync with the editor on every change.
   private readonly inlayHintSource = (_code: string) =>
@@ -752,6 +755,7 @@ export class TlangPlayground extends LitElement {
                 with-diagnostics
                 .hoverProvider=${this.hoverProvider}
                 .gotoDefinitionProvider=${this.gotoDefinitionProvider}
+                .signatureHelpProvider=${this.signatureHelpProvider}
                 .inlayHintSource=${this.hasInlayHints
                   ? this.inlayHintSource
                   : undefined}

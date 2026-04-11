@@ -1,6 +1,7 @@
 import {
   CodemirrorDiagnostic,
   type CodemirrorCompletion,
+  type CodemirrorSignatureHelp,
   getStandardLibraryCompiled,
   Tlang,
   type JsHirPrettyOptions,
@@ -299,5 +300,9 @@ export class TlangController {
 
   getInlayHints(): { position: number; label: string; kind: string }[] {
     return this.tlang.getInlayHints();
+  }
+
+  getSignatureHelp(pos: number): CodemirrorSignatureHelp | null {
+    return this.tlang.getSignatureHelp(pos) ?? null;
   }
 }
