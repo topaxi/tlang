@@ -24,6 +24,7 @@
 pub mod find_node;
 pub mod inlay_hints;
 pub mod query;
+pub mod signature_help;
 pub mod symbol_index;
 
 use tlang_ast::node::Module;

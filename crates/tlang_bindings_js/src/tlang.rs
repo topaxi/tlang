@@ -23,7 +23,10 @@ use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
 use crate::codemirror;
-use crate::codemirror::{CodemirrorDefinitionLocation, CodemirrorHoverInfo};
+use crate::codemirror::{
+    CodemirrorDefinitionLocation, CodemirrorHoverInfo, CodemirrorParameterInformation,
+    CodemirrorSignatureHelp, CodemirrorSignatureInformation,
+};
 use crate::ts_types::{JsDiagnostic, JsParseIssue};
 
 #[wasm_bindgen]
@@ -336,6 +339,51 @@ impl Tlang {
             }
             _ => Ok(JsValue::NULL),
         }
+    }
+
+    /// Get signature help for the call at the given UTF-16 position.
+    #[wasm_bindgen(js_name = "getSignatureHelp")]
+    pub fn get_signature_help(&mut self, pos: u32) -> Result<JsValue, serde_wasm_bindgen::Error> {
+        let target = match self.runner {
+            RunnerKind::JavaScript => tlang_analysis::CompilationTarget::Js,
+            RunnerKind::Interpreter => tlang_analysis::CompilationTarget::Interpreter,
+        };
+
+        let result = tlang_analysis::analyze_for_target(&self.source, target);
+        let Some(typed_hir) = tlang_analysis::inlay_hints::lower_and_typecheck(&result) else {
+            return Ok(JsValue::NULL);
+        };
+
+        let byte_pos = codemirror::utf16_to_byte_offset(&self.source, pos);
+        let (line, column) = codemirror::byte_offset_to_line_column(&self.source, byte_pos);
+
+        let Some(help) = tlang_analysis::signature_help::signature_help_at(
+            &self.source,
+            &typed_hir,
+            line,
+            column,
+        ) else {
+            return Ok(JsValue::NULL);
+        };
+
+        let help = CodemirrorSignatureHelp {
+            signatures: help
+                .signatures
+                .into_iter()
+                .map(|signature| CodemirrorSignatureInformation {
+                    label: signature.label,
+                    parameters: signature
+                        .parameters
+                        .into_iter()
+                        .map(|param| CodemirrorParameterInformation { label: param.label })
+                        .collect(),
+                })
+                .collect(),
+            active_signature: help.active_signature,
+            active_parameter: help.active_parameter,
+        };
+
+        serde_wasm_bindgen::to_value(&help)
     }
 
     #[allow(clippy::too_many_lines)]

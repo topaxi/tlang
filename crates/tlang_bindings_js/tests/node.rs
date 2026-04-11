@@ -1,4 +1,5 @@
 use js_sys::Function;
+use serde::Deserialize;
 use std::sync::Once;
 use tlang_bindings_js::tlang::{Runner, Tlang};
 use wasm_bindgen::JsCast;
@@ -413,6 +414,33 @@ fn get_hir_string_nonempty() -> Result<(), JsError> {
 fn get_ast_string_nonempty() -> Result<(), JsError> {
     let mut tlang = Tlang::new("fn foo() { 1 + 2 }".to_string(), Runner::Interpreter);
     assert!(!tlang.ast_string().is_empty());
+    Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TestSignatureHelp {
+    signatures: Vec<TestSignatureInformation>,
+    active_signature: u32,
+    active_parameter: u32,
+}
+
+#[derive(Deserialize)]
+struct TestSignatureInformation {
+    label: String,
+}
+
+#[wasm_bindgen_test]
+fn get_signature_help_returns_function_signature() -> Result<(), JsError> {
+    let source = "fn add(a: i64, b: i64) -> i64 { a + b }\nlet _ = add(1, 2);";
+    let mut tlang = Tlang::new(source.to_string(), Runner::JavaScript);
+    let cursor = source.find("2);").unwrap() as u32;
+    let value = tlang.get_signature_help(cursor)?;
+    let help: TestSignatureHelp = serde_wasm_bindgen::from_value(value).unwrap();
+
+    assert_eq!(help.active_signature, 0);
+    assert_eq!(help.active_parameter, 1);
+    assert_eq!(help.signatures[0].label, "add(a: i64, b: i64) -> i64");
     Ok(())
 }
 

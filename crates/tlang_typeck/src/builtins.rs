@@ -16,7 +16,7 @@ pub struct BuiltinSignature {
 /// Returns a `TyKind::Fn` wrapping the parameter types and return type,
 /// or `None` if the name is not a known builtin.
 pub fn lookup(name: &str) -> Option<TyKind> {
-    BUILTIN_SIGNATURES.iter().find(|b| b.name == name).map(|b| {
+    lookup_signature(name).map(|b| {
         let params: Vec<Ty> = b
             .params
             .iter()
@@ -31,6 +31,11 @@ pub fn lookup(name: &str) -> Option<TyKind> {
         };
         TyKind::Fn(params, Box::new(ret))
     })
+}
+
+/// Look up the raw signature metadata for a built-in function by name.
+pub fn lookup_signature(name: &str) -> Option<&'static BuiltinSignature> {
+    BUILTIN_SIGNATURES.iter().find(|b| b.name == name)
 }
 
 /// Returns `true` if the named builtin accepts a variable number of

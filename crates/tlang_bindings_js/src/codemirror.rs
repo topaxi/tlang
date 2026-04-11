@@ -132,6 +132,31 @@ pub struct CodemirrorCompletion {
     pub detail: Option<String>,
 }
 
+/// Signature help formatted for CodeMirror 6 consumers.
+#[derive(Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi)]
+#[serde(rename_all = "camelCase")]
+pub struct CodemirrorSignatureHelp {
+    pub signatures: Vec<CodemirrorSignatureInformation>,
+    pub active_signature: u32,
+    pub active_parameter: u32,
+}
+
+/// A single CodeMirror-friendly callable signature.
+#[derive(Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi)]
+pub struct CodemirrorSignatureInformation {
+    pub label: String,
+    pub parameters: Vec<CodemirrorParameterInformation>,
+}
+
+/// A single parameter label in a callable signature.
+#[derive(Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi)]
+pub struct CodemirrorParameterInformation {
+    pub label: String,
+}
+
 /// Map a `DefKind` to a CodeMirror completion type string.
 pub fn completion_type_from_def_kind(kind: DefKind) -> String {
     match kind {

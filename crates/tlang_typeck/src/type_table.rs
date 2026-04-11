@@ -138,6 +138,11 @@ impl TypeTable {
         self.impl_info.push(info);
     }
 
+    /// Return all registered impl blocks.
+    pub fn impls(&self) -> &[ImplInfo] {
+        &self.impl_info
+    }
+
     /// Check whether `impl Protocol for Type` has been registered.
     pub fn has_impl(&self, protocol_name: &str, target_type_name: &str) -> bool {
         self.impl_info

@@ -8,8 +8,10 @@ use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     GotoDefinitionParams, GotoDefinitionResponse, HoverParams, HoverProviderCapability,
-    InitializeParams, InitializeResult, InlayHint, InlayHintParams, PublishDiagnosticsParams,
-    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Url,
+    InitializeParams, InitializeResult, InlayHint, InlayHintParams, ParameterInformation,
+    ParameterLabel, PublishDiagnosticsParams, ServerCapabilities, SignatureHelpOptions,
+    SignatureHelpParams, SignatureInformation, TextDocumentSyncCapability, TextDocumentSyncKind,
+    Url,
 };
 use serde::Deserialize;
 use tlang_analysis::CompilationTarget;
@@ -97,6 +99,7 @@ impl ServerState {
             .request::<lsp_types::request::HoverRequest, _>(Self::on_hover)
             .request::<lsp_types::request::GotoDefinition, _>(Self::on_goto_definition)
             .request::<lsp_types::request::Completion, _>(Self::on_completion)
+            .request::<lsp_types::request::SignatureHelpRequest, _>(Self::on_signature_help)
             .request::<lsp_types::request::InlayHintRequest, _>(Self::on_inlay_hint)
             .notification::<lsp_types::notification::Initialized>(|_, _| ControlFlow::Continue(()))
             .notification::<lsp_types::notification::Exit>(|_, _| ControlFlow::Break(Ok(())))
@@ -137,6 +140,11 @@ impl ServerState {
                     completion_provider: Some(CompletionOptions {
                         trigger_characters: Some(vec![".".into(), ":".into()]),
                         ..CompletionOptions::default()
+                    }),
+                    signature_help_provider: Some(SignatureHelpOptions {
+                        trigger_characters: Some(vec!["(".into(), ",".into()]),
+                        retrigger_characters: Some(vec![",".into()]),
+                        ..SignatureHelpOptions::default()
                     }),
                     inlay_hint_provider: Some(lsp_types::OneOf::Left(true)),
                     ..ServerCapabilities::default()
@@ -278,6 +286,20 @@ impl ServerState {
         };
 
         Box::pin(async move { Ok(Some(CompletionResponse::Array(items))) })
+    }
+
+    fn on_signature_help(
+        state: &mut Self,
+        params: SignatureHelpParams,
+    ) -> futures::future::BoxFuture<
+        'static,
+        Result<Option<lsp_types::SignatureHelp>, async_lsp::ResponseError>,
+    > {
+        let uri = params.text_document_position_params.text_document.uri;
+        let pos = params.text_document_position_params.position;
+        let help = Self::collect_signature_help(state, &uri, pos);
+
+        Box::pin(async move { Ok(help) })
     }
 
     fn on_inlay_hint(
@@ -520,6 +542,25 @@ impl ServerState {
             .collect()
     }
 
+    fn collect_signature_help(
+        state: &mut Self,
+        uri: &Url,
+        pos: lsp_types::Position,
+    ) -> Option<lsp_types::SignatureHelp> {
+        Self::ensure_typed_hir(state, uri);
+
+        let doc = state.store.get(uri)?;
+        let typed_hir = doc.typed_hir.as_ref()?.as_ref()?;
+        let help = tlang_analysis::signature_help::signature_help_at(
+            &doc.source,
+            typed_hir,
+            pos.line,
+            pos.character,
+        )?;
+
+        Some(to_lsp_signature_help(help))
+    }
+
     /// Resolve the symbol under the cursor for a given document and position.
     ///
     /// Delegates to [`tlang_analysis::query::resolve_symbol`] which is shared
@@ -730,6 +771,34 @@ fn def_kind_to_completion_item_kind(kind: DefKind) -> CompletionItemKind {
         DefKind::Protocol => CompletionItemKind::INTERFACE,
         DefKind::ProtocolMethod(_) | DefKind::StructMethod(_) => CompletionItemKind::METHOD,
         DefKind::Module => CompletionItemKind::MODULE,
+    }
+}
+
+fn to_lsp_signature_help(
+    help: tlang_analysis::signature_help::SignatureHelp,
+) -> lsp_types::SignatureHelp {
+    lsp_types::SignatureHelp {
+        signatures: help
+            .signatures
+            .into_iter()
+            .map(|signature| SignatureInformation {
+                label: signature.label,
+                documentation: None,
+                parameters: Some(
+                    signature
+                        .parameters
+                        .into_iter()
+                        .map(|param| ParameterInformation {
+                            label: ParameterLabel::Simple(param.label),
+                            documentation: None,
+                        })
+                        .collect(),
+                ),
+                active_parameter: None,
+            })
+            .collect(),
+        active_signature: Some(help.active_signature),
+        active_parameter: Some(help.active_parameter),
     }
 }
 
@@ -1168,6 +1237,51 @@ mod tests {
         assert_eq!(
             def_kind_to_completion_item_kind(DefKind::ProtocolMethod(1)),
             CompletionItemKind::METHOD
+        );
+    }
+
+    #[test]
+    fn signature_help_returns_user_defined_function_signature() {
+        let mut state =
+            setup_server_with_source("fn add(a: i64, b: i64) -> i64 { a + b }\nlet _ = add(1, 2);");
+
+        let help = ServerState::collect_signature_help(
+            &mut state,
+            &test_uri(),
+            lsp_types::Position {
+                line: 1,
+                character: 15,
+            },
+        )
+        .expect("signature help should be available");
+
+        assert_eq!(help.active_parameter, Some(1));
+        assert_eq!(help.signatures[0].label, "add(a: i64, b: i64) -> i64");
+    }
+
+    #[test]
+    fn signature_help_omits_self_for_dot_methods() {
+        let mut state = setup_server_with_source(
+            "struct Vector { x: i64 }\nfn Vector.add(self, other: Vector) -> Vector { self }\nlet v1 = Vector { x: 1 };\nlet v2 = Vector { x: 2 };\nlet _ = v1.add(v2);",
+        );
+
+        let help = ServerState::collect_signature_help(
+            &mut state,
+            &test_uri(),
+            lsp_types::Position {
+                line: 4,
+                character: 16,
+            },
+        )
+        .expect("signature help should be available");
+
+        assert_eq!(
+            help.signatures[0].label,
+            "Vector.add(other: Vector) -> Vector"
+        );
+        assert_eq!(
+            help.signatures[0].parameters.as_ref().map(Vec::len),
+            Some(1)
         );
     }
 
