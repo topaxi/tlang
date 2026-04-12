@@ -7,10 +7,12 @@ pub const LIST: &str = "List";
 pub const DICT: &str = "Dict";
 pub const RESULT: &str = "Result";
 pub const OPTION: &str = "Option";
+pub const REGEX: &str = "Regex";
+pub const STRING_BUF: &str = "StringBuf";
 
 /// Returns `true` if `name` is a builtin collection type name.
 pub fn is_builtin_type(name: &str) -> bool {
-    matches!(name, LIST | DICT | RESULT | OPTION)
+    matches!(name, LIST | DICT | RESULT | OPTION | REGEX | STRING_BUF)
 }
 
 /// Construct the canonical `TyKind` for a builtin collection type name.

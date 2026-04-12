@@ -1684,3 +1684,278 @@ fn cast_with_wrong_into_target_error() {
         errs[0]
     );
 }
+
+// ── Native (builtin) protocol recognition ───────────────────────────────
+
+#[test]
+fn impl_against_native_protocol_functor_ok() {
+    // The type checker should recognise `Functor` as a native protocol and
+    // validate the impl block (method present + associated type bound).
+    common::typecheck_ok(
+        r#"
+        struct MyBox { value: i64 }
+        impl Functor for MyBox {
+            type Wrapped = MyBox
+            fn map(self, f) { MyBox { value: f(self.value) } }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn impl_against_native_protocol_display_ok() {
+    common::typecheck_ok(
+        r#"
+        struct Dog { name: String }
+        impl Display for Dog {
+            fn to_string(self) { self.name }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn impl_against_native_protocol_display_uses_default_body() {
+    // `Display` has a default `to_string` body, so an empty impl is valid.
+    common::typecheck_ok(
+        r#"
+        struct Cat { name: String }
+        impl Display for Cat {}
+        "#,
+    );
+}
+
+#[test]
+fn impl_against_native_protocol_missing_method_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        struct Dog { name: String }
+        impl Functor for Dog {
+            type Wrapped = Dog
+        }
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("missing method `map`") && e.contains("Functor")),
+        "expected missing method error, got: {errs:?}"
+    );
+}
+
+#[test]
+fn impl_against_native_protocol_missing_associated_type_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        struct Dog { name: String }
+        impl Functor for Dog {
+            fn map(self, f) { Dog { name: f(self.name) } }
+        }
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("missing associated type `Wrapped`") && e.contains("Functor")),
+        "expected missing associated type error, got: {errs:?}"
+    );
+}
+
+#[test]
+fn where_clause_bound_referencing_native_protocol_ok() {
+    common::typecheck_ok(
+        r#"
+        protocol MyProto {
+            fn do_thing(self)
+        }
+        impl<I> MyProto for I
+        where
+            I: Functor
+        {
+            fn do_thing(self) { self }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn impl_against_native_protocol_into_ok() {
+    common::typecheck_ok(
+        r#"
+        struct Wrapper { value: i64 }
+        impl Into<i64> for Wrapper {
+            fn into(self) { self.value }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn impl_against_native_protocol_try_into_ok() {
+    common::typecheck_ok(
+        r#"
+        struct Wrapper { value: i64 }
+        impl TryInto<i64> for Wrapper {
+            fn try_into(self) { Result::Ok(self.value) }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn impl_against_native_protocol_iterator_ok() {
+    common::typecheck_ok(
+        r#"
+        struct Counter { n: i64 }
+        impl Iterator for Counter {
+            fn next(self) { Option::Some(self.n) }
+        }
+        "#,
+    );
+}
+
+// ── Builtin method resolution ───────────────────────────────────────────
+
+#[test]
+fn builtin_regex_replace_all_returns_string() {
+    common::typecheck_ok(
+        r#"
+        let regex = re"test";
+        let result: String = regex.replace_all("input", "output");
+        "#,
+    );
+}
+
+#[test]
+fn builtin_regex_replace_all_type_mismatch() {
+    let errs = common::typecheck_errors(
+        r#"
+        let regex = re"test";
+        let result: i64 = regex.replace_all("input", "output");
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("type mismatch in binding")),
+        "expected binding type mismatch, got: {errs:?}"
+    );
+}
+
+#[test]
+fn builtin_regex_test_returns_bool() {
+    common::typecheck_ok(
+        r#"
+        let regex = re"test";
+        let result: bool = regex.test("input");
+        "#,
+    );
+}
+
+#[test]
+fn builtin_regex_replace_first_returns_string() {
+    common::typecheck_ok(
+        r#"
+        let regex = re"test";
+        let result: String = regex.replace_first("input", "output");
+        "#,
+    );
+}
+
+#[test]
+fn builtin_stringbuf_to_string_returns_string() {
+    common::typecheck_ok(
+        r#"
+        let buf = string::StringBuf();
+        let s: String = buf.to_string();
+        "#,
+    );
+}
+
+#[test]
+fn builtin_stringbuf_len_returns_i64() {
+    common::typecheck_ok(
+        r#"
+        let buf = string::StringBuf();
+        let n: i64 = buf.len();
+        "#,
+    );
+}
+
+#[test]
+fn builtin_stringbuf_is_empty_returns_bool() {
+    common::typecheck_ok(
+        r#"
+        let buf = string::StringBuf();
+        let b: bool = buf.is_empty();
+        "#,
+    );
+}
+
+#[test]
+fn builtin_option_is_some_returns_bool() {
+    common::typecheck_ok(
+        r#"
+        let opt = Option::Some(42);
+        let b: bool = opt.is_some();
+        "#,
+    );
+}
+
+#[test]
+fn builtin_option_is_none_returns_bool() {
+    common::typecheck_ok(
+        r#"
+        let opt = Option::Some(42);
+        let b: bool = opt.is_none();
+        "#,
+    );
+}
+
+#[test]
+fn builtin_result_is_ok_returns_bool() {
+    common::typecheck_ok(
+        r#"
+        let res = Result::Ok(42);
+        let b: bool = res.is_ok();
+        "#,
+    );
+}
+
+#[test]
+fn builtin_result_is_err_returns_bool() {
+    common::typecheck_ok(
+        r#"
+        let res = Result::Err("oops");
+        let b: bool = res.is_err();
+        "#,
+    );
+}
+
+#[test]
+fn builtin_re_returns_regex() {
+    // re"..." returns Regex, so calling a Regex method should work.
+    common::typecheck_ok(
+        r#"
+        let result: String = re"test".replace_all("input", "output");
+        "#,
+    );
+}
+
+#[test]
+fn builtin_f_returns_string() {
+    common::typecheck_ok(
+        r#"
+        let x = 42;
+        let s: String = f"value: {x}";
+        "#,
+    );
+}
+
+#[test]
+fn builtin_method_chaining_regex_pipeline() {
+    // Mimics the html.tlang pattern: re"&".replace_all(input, "&amp;")
+    common::typecheck_ok(
+        r#"
+        fn escape(input: String) -> String {
+            re"&".replace_all(input, "&amp;")
+        }
+        "#,
+    );
+}

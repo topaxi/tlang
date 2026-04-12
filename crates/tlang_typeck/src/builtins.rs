@@ -1,5 +1,7 @@
 use tlang_hir::{PrimTy, Ty, TyKind};
 
+use crate::builtin_types;
+
 /// A builtin function signature: the function name, parameter types,
 /// and return type.
 pub struct BuiltinSignature {
@@ -9,6 +11,10 @@ pub struct BuiltinSignature {
     /// If `true`, the function accepts a variable number of arguments.
     /// Argument types are still constrained by `params`.
     pub variadic: bool,
+    /// If set, the return type is resolved at lookup time via
+    /// `builtin_types::lookup` (for types like `Regex` that can't be
+    /// expressed as static `TyKind::Path`).
+    pub ret_builtin_type: Option<&'static str>,
 }
 
 /// Look up the type signature for a built-in function by name.
@@ -25,8 +31,12 @@ pub fn lookup(name: &str) -> Option<TyKind> {
                 ..Ty::default()
             })
             .collect();
+        let ret_kind = match b.ret_builtin_type {
+            Some(type_name) => builtin_types::lookup(type_name).unwrap_or_else(|| b.ret.clone()),
+            None => b.ret.clone(),
+        };
         let ret = Ty {
-            kind: b.ret.clone(),
+            kind: ret_kind,
             ..Ty::default()
         };
         TyKind::Fn(params, Box::new(ret))
@@ -54,6 +64,7 @@ static BUILTIN_SIGNATURES: &[BuiltinSignature] = &[
         params: &[TyKind::Unknown],
         ret: TyKind::Primitive(PrimTy::Nil),
         variadic: true,
+        ret_builtin_type: None,
     },
     // len(unknown) → i64
     BuiltinSignature {
@@ -61,6 +72,7 @@ static BUILTIN_SIGNATURES: &[BuiltinSignature] = &[
         params: &[TyKind::Unknown],
         ret: TyKind::Primitive(PrimTy::I64),
         variadic: false,
+        ret_builtin_type: None,
     },
     // math::sqrt(f64) → f64
     BuiltinSignature {
@@ -68,6 +80,7 @@ static BUILTIN_SIGNATURES: &[BuiltinSignature] = &[
         params: &[TyKind::Primitive(PrimTy::F64)],
         ret: TyKind::Primitive(PrimTy::F64),
         variadic: false,
+        ret_builtin_type: None,
     },
     // math::floor(f64) → i64
     BuiltinSignature {
@@ -75,6 +88,7 @@ static BUILTIN_SIGNATURES: &[BuiltinSignature] = &[
         params: &[TyKind::Primitive(PrimTy::F64)],
         ret: TyKind::Primitive(PrimTy::I64),
         variadic: false,
+        ret_builtin_type: None,
     },
     // math::random() → f64
     BuiltinSignature {
@@ -82,6 +96,7 @@ static BUILTIN_SIGNATURES: &[BuiltinSignature] = &[
         params: &[],
         ret: TyKind::Primitive(PrimTy::F64),
         variadic: false,
+        ret_builtin_type: None,
     },
     // math::min(f64...) → f64
     BuiltinSignature {
@@ -89,6 +104,7 @@ static BUILTIN_SIGNATURES: &[BuiltinSignature] = &[
         params: &[TyKind::Primitive(PrimTy::F64)],
         ret: TyKind::Primitive(PrimTy::F64),
         variadic: true,
+        ret_builtin_type: None,
     },
     // math::max(f64...) → f64
     BuiltinSignature {
@@ -96,6 +112,7 @@ static BUILTIN_SIGNATURES: &[BuiltinSignature] = &[
         params: &[TyKind::Primitive(PrimTy::F64)],
         ret: TyKind::Primitive(PrimTy::F64),
         variadic: true,
+        ret_builtin_type: None,
     },
     // panic(String) → never
     BuiltinSignature {
@@ -103,6 +120,7 @@ static BUILTIN_SIGNATURES: &[BuiltinSignature] = &[
         params: &[TyKind::Primitive(PrimTy::String)],
         ret: TyKind::Never,
         variadic: false,
+        ret_builtin_type: None,
     },
     // string::from_char_code(i64) → String
     BuiltinSignature {
@@ -110,6 +128,7 @@ static BUILTIN_SIGNATURES: &[BuiltinSignature] = &[
         params: &[TyKind::Primitive(PrimTy::I64)],
         ret: TyKind::Primitive(PrimTy::String),
         variadic: false,
+        ret_builtin_type: None,
     },
     // string::char_code_at(String, i64) → i64
     BuiltinSignature {
@@ -120,5 +139,62 @@ static BUILTIN_SIGNATURES: &[BuiltinSignature] = &[
         ],
         ret: TyKind::Primitive(PrimTy::I64),
         variadic: false,
+        ret_builtin_type: None,
+    },
+    // compose(fn, fn) → fn
+    BuiltinSignature {
+        name: "compose",
+        params: &[TyKind::Unknown, TyKind::Unknown],
+        ret: TyKind::Unknown,
+        variadic: false,
+        ret_builtin_type: None,
+    },
+    // re(parts, values) → Regex
+    BuiltinSignature {
+        name: "re",
+        params: &[TyKind::Unknown, TyKind::Unknown],
+        ret: TyKind::Unknown, // resolved via ret_builtin_type
+        variadic: false,
+        ret_builtin_type: Some("Regex"),
+    },
+    // f(parts, values) → String  (tagged string interpolation)
+    BuiltinSignature {
+        name: "f",
+        params: &[TyKind::Unknown, TyKind::Unknown],
+        ret: TyKind::Primitive(PrimTy::String),
+        variadic: false,
+        ret_builtin_type: None,
+    },
+    // Option::Some(value) → Option
+    BuiltinSignature {
+        name: "Option::Some",
+        params: &[TyKind::Unknown],
+        ret: TyKind::Unknown,
+        variadic: false,
+        ret_builtin_type: Some("Option"),
+    },
+    // Result::Ok(value) → Result
+    BuiltinSignature {
+        name: "Result::Ok",
+        params: &[TyKind::Unknown],
+        ret: TyKind::Unknown,
+        variadic: false,
+        ret_builtin_type: Some("Result"),
+    },
+    // Result::Err(error) → Result
+    BuiltinSignature {
+        name: "Result::Err",
+        params: &[TyKind::Unknown],
+        ret: TyKind::Unknown,
+        variadic: false,
+        ret_builtin_type: Some("Result"),
+    },
+    // string::StringBuf(initial?) → StringBuf
+    BuiltinSignature {
+        name: "string::StringBuf",
+        params: &[TyKind::Primitive(PrimTy::String)],
+        ret: TyKind::Unknown,
+        variadic: true,
+        ret_builtin_type: Some("StringBuf"),
     },
 ];

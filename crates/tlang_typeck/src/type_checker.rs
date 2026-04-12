@@ -8,6 +8,8 @@ use tlang_hir::{self as hir, BinaryOpKind, PrimTy, Ty, TyKind};
 use tlang_hir_opt::hir_opt::{HirOptContext, HirOptError, HirPass};
 use tlang_span::TypeVarId;
 
+use crate::builtin_methods;
+use crate::builtin_protocols;
 use crate::builtin_types;
 use crate::builtins;
 use crate::type_table::{
@@ -620,7 +622,19 @@ impl TypeChecker {
                 {
                     return Some(info.ty.kind.clone());
                 }
-                // Then try builtin signatures.
+                // Only fall back to builtin signatures when the path does
+                // not resolve to a local binding (parameter, variable,
+                // upvar, closure).
+                let is_local = matches!(
+                    path.res.binding_kind(),
+                    hir::BindingKind::Param
+                        | hir::BindingKind::Local
+                        | hir::BindingKind::Upvar
+                        | hir::BindingKind::Closure
+                );
+                if is_local {
+                    return None;
+                }
                 let name = path.join("::");
                 builtins::lookup(&name)
             }
@@ -1133,6 +1147,7 @@ impl TypeChecker {
 
     /// Type-check a field access expression (`base.field`).
     /// Resolves the field's type from the base expression's struct type.
+    /// Falls back to builtin method lookup for native types.
     /// Emits a diagnostic when the base is a known struct but the field
     /// does not exist.
     fn check_field_access(
@@ -1168,12 +1183,35 @@ impl TypeChecker {
                 });
             }
         }
+
+        // Fall back to builtin method lookup for native types.
+        if let Some(type_name) = builtin_methods::type_name_from_kind(base_ty_kind)
+            && let Some(method_ty) = builtin_methods::lookup(type_name, field_name)
+        {
+            self.type_table.insert(
+                expr_hir_id,
+                TypeInfo {
+                    ty: Ty {
+                        kind: method_ty.clone(),
+                        ..Ty::default()
+                    },
+                },
+            );
+            return method_ty;
+        }
+
         TyKind::Unknown
     }
 
     // ── HIR walk entry point ─────────────────────────────────────────
 
     fn check_module(&mut self, module: &mut hir::Module) {
+        // Seed the type table with builtin native protocol definitions so
+        // that impl blocks and where-clause bounds can reference them.
+        for info in builtin_protocols::all() {
+            self.type_table.insert_protocol_info(info);
+        }
+
         // Pre-scan the module for impl blocks and dot-methods so that
         // validation is order-independent (an impl or dot-method declared
         // after the first use site is still visible).
@@ -1766,10 +1804,24 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 {
                     expr.ty = info.ty.clone();
                 } else {
-                    // Try builtin signature lookup for unresolved paths.
-                    let name = path.join("::");
-                    if let Some(fn_ty) = builtins::lookup(&name) {
-                        expr.ty.kind = fn_ty;
+                    // Only fall back to builtin signature lookup when the path
+                    // does NOT resolve to a local binding (parameter, variable,
+                    // upvar). Local bindings with unknown type should stay
+                    // unknown rather than being shadowed by a builtin of the
+                    // same name (e.g. a closure parameter named `f` should not
+                    // resolve to the tagged-string `f` function).
+                    let is_local = matches!(
+                        path.res.binding_kind(),
+                        hir::BindingKind::Param
+                            | hir::BindingKind::Local
+                            | hir::BindingKind::Upvar
+                            | hir::BindingKind::Closure
+                    );
+                    if !is_local {
+                        let name = path.join("::");
+                        if let Some(fn_ty) = builtins::lookup(&name) {
+                            expr.ty.kind = fn_ty;
+                        }
                     }
                 }
             }
@@ -1850,6 +1902,23 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 }
                 let ty_kind = Self::infer_dict_type(entries);
                 self.assign_expr_type(expr, ty_kind);
+            }
+            hir::ExprKind::TaggedString {
+                tag,
+                parts: _,
+                exprs,
+            } => {
+                self.visit_expr(tag, ctx);
+                for e in exprs.iter_mut() {
+                    self.visit_expr(e, ctx);
+                }
+                // The result type of a tagged string is the return type of
+                // the tag function (e.g. `re"…"` → Regex, `f"…"` → String).
+                let result_ty = match &tag.ty.kind {
+                    TyKind::Fn(_, ret) => ret.kind.clone(),
+                    _ => TyKind::Unknown,
+                };
+                self.assign_expr_type(expr, result_ty);
             }
             _ => {
                 walk_expr(self, expr, ctx);

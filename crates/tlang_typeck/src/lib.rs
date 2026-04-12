@@ -1,3 +1,5 @@
+pub mod builtin_methods;
+pub mod builtin_protocols;
 pub mod builtin_types;
 pub mod builtins;
 mod type_checker;

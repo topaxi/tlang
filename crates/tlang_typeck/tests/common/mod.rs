@@ -18,7 +18,15 @@ fn compile(source: &str) -> hir::LowerResult {
         ("math", DefKind::Module),
         ("math::min", DefKind::Function(u16::MAX)),
         ("math::max", DefKind::Function(u16::MAX)),
+        ("re", DefKind::Function(2)),
+        ("f", DefKind::Function(2)),
+        ("string", DefKind::Module),
+        ("string::StringBuf", DefKind::Function(u16::MAX)),
     ]);
+    // Register native protocol names (Functor, Display, Into, …) so
+    // that semantic analysis doesn't reject `impl Foo for Bar` when
+    // `Foo` is a builtin protocol.
+    semantic_analyzer.add_builtin_symbols(&tlang_typeck::builtin_protocols::builtin_symbols());
     semantic_analyzer.analyze(&mut ast).unwrap();
     lower_to_hir(
         &ast,
