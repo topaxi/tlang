@@ -428,4 +428,30 @@ mod tests {
             "should resolve to DefKind::Protocol"
         );
     }
+
+    #[test]
+    fn resolve_recursive_call_in_multi_clause_function() {
+        // In the second clause of a multi-clause function, the recursive call
+        // `map(xs, f)` should resolve to the function itself.
+        let source = "fn map([], _) { [] }\nfn map([x, ...xs], f) { [f(x), ...map(xs, f)] }";
+
+        // Try a range of columns to find where 'map' is in the recursive call.
+        // The recursive call is in `...map(xs, f)` on line 1.
+        let mut found_and_resolved = false;
+        for col in 30..45 {
+            let resolved = setup_and_resolve(source, 1, col);
+            if let Some(ref r) = resolved
+                && r.name == "map"
+                && r.def_kind.arity().is_some()
+            {
+                found_and_resolved = true;
+                break;
+            }
+        }
+
+        assert!(
+            found_and_resolved,
+            "should resolve recursive `map` call in multi-clause function"
+        );
+    }
 }

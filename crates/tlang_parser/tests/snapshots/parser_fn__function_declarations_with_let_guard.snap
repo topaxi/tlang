@@ -831,15 +831,15 @@ Module(
                   leading_comments: [],
                   trailing_comments: [],
                   span: Span(
-                    start: 0,
-                    end: 0,
+                    start: 79,
+                    end: 99,
                     start_lc: LineColumn(
-                      line: 0,
-                      column: 0,
+                      line: 1,
+                      column: 52,
                     ),
                     end_lc: LineColumn(
-                      line: 0,
-                      column: 0,
+                      line: 1,
+                      column: 72,
                     ),
                   ),
                 ),

@@ -1253,12 +1253,15 @@ impl<'src> Parser<'src> {
         while self.not_at_closing(TokenKind::RBracket) {
             let element = match self.current_token_kind() {
                 TokenKind::DotDotDot => {
+                    let mut span = self.create_span_from_current_token();
                     self.advance();
 
-                    node::expr!(
-                        self.unique_id(),
-                        UnaryOp(UnaryOp::Spread, Box::new(self.parse_expression()))
-                    )
+                    let id = self.unique_id();
+                    let inner = self.parse_expression();
+                    span.end = inner.span.end;
+                    span.end_lc = inner.span.end_lc;
+
+                    node::expr!(id, UnaryOp(UnaryOp::Spread, Box::new(inner))).with_span(span)
                 }
                 _ => self.parse_expression(),
             };
