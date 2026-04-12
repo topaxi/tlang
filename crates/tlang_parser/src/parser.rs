@@ -2166,9 +2166,11 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            // Parse type parameters. Store them from the first clause; skip
-            // (consume) type params on subsequent clauses — they must be
-            // identical to the first clause's params by convention.
+            // Parse type parameters. Store them from the first clause; consume
+            // (and discard) type params on subsequent clauses so the parser
+            // advances past them. All clauses of a multi-clause function share
+            // the same type parameters — cross-clause consistency is validated
+            // during semantic analysis, not at parse time.
             let clause_type_params = self.parse_type_params();
             if declarations.is_empty() {
                 type_params = clause_type_params;
