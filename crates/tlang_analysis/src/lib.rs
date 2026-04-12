@@ -23,9 +23,11 @@
 
 pub mod find_node;
 pub mod inlay_hints;
+pub mod member_resolution;
 pub mod query;
 pub mod signature_help;
 pub mod symbol_index;
+pub mod typed_hir;
 
 use tlang_ast::node::Module;
 use tlang_diagnostics::Diagnostic;
