@@ -1959,3 +1959,207 @@ fn builtin_method_chaining_regex_pipeline() {
         "#,
     );
 }
+
+// ── Generic builtin methods ────────────────────────────────────────────
+
+#[test]
+fn list_foldl_infers_return_type_from_init() {
+    // foldl(init: U, f: fn(U, T) -> U) -> U
+    // init = 0 (i64) → U = i64 → return type is i64
+    common::typecheck_ok(
+        r#"
+        fn sum(xs: List) -> i64 {
+            xs.foldl(0, fn(acc, x) { acc })
+        }
+        "#,
+    );
+}
+
+#[test]
+fn list_foldl_wrong_return_type_error() {
+    // foldl returns i64 (inferred from init=0), but annotation says String
+    let errs = common::typecheck_errors(
+        r#"
+        fn sum(xs: List) -> String {
+            xs.foldl(0, fn(acc, x) { acc })
+        }
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("return type mismatch")),
+        "expected return type mismatch, got: {errs:?}"
+    );
+}
+
+#[test]
+fn list_map_infers_return_type_from_closure() {
+    // map(f: fn(T) -> U) -> List<U>
+    // closure returns String → U = String → map returns List<String>
+    common::typecheck_ok(
+        r#"
+        fn to_strings(xs: List) -> List {
+            xs.map(fn(x) { "hello" })
+        }
+        "#,
+    );
+}
+
+#[test]
+fn list_foldl_string_init_infers_string_return() {
+    // foldl with String init → return type is String
+    common::typecheck_ok(
+        r#"
+        fn join(xs: List) -> String {
+            xs.foldl("", fn(acc, x) { acc })
+        }
+        "#,
+    );
+}
+
+#[test]
+fn list_foldl_string_init_wrong_return_error() {
+    // foldl returns String (from init=""), but annotation says i64
+    let errs = common::typecheck_errors(
+        r#"
+        fn join(xs: List) -> i64 {
+            xs.foldl("", fn(acc, x) { acc })
+        }
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("return type mismatch")),
+        "expected return type mismatch, got: {errs:?}"
+    );
+}
+
+#[test]
+fn list_filter_returns_list() {
+    common::typecheck_ok(
+        r#"
+        fn evens(xs: List) -> List {
+            xs.filter(fn(x) { true })
+        }
+        "#,
+    );
+}
+
+#[test]
+fn list_any_returns_bool() {
+    common::typecheck_ok(
+        r#"
+        fn has_positive(xs: List) -> bool {
+            xs.any(fn(x) { true })
+        }
+        "#,
+    );
+}
+
+#[test]
+fn list_all_returns_bool() {
+    common::typecheck_ok(
+        r#"
+        fn all_positive(xs: List) -> bool {
+            xs.all(fn(x) { true })
+        }
+        "#,
+    );
+}
+
+#[test]
+fn option_map_infers_return_type() {
+    // Option.map(f: fn(T) -> U) -> U
+    // closure returns String → map returns String
+    common::typecheck_ok(
+        r#"
+        fn transform(opt: Option) -> String {
+            opt.map(fn(x) { "value" })
+        }
+        "#,
+    );
+}
+
+#[test]
+fn option_map_wrong_return_type_error() {
+    // map closure returns String, but function expects i64
+    let errs = common::typecheck_errors(
+        r#"
+        fn transform(opt: Option) -> i64 {
+            opt.map(fn(x) { "value" })
+        }
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("return type mismatch")),
+        "expected return type mismatch, got: {errs:?}"
+    );
+}
+
+#[test]
+fn result_map_infers_return_type() {
+    common::typecheck_ok(
+        r#"
+        fn transform(r: Result) -> String {
+            r.map(fn(x) { "ok" })
+        }
+        "#,
+    );
+}
+
+#[test]
+fn string_split_returns_list() {
+    common::typecheck_ok(
+        r#"
+        fn words(s: String) -> List {
+            s.split(" ")
+        }
+        "#,
+    );
+}
+
+#[test]
+fn string_contains_returns_bool() {
+    common::typecheck_ok(
+        r#"
+        fn has_hello(s: String) -> bool {
+            s.contains("hello")
+        }
+        "#,
+    );
+}
+
+#[test]
+fn string_len_returns_i64() {
+    common::typecheck_ok(
+        r#"
+        fn length(s: String) -> i64 {
+            s.len()
+        }
+        "#,
+    );
+}
+
+#[test]
+fn string_trim_returns_string() {
+    common::typecheck_ok(
+        r#"
+        fn cleaned(s: String) -> String {
+            s.trim()
+        }
+        "#,
+    );
+}
+
+#[test]
+fn string_method_wrong_return_type_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        fn length(s: String) -> String {
+            s.len()
+        }
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("return type mismatch")),
+        "expected return type mismatch, got: {errs:?}"
+    );
+}

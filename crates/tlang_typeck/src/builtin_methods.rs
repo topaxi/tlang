@@ -1,8 +1,13 @@
-//! Static registry of method signatures for builtin types.
+//! Registry of method signatures for builtin types.
 //!
 //! This gives the type checker knowledge of the methods available on native
-//! types (Regex, Option, Result, StringBuf, List) and their return types,
-//! without depending on the runtime (`tlang_memory`).
+//! types (Regex, Option, Result, StringBuf, List, String) and their return
+//! types, without depending on the runtime (`tlang_memory`).
+//!
+//! Generic methods use `TyKind::Var` with well-known `TypeVarId` constants
+//! in the 10_001+ range to avoid collisions with user-defined type variables.
+//! The type checker's existing generic infrastructure (`collect_type_var_bindings`,
+//! `substitute_type_vars`) handles instantiation automatically.
 //!
 //! ## Builtin type methods (tlang syntax)
 //!
@@ -31,7 +36,7 @@
 //!     fn is_some(self) -> bool { ... }
 //!     fn is_none(self) -> bool { ... }
 //!     fn unwrap(self) -> T { ... }
-//!     fn map(self, f: fn(T) -> U) -> Option<U> { ... }
+//!     fn map<U>(self, f: fn(T) -> U) -> U { ... }
 //! }
 //!
 //! enum Result<T, E> { Ok(T), Err(E) }
@@ -39,212 +44,45 @@
 //!     fn is_ok(self) -> bool { ... }
 //!     fn is_err(self) -> bool { ... }
 //!     fn unwrap(self) -> T { ... }
-//!     fn map(self, f: fn(T) -> U) -> Result<U, E> { ... }
+//!     fn map<U>(self, f: fn(T) -> U) -> U { ... }
 //! }
 //!
-//! impl List {
-//!     fn slice(self, start: i64, end: i64) -> List { ... }
+//! impl List<T> {
+//!     fn slice(self, start: i64, end: i64) -> List<T> { ... }
+//!     fn map<U>(self, f: fn(T) -> U) -> List<U> { ... }
+//!     fn filter(self, f: fn(T) -> bool) -> List<T> { ... }
+//!     fn foldl<U>(self, init: U, f: fn(U, T) -> U) -> U { ... }
+//!     fn foldr<U>(self, init: U, f: fn(T, U) -> U) -> U { ... }
+//!     fn find(self, f: fn(T) -> bool) -> T { ... }
+//!     fn any(self, f: fn(T) -> bool) -> bool { ... }
+//!     fn all(self, f: fn(T) -> bool) -> bool { ... }
 //! }
 //! ```
 
 use tlang_hir::{PrimTy, Ty, TyKind};
+use tlang_span::TypeVarId;
 
 use crate::builtin_types;
 
-/// A builtin method signature descriptor.
-struct BuiltinMethodDef {
-    type_name: &'static str,
-    method_name: &'static str,
-    /// Parameter types (including `self`).
-    params: &'static [TyKind],
-    ret: TyKind,
-    /// If set, the return type is resolved at lookup time via
-    /// `builtin_types::lookup`.
-    ret_builtin_type: Option<&'static str>,
+// Well-known type variable IDs for builtin generic parameters.
+// These use a high range (10_001+) to avoid collisions with user code.
+const VAR_T: TypeVarId = TypeVarId::new(10_001);
+const VAR_U: TypeVarId = TypeVarId::new(10_002);
+
+fn ty(kind: TyKind) -> Ty {
+    Ty {
+        kind,
+        ..Ty::default()
+    }
 }
 
-/// Authoritative registry of builtin method type signatures.
-///
-/// Kept in sync with `crates/tlang_core/tlang_stdlib/src/`.
-static BUILTIN_METHODS: &[BuiltinMethodDef] = &[
-    // ── Regex methods ───────────────────────────────────────────────
-    // fn Regex.test(self, haystack: String) -> bool
-    BuiltinMethodDef {
-        type_name: "Regex",
-        method_name: "test",
-        params: &[TyKind::Unknown, TyKind::Primitive(PrimTy::String)],
-        ret: TyKind::Primitive(PrimTy::Bool),
-        ret_builtin_type: None,
-    },
-    // fn Regex.exec(self, haystack: String) -> Option<String>
-    BuiltinMethodDef {
-        type_name: "Regex",
-        method_name: "exec",
-        params: &[TyKind::Unknown, TyKind::Primitive(PrimTy::String)],
-        ret: TyKind::Unknown,
-        ret_builtin_type: Some("Option"),
-    },
-    // fn Regex.replace_all(self, haystack: String, replacement: String) -> String
-    BuiltinMethodDef {
-        type_name: "Regex",
-        method_name: "replace_all",
-        params: &[
-            TyKind::Unknown,
-            TyKind::Primitive(PrimTy::String),
-            TyKind::Primitive(PrimTy::String),
-        ],
-        ret: TyKind::Primitive(PrimTy::String),
-        ret_builtin_type: None,
-    },
-    // fn Regex.replace_first(self, haystack: String, replacement: String) -> String
-    BuiltinMethodDef {
-        type_name: "Regex",
-        method_name: "replace_first",
-        params: &[
-            TyKind::Unknown,
-            TyKind::Primitive(PrimTy::String),
-            TyKind::Primitive(PrimTy::String),
-        ],
-        ret: TyKind::Primitive(PrimTy::String),
-        ret_builtin_type: None,
-    },
-    // fn Regex.flags(self, new_flags: String) -> Regex
-    BuiltinMethodDef {
-        type_name: "Regex",
-        method_name: "flags",
-        params: &[TyKind::Unknown, TyKind::Primitive(PrimTy::String)],
-        ret: TyKind::Unknown,
-        ret_builtin_type: Some("Regex"),
-    },
-    // ── StringBuf methods ───────────────────────────────────────────
-    // fn StringBuf.push(self, s: String) -> StringBuf
-    BuiltinMethodDef {
-        type_name: "StringBuf",
-        method_name: "push",
-        params: &[TyKind::Unknown, TyKind::Primitive(PrimTy::String)],
-        ret: TyKind::Unknown,
-        ret_builtin_type: Some("StringBuf"),
-    },
-    // fn StringBuf.push_char(self, c: String) -> StringBuf
-    BuiltinMethodDef {
-        type_name: "StringBuf",
-        method_name: "push_char",
-        params: &[TyKind::Unknown, TyKind::Primitive(PrimTy::String)],
-        ret: TyKind::Unknown,
-        ret_builtin_type: Some("StringBuf"),
-    },
-    // fn StringBuf.clear(self) -> StringBuf
-    BuiltinMethodDef {
-        type_name: "StringBuf",
-        method_name: "clear",
-        params: &[TyKind::Unknown],
-        ret: TyKind::Unknown,
-        ret_builtin_type: Some("StringBuf"),
-    },
-    // fn StringBuf.to_string(self) -> String
-    BuiltinMethodDef {
-        type_name: "StringBuf",
-        method_name: "to_string",
-        params: &[TyKind::Unknown],
-        ret: TyKind::Primitive(PrimTy::String),
-        ret_builtin_type: None,
-    },
-    // fn StringBuf.len(self) -> i64
-    BuiltinMethodDef {
-        type_name: "StringBuf",
-        method_name: "len",
-        params: &[TyKind::Unknown],
-        ret: TyKind::Primitive(PrimTy::I64),
-        ret_builtin_type: None,
-    },
-    // fn StringBuf.is_empty(self) -> bool
-    BuiltinMethodDef {
-        type_name: "StringBuf",
-        method_name: "is_empty",
-        params: &[TyKind::Unknown],
-        ret: TyKind::Primitive(PrimTy::Bool),
-        ret_builtin_type: None,
-    },
-    // ── Option methods ──────────────────────────────────────────────
-    // fn Option.is_some(self) -> bool
-    BuiltinMethodDef {
-        type_name: "Option",
-        method_name: "is_some",
-        params: &[TyKind::Unknown],
-        ret: TyKind::Primitive(PrimTy::Bool),
-        ret_builtin_type: None,
-    },
-    // fn Option.is_none(self) -> bool
-    BuiltinMethodDef {
-        type_name: "Option",
-        method_name: "is_none",
-        params: &[TyKind::Unknown],
-        ret: TyKind::Primitive(PrimTy::Bool),
-        ret_builtin_type: None,
-    },
-    // fn Option.unwrap(self) -> T
-    BuiltinMethodDef {
-        type_name: "Option",
-        method_name: "unwrap",
-        params: &[TyKind::Unknown],
-        ret: TyKind::Unknown,
-        ret_builtin_type: None,
-    },
-    // fn Option.map(self, f) -> Option
-    BuiltinMethodDef {
-        type_name: "Option",
-        method_name: "map",
-        params: &[TyKind::Unknown, TyKind::Unknown],
-        ret: TyKind::Unknown,
-        ret_builtin_type: Some("Option"),
-    },
-    // ── Result methods ──────────────────────────────────────────────
-    // fn Result.is_ok(self) -> bool
-    BuiltinMethodDef {
-        type_name: "Result",
-        method_name: "is_ok",
-        params: &[TyKind::Unknown],
-        ret: TyKind::Primitive(PrimTy::Bool),
-        ret_builtin_type: None,
-    },
-    // fn Result.is_err(self) -> bool
-    BuiltinMethodDef {
-        type_name: "Result",
-        method_name: "is_err",
-        params: &[TyKind::Unknown],
-        ret: TyKind::Primitive(PrimTy::Bool),
-        ret_builtin_type: None,
-    },
-    // fn Result.unwrap(self) -> T
-    BuiltinMethodDef {
-        type_name: "Result",
-        method_name: "unwrap",
-        params: &[TyKind::Unknown],
-        ret: TyKind::Unknown,
-        ret_builtin_type: None,
-    },
-    // fn Result.map(self, f) -> Result
-    BuiltinMethodDef {
-        type_name: "Result",
-        method_name: "map",
-        params: &[TyKind::Unknown, TyKind::Unknown],
-        ret: TyKind::Unknown,
-        ret_builtin_type: Some("Result"),
-    },
-    // ── List methods ────────────────────────────────────────────────
-    // fn List.slice(self, start: i64, end: i64) -> List
-    BuiltinMethodDef {
-        type_name: "List",
-        method_name: "slice",
-        params: &[
-            TyKind::Unknown,
-            TyKind::Primitive(PrimTy::I64),
-            TyKind::Primitive(PrimTy::I64),
-        ],
-        ret: TyKind::Unknown,
-        ret_builtin_type: Some("List"),
-    },
-];
+fn fn_ty(params: Vec<TyKind>, ret: TyKind) -> TyKind {
+    TyKind::Fn(params.into_iter().map(ty).collect(), Box::new(ty(ret)))
+}
+
+fn builtin_path(name: &str) -> TyKind {
+    builtin_types::lookup(name).unwrap_or(TyKind::Unknown)
+}
 
 /// Look up the type signature for a method on a builtin type.
 ///
@@ -252,30 +90,172 @@ static BUILTIN_METHODS: &[BuiltinMethodDef] = &[
 /// The `self` parameter is excluded from the returned Fn params since
 /// method calls pass `self` implicitly.
 pub fn lookup(type_name: &str, method_name: &str) -> Option<TyKind> {
-    BUILTIN_METHODS
-        .iter()
-        .find(|m| m.type_name == type_name && m.method_name == method_name)
-        .map(|m| {
-            let ret_kind = match m.ret_builtin_type {
-                Some(name) => builtin_types::lookup(name).unwrap_or_else(|| m.ret.clone()),
-                None => m.ret.clone(),
-            };
-            // Skip the first param (self) — method calls pass self implicitly.
-            let params: Vec<Ty> = m
-                .params
-                .iter()
-                .skip(1)
-                .map(|k| Ty {
-                    kind: k.clone(),
-                    ..Ty::default()
-                })
-                .collect();
-            let ret_ty = Ty {
-                kind: ret_kind,
-                ..Ty::default()
-            };
-            TyKind::Fn(params, Box::new(ret_ty))
-        })
+    match type_name {
+        "Regex" => lookup_regex(method_name),
+        "StringBuf" => lookup_stringbuf(method_name),
+        "Option" => lookup_option(method_name),
+        "Result" => lookup_result(method_name),
+        "List" => lookup_list(method_name),
+        "String" => lookup_string(method_name),
+        _ => None,
+    }
+}
+
+fn lookup_regex(method: &str) -> Option<TyKind> {
+    use PrimTy::*;
+    use TyKind::*;
+
+    match method {
+        "test" => Some(fn_ty(vec![Primitive(String)], Primitive(Bool))),
+        "exec" => Some(fn_ty(vec![Primitive(String)], builtin_path("Option"))),
+        "replace_all" => Some(fn_ty(
+            vec![Primitive(String), Primitive(String)],
+            Primitive(String),
+        )),
+        "replace_first" => Some(fn_ty(
+            vec![Primitive(String), Primitive(String)],
+            Primitive(String),
+        )),
+        "flags" => Some(fn_ty(vec![Primitive(String)], builtin_path("Regex"))),
+        _ => None,
+    }
+}
+
+fn lookup_stringbuf(method: &str) -> Option<TyKind> {
+    use PrimTy::*;
+    use TyKind::*;
+
+    match method {
+        "push" => Some(fn_ty(vec![Primitive(String)], builtin_path("StringBuf"))),
+        "push_char" => Some(fn_ty(vec![Primitive(String)], builtin_path("StringBuf"))),
+        "clear" => Some(fn_ty(vec![], builtin_path("StringBuf"))),
+        "to_string" => Some(fn_ty(vec![], Primitive(String))),
+        "len" => Some(fn_ty(vec![], Primitive(I64))),
+        "is_empty" => Some(fn_ty(vec![], Primitive(Bool))),
+        _ => None,
+    }
+}
+
+fn lookup_option(method: &str) -> Option<TyKind> {
+    use PrimTy::*;
+    use TyKind::*;
+
+    let t = Var(VAR_T);
+    let u = Var(VAR_U);
+
+    match method {
+        "is_some" => Some(fn_ty(vec![], Primitive(Bool))),
+        "is_none" => Some(fn_ty(vec![], Primitive(Bool))),
+        "unwrap" => Some(fn_ty(vec![], t)),
+        // fn map<U>(self, f: fn(T) -> U) -> U
+        // NOTE: Ideally returns Option<U>, but we can't express parameterised
+        // paths yet.  Returning Var(U) still gives correct type propagation
+        // through the closure's return type.
+        "map" => Some(fn_ty(vec![fn_ty(vec![t], u.clone())], u)),
+        _ => None,
+    }
+}
+
+fn lookup_result(method: &str) -> Option<TyKind> {
+    use PrimTy::*;
+    use TyKind::*;
+
+    let t = Var(VAR_T);
+    let u = Var(VAR_U);
+
+    match method {
+        "is_ok" => Some(fn_ty(vec![], Primitive(Bool))),
+        "is_err" => Some(fn_ty(vec![], Primitive(Bool))),
+        "unwrap" => Some(fn_ty(vec![], t)),
+        // fn map<U>(self, f: fn(T) -> U) -> U
+        "map" => Some(fn_ty(vec![fn_ty(vec![t], u.clone())], u)),
+        _ => None,
+    }
+}
+
+fn lookup_list(method: &str) -> Option<TyKind> {
+    use PrimTy::*;
+    use TyKind::*;
+
+    let t = Var(VAR_T);
+    let u = Var(VAR_U);
+
+    match method {
+        "slice" => Some(fn_ty(
+            vec![Primitive(I64), Primitive(I64)],
+            Slice(Box::new(ty(t))),
+        )),
+        // fn map<U>(self, f: fn(T) -> U) -> List<U>
+        "map" => Some(fn_ty(
+            vec![fn_ty(vec![t], u.clone())],
+            Slice(Box::new(ty(u))),
+        )),
+        // fn filter(self, f: fn(T) -> bool) -> List<T>
+        "filter" => Some(fn_ty(
+            vec![fn_ty(vec![t.clone()], Primitive(Bool))],
+            Slice(Box::new(ty(t))),
+        )),
+        // fn foldl<U>(self, init: U, f: fn(U, T) -> U) -> U
+        "foldl" => Some(fn_ty(
+            vec![u.clone(), fn_ty(vec![u.clone(), t], u.clone())],
+            u,
+        )),
+        // fn foldr<U>(self, init: U, f: fn(T, U) -> U) -> U
+        "foldr" => Some(fn_ty(
+            vec![u.clone(), fn_ty(vec![t, u.clone()], u.clone())],
+            u,
+        )),
+        // fn find(self, f: fn(T) -> bool) -> T
+        "find" => Some(fn_ty(vec![fn_ty(vec![t.clone()], Primitive(Bool))], t)),
+        // fn any(self, f: fn(T) -> bool) -> bool
+        "any" => Some(fn_ty(
+            vec![fn_ty(vec![t], Primitive(Bool))],
+            Primitive(Bool),
+        )),
+        // fn all(self, f: fn(T) -> bool) -> bool
+        "all" => Some(fn_ty(
+            vec![fn_ty(vec![t], Primitive(Bool))],
+            Primitive(Bool),
+        )),
+        _ => None,
+    }
+}
+
+fn lookup_string(method: &str) -> Option<TyKind> {
+    use PrimTy::*;
+    use TyKind::*;
+
+    match method {
+        "len" => Some(fn_ty(vec![], Primitive(I64))),
+        "trim" | "trim_start" | "trim_end" | "to_uppercase" | "to_lowercase" | "reverse" => {
+            Some(fn_ty(vec![], Primitive(String)))
+        }
+        "starts_with" | "ends_with" | "contains" => {
+            Some(fn_ty(vec![Primitive(String)], Primitive(Bool)))
+        }
+        "split" => Some(fn_ty(
+            vec![Primitive(String)],
+            Slice(Box::new(ty(Primitive(String)))),
+        )),
+        "replace" => Some(fn_ty(
+            vec![Primitive(String), Primitive(String)],
+            Primitive(String),
+        )),
+        "chars" => Some(fn_ty(vec![], Slice(Box::new(ty(Primitive(String)))))),
+        "char_at" => Some(fn_ty(vec![Primitive(I64)], Primitive(String))),
+        "slice" => Some(fn_ty(
+            vec![Primitive(I64), Primitive(I64)],
+            Primitive(String),
+        )),
+        "repeat" => Some(fn_ty(vec![Primitive(I64)], Primitive(String))),
+        "is_empty" => Some(fn_ty(vec![], Primitive(Bool))),
+        "index_of" | "last_index_of" => Some(fn_ty(vec![Primitive(String)], Primitive(I64))),
+        "pad_start" | "pad_end" => Some(fn_ty(
+            vec![Primitive(I64), Primitive(String)],
+            Primitive(String),
+        )),
+        _ => None,
+    }
 }
 
 /// Extract the type name from a `TyKind` for method lookup purposes.
@@ -290,5 +270,56 @@ pub fn type_name_from_kind(kind: &TyKind) -> Option<&str> {
         }
         TyKind::Slice(_) => Some("List"),
         _ => None,
+    }
+}
+
+/// Pre-bind type variable `T` from the receiver type into a method signature.
+///
+/// For `Slice(i64).map(...)`, this binds `T → i64` in the method signature
+/// so `fn(fn(T) -> U) -> Slice(U)` becomes `fn(fn(i64) -> U) -> Slice(U)`.
+/// This enables bidirectional inference to propagate concrete element types
+/// into closure parameters.
+pub fn substitute_receiver_type_vars(receiver_ty: &TyKind, method_ty: &TyKind) -> TyKind {
+    use std::collections::HashMap;
+
+    let mut bindings: HashMap<TypeVarId, TyKind> = HashMap::new();
+
+    match receiver_ty {
+        // List<T> = Slice(inner) → bind T to the inner element type
+        TyKind::Slice(inner) if !matches!(inner.kind, TyKind::Unknown) => {
+            bindings.insert(VAR_T, inner.kind.clone());
+        }
+        _ => {}
+    }
+
+    if bindings.is_empty() {
+        return method_ty.clone();
+    }
+
+    substitute_ty(method_ty, &bindings)
+}
+
+fn substitute_ty(ty: &TyKind, bindings: &std::collections::HashMap<TypeVarId, TyKind>) -> TyKind {
+    match ty {
+        TyKind::Var(id) => bindings.get(id).cloned().unwrap_or_else(|| ty.clone()),
+        TyKind::Slice(inner) => TyKind::Slice(Box::new(Ty {
+            kind: substitute_ty(&inner.kind, bindings),
+            ..Ty::default()
+        })),
+        TyKind::Fn(params, ret) => {
+            let params = params
+                .iter()
+                .map(|p| Ty {
+                    kind: substitute_ty(&p.kind, bindings),
+                    ..Ty::default()
+                })
+                .collect();
+            let ret = Box::new(Ty {
+                kind: substitute_ty(&ret.kind, bindings),
+                ..Ty::default()
+            });
+            TyKind::Fn(params, ret)
+        }
+        _ => ty.clone(),
     }
 }

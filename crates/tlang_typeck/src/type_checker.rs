@@ -1188,6 +1188,12 @@ impl TypeChecker {
         if let Some(type_name) = builtin_methods::type_name_from_kind(base_ty_kind)
             && let Some(method_ty) = builtin_methods::lookup(type_name, field_name)
         {
+            // Pre-bind type variables from the receiver type.  For example,
+            // `Slice(i64).map(...)` binds T→i64 so the method signature
+            // `fn(fn(T) -> U) -> Slice(U)` becomes `fn(fn(i64) -> U) -> Slice(U)`.
+            let method_ty =
+                builtin_methods::substitute_receiver_type_vars(base_ty_kind, &method_ty);
+
             self.type_table.insert(
                 expr_hir_id,
                 TypeInfo {
