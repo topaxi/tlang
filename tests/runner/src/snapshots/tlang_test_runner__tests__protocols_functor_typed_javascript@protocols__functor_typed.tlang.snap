@@ -1,0 +1,16 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: javascript"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/protocols/functor_typed.tlang
+---
+Option { '0': 10, tag: [Function: Some] }
+<ref *1> Option { '0': undefined, tag: [Circular *1] }
+15
+36
+
+warning: `rec` call is not in tail position; the `rec` annotation has no effect
+   ┌─ [WORKSPACE_ROOT]/tests/protocols/functor_typed.tlang:33:37
+   │
+33 │   fn foldl<U>([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+   │                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
