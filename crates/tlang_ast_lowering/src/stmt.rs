@@ -870,6 +870,15 @@ impl LoweringContext {
 
             let match_arms = this.create_match_arms(decls, leading_comments);
 
+            // Inherit the return type from the first clause that has an
+            // explicit annotation.  Must happen before `pop_type_param_scope`
+            // so that type-parameter references (e.g. `List<T>`) resolve.
+            let return_type = decls
+                .iter()
+                .find_map(|d| d.return_type_annotation.as_ref())
+                .map(|ty| this.lower_ty(Some(ty)))
+                .unwrap_or_default();
+
             // Use actual source spans for the synthesised body so that inlay hints
             // (return-type hints in particular) land at the real `{` position rather
             // than the default (0, 0).
@@ -893,6 +902,7 @@ impl LoweringContext {
             (hir_id, {
                 let mut decl = hir::FunctionDeclaration::new(hir_id, fn_name, params, body);
                 decl.type_params = type_params;
+                decl.return_type = return_type;
                 // Multi-clause functions inherit visibility from the first clause.
                 decl.visibility = decls[0].visibility;
                 // Use the first clause's params_span so return-type hints land

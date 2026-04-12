@@ -698,7 +698,9 @@ impl LoweringContext {
 
         if let Some(node) = node {
             let kind = match &node.kind {
-                ast::node::TyKind::Path(path) => self.lower_ty_path(path),
+                ast::node::TyKind::Path(path) => {
+                    self.lower_ty_path_with_params(path, &node.parameters)
+                }
                 ast::node::TyKind::Union(paths) => hir::TyKind::Union(
                     paths
                         .iter()
@@ -737,8 +739,35 @@ impl LoweringContext {
     /// Lower a type path, mapping known primitive names to `TyKind::Primitive`
     /// and type parameter names to `TyKind::Var`.
     fn lower_ty_path(&mut self, path: &ast::node::Path) -> hir::TyKind {
+        self.lower_ty_path_with_params(path, &[])
+    }
+
+    /// Lower a type path together with its type parameters, recognising
+    /// built-in generic collection types:
+    ///
+    /// - `List<T>` / `Slice<T>` → `TyKind::Slice(T)`
+    /// - `Dict<K, V>` → `TyKind::Dict(K, V)`
+    fn lower_ty_path_with_params(
+        &mut self,
+        path: &ast::node::Path,
+        params: &[ast::node::Ty],
+    ) -> hir::TyKind {
         if path.segments.len() == 1 {
             let name = path.segments[0].as_str();
+
+            // List<T> / Slice<T> → TyKind::Slice(T)
+            if (name == "List" || name == "Slice") && params.len() == 1 {
+                let elem_ty = self.lower_ty(Some(&params[0]));
+                return hir::TyKind::Slice(Box::new(elem_ty));
+            }
+
+            // Dict<K, V> → TyKind::Dict(K, V)
+            if name == "Dict" && params.len() == 2 {
+                let key_ty = self.lower_ty(Some(&params[0]));
+                let val_ty = self.lower_ty(Some(&params[1]));
+                return hir::TyKind::Dict(Box::new(key_ty), Box::new(val_ty));
+            }
+
             if let Some(prim) = Self::name_to_prim_ty(name) {
                 return hir::TyKind::Primitive(prim);
             }

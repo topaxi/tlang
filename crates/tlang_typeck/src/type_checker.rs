@@ -647,8 +647,23 @@ impl TypeChecker {
                 );
             }
             hir::PatKind::List(pats) => {
+                // When the binding type is a list/slice, decompose it so that
+                // element patterns get the element type and rest patterns keep
+                // the full list type.
+                let elem_ty = match binding_ty {
+                    TyKind::Slice(inner) => Some(inner.kind.clone()),
+                    _ => None,
+                };
+
                 for p in pats {
-                    self.register_pat_bindings(p, binding_ty);
+                    let is_rest = matches!(p.kind, hir::PatKind::Rest(_));
+                    if is_rest {
+                        // Rest patterns (`...xs`) keep the full list type.
+                        self.register_pat_bindings(p, binding_ty);
+                    } else {
+                        let ty = elem_ty.as_ref().unwrap_or(binding_ty);
+                        self.register_pat_bindings(p, ty);
+                    }
                 }
             }
             hir::PatKind::Rest(inner) => {
