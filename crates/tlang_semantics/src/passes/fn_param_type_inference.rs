@@ -151,11 +151,20 @@ fn pattern_type(pat: &PatKind) -> Option<Result<PatternType, ()>> {
     match pat {
         PatKind::Enum(enum_pattern) => {
             let segs = &enum_pattern.path.segments;
-            if segs.len() < 2 {
-                return Some(Err(()));
+            match segs.len() {
+                0 => Some(Err(())),
+                1 => {
+                    // Struct pattern: `Page { title }` — the type is the struct
+                    // name itself (the single path segment).
+                    Some(Ok(PatternType::Named(segs[0].to_string())))
+                }
+                _ => {
+                    // Enum variant pattern: `Option::Some(x)` — the type is the
+                    // second-to-last segment (e.g. "Option" from "Option::Some").
+                    let name = segs[segs.len() - 2].to_string();
+                    Some(Ok(PatternType::Named(name)))
+                }
             }
-            let name = segs[segs.len() - 2].to_string();
-            Some(Ok(PatternType::Named(name)))
         }
         PatKind::Literal(lit) => {
             builtin_type_for_literal(lit).map(|name| Ok(PatternType::Named(name.to_string())))

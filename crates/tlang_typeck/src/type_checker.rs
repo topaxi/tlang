@@ -729,9 +729,73 @@ impl TypeChecker {
             hir::PatKind::Rest(inner) => {
                 self.register_pat_bindings(inner, binding_ty);
             }
-            hir::PatKind::Enum(_, fields) => {
-                for (_, p) in fields {
-                    self.register_pat_bindings(p, binding_ty);
+            hir::PatKind::Enum(path, fields) => {
+                // Try to resolve individual field types from struct/enum metadata.
+                //
+                // For single-segment paths (`Page { title }`), the path names the
+                // struct directly and we look up struct field info.
+                //
+                // For multi-segment paths (`Animal::Dog(name)`), the second-to-last
+                // segment names the enum and the last segment names the variant.
+                //
+                // When the field type cannot be resolved (unknown struct/variant),
+                // we fall back to `Unknown` to avoid false type errors — unresolved
+                // bindings remain permissive rather than inheriting the container
+                // type which would cause spurious type-mismatch errors.
+                let last_ident = path.last_ident().as_str().to_owned();
+                let struct_hir_id = Self::resolve_type_hir_id(binding_ty);
+                let is_enum_variant = path.segments.len() >= 2;
+
+                for (field_key, p) in fields {
+                    let field_ty = if is_enum_variant {
+                        // Enum variant pattern: look up variant parameter type.
+                        let enum_name = path.segments[path.segments.len() - 2]
+                            .ident
+                            .as_str()
+                            .to_owned();
+                        let variant_name = &last_ident;
+                        let find_variant_field = |info: &EnumInfo| {
+                            info.variants
+                                .iter()
+                                .find(|v| v.name.as_str() == variant_name)
+                                .and_then(|v| {
+                                    v.parameters
+                                        .iter()
+                                        .find(|(n, _)| n.as_str() == field_key.as_str())
+                                        .map(|(_, ty)| ty.kind.clone())
+                                })
+                        };
+                        struct_hir_id
+                            .and_then(|id| self.type_table.get_enum_info(&id))
+                            .and_then(find_variant_field)
+                            .or_else(|| {
+                                self.type_table
+                                    .get_enum_info_by_name(&enum_name)
+                                    .and_then(find_variant_field)
+                            })
+                    } else {
+                        // Struct pattern: look up struct field type.
+                        struct_hir_id
+                            .and_then(|id| self.resolve_field_type(&id, field_key.as_str()))
+                            .or_else(|| {
+                                self.type_table
+                                    .get_struct_info_by_name(&last_ident)
+                                    .and_then(|info| {
+                                        info.fields
+                                            .iter()
+                                            .find(|(n, _)| n.as_str() == field_key.as_str())
+                                            .map(|(_, ty)| ty.kind.clone())
+                                    })
+                            })
+                    };
+
+                    if let Some(field_ty) = field_ty.filter(Self::is_concrete_ty) {
+                        p.ty.kind = field_ty.clone();
+                        self.register_pat_bindings(p, &field_ty);
+                    } else {
+                        // Cannot resolve field type; leave Unknown to avoid false errors.
+                        self.register_pat_bindings(p, &TyKind::Unknown);
+                    }
                 }
             }
             hir::PatKind::Wildcard | hir::PatKind::Literal(_) => {}
@@ -739,6 +803,19 @@ impl TypeChecker {
     }
 
     // ── Struct and enum declaration registration ──────────────────────
+
+    /// Returns `true` if `kind` represents a resolved, concrete type that is
+    /// worth propagating to pattern bindings.  Unknown types, type variables,
+    /// and unresolved path types (no HirId) are not concrete — treating them
+    /// as Unknown preserves the permissive behaviour of the type checker.
+    fn is_concrete_ty(kind: &TyKind) -> bool {
+        match kind {
+            TyKind::Unknown => false,
+            TyKind::Var(_) => false,
+            TyKind::Path(path) => path.res.hir_id().is_some(),
+            _ => true,
+        }
+    }
 
     /// Register a struct declaration in the type table: store field metadata
     /// and register a constructor function type `Fn(field_tys…) → Path(Struct)`.
@@ -1695,6 +1772,25 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                         expr.ty.kind = fn_ty;
                     }
                 }
+            }
+            hir::ExprKind::Match(scrutinee, arms) => {
+                self.visit_expr(scrutinee, ctx);
+                let scrutinee_ty = scrutinee.ty.kind.clone();
+                let mut match_ty = TyKind::Unknown;
+                for arm in arms.iter_mut() {
+                    arm.pat.ty.kind = scrutinee_ty.clone();
+                    self.register_pat_bindings(&mut arm.pat, &scrutinee_ty);
+                    if let Some(guard) = &mut arm.guard {
+                        self.visit_expr(guard, ctx);
+                    }
+                    self.visit_block(&mut arm.block, ctx);
+                    if matches!(match_ty, TyKind::Unknown)
+                        && let Some(e) = &arm.block.expr
+                    {
+                        match_ty = e.ty.kind.clone();
+                    }
+                }
+                self.assign_expr_type(expr, match_ty);
             }
             hir::ExprKind::Block(block) => {
                 self.visit_block(block, ctx);

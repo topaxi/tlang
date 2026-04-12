@@ -335,6 +335,11 @@ fn collect_expr_hints(expr: &hir::Expr, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
         hir::ExprKind::Match(scrutinee, arms) => {
             collect_expr_hints(scrutinee, ctx, hints);
             for arm in arms {
+                // Emit type hints for each binding introduced by the arm pattern
+                // (e.g. `title: string` for `Page { title, alerts, posts }`).
+                if !matches!(arm.pat.ty.kind, TyKind::Unknown) {
+                    collect_pat_type_hints(&arm.pat, ctx.range, hints);
+                }
                 if let Some(guard) = &arm.guard {
                     collect_expr_hints(guard, ctx, hints);
                 }
@@ -954,10 +959,8 @@ fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, 
 let result = [1,2,3] |> map(fn (x) { x ** 2 });
 "#;
         let hints = hints_for(source);
-        // Find the hint for `result` binding.
-        let result_hint = hints.iter().find(|h| {
-            h.label.contains("List") || h.label.contains("?") || h.kind == InlayHintKind::Type
-        });
+        // Find the hint for `result` binding specifically (label starts with ": List").
+        let result_hint = hints.iter().find(|h| h.label.starts_with(": List"));
         assert!(
             result_hint.is_some(),
             "expected a type hint for `result`, got: {hints:?}"

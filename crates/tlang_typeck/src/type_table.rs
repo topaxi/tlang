@@ -128,6 +128,13 @@ impl TypeTable {
         self.struct_info.get(hir_id)
     }
 
+    /// Look up struct info by the struct's name string.
+    pub fn get_struct_info_by_name(&self, name: &str) -> Option<&StructInfo> {
+        self.struct_info
+            .values()
+            .find(|info| info.name.as_str() == name)
+    }
+
     /// Register enum declaration metadata.
     pub fn insert_enum_info(&mut self, hir_id: HirId, info: EnumInfo) {
         self.enum_info.insert(hir_id, info);
@@ -136,6 +143,13 @@ impl TypeTable {
     /// Look up enum info by the enum declaration's `HirId`.
     pub fn get_enum_info(&self, hir_id: &HirId) -> Option<&EnumInfo> {
         self.enum_info.get(hir_id)
+    }
+
+    /// Look up enum info by the enum's name string.
+    pub fn get_enum_info_by_name(&self, name: &str) -> Option<&EnumInfo> {
+        self.enum_info
+            .values()
+            .find(|info| info.name.as_str() == name)
     }
 
     /// Register protocol declaration metadata.
