@@ -954,6 +954,10 @@ pub struct FunctionParameter {
     pub hir_id: HirId,
     pub name: Ident,
     pub type_annotation: Ty,
+    /// Whether the user wrote an explicit type annotation for this parameter.
+    /// `false` when the type was left unannotated (even if the type checker
+    /// later fills in `type_annotation` via inference).
+    pub has_type_annotation: bool,
     pub span: Span,
 }
 
@@ -981,6 +985,10 @@ pub struct FunctionDeclaration {
     /// Used to place return-type inlay hints right after `)`.
     pub params_span: Span,
     pub return_type: Ty,
+    /// Whether the user wrote an explicit return type annotation.
+    /// `false` when the return type was left unannotated (even if the type
+    /// checker later fills in `return_type` via inference).
+    pub has_return_type: bool,
     pub body: Block,
     pub span: Span,
 }
@@ -995,6 +1003,7 @@ impl FunctionDeclaration {
             parameters: params,
             params_span: Span::default(),
             return_type: Ty::default(),
+            has_return_type: false,
             body,
             span: Span::default(),
         }

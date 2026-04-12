@@ -23,6 +23,20 @@ use tlang_typeck::TypeTable;
 
 use crate::AnalysisResult;
 
+/// Returns `true` when the type kind contains any unresolved `TyKind::Var`.
+fn ty_contains_var(ty: &TyKind) -> bool {
+    match ty {
+        TyKind::Var(_) => true,
+        TyKind::Slice(inner) => ty_contains_var(&inner.kind),
+        TyKind::Dict(k, v) => ty_contains_var(&k.kind) || ty_contains_var(&v.kind),
+        TyKind::Fn(params, ret) => {
+            params.iter().any(|p| ty_contains_var(&p.kind)) || ty_contains_var(&ret.kind)
+        }
+        TyKind::Union(tys) => tys.iter().any(|t| ty_contains_var(&t.kind)),
+        _ => false,
+    }
+}
+
 /// A single inlay hint to be displayed in the editor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InlayHint {
@@ -197,10 +211,7 @@ fn collect_fn_decl_hints(
 ) {
     // Parameter type hints — show when the user didn't annotate a type.
     for param in &decl.parameters {
-        if matches!(param.type_annotation.kind, TyKind::Unknown) {
-            // The type checker may not infer parameter types yet, so this
-            // shows `: unknown` for now.  As inference improves, concrete
-            // types will appear automatically.
+        if !param.has_type_annotation && !matches!(param.type_annotation.kind, TyKind::Unknown) {
             let pos = param.name.span.end_lc;
             push_hint(
                 hints,
@@ -213,19 +224,29 @@ fn collect_fn_decl_hints(
     }
 
     // Return type hint — show when no explicit return type was written.
-    if matches!(decl.return_type.kind, TyKind::Unknown) {
-        // Try to get the inferred return type from the type table.
-        let inferred_ret = ctx
-            .type_table
-            .get(&decl.hir_id)
-            .and_then(|info| match &info.ty.kind {
-                TyKind::Fn(_, ret) => Some(&ret.kind),
-                _ => None,
+    if !decl.has_return_type {
+        // Try to get the inferred return type. Priority:
+        // 1. The type checker may have written it back to decl.return_type.
+        // 2. The type table entry for this declaration (Fn signature).
+        // 3. The body's completion expression type.
+        let ret_from_decl = (!matches!(decl.return_type.kind, TyKind::Unknown)
+            && !ty_contains_var(&decl.return_type.kind))
+        .then_some(&decl.return_type.kind);
+
+        let inferred_ret = ret_from_decl
+            .or_else(|| {
+                ctx.type_table
+                    .get(&decl.hir_id)
+                    .and_then(|info| match &info.ty.kind {
+                        TyKind::Fn(_, ret) => Some(&ret.kind),
+                        _ => None,
+                    })
             })
             .or_else(|| decl.body.expr.as_ref().map(|e| &e.ty.kind));
 
         if let Some(ret_kind) = inferred_ret
             && !matches!(ret_kind, TyKind::Unknown)
+            && !ty_contains_var(ret_kind)
         {
             // Find the position after the closing `)` of the parameter list.
             // Use the span of the last parameter, or the function name span.
@@ -831,13 +852,13 @@ mod tests {
     }
 
     #[test]
-    fn function_parameter_unknown_type_hint() {
+    fn function_parameter_unknown_type_no_hint() {
+        // Un-annotated parameters with unknown type should not show a hint —
+        // only inferred concrete types are useful.
         let hints = hints_for("fn double(x) { x }");
         assert!(
-            hints
-                .iter()
-                .any(|h| h.label == ": unknown" && h.kind == InlayHintKind::Type),
-            "expected `: unknown` hint for un-annotated parameter, got: {hints:?}"
+            !hints.iter().any(|h| h.label == ": unknown"),
+            "should not show `: unknown` hint for un-annotated parameter, got: {hints:?}"
         );
     }
 

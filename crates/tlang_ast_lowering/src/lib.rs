@@ -504,10 +504,13 @@ impl LoweringContext {
         let name = self.lower_fn_param_pat(node);
         let ty = self.lower_ty(node.type_annotation.as_ref());
 
+        let has_type_annotation = node.type_annotation.is_some();
+
         hir::FunctionParameter {
             hir_id,
             name,
             type_annotation: ty,
+            has_type_annotation,
             span: node.span,
         }
     }
@@ -539,6 +542,7 @@ impl LoweringContext {
                 parameters,
                 params_span: decl.params_span,
                 return_type,
+                has_return_type: decl.return_type_annotation.is_some(),
                 body,
                 span: decl.span,
             }

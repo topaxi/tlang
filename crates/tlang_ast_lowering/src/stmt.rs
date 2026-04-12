@@ -371,28 +371,7 @@ impl LoweringContext {
                 let params: Vec<hir::FunctionParameter> = method
                     .parameters
                     .iter()
-                    .map(|param| {
-                        let name = match &param.pattern.kind {
-                            ast::node::PatKind::Identifier(ident) => *ident.as_ref(),
-                            ast::node::PatKind::_Self => Ident::new("self", param.pattern.span),
-                            _ => Ident::new("_", param.pattern.span),
-                        };
-                        // For default implementations, use `lower_node_id` to create
-                        // the NodeId→HirId mapping. `symbol_tables()` will then
-                        // assign HirIds to the semantic analyzer's existing symbols
-                        // in this scope, which avoids creating duplicate entries.
-                        let hir_id = if has_body {
-                            self.lower_node_id(param.pattern.id)
-                        } else {
-                            self.unique_id()
-                        };
-                        hir::FunctionParameter {
-                            hir_id,
-                            name,
-                            type_annotation: self.lower_ty(param.type_annotation.as_ref()),
-                            span: param.pattern.span,
-                        }
-                    })
+                    .map(|param| self.lower_protocol_method_param(param, has_body))
                     .collect();
 
                 // Find the `self` parameter for this method (pattern kind `_Self`).
@@ -489,6 +468,35 @@ impl LoweringContext {
             span: node.span,
             leading_comments: node.leading_comments.clone(),
             trailing_comments: node.trailing_comments.clone(),
+        }
+    }
+
+    fn lower_protocol_method_param(
+        &mut self,
+        param: &ast::node::FunctionParameter,
+        has_body: bool,
+    ) -> hir::FunctionParameter {
+        let name = match &param.pattern.kind {
+            ast::node::PatKind::Identifier(ident) => *ident.as_ref(),
+            ast::node::PatKind::_Self => Ident::new("self", param.pattern.span),
+            _ => Ident::new("_", param.pattern.span),
+        };
+        // For default implementations, use `lower_node_id` to create
+        // the NodeId→HirId mapping. `symbol_tables()` will then
+        // assign HirIds to the semantic analyzer's existing symbols
+        // in this scope, which avoids creating duplicate entries.
+        let hir_id = if has_body {
+            self.lower_node_id(param.pattern.id)
+        } else {
+            self.unique_id()
+        };
+        let has_type_annotation = param.type_annotation.is_some();
+        hir::FunctionParameter {
+            hir_id,
+            name,
+            type_annotation: self.lower_ty(param.type_annotation.as_ref()),
+            has_type_annotation,
+            span: param.pattern.span,
         }
     }
 
@@ -726,6 +734,13 @@ impl LoweringContext {
             .iter()
             .enumerate()
             .map(|(i, ident)| {
+                let has_type_annotation = decls.iter().any(|d| {
+                    d.parameters
+                        .get(i)
+                        .and_then(|p| p.type_annotation.as_ref())
+                        .is_some()
+                });
+
                 // Pick up any type annotation inferred by the semantic analysis phase.
                 let type_annotation = decls
                     .iter()
@@ -737,6 +752,7 @@ impl LoweringContext {
                     hir_id: self.unique_id(),
                     name: *ident,
                     type_annotation,
+                    has_type_annotation,
                     span: ident.span,
                 }
             })
@@ -903,6 +919,7 @@ impl LoweringContext {
                 let mut decl = hir::FunctionDeclaration::new(hir_id, fn_name, params, body);
                 decl.type_params = type_params;
                 decl.return_type = return_type;
+                decl.has_return_type = decls.iter().any(|d| d.return_type_annotation.is_some());
                 // Multi-clause functions inherit visibility from the first clause.
                 decl.visibility = decls[0].visibility;
                 // Use the first clause's params_span so return-type hints land

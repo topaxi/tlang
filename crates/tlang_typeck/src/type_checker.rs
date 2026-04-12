@@ -1566,6 +1566,11 @@ impl TypeChecker {
             decl.return_type.kind.clone()
         };
 
+        // Write the resolved return type back so inlay hints can read it.
+        if !decl.has_return_type {
+            decl.return_type.kind = ret_ty.clone();
+        }
+
         let param_tys: Vec<Ty> = decl
             .parameters
             .iter()
@@ -1613,6 +1618,12 @@ impl TypeChecker {
                 .map(|e| e.ty.kind.clone())
                 .or_else(|| self.infer_return_type_from_observed())
                 .unwrap_or_else(|| decl.return_type.kind.clone());
+
+            // Write the inferred return type back so inlay hints can read it.
+            if !decl.has_return_type {
+                decl.return_type.kind = body_ty.clone();
+            }
+
             let param_tys: Vec<Ty> = decl
                 .parameters
                 .iter()
@@ -2111,6 +2122,7 @@ mod tests {
                 kind: ty_kind,
                 ..Ty::default()
             },
+            has_type_annotation: false,
             span: tlang_span::Span::default(),
         }
     }
@@ -2133,6 +2145,7 @@ mod tests {
                 kind: ret,
                 ..Ty::default()
             },
+            has_return_type: false,
             body: hir::Block::new(dummy_hir_id(), vec![], None, tlang_span::Span::default()),
             span: tlang_span::Span::default(),
         }
