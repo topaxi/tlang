@@ -181,7 +181,9 @@ struct Page {
 }
 
 fn Page.render(Page { title, alerts, posts }) {
-    let alert_section = alerts |> map(fn(a) { a.render() }) |> join_html();
+    let alert_section = alerts
+        |> map(Alert::render)
+        |> join_html();
     let post_items = posts
         |> map(fn(p) { html"<li>{p.render()}</li>" })
         |> join_html();
