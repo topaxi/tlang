@@ -128,8 +128,8 @@ fn test_empty_list_pattern_inference() {
         "fn len([]) { 0 }
          fn len([_, ...xs]) { 1 + len(xs) }",
     );
-    assert!(matches!(param_ty_kind(&decls, 0, 0), TyKind::Path(p) if p.to_string() == "Slice"));
-    assert!(matches!(param_ty_kind(&decls, 1, 0), TyKind::Path(p) if p.to_string() == "Slice"));
+    assert!(matches!(param_ty_kind(&decls, 0, 0), TyKind::Path(p) if p.to_string() == "List"));
+    assert!(matches!(param_ty_kind(&decls, 1, 0), TyKind::Path(p) if p.to_string() == "List"));
 }
 
 #[test]
@@ -138,9 +138,9 @@ fn test_list_with_wildcard_inference() {
         "fn map([], _) { [] }
          fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }",
     );
-    // First param: [] and [x,...xs] → Slice
-    assert!(matches!(param_ty_kind(&decls, 0, 0), TyKind::Path(p) if p.to_string() == "Slice"));
-    assert!(matches!(param_ty_kind(&decls, 1, 0), TyKind::Path(p) if p.to_string() == "Slice"));
+    // First param: [] and [x,...xs] → List
+    assert!(matches!(param_ty_kind(&decls, 0, 0), TyKind::Path(p) if p.to_string() == "List"));
+    assert!(matches!(param_ty_kind(&decls, 1, 0), TyKind::Path(p) if p.to_string() == "List"));
     // Second param: _ and f — unconstrained, no annotation
     assert!(decls[0].parameters[1].type_annotation.is_none());
     assert!(decls[1].parameters[1].type_annotation.is_none());
@@ -149,13 +149,13 @@ fn test_list_with_wildcard_inference() {
 // ── Union inference ───────────────────────────────────────────────────────────
 
 #[test]
-fn test_string_and_slice_union_inference() {
-    // reverse_string-style: "" matches String, [x,...xs] matches Slice
+fn test_string_and_list_union_inference() {
+    // reverse_string-style: "" matches String, [x,...xs] matches List
     let decls = analyze_fn_decls(
         r#"fn reverse("", acc) { acc }
            fn reverse([x, ...xs], acc) { reverse(xs, acc) }"#,
     );
-    // param 0 should be String | Slice union
+    // param 0 should be String | List union
     for (i, _) in decls.iter().enumerate() {
         match param_ty_kind(&decls, i, 0) {
             TyKind::Union(paths) => {
@@ -164,7 +164,7 @@ fn test_string_and_slice_union_inference() {
                     names.contains(&"String".to_string()),
                     "union missing String"
                 );
-                assert!(names.contains(&"Slice".to_string()), "union missing Slice");
+                assert!(names.contains(&"List".to_string()), "union missing List");
             }
             other => panic!("expected Union, got {other:?}"),
         }

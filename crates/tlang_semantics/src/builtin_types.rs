@@ -24,10 +24,8 @@ pub const CHAR: &str = "char";
 /// The single heap-allocated string type, maps to `TlangObjectKind::String`.
 pub const STRING: &str = "String";
 
-/// The sliceable sequence type. Used when a `PatKind::List` pattern (`[]` or
-/// `[x, ...xs]`) is matched, since the interpreter handles list patterns on
-/// both `TlangObjectKind::Slice` (list slices) and `TlangObjectKind::String`
-/// (strings).
+/// The sliceable sequence type. The underlying runtime representation for
+/// `List` values. User-facing code should use `List` instead.
 pub const SLICE: &str = "Slice";
 
 /// The builtin ordered list (array) type produced by list literals `[1, 2, 3]`.

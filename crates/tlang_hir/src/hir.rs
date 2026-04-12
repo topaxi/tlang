@@ -901,7 +901,7 @@ pub enum TyKind {
     Primitive(PrimTy),
     /// Function type: parameter types → return type.
     Fn(Vec<Ty>, Box<Ty>),
-    /// Homogeneous list/slice type.
+    /// List type with element type (user-facing `List<T>`).
     Slice(Box<Ty>),
     /// Dictionary type: key type → value type.
     Dict(Box<Ty>, Box<Ty>),
@@ -930,8 +930,8 @@ impl Display for TyKind {
                 }
                 write!(f, ") -> {}", ret.kind)
             }
-            TyKind::Slice(inner) => write!(f, "{}[]", inner.kind),
-            TyKind::Dict(k, v) => write!(f, "dict[{}, {}]", k.kind, v.kind),
+            TyKind::Slice(inner) => write!(f, "List<{}>", inner.kind),
+            TyKind::Dict(k, v) => write!(f, "Dict<{}, {}>", k.kind, v.kind),
             TyKind::Never => write!(f, "never"),
             TyKind::Var(id) => write!(f, "?{id}"),
             TyKind::Path(path) => write!(f, "{path}"),

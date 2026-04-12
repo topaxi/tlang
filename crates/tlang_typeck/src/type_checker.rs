@@ -70,6 +70,54 @@ impl TypeChecker {
             .unwrap_or_else(|| panic!("unknown builtin collection type: {name}"))
     }
 
+    /// Infer `Slice(elem_ty)` from a list literal's elements.
+    ///
+    /// When all elements agree on a single known type, the list is typed as
+    /// `Slice(that_type)`.  Otherwise (empty list, mixed types, or unknown
+    /// elements) falls back to the bare `List` path.
+    fn infer_list_type(elements: &[hir::Expr]) -> TyKind {
+        let common = Self::common_element_type(elements.iter().map(|e| &e.ty.kind));
+        match common {
+            Some(elem_kind) => TyKind::Slice(Box::new(Ty {
+                kind: elem_kind,
+                ..Ty::default()
+            })),
+            None => Self::builtin_type_path("List"),
+        }
+    }
+
+    /// Infer `Dict(key_ty, val_ty)` from a dict literal's entries.
+    fn infer_dict_type(entries: &[(hir::Expr, hir::Expr)]) -> TyKind {
+        let key_common = Self::common_element_type(entries.iter().map(|(k, _)| &k.ty.kind));
+        let val_common = Self::common_element_type(entries.iter().map(|(_, v)| &v.ty.kind));
+        match (key_common, val_common) {
+            (Some(k), Some(v)) => TyKind::Dict(
+                Box::new(Ty {
+                    kind: k,
+                    ..Ty::default()
+                }),
+                Box::new(Ty {
+                    kind: v,
+                    ..Ty::default()
+                }),
+            ),
+            _ => Self::builtin_type_path("Dict"),
+        }
+    }
+
+    /// Find the common type across an iterator of `TyKind`s.
+    ///
+    /// Returns `Some(ty)` when all non-unknown elements agree on a single
+    /// concrete type, `None` otherwise (empty, mixed, or all unknown).
+    fn common_element_type<'a>(mut types: impl Iterator<Item = &'a TyKind>) -> Option<TyKind> {
+        let first = types.find(|t| !matches!(t, TyKind::Unknown))?;
+        if types.all(|t| matches!(t, TyKind::Unknown) || t == first) {
+            Some(first.clone())
+        } else {
+            None
+        }
+    }
+
     /// Assign `ty_kind` to `expr.ty` and record it in the type table.
     fn assign_expr_type(&mut self, expr: &mut hir::Expr, ty_kind: TyKind) {
         expr.ty.kind = ty_kind.clone();
@@ -1640,7 +1688,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 for elem in elements.iter_mut() {
                     self.visit_expr(elem, ctx);
                 }
-                let ty_kind = Self::builtin_type_path("List");
+                let ty_kind = Self::infer_list_type(elements);
                 self.assign_expr_type(expr, ty_kind);
             }
             hir::ExprKind::Dict(entries) => {
@@ -1648,7 +1696,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     self.visit_expr(key, ctx);
                     self.visit_expr(val, ctx);
                 }
-                let ty_kind = Self::builtin_type_path("Dict");
+                let ty_kind = Self::infer_dict_type(entries);
                 self.assign_expr_type(expr, ty_kind);
             }
             _ => {
@@ -1689,6 +1737,19 @@ fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
             ty_kinds_compatible(&ka.kind, &kb.kind) && ty_kinds_compatible(&va.kind, &vb.kind)
         }
         (TyKind::Path(pa), TyKind::Path(pb)) => pa == pb,
+        // A bare `List`/`Dict` path annotation is compatible with any
+        // parameterised `Slice(_)`/`Dict(_, _)` — the annotation just doesn't
+        // constrain the element type.
+        (TyKind::Path(p), TyKind::Slice(_)) | (TyKind::Slice(_), TyKind::Path(p))
+            if p.to_string() == "List" =>
+        {
+            true
+        }
+        (TyKind::Path(p), TyKind::Dict(..)) | (TyKind::Dict(..), TyKind::Path(p))
+            if p.to_string() == "Dict" =>
+        {
+            true
+        }
         (TyKind::Union(ua), TyKind::Union(ub)) => {
             ua.len() == ub.len()
                 && ua

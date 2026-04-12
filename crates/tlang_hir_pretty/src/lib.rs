@@ -786,15 +786,16 @@ impl HirPretty {
                 self.print_ty(ret);
             }
             hir::TyKind::Slice(inner) => {
+                self.push_str("List<");
                 self.print_ty(inner);
-                self.push_str("[]");
+                self.push_str(">");
             }
             hir::TyKind::Dict(key, val) => {
-                self.push_str("{");
+                self.push_str("Dict<");
                 self.print_ty(key);
-                self.push_str(": ");
+                self.push_str(", ");
                 self.print_ty(val);
-                self.push_str("}");
+                self.push_str(">");
             }
             hir::TyKind::Never => self.push_str("!"),
             hir::TyKind::Var(id) => {

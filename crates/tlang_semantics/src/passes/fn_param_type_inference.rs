@@ -160,7 +160,7 @@ fn pattern_type(pat: &PatKind) -> Option<Result<PatternType, ()>> {
         PatKind::Literal(lit) => {
             builtin_type_for_literal(lit).map(|name| Ok(PatternType::Named(name.to_string())))
         }
-        PatKind::List(_) => Some(Ok(PatternType::Named(builtin_types::SLICE.to_string()))),
+        PatKind::List(_) => Some(Ok(PatternType::Named(builtin_types::LIST.to_string()))),
         // Unconstrained — don't block or contribute to inference.
         PatKind::Identifier(_) | PatKind::Wildcard | PatKind::_Self => None,
         // Rest patterns at the top level, None patterns — block inference.
