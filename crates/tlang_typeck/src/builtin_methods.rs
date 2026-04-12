@@ -273,6 +273,83 @@ pub fn type_name_from_kind(kind: &TyKind) -> Option<&str> {
     }
 }
 
+/// A builtin method descriptor for enumeration.
+#[derive(Debug, Clone)]
+pub struct BuiltinMethod {
+    /// The method name (e.g. `"replace_all"`).
+    pub name: &'static str,
+    /// The method's type signature as `TyKind::Fn(params, ret)`.
+    /// The `self` parameter is excluded.
+    pub signature: TyKind,
+}
+
+/// The list of builtin type names that have methods.
+pub const BUILTIN_TYPE_NAMES: &[&str] =
+    &["Regex", "StringBuf", "Option", "Result", "List", "String"];
+
+/// Enumerate all builtin methods available on a type.
+///
+/// Returns an empty slice when `type_name` is not a recognised builtin type.
+/// The returned signatures have `self` excluded (same convention as [`lookup`]).
+pub fn methods_for(type_name: &str) -> Vec<BuiltinMethod> {
+    match type_name {
+        "Regex" => methods_for_regex(),
+        "StringBuf" => methods_for_stringbuf(),
+        "Option" => methods_for_option(),
+        "Result" => methods_for_result(),
+        "List" => methods_for_list(),
+        "String" => methods_for_string(),
+        _ => vec![],
+    }
+}
+
+fn methods_for_regex() -> Vec<BuiltinMethod> {
+    ["test", "exec", "replace_all", "replace_first", "flags"]
+        .iter()
+        .filter_map(|&name| Some(BuiltinMethod { name, signature: lookup_regex(name)? }))
+        .collect()
+}
+
+fn methods_for_stringbuf() -> Vec<BuiltinMethod> {
+    ["push", "push_char", "clear", "to_string", "len", "is_empty"]
+        .iter()
+        .filter_map(|&name| Some(BuiltinMethod { name, signature: lookup_stringbuf(name)? }))
+        .collect()
+}
+
+fn methods_for_option() -> Vec<BuiltinMethod> {
+    ["is_some", "is_none", "unwrap", "map"]
+        .iter()
+        .filter_map(|&name| Some(BuiltinMethod { name, signature: lookup_option(name)? }))
+        .collect()
+}
+
+fn methods_for_result() -> Vec<BuiltinMethod> {
+    ["is_ok", "is_err", "unwrap", "map"]
+        .iter()
+        .filter_map(|&name| Some(BuiltinMethod { name, signature: lookup_result(name)? }))
+        .collect()
+}
+
+fn methods_for_list() -> Vec<BuiltinMethod> {
+    ["slice", "map", "filter", "foldl", "foldr", "find", "any", "all"]
+        .iter()
+        .filter_map(|&name| Some(BuiltinMethod { name, signature: lookup_list(name)? }))
+        .collect()
+}
+
+fn methods_for_string() -> Vec<BuiltinMethod> {
+    [
+        "len", "trim", "trim_start", "trim_end", "to_uppercase", "to_lowercase",
+        "reverse", "starts_with", "ends_with", "contains", "split", "replace",
+        "chars", "char_at", "slice", "repeat", "is_empty", "index_of",
+        "last_index_of", "pad_start", "pad_end",
+    ]
+    .iter()
+    .filter_map(|&name| Some(BuiltinMethod { name, signature: lookup_string(name)? }))
+    .collect()
+}
+
 /// Pre-bind type variable `T` from the receiver type into a method signature.
 ///
 /// For `Slice(i64).map(...)`, this binds `T → i64` in the method signature
