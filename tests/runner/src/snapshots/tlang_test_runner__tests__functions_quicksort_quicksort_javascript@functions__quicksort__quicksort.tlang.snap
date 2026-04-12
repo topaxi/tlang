@@ -9,9 +9,3 @@ input_file: tests/functions/quicksort/quicksort.tlang
   4, 5, 5, 5, 6,
   9
 ]
-
-warning: `rec` call is not in tail position; the `rec` annotation has no effect
-  ┌─ [WORKSPACE_ROOT]/tests/functions/quicksort/quicksort.tlang:7:28
-  │
-7 │ fn filter([_, ...xs], f) { rec filter(xs, f) }
-  │                            ^^^^^^^^^^^^^^^^^

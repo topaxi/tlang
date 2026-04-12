@@ -1,0 +1,15 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: "apply_redactions(&output, workspace_root)"
+input_file: tests/protocols/functor_typed.tlang
+---
+Option::Some(0: 10)
+Option::None
+15
+36
+
+[TIMESTAMP] WARN  tlang_hir_opt::symbol_resolution::identifier_resolver] No symbols found for path 'List' on line 1109. Available symbols: [INTERNAL_SYMBOL_TABLE]
+[TIMESTAMP] WARN  tlang_hir_opt::slot_allocation::slot_allocator] Unable to assign slot for path 'List' on line 1109, as it has not been resolved
+[TIMESTAMP] WARN  tlang_hir_opt::symbol_resolution::identifier_resolver] No symbols found for path 'List' on line 1109. Available symbols: [INTERNAL_SYMBOL_TABLE]
+[TIMESTAMP] WARN  tlang_hir_opt::slot_allocation::slot_allocator] Unable to assign slot for path 'List' on line 1109, as it has not been resolved

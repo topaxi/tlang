@@ -5,15 +5,3 @@ expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/functions/binary_search/alias.tlang
 ---
 6
-
-warning: `rec` call is not in tail position; the `rec` annotation has no effect
-   ┌─ [WORKSPACE_ROOT]/tests/functions/binary_search/alias.tlang:10:9
-   │
-10 │         rec binary_search(list, target, mid + 1, high)
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: `rec` call is not in tail position; the `rec` annotation has no effect
-   ┌─ [WORKSPACE_ROOT]/tests/functions/binary_search/alias.tlang:12:9
-   │
-12 │         rec binary_search(list, target, low, mid - 1)
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

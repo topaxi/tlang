@@ -1,0 +1,48 @@
+// Acceptance test for typed protocol system features:
+// associated types, impl-level type parameters, method-level generics.
+
+// ── User-defined typed protocol with associated type ──────────────────────────
+
+// Define a typed Functor protocol with an associated type.
+protocol MyFunctor<T> {
+  type Wrapped<U>
+  fn map<U>(self, f: fn(T) -> U) -> Wrapped<U>
+}
+
+// Generic impl for Option<T>
+impl<T> MyFunctor<T> for Option<T> {
+  type Wrapped<U> = Option<U>
+  fn map<U>(Option::Some(x), f) { Option::Some(f(x)) }
+  fn map<U>(Option::None, _) { Option::None }
+}
+
+// Test user-defined typed Functor::map on Option
+MyFunctor::map(Option::Some(5), fn (x) { x * 2 }) |> log();
+MyFunctor::map(Option::None, fn (x) { x * 2 }) |> log();
+
+// ── User-defined typed protocol with method-level generics ────────────────────
+
+// Define a typed Foldable protocol with method-level generics.
+protocol Foldable<T> {
+  fn foldl<U>(self, init: U, f: fn(U, T) -> U) -> U
+}
+
+// Generic impl for List<T>
+impl<T> Foldable<T> for List<T> {
+  fn foldl<U>([], acc, _) { acc }
+  fn foldl<U>([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+}
+
+// Test Foldable::foldl on List - sum 1+2+3+4+5 = 15
+Foldable::foldl([1, 2, 3, 4, 5], 0, fn (acc, x) { acc + x }) |> log();
+
+// ── Cross-protocol pipeline ────────────────────────────────────────────────────
+
+// Use stdlib Functor::map (has List impl) combined with user-defined Foldable::foldl
+// [1, 2, 3] |> map(x => x+10) gives [11, 12, 13], foldl sum = 36
+[1, 2, 3]
+|> Functor::map(fn (x) { x + 10 })
+|> Foldable::foldl(0, fn (acc, x) { acc + x })
+|> log();
+
+

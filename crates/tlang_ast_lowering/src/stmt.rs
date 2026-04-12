@@ -520,6 +520,11 @@ impl LoweringContext {
             })
             .collect();
         let target_type = self.lower_path(&impl_block.target_type);
+        let target_type_arguments: Vec<hir::Ty> = impl_block
+            .target_type_arguments
+            .iter()
+            .map(|ty| self.lower_ty(Some(ty)))
+            .collect();
 
         let where_clause = impl_block
             .where_clause
@@ -566,6 +571,7 @@ impl LoweringContext {
             protocol_name,
             type_arguments,
             target_type,
+            target_type_arguments,
             where_clause,
             associated_types,
             methods,
@@ -847,6 +853,13 @@ impl LoweringContext {
         );
 
         self.with_new_scope(|this, _scope| {
+            // Push method-level type parameter scope (e.g. `<U>` from `fn map<U>`)
+            // before lowering any type annotations so that references like
+            // `fn(T) -> U` in parameter types resolve `U` to `TyKind::Var`.
+            // Type params are taken from the first clause — subsequent clauses
+            // must use identical params (enforced by convention, not yet validated).
+            let type_params = this.lower_type_params(&decls[0].type_params);
+
             let (hir_id, fn_name, params, span) =
                 this.setup_function_declaration_metadata(decls, all_param_names);
 
@@ -875,8 +888,11 @@ impl LoweringContext {
                 body_span,
             );
 
+            this.pop_type_param_scope();
+
             (hir_id, {
                 let mut decl = hir::FunctionDeclaration::new(hir_id, fn_name, params, body);
+                decl.type_params = type_params;
                 // Multi-clause functions inherit visibility from the first clause.
                 decl.visibility = decls[0].visibility;
                 // Use the first clause's params_span so return-type hints land

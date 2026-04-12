@@ -5,15 +5,3 @@ expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/functions/pipeline/pipeline.tlang
 ---
 120
-
-warning: `rec` call is not in tail position; the `rec` annotation has no effect
-  ┌─ [WORKSPACE_ROOT]/tests/functions/pipeline/pipeline.tlang:4:28
-  │
-4 │ fn filter([_, ...xs], f) { rec filter(xs, f) }
-  │                            ^^^^^^^^^^^^^^^^^
-
-warning: `rec` call is not in tail position; the `rec` annotation has no effect
-  ┌─ [WORKSPACE_ROOT]/tests/functions/pipeline/pipeline.tlang:8:32
-  │
-8 │ fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
-  │                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^

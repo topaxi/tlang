@@ -31,15 +31,3 @@ Prime counts in different ranges:
 4
 2
 2
-
-warning: `rec` call is not in tail position; the `rec` annotation has no effect
-   ┌─ [WORKSPACE_ROOT]/tests/algorithms/primes.tlang:18:28
-   │
-18 │ fn filter([_, ...xs], f) { rec filter(xs, f) }
-   │                            ^^^^^^^^^^^^^^^^^
-
-warning: `rec` call is not in tail position; the `rec` annotation has no effect
-   ┌─ [WORKSPACE_ROOT]/tests/algorithms/primes.tlang:40:9
-   │
-40 │         rec is_prime_helper(n, divisor + 2)
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

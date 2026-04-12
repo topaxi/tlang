@@ -1199,6 +1199,8 @@ pub struct ImplBlock {
     /// Type arguments for generic protocols, e.g. `<i64>` in `impl Into<i64> for String`.
     pub type_arguments: Vec<Ty>,
     pub target_type: Path,
+    /// Type arguments for generic target types, e.g. `<T>` in `impl Functor<T> for Option<T>`.
+    pub target_type_arguments: Vec<Ty>,
     /// Where clause constraints, e.g. `where T: Iterator`.
     pub where_clause: Option<WhereClause>,
     /// Associated type bindings, e.g. `type Wrapped = Option`.

@@ -5,15 +5,3 @@ expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/functions/tco/tco.tlang
 ---
 49995000
-
-warning: `rec` call is not in tail position; the `rec` annotation has no effect
-  ┌─ [WORKSPACE_ROOT]/tests/functions/tco/tco.tlang:3:29
-  │
-3 │ fn range(start, end, acc) { rec range(start + 1, end, [...acc, start]) }
-  │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: `rec` call is not in tail position; the `rec` annotation has no effect
-  ┌─ [WORKSPACE_ROOT]/tests/functions/tco/tco.tlang:6:32
-  │
-6 │ fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
-  │                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^

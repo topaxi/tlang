@@ -22,7 +22,7 @@ impl Default for DefaultJsOptimizations {
     fn default() -> Self {
         Self {
             passes: vec![
-                Box::new(hir_opt::tail_call_validation::TailPositionAnalysis),
+                Box::new(hir_opt::tail_call_validation::TailPositionAnalysis::default()),
                 // SymbolResolution must run before ANF so that callee paths have
                 // their `res.hir_id()` set — the ANF pass uses HirId identity to
                 // detect self-referencing tail calls.

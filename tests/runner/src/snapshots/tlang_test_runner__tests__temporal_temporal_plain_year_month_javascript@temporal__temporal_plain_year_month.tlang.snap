@@ -1,6 +1,5 @@
 ---
 source: tests/runner/src/main.rs
-assertion_line: 379
 description: "Backend: javascript"
 expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/temporal/temporal_plain_year_month.tlang

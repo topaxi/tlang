@@ -450,7 +450,7 @@ impl Tlang {
 
                     // TailPositionAnalysis must run first to annotate rec call sites.
                     let mut passes: Vec<Box<dyn HirPass>> = vec![Box::new(
-                        tlang_hir_opt::tail_call_validation::TailPositionAnalysis,
+                        tlang_hir_opt::tail_call_validation::TailPositionAnalysis::default(),
                     )];
 
                     // SymbolResolution must run before ANF so that callee paths have

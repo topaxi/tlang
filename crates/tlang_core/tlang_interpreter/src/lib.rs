@@ -1249,8 +1249,16 @@ impl Interpreter {
                 })
         };
 
-        // Build a type argument suffix for generic protocol impls (e.g. "<i64>").
-        let type_arg_suffix = if impl_block.type_arguments.is_empty() {
+        // Build a type argument suffix for generic protocol impls with concrete type args
+        // (e.g. "<i64>" for `impl Into<i64> for String`).
+        // Skip the suffix when all type arguments are type variables (e.g. `impl<T>
+        // Functor<T> for Option<T>`) — those are resolved generically and should not be
+        // keyed by a type-var placeholder.
+        let type_args_are_concrete = impl_block
+            .type_arguments
+            .iter()
+            .all(|ty| !matches!(ty.kind, hir::TyKind::Var(_)));
+        let type_arg_suffix = if impl_block.type_arguments.is_empty() || !type_args_are_concrete {
             String::new()
         } else {
             let args = impl_block

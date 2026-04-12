@@ -795,6 +795,7 @@ impl<'src> Parser<'src> {
         let type_arguments = self.parse_type_annotation_parameters();
         self.consume_keyword_token(Keyword::For);
         let target_type = self.parse_path();
+        let target_type_arguments = self.parse_type_annotation_parameters();
         let where_clause = self.parse_where_clause();
         self.consume_token(TokenKind::LBrace);
         let mut methods = Vec::new();
@@ -855,6 +856,7 @@ impl<'src> Parser<'src> {
                 protocol_name,
                 type_arguments,
                 target_type,
+                target_type_arguments,
                 where_clause,
                 associated_types,
                 methods,
@@ -2164,9 +2166,14 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            // Parse type parameters on the first clause only.
+            // Parse type parameters. Store them from the first clause; consume
+            // (and discard) type params on subsequent clauses so the parser
+            // advances past them. All clauses of a multi-clause function share
+            // the same type parameters — cross-clause consistency is validated
+            // during semantic analysis, not at parse time.
+            let clause_type_params = self.parse_type_params();
             if declarations.is_empty() {
-                type_params = self.parse_type_params();
+                type_params = clause_type_params;
             }
 
             self.expect_token(TokenKind::LParen);
