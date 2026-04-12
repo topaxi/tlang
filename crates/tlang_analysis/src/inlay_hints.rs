@@ -260,6 +260,7 @@ fn return_type_hint_position(decl: &hir::FunctionDeclaration) -> LineColumn {
 
 // ── Expression traversal (recurse into nested functions / blocks) ──────
 
+#[allow(clippy::too_many_lines)]
 fn collect_expr_hints(expr: &hir::Expr, ctx: &HintCtx<'_>, hints: &mut Vec<InlayHint>) {
     match &expr.kind {
         hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
