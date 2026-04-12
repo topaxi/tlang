@@ -42,6 +42,11 @@ impl VisitorMut for FnParamTypeInference {
         // FieldExpression name — extract the struct type from the base path.
         annotate_self_param(decl);
 
+        // Also infer types from patterns for single-clause functions.
+        // Multi-clause functions are handled by visit_fn_decls which has
+        // access to all overloads at once.
+        annotate_params_from_patterns(std::slice::from_mut(decl), &self.enum_decl_ids);
+
         walk_fn_decl(self, decl);
     }
 
@@ -51,19 +56,7 @@ impl VisitorMut for FnParamTypeInference {
             annotate_self_param(decl);
         }
 
-        let num_params = decls.iter().map(|d| d.parameters.len()).max().unwrap_or(0);
-
-        for i in 0..num_params {
-            if let Some(inferred_ty) = infer_param_type(decls, i, &self.enum_decl_ids) {
-                for decl in decls.iter_mut() {
-                    if let Some(param) = decl.parameters.get_mut(i)
-                        && param.type_annotation.is_none()
-                    {
-                        param.type_annotation = Some(inferred_ty.clone());
-                    }
-                }
-            }
-        }
+        annotate_params_from_patterns(decls, &self.enum_decl_ids);
 
         // Recurse into function bodies to handle nested declarations.
         for decl in decls.iter_mut() {
@@ -87,18 +80,16 @@ impl VisitorMut for FnParamTypeInference {
             }
         }
         for (_name, indices) in groups {
-            if indices.len() == 1 {
-                walk_fn_decl(self, &mut impl_block.methods[indices[0]]);
-            } else {
-                // Clone the group, run inference, then write annotations back.
-                let mut group: Vec<FunctionDeclaration> = indices
-                    .iter()
-                    .map(|&i| impl_block.methods[i].clone())
-                    .collect();
-                self.visit_fn_decls(&mut group);
-                for (pos, &i) in indices.iter().enumerate() {
-                    impl_block.methods[i] = group[pos].clone();
-                }
+            // Always run via visit_fn_decls — this handles both single and
+            // multi-clause methods uniformly, including pattern-based type
+            // inference for single-clause methods with destructuring params.
+            let mut group: Vec<FunctionDeclaration> = indices
+                .iter()
+                .map(|&i| impl_block.methods[i].clone())
+                .collect();
+            self.visit_fn_decls(&mut group);
+            for (pos, &i) in indices.iter().enumerate() {
+                impl_block.methods[i] = group[pos].clone();
             }
         }
     }
@@ -189,6 +180,28 @@ fn builtin_type_for_literal(lit: &Literal) -> Option<&'static str> {
         Literal::String(_) => Some(builtin_types::STRING),
         Literal::Char(_) => Some(builtin_types::CHAR),
         Literal::None => None,
+    }
+}
+
+/// Infers and sets parameter type annotations for all parameters across
+/// `decls` using cross-overload pattern analysis.  For a single-clause
+/// function this reduces to pattern-based inference for that one clause.
+fn annotate_params_from_patterns(
+    decls: &mut [FunctionDeclaration],
+    enum_decl_ids: &HashMap<String, NodeId>,
+) {
+    let num_params = decls.iter().map(|d| d.parameters.len()).max().unwrap_or(0);
+
+    for i in 0..num_params {
+        if let Some(inferred_ty) = infer_param_type(decls, i, enum_decl_ids) {
+            for decl in decls.iter_mut() {
+                if let Some(param) = decl.parameters.get_mut(i)
+                    && param.type_annotation.is_none()
+                {
+                    param.type_annotation = Some(inferred_ty.clone());
+                }
+            }
+        }
     }
 }
 

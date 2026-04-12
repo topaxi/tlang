@@ -858,6 +858,31 @@ mod tests {
     }
 
     #[test]
+    fn single_clause_struct_destructuring_no_unknown_hint() {
+        // A single-clause function with a struct destructuring parameter should NOT
+        // show `: unknown` for the synthesized parameter — the type is inferred from
+        // the pattern name and the whole-pattern hint should be suppressed.
+        let source = "struct Page { title: String }\nfn render(Page { title }) { title }";
+        let hints = hints_for(source);
+        assert!(
+            !hints.iter().any(|h| h.label == ": unknown"),
+            "should not show `: unknown` for struct destructuring param, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn single_clause_struct_destructuring_field_hints() {
+        // Per-field type hints should be shown for each binding created by
+        // struct destructuring in a single-clause function parameter.
+        let source = "struct Page { title: String }\nfn render(Page { title }) { title }";
+        let hints = hints_for(source);
+        assert!(
+            hints.iter().any(|h| h.label == ": String"),
+            "expected `: String` hint for `title` field binding, got: {hints:?}"
+        );
+    }
+
+    #[test]
     fn function_parameter_with_annotation_no_hint() {
         let hints = hints_for("fn double(x: i64) { x * 2 }");
         // Only check that no Type hint exists for the parameter position.
