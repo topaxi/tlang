@@ -836,6 +836,23 @@ mod tests {
     }
 
     #[test]
+    fn struct_pattern_param_hint_not_at_origin() {
+        // Regression test: struct/enum destructuring parameters like
+        // `fn f(Page { title }) { ... }` used to produce a hint at position
+        // (0, 0) because `get_param_names` only extracted spans for
+        // `PatKind::Identifier` patterns and fell back to `Span::default()`
+        // for `PatKind::Enum`.
+        let source = "struct Point { x: i64, y: i64 }\nfn f(Point { x, y }) { x + y }";
+        let hints = hints_for(source);
+        for hint in &hints {
+            assert!(
+                hint.line != 0 || hint.character != 0,
+                "struct pattern param hint must not be at (0, 0), got: {hint:?}"
+            );
+        }
+    }
+
+    #[test]
     fn function_parameter_with_annotation_no_hint() {
         let hints = hints_for("fn double(x: i64) { x * 2 }");
         // Only check that no Type hint exists for the parameter position.

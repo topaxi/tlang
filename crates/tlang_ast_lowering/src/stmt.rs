@@ -1037,16 +1037,14 @@ fn get_param_names(decls: &[FunctionDeclaration]) -> Vec<Option<Ident>> {
         {
             // Use the source span of the identifier from whichever clause defines it, so
             // that any inlay hints derived from this parameter land at the right location.
+            // For Enum/struct patterns (e.g. `Page { title }`) use the full parameter
+            // span so the synthesised name ident's end position is after the closing `}`.
             let source_span = decls
                 .iter()
-                .find_map(|d| {
-                    if let Some(ast::node::PatKind::Identifier(ident)) =
-                        d.parameters.get(i).map(|p| &p.pattern.kind)
-                    {
-                        Some(ident.span)
-                    } else {
-                        None
-                    }
+                .find_map(|d| match d.parameters.get(i).map(|p| (&p.pattern.kind, p.span)) {
+                    Some((ast::node::PatKind::Identifier(ident), _)) => Some(ident.span),
+                    Some((ast::node::PatKind::Enum(_), param_span)) => Some(param_span),
+                    _ => None,
                 })
                 .unwrap_or_default();
             argument_names.push(Some(Ident::new(&arg_name, source_span)));
