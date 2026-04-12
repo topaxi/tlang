@@ -244,7 +244,7 @@ fn multi_arm_function_with_guard() {
 /// `TailCall` nodes before ANF runs.
 fn optimizer_with_tail_calls() -> tlang_hir_opt::HirOptimizer {
     tlang_hir_opt::HirOptimizer::new(vec![
-        Box::new(TailPositionAnalysis),
+        Box::new(TailPositionAnalysis::default()),
         Box::new(tlang_hir_opt::symbol_resolution::SymbolResolution::default()),
         Box::new(AnfTransform::<FullAnfFilter>::default()),
     ])

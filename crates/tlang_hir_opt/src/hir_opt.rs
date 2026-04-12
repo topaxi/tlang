@@ -159,7 +159,7 @@ impl Default for DefaultOptimizations {
     fn default() -> Self {
         Self {
             passes: vec![
-                Box::new(crate::tail_call_validation::TailPositionAnalysis),
+                Box::new(crate::tail_call_validation::TailPositionAnalysis::default()),
                 Box::new(crate::symbol_resolution::SymbolResolution::default()),
                 Box::new(crate::constant_folding::ConstantFolding::default()),
                 Box::new(crate::dead_code_elimination::DeadCodeElimination::default()),

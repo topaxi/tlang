@@ -11,8 +11,14 @@ use crate::hir_opt::{HirOptContext, HirOptError, HirPass};
 /// expression of an `if`/`match`/block that is itself in tail position).
 ///
 /// The pass never modifies the HIR; it always returns `Ok(false)`.
+///
+/// The pass is guarded so it only runs once per compilation.  Later passes
+/// (e.g. the ANF transform) restructure blocks in ways that would cause
+/// spurious warnings on a second run.
 #[derive(Default)]
-pub struct TailPositionAnalysis;
+pub struct TailPositionAnalysis {
+    ran: bool,
+}
 
 impl HirPass for TailPositionAnalysis {
     fn optimize_hir(
@@ -20,7 +26,10 @@ impl HirPass for TailPositionAnalysis {
         module: &mut hir::Module,
         ctx: &mut HirOptContext,
     ) -> Result<bool, HirOptError> {
-        check_block(&module.block, false, &mut ctx.diagnostics);
+        if !self.ran {
+            self.ran = true;
+            check_block(&module.block, false, &mut ctx.diagnostics);
+        }
         Ok(false)
     }
 }

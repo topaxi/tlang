@@ -853,6 +853,13 @@ impl LoweringContext {
         );
 
         self.with_new_scope(|this, _scope| {
+            // Push method-level type parameter scope (e.g. `<U>` from `fn map<U>`)
+            // before lowering any type annotations so that references like
+            // `fn(T) -> U` in parameter types resolve `U` to `TyKind::Var`.
+            // Type params are taken from the first clause — subsequent clauses
+            // must use identical params (enforced by convention, not yet validated).
+            let type_params = this.lower_type_params(&decls[0].type_params);
+
             let (hir_id, fn_name, params, span) =
                 this.setup_function_declaration_metadata(decls, all_param_names);
 
@@ -881,8 +888,11 @@ impl LoweringContext {
                 body_span,
             );
 
+            this.pop_type_param_scope();
+
             (hir_id, {
                 let mut decl = hir::FunctionDeclaration::new(hir_id, fn_name, params, body);
+                decl.type_params = type_params;
                 // Multi-clause functions inherit visibility from the first clause.
                 decl.visibility = decls[0].visibility;
                 // Use the first clause's params_span so return-type hints land

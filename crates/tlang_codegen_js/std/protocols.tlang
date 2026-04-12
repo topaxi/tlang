@@ -7,13 +7,13 @@ let map = Functor::map;
 
 impl<T> Functor<T> for Option<T> {
   type Wrapped<U> = Option<U>
-  fn map<U>(Option::Some(x), f) { Option::Some(f(x)) }
+  fn map<U>(Option::Some(x), f: fn(T) -> U) { Option::Some(f(x)) }
   fn map<U>(Option::None, _) { Option::None }
 }
 
 impl<T, E> Functor<T> for Result<T, E> {
   type Wrapped<U> = Result<U, E>
-  fn map<U>(Result::Ok(x), f) { Result::Ok(f(x)) }
+  fn map<U>(Result::Ok(x), f: fn(T) -> U) { Result::Ok(f(x)) }
   fn map<U>(Result::Err(e), _) { Result::Err(e) }
 }
 

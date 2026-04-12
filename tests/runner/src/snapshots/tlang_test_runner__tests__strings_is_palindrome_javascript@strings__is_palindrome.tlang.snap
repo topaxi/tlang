@@ -6,9 +6,3 @@ input_file: tests/strings/is_palindrome.tlang
 ---
 true
 false
-
-warning: `rec` call is not in tail position; the `rec` annotation has no effect
-  ┌─ [WORKSPACE_ROOT]/tests/strings/is_palindrome.tlang:5:38
-  │
-5 │ fn reverse_string([x, ...xs], acc) { rec reverse_string(xs, x + acc) }
-  │                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

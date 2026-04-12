@@ -13,9 +13,3 @@ Testing iterative factorial:
 [ 1, 1, 120, 5040, 3628800 ]
 Verification: All methods should produce identical results
 [ true, true, true, true, true ]
-
-warning: `rec` call is not in tail position; the `rec` annotation has no effect
-   ┌─ [WORKSPACE_ROOT]/tests/functions/factorial.tlang:13:5
-   │
-13 │     rec factorial_tail_helper(n - 1, n * acc) 
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
