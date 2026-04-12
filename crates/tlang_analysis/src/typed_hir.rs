@@ -8,12 +8,11 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
 use tlang_defs::DefScope;
+use tlang_diagnostics::Diagnostic;
 use tlang_hir as hir;
 use tlang_span::{HirId, NodeId};
 use tlang_typeck::TypeChecker;
 use tlang_typeck::TypeTable;
-
-use tlang_diagnostics::Diagnostic;
 
 use crate::AnalysisResult;
 
