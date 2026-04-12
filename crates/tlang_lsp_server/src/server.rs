@@ -246,6 +246,38 @@ impl ServerState {
                 tlang_analysis::inlay_hints::type_at_definition(typed_hir, def_line, def_col);
         }
 
+        // If standard symbol resolution didn't find anything, try the
+        // shared member resolution module for `receiver.member` expressions
+        // (e.g. `re"foo".replace_all` where the member is a builtin method).
+        if resolved.is_none()
+            && let Some(doc) = state.store.get(uri)
+            && let Some(Some(typed_hir)) = doc.typed_hir.as_ref()
+            && let Some(member) = tlang_analysis::member_resolution::resolve_member_at_position(
+                &doc.source,
+                typed_hir,
+                pos.line,
+                pos.character,
+            )
+        {
+            let hover_text = if let Some(sig) = &member.signature {
+                sig.label.clone()
+            } else {
+                let ret_str = member
+                    .return_ty
+                    .as_ref()
+                    .map_or("unknown".to_string(), |ty| ty.to_string());
+                format!("{}: {ret_str}", member.name)
+            };
+
+            let hover = lsp_types::Hover {
+                contents: lsp_types::HoverContents::Scalar(lsp_types::MarkedString::String(
+                    hover_text,
+                )),
+                range: None,
+            };
+            return Box::pin(async move { Ok(Some(hover)) });
+        }
+
         Box::pin(async move { Ok(resolved.map(|info| info.to_hover())) })
     }
 
@@ -451,26 +483,63 @@ impl ServerState {
 
     /// Collect dot-triggered method completions for a receiver expression.
     ///
-    /// When the user types `v1.`, this extracts the identifier before the dot,
-    /// resolves its type via typed HIR, and returns methods of that type.
+    /// When the user types `v1.`, this delegates to the shared member
+    /// resolution module which uses typed HIR to determine the receiver type
+    /// and enumerate all available members (user-defined, protocol impls,
+    /// and builtin methods).
     fn collect_dot_completions(
         state: &mut Self,
         uri: &Url,
         pos: lsp_types::Position,
     ) -> Vec<CompletionItem> {
+        // Ensure typed HIR is available for member resolution.
+        Self::ensure_typed_hir(state, uri);
+
         let Some(doc) = state.store.get(uri) else {
             return vec![];
         };
 
-        // Extract the identifier before the dot from source text.
+        // Try typed-HIR-backed member resolution first.
+        if let Some(Some(typed_hir)) = doc.typed_hir.as_ref() {
+            let candidates = tlang_analysis::member_resolution::complete_members_at_position(
+                &doc.source,
+                typed_hir,
+                doc.symbol_index.as_ref(),
+                pos.line,
+                pos.character,
+            );
+
+            if !candidates.is_empty() {
+                return candidates
+                    .into_iter()
+                    .map(|c| {
+                        let kind = match c.kind {
+                            tlang_analysis::member_resolution::MemberKind::Method => {
+                                CompletionItemKind::METHOD
+                            }
+                            tlang_analysis::member_resolution::MemberKind::Field => {
+                                CompletionItemKind::FIELD
+                            }
+                        };
+                        CompletionItem {
+                            label: c.name,
+                            kind: Some(kind),
+                            detail: c.signature.map(|s| s.label),
+                            ..CompletionItem::default()
+                        }
+                    })
+                    .collect();
+            }
+        }
+
+        // Fallback: use the old symbol-index path for cases where typed HIR
+        // did not resolve a receiver type (e.g. identifier receivers).
         let receiver = extract_receiver_before_dot(&doc.source, pos);
         let receiver = match receiver {
             Some(r) => r,
             None => return Self::collect_completions(state, uri),
         };
 
-        // Resolve the receiver's type via symbol resolution. The receiver is
-        // a variable at `(pos.line, receiver_col)`.
         let receiver_col = pos.character.saturating_sub(receiver.len() as u32 + 1);
         let receiver_pos = lsp_types::Position::new(pos.line, receiver_col);
         let resolved = Self::resolve_symbol(state, uri, receiver_pos);
@@ -478,13 +547,8 @@ impl ServerState {
         // Try to get the type name from type info enrichment.
         let type_name = resolved
             .as_ref()
-            .and_then(|r| {
-                // First try the type_info field.
-                r.type_info.as_deref()
-            })
+            .and_then(|r| r.type_info.as_deref())
             .or_else(|| {
-                // Fallback: use the DefKind name if the variable was
-                // declared with a struct or enum type annotation.
                 resolved
                     .as_ref()
                     .filter(|r| matches!(r.def_kind, DefKind::Struct | DefKind::Enum))
@@ -494,8 +558,6 @@ impl ServerState {
         let type_name = match type_name {
             Some(t) => t.to_string(),
             None => {
-                // If we can't determine the type, try to get it from typed HIR.
-                Self::ensure_typed_hir(state, uri);
                 let doc = match state.store.get(uri) {
                     Some(d) => d,
                     None => return vec![],
@@ -504,11 +566,10 @@ impl ServerState {
                     Some(typed_hir) => {
                         let line = receiver_pos.line;
                         let col = receiver_pos.character;
-                        // Adjust column for lexer coordinate system.
-                        let adj_col = if line > 0 { col + 1 } else { col };
-                        match tlang_analysis::inlay_hints::type_at_definition(
-                            typed_hir, line, adj_col,
-                        ) {
+                        // type_at_definition expects 0-based editor positions
+                        // and handles coordinate conversion internally.
+                        match tlang_analysis::inlay_hints::type_at_definition(typed_hir, line, col)
+                        {
                             Some(ty) => ty,
                             None => return Self::collect_completions(state, uri),
                         }
@@ -518,8 +579,46 @@ impl ServerState {
             }
         };
 
-        let Some(doc) = state.store.get(uri) else {
-            return vec![];
+        // Use the centralized member resolution for the resolved type name.
+        let doc = match state.store.get(uri) {
+            Some(d) => d,
+            None => return vec![],
+        };
+
+        if let Some(Some(typed_hir)) = doc.typed_hir.as_ref() {
+            let candidates = tlang_analysis::member_resolution::complete_members_for_type(
+                typed_hir,
+                doc.symbol_index.as_ref(),
+                &type_name,
+            );
+
+            if !candidates.is_empty() {
+                return candidates
+                    .into_iter()
+                    .map(|c| {
+                        let kind = match c.kind {
+                            tlang_analysis::member_resolution::MemberKind::Method => {
+                                CompletionItemKind::METHOD
+                            }
+                            tlang_analysis::member_resolution::MemberKind::Field => {
+                                CompletionItemKind::FIELD
+                            }
+                        };
+                        CompletionItem {
+                            label: c.name,
+                            kind: Some(kind),
+                            detail: c.signature.map(|s| s.label),
+                            ..CompletionItem::default()
+                        }
+                    })
+                    .collect();
+            }
+        }
+
+        // Final fallback: symbol-index-only method completions.
+        let doc = match state.store.get(uri) {
+            Some(d) => d,
+            None => return vec![],
         };
         let Some(index) = doc.symbol_index.as_ref() else {
             return vec![];
@@ -527,7 +626,6 @@ impl ServerState {
 
         let methods = index.collect_method_completions(&type_name);
         if methods.is_empty() {
-            // Fallback to general completions if no methods found.
             return Self::collect_completions(state, uri);
         }
 

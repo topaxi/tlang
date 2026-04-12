@@ -306,47 +306,96 @@ pub fn methods_for(type_name: &str) -> Vec<BuiltinMethod> {
 fn methods_for_regex() -> Vec<BuiltinMethod> {
     ["test", "exec", "replace_all", "replace_first", "flags"]
         .iter()
-        .filter_map(|&name| Some(BuiltinMethod { name, signature: lookup_regex(name)? }))
+        .filter_map(|&name| {
+            Some(BuiltinMethod {
+                name,
+                signature: lookup_regex(name)?,
+            })
+        })
         .collect()
 }
 
 fn methods_for_stringbuf() -> Vec<BuiltinMethod> {
     ["push", "push_char", "clear", "to_string", "len", "is_empty"]
         .iter()
-        .filter_map(|&name| Some(BuiltinMethod { name, signature: lookup_stringbuf(name)? }))
+        .filter_map(|&name| {
+            Some(BuiltinMethod {
+                name,
+                signature: lookup_stringbuf(name)?,
+            })
+        })
         .collect()
 }
 
 fn methods_for_option() -> Vec<BuiltinMethod> {
     ["is_some", "is_none", "unwrap", "map"]
         .iter()
-        .filter_map(|&name| Some(BuiltinMethod { name, signature: lookup_option(name)? }))
+        .filter_map(|&name| {
+            Some(BuiltinMethod {
+                name,
+                signature: lookup_option(name)?,
+            })
+        })
         .collect()
 }
 
 fn methods_for_result() -> Vec<BuiltinMethod> {
     ["is_ok", "is_err", "unwrap", "map"]
         .iter()
-        .filter_map(|&name| Some(BuiltinMethod { name, signature: lookup_result(name)? }))
+        .filter_map(|&name| {
+            Some(BuiltinMethod {
+                name,
+                signature: lookup_result(name)?,
+            })
+        })
         .collect()
 }
 
 fn methods_for_list() -> Vec<BuiltinMethod> {
-    ["slice", "map", "filter", "foldl", "foldr", "find", "any", "all"]
-        .iter()
-        .filter_map(|&name| Some(BuiltinMethod { name, signature: lookup_list(name)? }))
-        .collect()
+    [
+        "slice", "map", "filter", "foldl", "foldr", "find", "any", "all",
+    ]
+    .iter()
+    .filter_map(|&name| {
+        Some(BuiltinMethod {
+            name,
+            signature: lookup_list(name)?,
+        })
+    })
+    .collect()
 }
 
 fn methods_for_string() -> Vec<BuiltinMethod> {
     [
-        "len", "trim", "trim_start", "trim_end", "to_uppercase", "to_lowercase",
-        "reverse", "starts_with", "ends_with", "contains", "split", "replace",
-        "chars", "char_at", "slice", "repeat", "is_empty", "index_of",
-        "last_index_of", "pad_start", "pad_end",
+        "len",
+        "trim",
+        "trim_start",
+        "trim_end",
+        "to_uppercase",
+        "to_lowercase",
+        "reverse",
+        "starts_with",
+        "ends_with",
+        "contains",
+        "split",
+        "replace",
+        "chars",
+        "char_at",
+        "slice",
+        "repeat",
+        "is_empty",
+        "index_of",
+        "last_index_of",
+        "pad_start",
+        "pad_end",
     ]
     .iter()
-    .filter_map(|&name| Some(BuiltinMethod { name, signature: lookup_string(name)? }))
+    .filter_map(|&name| {
+        Some(BuiltinMethod {
+            name,
+            signature: lookup_string(name)?,
+        })
+    })
     .collect()
 }
 

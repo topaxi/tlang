@@ -81,8 +81,7 @@ pub fn resolve_member_at_position(
     utf16_col: u32,
 ) -> Option<ResolvedMember> {
     let offset = utf16_line_column_to_byte_offset(source, line, utf16_col);
-    let (_base, ident, base_ty) =
-        find_field_access_at_offset(&typed_hir.module.block, offset)?;
+    let (_base, ident, base_ty) = find_field_access_at_offset(&typed_hir.module.block, offset)?;
 
     let type_name = builtin_methods::type_name_from_kind(&base_ty)?;
     let member_name = ident.as_str();
@@ -104,9 +103,7 @@ pub fn resolve_member_at_position(
     }
 
     // 2. Try user-defined methods from protocol impls.
-    if let Some(info) =
-        resolve_protocol_method(&typed_hir.type_table, type_name, member_name)
-    {
+    if let Some(info) = resolve_protocol_method(&typed_hir.type_table, type_name, member_name) {
         return Some(ResolvedMember {
             name: member_name.to_string(),
             receiver_ty: base_ty,
@@ -119,9 +116,7 @@ pub fn resolve_member_at_position(
     }
 
     // 3. Try user-defined methods/fields from the HIR (struct methods, etc.).
-    if let Some(info) =
-        resolve_hir_member(&typed_hir.module.block, type_name, member_name)
-    {
+    if let Some(info) = resolve_hir_member(&typed_hir.module.block, type_name, member_name) {
         return Some(ResolvedMember {
             name: member_name.to_string(),
             receiver_ty: base_ty,
@@ -259,10 +254,10 @@ pub fn find_hir_expr_at_position(block: &hir::Block, offset: u32) -> Option<&hir
         }
     }
 
-    if let Some(expr) = &block.expr {
-        if let Some(found) = find_expr_in_expr(expr, offset) {
-            best = update_best_expr(best, Some(found));
-        }
+    if let Some(expr) = &block.expr
+        && let Some(found) = find_expr_in_expr(expr, offset)
+    {
+        best = update_best_expr(best, Some(found));
     }
 
     best
@@ -279,9 +274,7 @@ fn find_expr_in_stmt(stmt: &hir::Stmt, offset: u32) -> Option<&hir::Expr> {
             find_expr_in_expr(init, offset)
         }
         hir::StmtKind::Return(Some(expr)) => find_expr_in_expr(expr, offset),
-        hir::StmtKind::FunctionDeclaration(decl) => {
-            find_hir_expr_at_position(&decl.body, offset)
-        }
+        hir::StmtKind::FunctionDeclaration(decl) => find_hir_expr_at_position(&decl.body, offset),
         hir::StmtKind::ImplBlock(impl_block) => impl_block
             .methods
             .iter()
@@ -326,10 +319,8 @@ fn find_expr_in_expr(expr: &hir::Expr, offset: u32) -> Option<&hir::Expr> {
                 if let Some(cond) = &clause.condition {
                     best = update_best_expr(best, find_expr_in_expr(cond, offset));
                 }
-                best = update_best_expr(
-                    best,
-                    find_hir_expr_at_position(&clause.consequence, offset),
-                );
+                best =
+                    update_best_expr(best, find_hir_expr_at_position(&clause.consequence, offset));
             }
         }
         hir::ExprKind::Binary(_, lhs, rhs) => {
@@ -413,17 +404,17 @@ fn expr_span_len(expr: &hir::Expr) -> u32 {
 ///
 /// Returns `(base_expr, member_ident, base_type)` if the cursor is on the
 /// member name of a field-access expression.
-fn find_field_access_at_offset<'a>(
-    block: &'a hir::Block,
+fn find_field_access_at_offset(
+    block: &hir::Block,
     offset: u32,
-) -> Option<(&'a hir::Expr, &'a tlang_ast::node::Ident, TyKind)> {
+) -> Option<(&hir::Expr, &tlang_ast::node::Ident, TyKind)> {
     find_field_access_in_block(block, offset)
 }
 
-fn find_field_access_in_block<'a>(
-    block: &'a hir::Block,
+fn find_field_access_in_block(
+    block: &hir::Block,
     offset: u32,
-) -> Option<(&'a hir::Expr, &'a tlang_ast::node::Ident, TyKind)> {
+) -> Option<(&hir::Expr, &tlang_ast::node::Ident, TyKind)> {
     for stmt in &block.stmts {
         if let Some(found) = find_field_access_in_stmt(stmt, offset) {
             return Some(found);
@@ -435,10 +426,10 @@ fn find_field_access_in_block<'a>(
     None
 }
 
-fn find_field_access_in_stmt<'a>(
-    stmt: &'a hir::Stmt,
+fn find_field_access_in_stmt(
+    stmt: &hir::Stmt,
     offset: u32,
-) -> Option<(&'a hir::Expr, &'a tlang_ast::node::Ident, TyKind)> {
+) -> Option<(&hir::Expr, &tlang_ast::node::Ident, TyKind)> {
     if !span_contains_offset(&stmt.span, offset) {
         return None;
     }
@@ -448,9 +439,7 @@ fn find_field_access_in_stmt<'a>(
             find_field_access_in_expr(init, offset)
         }
         hir::StmtKind::Return(Some(expr)) => find_field_access_in_expr(expr, offset),
-        hir::StmtKind::FunctionDeclaration(decl) => {
-            find_field_access_in_block(&decl.body, offset)
-        }
+        hir::StmtKind::FunctionDeclaration(decl) => find_field_access_in_block(&decl.body, offset),
         hir::StmtKind::ImplBlock(impl_block) => impl_block
             .methods
             .iter()
@@ -464,10 +453,11 @@ fn find_field_access_in_stmt<'a>(
     }
 }
 
-fn find_field_access_in_expr<'a>(
-    expr: &'a hir::Expr,
+#[allow(clippy::too_many_lines)]
+fn find_field_access_in_expr(
+    expr: &hir::Expr,
     offset: u32,
-) -> Option<(&'a hir::Expr, &'a tlang_ast::node::Ident, TyKind)> {
+) -> Option<(&hir::Expr, &tlang_ast::node::Ident, TyKind)> {
     if !span_contains_offset(&expr.span, offset) {
         return None;
     }
@@ -508,10 +498,10 @@ fn find_field_access_in_expr<'a>(
                 return Some(found);
             }
             for clause in else_clauses {
-                if let Some(cond) = &clause.condition {
-                    if let Some(found) = find_field_access_in_expr(cond, offset) {
-                        return Some(found);
-                    }
+                if let Some(cond) = &clause.condition
+                    && let Some(found) = find_field_access_in_expr(cond, offset)
+                {
+                    return Some(found);
                 }
                 if let Some(found) = find_field_access_in_block(&clause.consequence, offset) {
                     return Some(found);
@@ -539,10 +529,10 @@ fn find_field_access_in_expr<'a>(
                 return Some(found);
             }
             for arm in arms {
-                if let Some(guard) = &arm.guard {
-                    if let Some(found) = find_field_access_in_expr(guard, offset) {
-                        return Some(found);
-                    }
+                if let Some(guard) = &arm.guard
+                    && let Some(found) = find_field_access_in_expr(guard, offset)
+                {
+                    return Some(found);
                 }
                 if let Some(found) = find_field_access_in_block(&arm.block, offset) {
                     return Some(found);
@@ -762,16 +752,11 @@ fn resolve_hir_member(
                     .parameters
                     .iter()
                     .skip(1) // skip self
-                    .map(|p| {
-                        format!("{}: {}", p.name, p.type_annotation.kind)
-                    })
+                    .map(|p| format!("{}: {}", p.name, p.type_annotation.kind))
                     .collect();
                 let ret = &decl.return_type.kind;
                 let signature = SignatureInformation {
-                    label: format!(
-                        "{type_name}.{member_name}({}) -> {ret}",
-                        params.join(", ")
-                    ),
+                    label: format!("{type_name}.{member_name}({}) -> {ret}", params.join(", ")),
                     parameters: params
                         .into_iter()
                         .map(|label| ParameterInformation { label })
@@ -781,7 +766,7 @@ fn resolve_hir_member(
                     kind: MemberKind::Method,
                     signature: Some(signature),
                     return_ty: Some(ret.clone()),
-                    def_span: Some(decl.name.span.clone()),
+                    def_span: Some(decl.name.span),
                 });
             }
             hir::StmtKind::StructDeclaration(decl) if decl.name.to_string() == type_name => {
@@ -791,7 +776,7 @@ fn resolve_hir_member(
                             kind: MemberKind::Field,
                             signature: None,
                             return_ty: Some(field.ty.kind.clone()),
-                            def_span: Some(field.name.span.clone()),
+                            def_span: Some(field.name.span),
                         });
                     }
                 }
@@ -809,9 +794,7 @@ fn resolve_hir_member(
                             .parameters
                             .iter()
                             .skip(1)
-                            .map(|p| {
-                                format!("{}: {}", p.name, p.type_annotation.kind)
-                            })
+                            .map(|p| format!("{}: {}", p.name, p.type_annotation.kind))
                             .collect();
                         let ret = &decl.return_type.kind;
                         let signature = SignatureInformation {
@@ -828,7 +811,7 @@ fn resolve_hir_member(
                             kind: MemberKind::Method,
                             signature: Some(signature),
                             return_ty: Some(ret.clone()),
-                            def_span: Some(decl.name.span.clone()),
+                            def_span: Some(decl.name.span),
                         });
                     }
                 }
@@ -894,8 +877,8 @@ fn utf16_line_column_to_byte_offset(source: &str, line: u32, utf16_column: u32) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CompilationTarget, analyze_for_target};
     use crate::typed_hir::lower_and_typecheck;
+    use crate::{CompilationTarget, analyze_for_target};
 
     fn typed_hir(source: &str) -> TypedHir {
         let result = analyze_for_target(source, CompilationTarget::Js);
@@ -1035,11 +1018,7 @@ mod tests {
         let len_before = names.len();
         names.sort();
         names.dedup();
-        assert_eq!(
-            len_before,
-            names.len(),
-            "should have no duplicate members"
-        );
+        assert_eq!(len_before, names.len(), "should have no duplicate members");
     }
 
     #[test]
