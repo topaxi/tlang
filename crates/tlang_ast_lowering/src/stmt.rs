@@ -1041,11 +1041,13 @@ fn get_param_names(decls: &[FunctionDeclaration]) -> Vec<Option<Ident>> {
             // span so the synthesised name ident's end position is after the closing `}`.
             let source_span = decls
                 .iter()
-                .find_map(|d| match d.parameters.get(i).map(|p| (&p.pattern.kind, p.span)) {
-                    Some((ast::node::PatKind::Identifier(ident), _)) => Some(ident.span),
-                    Some((ast::node::PatKind::Enum(_), param_span)) => Some(param_span),
-                    _ => None,
-                })
+                .find_map(
+                    |d| match d.parameters.get(i).map(|p| (&p.pattern.kind, p.span)) {
+                        Some((ast::node::PatKind::Identifier(ident), _)) => Some(ident.span),
+                        Some((ast::node::PatKind::Enum(_), param_span)) => Some(param_span),
+                        _ => None,
+                    },
+                )
                 .unwrap_or_default();
             argument_names.push(Some(Ident::new(&arg_name, source_span)));
         } else {
