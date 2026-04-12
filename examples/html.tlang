@@ -10,7 +10,7 @@
 //   • Pipeline operator for composing components
 //
 // Design:
-//   - SafeHtml::Html(string) wraps trusted HTML content
+//   - SafeHtml::Html(String) wraps trusted HTML content
 //   - html"..." auto-escapes interpolated values and returns SafeHtml
 //   - Nested SafeHtml values embed without re-escaping
 //   - text(v)  manually escapes input and wraps in SafeHtml
@@ -20,7 +20,7 @@
 
 // ── SafeHtml type ───────────────────────────────────────────────────────────
 
-enum SafeHtml { Html(string) }
+enum SafeHtml { Html(String) }
 
 impl Display for SafeHtml {
     apply to_string;
@@ -121,9 +121,9 @@ html"<span>Author: {safe_name}</span>" |> Display::to_string() |> log();
 log("=== Blog posts ===");
 
 struct Post {
-    title: string,
-    author: string,
-    excerpt: string,
+    title: String,
+    author: String,
+    excerpt: String,
 }
 
 fn Post.render(Post { title, author, excerpt }) {
@@ -157,9 +157,9 @@ html"""<ul class="posts">{post_list}</ul>"""
 log("=== Alert component ===");
 
 enum Alert {
-    Success(string),
-    Warning(string),
-    Error(string),
+    Success(String),
+    Warning(String),
+    Error(String),
 }
 
 fn Alert.render(Alert::Success(msg)) { html"""<div class="alert success">{msg}</div>""" }
@@ -175,9 +175,9 @@ Alert::Error("Invalid <input> detected.").render().to_string() |> log();
 log("=== Full page ===");
 
 struct Page {
-    title: string,
-    alerts: list,
-    posts: list,
+    title: String,
+    alerts: List<Alert>,
+    posts: List<Post>,
 }
 
 fn Page.render(Page { title, alerts, posts }) {
