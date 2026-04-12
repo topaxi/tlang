@@ -1,6 +1,7 @@
 #![feature(box_patterns)]
 
 use pretty_assertions::assert_matches;
+use tlang_ast::node::{ExprKind, StmtKind};
 use tlang_parser::Parser;
 
 mod common;
@@ -296,6 +297,32 @@ fn test_tagged_string_with_expression() {
 fn test_tagged_string_regex_quantifier() {
     // re"\d{2,5}" — {2,5} is not interpolation (digit after {)
     assert_parser_snapshot!(r#"re"\d{2,5}";"#);
+}
+
+#[test]
+fn test_triple_quoted_tagged_string_span_reaches_closing_quotes() {
+    let module = parse!(
+        r#"let page = html"""
+    <p>{title}</p>
+""";"#
+    );
+
+    let StmtKind::Let(let_decl) = &module.statements[0].kind else {
+        panic!(
+            "expected let statement, got: {:?}",
+            module.statements[0].kind
+        );
+    };
+
+    let ExprKind::TaggedString { .. } = &let_decl.expression.kind else {
+        panic!(
+            "expected tagged string expression, got: {:?}",
+            let_decl.expression.kind
+        );
+    };
+
+    assert_eq!(let_decl.expression.span.start_lc.line, 0);
+    assert_eq!(let_decl.expression.span.end_lc.line, 2);
 }
 
 #[test]

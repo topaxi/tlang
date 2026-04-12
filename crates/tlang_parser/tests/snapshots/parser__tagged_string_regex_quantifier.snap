@@ -1,5 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser.rs
+assertion_line: 299
 expression: "parse! (r#\"re\"\\d{2,5}\";\"#)"
 ---
 Module(
@@ -18,14 +19,14 @@ Module(
                   name: "re",
                   span: Span(
                     start: 0,
-                    end: 3,
+                    end: 11,
                     start_lc: LineColumn(
                       line: 0,
                       column: 0,
                     ),
                     end_lc: LineColumn(
                       line: 0,
-                      column: 3,
+                      column: 11,
                     ),
                   ),
                 ),
@@ -33,14 +34,14 @@ Module(
               res: Unresolved,
               span: Span(
                 start: 0,
-                end: 3,
+                end: 11,
                 start_lc: LineColumn(
                   line: 0,
                   column: 0,
                 ),
                 end_lc: LineColumn(
                   line: 0,
-                  column: 3,
+                  column: 11,
                 ),
               ),
             )),
@@ -48,14 +49,14 @@ Module(
             trailing_comments: [],
             span: Span(
               start: 0,
-              end: 3,
+              end: 11,
               start_lc: LineColumn(
                 line: 0,
                 column: 0,
               ),
               end_lc: LineColumn(
                 line: 0,
-                column: 3,
+                column: 11,
               ),
             ),
           ),
@@ -68,14 +69,14 @@ Module(
         trailing_comments: [],
         span: Span(
           start: 0,
-          end: 3,
+          end: 11,
           start_lc: LineColumn(
             line: 0,
             column: 0,
           ),
           end_lc: LineColumn(
             line: 0,
-            column: 3,
+            column: 11,
           ),
         ),
       )),

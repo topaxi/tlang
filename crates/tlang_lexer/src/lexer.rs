@@ -18,6 +18,9 @@ pub struct Lexer<'src> {
     /// Tagged string parts read eagerly when a tagged string start is detected.
     /// The parser consumes this via `take_tagged_string_parts()`.
     pending_tagged_parts: Option<Vec<TaggedStringPart>>,
+    /// Full source span of the tagged string that produced
+    /// `pending_tagged_parts`, including its contents and closing quote(s).
+    pending_tagged_span: Option<Span>,
 }
 
 impl<'src> Lexer<'src> {
@@ -36,6 +39,7 @@ impl<'src> Lexer<'src> {
             next_char,
             chars,
             pending_tagged_parts: None,
+            pending_tagged_span: None,
         }
     }
 
@@ -72,6 +76,11 @@ impl<'src> Lexer<'src> {
     /// `TaggedStringStart` token. Returns `None` if no parts are pending.
     pub fn take_tagged_string_parts(&mut self) -> Option<Vec<TaggedStringPart>> {
         self.pending_tagged_parts.take()
+    }
+
+    /// Take the full span buffered for the last `TaggedStringStart` token.
+    pub fn take_tagged_string_span(&mut self) -> Option<Span> {
+        self.pending_tagged_span.take()
     }
 
     /// Extract the source text covered by a span, adjusting for the byte offset.
@@ -981,9 +990,17 @@ impl<'src> Lexer<'src> {
                                 let parts = match self.read_tagged_triple_string_parts(quote) {
                                     Ok(p) => p,
                                     Err(_) => {
+                                        self.pending_tagged_parts = None;
+                                        self.pending_tagged_span = None;
                                         return self.token(TokenKind::Unknown, start_pos, start_lc);
                                     }
                                 };
+                                self.pending_tagged_span = Some(Span::new(
+                                    start_pos,
+                                    self.byte_position(),
+                                    start_lc,
+                                    self.line_column(),
+                                ));
                                 self.pending_tagged_parts = Some(parts);
                                 return tag_token;
                             }
@@ -1001,9 +1018,17 @@ impl<'src> Lexer<'src> {
                             let parts = match self.read_tagged_string_parts(quote) {
                                 Ok(p) => p,
                                 Err(_) => {
+                                    self.pending_tagged_parts = None;
+                                    self.pending_tagged_span = None;
                                     return self.token(TokenKind::Unknown, start_pos, start_lc);
                                 }
                             };
+                            self.pending_tagged_span = Some(Span::new(
+                                start_pos,
+                                self.byte_position(),
+                                start_lc,
+                                self.line_column(),
+                            ));
                             self.pending_tagged_parts = Some(parts);
                             return tag_token;
                         }

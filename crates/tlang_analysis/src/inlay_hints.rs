@@ -1018,4 +1018,34 @@ let result = [1,2,3] |> map(fn (x) { x ** 2 });
             "map should return List<i64> after generic instantiation"
         );
     }
+
+    #[test]
+    fn multiline_tagged_string_pipeline_hint_anchors_after_expression() {
+        let source = r#"
+fn html(parts, values) { "" }
+fn dedent(s) { s }
+fn trim(s) { s }
+
+let page = html"""
+    <p>hello</p>
+"""
+|> dedent()
+|> trim();
+"#;
+
+        let hints = hints_for(source);
+        let chain_hints: Vec<_> = hints
+            .iter()
+            .filter(|h| h.kind == InlayHintKind::ChainedPipeline)
+            .collect();
+
+        assert!(
+            chain_hints.iter().any(|h| h.line == 7),
+            "expected a chained pipeline hint on the tagged string closing line, got: {chain_hints:?}"
+        );
+        assert!(
+            !chain_hints.iter().any(|h| h.line == 5),
+            "tagged string pipeline hint should not anchor to the opening line, got: {chain_hints:?}"
+        );
+    }
 }

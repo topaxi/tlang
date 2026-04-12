@@ -1508,21 +1508,23 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_tagged_string_expression(&mut self) -> Expr {
-        let span = self.create_span_from_current_token();
+        let tag_span = self.create_span_from_current_token();
         let token = self.current_token;
         let TokenKind::TaggedStringStart(quote) = token.kind else {
             unreachable!()
         };
-        // Extract tag name from the span: span covers "tag<quote>content<quote>",
-        // but the tag is just the identifier before the opening quote.
-        let full = self.lexer.span_text(token.span);
-        let tag = &full[..full.len() - quote.len_utf8()];
+        // The token span only covers `tag"` / `tag'`, so use it to recover the
+        // tag name while taking the full string span separately from the lexer.
+        let tag_header = self.lexer.span_text(token.span);
+        let tag = &tag_header[..tag_header.len() - quote.len_utf8()];
         // Take the eagerly-buffered parts BEFORE advancing. `advance()` pre-loads
         // the next token via a lexer lookahead; if that token is another tagged
         // string, `pending_tagged_parts` would be overwritten before we get a
         // chance to read the parts that belong to this tagged string.
         let parts = self.lexer.take_tagged_string_parts().unwrap_or_default();
+        let span = self.lexer.take_tagged_string_span().unwrap_or(tag_span);
         self.advance();
+        self.previous_span = span;
         self.expand_tagged_string(tag, parts, span)
     }
 
