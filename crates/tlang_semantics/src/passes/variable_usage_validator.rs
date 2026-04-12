@@ -64,16 +64,18 @@ impl VariableUsageValidator {
             // `self` is a fixed receiver name, so the usual underscore advice
             // is not actionable. Leave receiver-specific cleanup to linting.
             .filter(|symbol| symbol.name.as_ref() != "self")
-            // TODO(#580): We currently do not track member methods, as we do not have any type
-            //       information yet.
+            // Dot-methods (e.g. `Vector.add`) require type information to track
+            // usage via `v.add(w)` expressions. Tracked by `UnusedSymbolDetector`
+            // in the post-type-check HIR pass instead.
             .filter(|symbol| !symbol.name.contains('.'))
             // StructMethod aliases (e.g. `Expense::is_food`) shadow the dot-method
-            // and are only used when referenced explicitly; don't report them as unused.
+            // and are only used when referenced explicitly; tracked by
+            // `UnusedSymbolDetector` in the post-type-check HIR pass.
             .filter(|symbol| !matches!(symbol.kind, DefKind::StructMethod(_)))
-            // TODO(#580): StructField symbols (e.g. `Vector::x`) are never marked as used
-            // because field-access expressions (`v.x`) cannot be resolved at this stage
-            // (no type information available). Suppress false positives until unused-symbol
-            // detection moves to a type-aware pass.
+            // StructField symbols (e.g. `Vector::x`) are never marked as used
+            // because field-access expressions (`v.x`) cannot be resolved at this
+            // stage (no type information available). Tracked by
+            // `UnusedSymbolDetector` in the post-type-check HIR pass.
             .filter(|symbol| !matches!(symbol.kind, DefKind::StructField))
             .collect::<Vec<_>>();
 
@@ -478,10 +480,9 @@ impl<'ast> Visitor<'ast> for VariableUsageValidator {
             }
             ExprKind::FieldExpression(field_expr) => {
                 self.visit_expr(&field_expr.base, ctx);
-                // TODO(#580): We are checking for unused variables, this should be refactored into
-                //       it's own pass. Skipping analyzing field of variable as we do not have
-                //       any type information yet.
-                // Don't analyze the field name as it's not a variable reference
+                // Field access resolution requires type information that is not
+                // available at this AST stage. The `UnusedSymbolDetector` HIR
+                // pass handles this after type checking.
             }
             _ => walk_expr(self, expr, ctx),
         }
