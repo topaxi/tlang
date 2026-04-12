@@ -926,4 +926,29 @@ mod tests {
             "self parameter should be typed as Vector"
         );
     }
+
+    #[test]
+    fn generic_call_return_type_instantiation() {
+        // map<T,U>(List<T>, fn(T)->U) -> List<U> called with List<i64>
+        // and fn(x) { x ** 2 } should produce List<i64>.
+        let source = r#"
+fn map<T, U>([]: List<T>, _: fn(T) -> U) -> List<U> { [] }
+fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, f)] }
+let result = [1,2,3] |> map(fn (x) { x ** 2 });
+"#;
+        let hints = hints_for(source);
+        // Find the hint for `result` binding.
+        let result_hint = hints.iter().find(|h| {
+            h.label.contains("List") || h.label.contains("?") || h.kind == InlayHintKind::Type
+        });
+        assert!(
+            result_hint.is_some(),
+            "expected a type hint for `result`, got: {hints:?}"
+        );
+        let label = &result_hint.unwrap().label;
+        assert_eq!(
+            label, ": List<i64>",
+            "map should return List<i64> after generic instantiation"
+        );
+    }
 }

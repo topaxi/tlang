@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use tlang_ast::node::UnaryOp;
 use tlang_ast::token::Literal;
@@ -6,6 +6,7 @@ use tlang_hir::Visitor;
 use tlang_hir::visit::{walk_block, walk_expr, walk_module, walk_stmt};
 use tlang_hir::{self as hir, BinaryOpKind, PrimTy, Ty, TyKind};
 use tlang_hir_opt::hir_opt::{HirOptContext, HirOptError, HirPass};
+use tlang_span::TypeVarId;
 
 use crate::builtin_types;
 use crate::builtins;
@@ -539,52 +540,18 @@ impl TypeChecker {
                     return ret_ty.kind.clone();
                 }
 
-                // Check each argument type.
-                // For variadic builtins, validate every argument against the
-                // (single) parameter type; for normal calls, zip 1:1.
-                if is_variadic {
-                    if let Some(param_ty) = param_tys.first() {
-                        for (i, arg) in call.arguments.iter().enumerate() {
-                            if matches!(param_ty.kind, TyKind::Unknown)
-                                || matches!(arg.ty.kind, TyKind::Unknown)
-                            {
-                                continue;
-                            }
-                            if !ty_kinds_compatible(&arg.ty.kind, &param_ty.kind) {
-                                let param_name = callee_name
-                                    .as_deref()
-                                    .map(|n| format!("arg{i} of `{n}`"))
-                                    .unwrap_or_else(|| format!("arg{i}"));
-                                self.errors.push(TypeError::ArgumentTypeMismatch {
-                                    param_name,
-                                    expected: param_ty.kind.to_string(),
-                                    actual: arg.ty.kind.to_string(),
-                                    span: arg.span,
-                                });
-                            }
-                        }
+                self.check_argument_types(call, param_tys, &callee_name, is_variadic);
+
+                // Instantiate generic return type: if the return type
+                // contains type variables, match argument types against
+                // parameter types to infer bindings and substitute.
+                if ty_contains_var(&ret_ty.kind) {
+                    let mut bindings = HashMap::new();
+                    for (arg, param_ty) in call.arguments.iter().zip(param_tys.iter()) {
+                        collect_type_var_bindings(&arg.ty.kind, &param_ty.kind, &mut bindings);
                     }
-                } else {
-                    for (i, (arg, param_ty)) in
-                        call.arguments.iter().zip(param_tys.iter()).enumerate()
-                    {
-                        if matches!(param_ty.kind, TyKind::Unknown)
-                            || matches!(arg.ty.kind, TyKind::Unknown)
-                        {
-                            continue;
-                        }
-                        if !ty_kinds_compatible(&arg.ty.kind, &param_ty.kind) {
-                            let param_name = callee_name
-                                .as_deref()
-                                .map(|n| format!("arg{i} of `{n}`"))
-                                .unwrap_or_else(|| format!("arg{i}"));
-                            self.errors.push(TypeError::ArgumentTypeMismatch {
-                                param_name,
-                                expected: param_ty.kind.to_string(),
-                                actual: arg.ty.kind.to_string(),
-                                span: arg.span,
-                            });
-                        }
+                    if !bindings.is_empty() {
+                        return substitute_type_vars(&ret_ty.kind, &bindings);
                     }
                 }
 
@@ -594,6 +561,51 @@ impl TypeChecker {
                 // Callee type is unknown — cannot check, propagate unknown.
                 TyKind::Unknown
             }
+        }
+    }
+
+    /// Validate argument types against parameter types and emit diagnostics.
+    fn check_argument_types(
+        &mut self,
+        call: &hir::CallExpression,
+        param_tys: &[Ty],
+        callee_name: &Option<String>,
+        is_variadic: bool,
+    ) {
+        if is_variadic {
+            if let Some(param_ty) = param_tys.first() {
+                for (i, arg) in call.arguments.iter().enumerate() {
+                    self.check_single_arg(arg, param_ty, i, callee_name);
+                }
+            }
+        } else {
+            for (i, (arg, param_ty)) in call.arguments.iter().zip(param_tys.iter()).enumerate() {
+                self.check_single_arg(arg, param_ty, i, callee_name);
+            }
+        }
+    }
+
+    fn check_single_arg(
+        &mut self,
+        arg: &hir::Expr,
+        param_ty: &Ty,
+        index: usize,
+        callee_name: &Option<String>,
+    ) {
+        if matches!(param_ty.kind, TyKind::Unknown) || matches!(arg.ty.kind, TyKind::Unknown) {
+            return;
+        }
+        if !ty_kinds_compatible(&arg.ty.kind, &param_ty.kind) {
+            let param_name = callee_name
+                .as_deref()
+                .map(|n| format!("arg{index} of `{n}`"))
+                .unwrap_or_else(|| format!("arg{index}"));
+            self.errors.push(TypeError::ArgumentTypeMismatch {
+                param_name,
+                expected: param_ty.kind.to_string(),
+                actual: arg.ty.kind.to_string(),
+                span: arg.span,
+            });
         }
     }
 
@@ -1308,17 +1320,56 @@ impl TypeChecker {
         self.visit_expr(&mut call.callee, &mut ());
         let callee_fn_ty = self.resolve_callee_type(&call.callee);
 
-        // Visit each argument.  When the callee has a known `Fn` type and
-        // the argument is a closure, push the expected parameter types into
-        // unannotated closure parameters before visiting the closure body.
-        for (i, arg) in call.arguments.iter_mut().enumerate() {
-            if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind
-                && let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty
-                && let Some(expected_arg_ty) = param_tys.get(i)
-            {
-                Self::apply_expected_closure_types(decl, &expected_arg_ty.kind);
+        // When the callee is a generic function, we need to infer type
+        // variable bindings from non-closure arguments first, then
+        // substitute those bindings into expected closure parameter types
+        // for bidirectional inference.
+        let has_generic_params = callee_fn_ty.as_ref().is_some_and(ty_contains_var);
+        let has_closures = call
+            .arguments
+            .iter()
+            .any(|a| matches!(a.kind, hir::ExprKind::FunctionExpression(_)));
+
+        if has_generic_params && has_closures {
+            // Two-pass approach: visit non-closure args first to collect
+            // type variable bindings, then visit closure args with
+            // substituted expected types.
+            let mut bindings = HashMap::new();
+            if let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty {
+                // Pass 1: visit non-closure args and collect bindings.
+                for (i, arg) in call.arguments.iter_mut().enumerate() {
+                    if !matches!(arg.kind, hir::ExprKind::FunctionExpression(_)) {
+                        self.visit_expr(arg, &mut ());
+                        if let Some(param_ty) = param_tys.get(i) {
+                            collect_type_var_bindings(&arg.ty.kind, &param_ty.kind, &mut bindings);
+                        }
+                    }
+                }
+
+                // Pass 2: visit closure args with substituted expected types.
+                for (i, arg) in call.arguments.iter_mut().enumerate() {
+                    if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind {
+                        if let Some(expected_arg_ty) = param_tys.get(i) {
+                            let substituted =
+                                substitute_type_vars(&expected_arg_ty.kind, &bindings);
+                            Self::apply_expected_closure_types(decl, &substituted);
+                        }
+                        self.visit_expr(arg, &mut ());
+                    }
+                }
             }
-            self.visit_expr(arg, &mut ());
+        } else {
+            // Simple path: visit all arguments in order with optional
+            // bidirectional inference for closures.
+            for (i, arg) in call.arguments.iter_mut().enumerate() {
+                if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind
+                    && let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty
+                    && let Some(expected_arg_ty) = param_tys.get(i)
+                {
+                    Self::apply_expected_closure_types(decl, &expected_arg_ty.kind);
+                }
+                self.visit_expr(arg, &mut ());
+            }
         }
 
         let result_ty = self.check_call(call, expr_span);
@@ -1383,7 +1434,12 @@ impl TypeChecker {
             .map(|e| e.ty.kind.clone())
             .or_else(|| self.infer_return_type_from_observed())
             .unwrap_or_else(|| decl.return_type.kind.clone());
-        let ret_ty = if matches!(decl.return_type.kind, TyKind::Unknown) {
+        let ret_ty = if matches!(decl.return_type.kind, TyKind::Unknown)
+            || ty_contains_var(&decl.return_type.kind)
+        {
+            // When the declared return type is unknown or contains
+            // unresolved type variables (from bidirectional inference),
+            // use the inferred body return type instead.
             body_ret
         } else {
             decl.return_type.kind.clone()
@@ -1758,7 +1814,112 @@ fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
                     .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
         }
         (TyKind::Var(a), TyKind::Var(b)) => a == b,
+        // A type variable in either position is compatible with anything —
+        // this is needed so that generic signatures do not spuriously trigger
+        // type-mismatch errors during argument checking.
+        (TyKind::Var(_), _) | (_, TyKind::Var(_)) => true,
         _ => false,
+    }
+}
+
+// ── Generic type variable instantiation ──────────────────────────────
+
+/// Check whether a [`TyKind`] contains any `Var` (unresolved type
+/// variable) nodes.
+fn ty_contains_var(ty: &TyKind) -> bool {
+    match ty {
+        TyKind::Var(_) => true,
+        TyKind::Slice(inner) => ty_contains_var(&inner.kind),
+        TyKind::Dict(k, v) => ty_contains_var(&k.kind) || ty_contains_var(&v.kind),
+        TyKind::Fn(params, ret) => {
+            params.iter().any(|p| ty_contains_var(&p.kind)) || ty_contains_var(&ret.kind)
+        }
+        TyKind::Union(tys) => tys.iter().any(|t| ty_contains_var(&t.kind)),
+        _ => false,
+    }
+}
+
+/// Structurally match a concrete type against a pattern that may contain
+/// `Var` placeholders, and collect the bindings into `bindings`.
+///
+/// For example, matching `Slice(i64)` against `Slice(Var(T))` adds
+/// `T → i64`.  Conflicting bindings (the same `Var` mapped to different
+/// concrete types) are silently ignored (first-wins).
+fn collect_type_var_bindings(
+    concrete: &TyKind,
+    pattern: &TyKind,
+    bindings: &mut HashMap<TypeVarId, TyKind>,
+) {
+    match (concrete, pattern) {
+        // Skip Unknown types — they carry no information.
+        (TyKind::Unknown, _) | (_, TyKind::Unknown) => {}
+
+        // The core case: a type variable in the pattern position.
+        (_, TyKind::Var(id)) => {
+            bindings.entry(*id).or_insert_with(|| concrete.clone());
+        }
+        (TyKind::Slice(c), TyKind::Slice(p)) => {
+            collect_type_var_bindings(&c.kind, &p.kind, bindings);
+        }
+        (TyKind::Dict(ck, cv), TyKind::Dict(pk, pv)) => {
+            collect_type_var_bindings(&ck.kind, &pk.kind, bindings);
+            collect_type_var_bindings(&cv.kind, &pv.kind, bindings);
+        }
+        (TyKind::Fn(c_params, c_ret), TyKind::Fn(p_params, p_ret)) => {
+            for (cp, pp) in c_params.iter().zip(p_params.iter()) {
+                collect_type_var_bindings(&cp.kind, &pp.kind, bindings);
+            }
+            collect_type_var_bindings(&c_ret.kind, &p_ret.kind, bindings);
+        }
+        // Bare `List` path (unparameterised) vs Slice(Var(T)): no binding.
+        // Bare `Dict` path vs Dict(Var, Var): no binding.
+        _ => {}
+    }
+}
+
+/// Substitute all `Var` occurrences in `ty` with their bindings from
+/// the map, recursing into compound types.  Unbound variables are left
+/// unchanged.
+fn substitute_type_vars(ty: &TyKind, bindings: &HashMap<TypeVarId, TyKind>) -> TyKind {
+    match ty {
+        TyKind::Var(id) => bindings.get(id).cloned().unwrap_or_else(|| ty.clone()),
+        TyKind::Slice(inner) => TyKind::Slice(Box::new(Ty {
+            kind: substitute_type_vars(&inner.kind, bindings),
+            ..Ty::default()
+        })),
+        TyKind::Dict(k, v) => TyKind::Dict(
+            Box::new(Ty {
+                kind: substitute_type_vars(&k.kind, bindings),
+                ..Ty::default()
+            }),
+            Box::new(Ty {
+                kind: substitute_type_vars(&v.kind, bindings),
+                ..Ty::default()
+            }),
+        ),
+        TyKind::Fn(params, ret) => {
+            let params = params
+                .iter()
+                .map(|p| Ty {
+                    kind: substitute_type_vars(&p.kind, bindings),
+                    ..Ty::default()
+                })
+                .collect();
+            let ret = Box::new(Ty {
+                kind: substitute_type_vars(&ret.kind, bindings),
+                ..Ty::default()
+            });
+            TyKind::Fn(params, ret)
+        }
+        TyKind::Union(tys) => TyKind::Union(
+            tys.iter()
+                .map(|t| Ty {
+                    kind: substitute_type_vars(&t.kind, bindings),
+                    ..Ty::default()
+                })
+                .collect(),
+        ),
+        _ => ty.clone(),
     }
 }
 
@@ -1898,5 +2059,111 @@ mod tests {
 
         assert_eq!(decl.parameters[0].type_annotation.kind, TyKind::Unknown);
         assert_eq!(decl.return_type.kind, TyKind::Unknown);
+    }
+
+    #[test]
+    fn collect_bindings_from_slice() {
+        use tlang_span::TypeVarIdAllocator;
+
+        let mut alloc = TypeVarIdAllocator::new(1);
+        let t = alloc.next_id();
+
+        let concrete = TyKind::Slice(Box::new(Ty {
+            kind: TyKind::Primitive(PrimTy::I64),
+            ..Ty::default()
+        }));
+        let pattern = TyKind::Slice(Box::new(Ty {
+            kind: TyKind::Var(t),
+            ..Ty::default()
+        }));
+
+        let mut bindings = HashMap::new();
+        collect_type_var_bindings(&concrete, &pattern, &mut bindings);
+
+        assert_eq!(bindings.len(), 1);
+        assert_eq!(bindings[&t], TyKind::Primitive(PrimTy::I64));
+    }
+
+    #[test]
+    fn substitute_vars_in_return_type() {
+        use tlang_span::TypeVarIdAllocator;
+
+        let mut alloc = TypeVarIdAllocator::new(1);
+        let t = alloc.next_id();
+        let u = alloc.next_id();
+
+        let mut bindings = HashMap::new();
+        bindings.insert(t, TyKind::Primitive(PrimTy::I64));
+        bindings.insert(u, TyKind::Primitive(PrimTy::F64));
+
+        // Slice(Var(U)) → Slice(f64)
+        let ty = TyKind::Slice(Box::new(Ty {
+            kind: TyKind::Var(u),
+            ..Ty::default()
+        }));
+        let result = substitute_type_vars(&ty, &bindings);
+        assert_eq!(
+            result,
+            TyKind::Slice(Box::new(Ty {
+                kind: TyKind::Primitive(PrimTy::F64),
+                ..Ty::default()
+            }))
+        );
+    }
+
+    #[test]
+    fn collect_bindings_from_fn_type() {
+        use tlang_span::TypeVarIdAllocator;
+
+        let mut alloc = TypeVarIdAllocator::new(1);
+        let t = alloc.next_id();
+        let u = alloc.next_id();
+
+        // concrete: fn(i64) -> f64
+        let concrete = TyKind::Fn(
+            vec![Ty {
+                kind: TyKind::Primitive(PrimTy::I64),
+                ..Ty::default()
+            }],
+            Box::new(Ty {
+                kind: TyKind::Primitive(PrimTy::F64),
+                ..Ty::default()
+            }),
+        );
+        // pattern: fn(Var(T)) -> Var(U)
+        let pattern = TyKind::Fn(
+            vec![Ty {
+                kind: TyKind::Var(t),
+                ..Ty::default()
+            }],
+            Box::new(Ty {
+                kind: TyKind::Var(u),
+                ..Ty::default()
+            }),
+        );
+
+        let mut bindings = HashMap::new();
+        collect_type_var_bindings(&concrete, &pattern, &mut bindings);
+
+        assert_eq!(bindings.len(), 2);
+        assert_eq!(bindings[&t], TyKind::Primitive(PrimTy::I64));
+        assert_eq!(bindings[&u], TyKind::Primitive(PrimTy::F64));
+    }
+
+    #[test]
+    fn unbound_vars_remain_unchanged() {
+        use tlang_span::TypeVarIdAllocator;
+
+        let mut alloc = TypeVarIdAllocator::new(1);
+        let t = alloc.next_id();
+        let u = alloc.next_id();
+
+        let mut bindings = HashMap::new();
+        bindings.insert(t, TyKind::Primitive(PrimTy::I64));
+        // u is intentionally NOT in bindings
+
+        let ty = TyKind::Var(u);
+        let result = substitute_type_vars(&ty, &bindings);
+        assert_eq!(result, TyKind::Var(u));
     }
 }
