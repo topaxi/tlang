@@ -2163,3 +2163,71 @@ fn string_method_wrong_return_type_error() {
         "expected return type mismatch, got: {errs:?}"
     );
 }
+
+// ── Builtin free-function closure inference (map, Functor::map) ─────────
+
+#[test]
+fn functor_map_infers_closure_param_from_list() {
+    // Functor::map([1,2,3], fn(x) { x + 1 }) → x should be i64
+    // Returning String from closure while assigning to List<i64> should error
+    let errs = common::typecheck_errors(
+        r#"
+        let xs: List<i64> = [1, 2, 3];
+        let ys: List<i64> = Functor::map(xs, fn(x) { "hello" });
+        "#,
+    );
+    assert!(
+        !errs.is_empty(),
+        "expected type error: closure returns String but List<i64> expected"
+    );
+}
+
+#[test]
+fn functor_map_closure_ok() {
+    // Functor::map should work without errors when types are consistent
+    common::typecheck_ok(
+        r#"
+        let xs: List<i64> = [1, 2, 3];
+        let ys = Functor::map(xs, fn(x) { x + 1 });
+        "#,
+    );
+}
+
+#[test]
+fn pipeline_map_infers_closure_param_from_list() {
+    // [1,2,3] |> map(fn(x) { "hello" }) → assigning to List<i64> should error
+    let errs = common::typecheck_errors(
+        r#"
+        let ys: List<i64> = [1, 2, 3] |> map(fn(x) { "hello" });
+        "#,
+    );
+    assert!(
+        !errs.is_empty(),
+        "expected type error: closure returns String but List<i64> expected"
+    );
+}
+
+#[test]
+fn pipeline_map_closure_ok() {
+    // Pipeline map should work without errors when types are consistent
+    common::typecheck_ok(
+        r#"
+        let ys = [1, 2, 3] |> map(fn(x) { x + 1 });
+        "#,
+    );
+}
+
+#[test]
+fn pipeline_map_chain_infers_types() {
+    // Full pipeline: [1,2,3] |> map(fn(x) { x * 2 }) — result should be List<i64>
+    // Assigning to String should error
+    let errs = common::typecheck_errors(
+        r#"
+        let result: String = [1, 2, 3] |> map(fn(x) { x * 2 });
+        "#,
+    );
+    assert!(
+        !errs.is_empty(),
+        "expected type error: List<i64> assigned to String"
+    );
+}

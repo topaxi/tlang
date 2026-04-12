@@ -1,4 +1,5 @@
 use tlang_hir::{PrimTy, Ty, TyKind};
+use tlang_span::TypeVarId;
 
 use crate::builtin_types;
 
@@ -17,11 +18,34 @@ pub struct BuiltinSignature {
     pub ret_builtin_type: Option<&'static str>,
 }
 
+// Well-known type variable IDs — shared with builtin_methods.rs.
+const VAR_T: TypeVarId = TypeVarId::new(10_001);
+const VAR_U: TypeVarId = TypeVarId::new(10_002);
+
+fn mk_ty(kind: TyKind) -> Ty {
+    Ty {
+        kind,
+        ..Ty::default()
+    }
+}
+
+fn mk_fn_ty(params: Vec<TyKind>, ret: TyKind) -> TyKind {
+    TyKind::Fn(
+        params.into_iter().map(mk_ty).collect(),
+        Box::new(mk_ty(ret)),
+    )
+}
+
 /// Look up the type signature for a built-in function by name.
 ///
 /// Returns a `TyKind::Fn` wrapping the parameter types and return type,
 /// or `None` if the name is not a known builtin.
 pub fn lookup(name: &str) -> Option<TyKind> {
+    // Try generic (heap-allocated) signatures first, then static ones.
+    if let Some(ty) = lookup_generic(name) {
+        return Some(ty);
+    }
+
     lookup_signature(name).map(|b| {
         let params: Vec<Ty> = b
             .params
@@ -41,6 +65,26 @@ pub fn lookup(name: &str) -> Option<TyKind> {
         };
         TyKind::Fn(params, Box::new(ret))
     })
+}
+
+/// Signatures for generic builtin free functions that require
+/// heap-allocated types (`Vec`, `Box`) and can't live in a static array.
+fn lookup_generic(name: &str) -> Option<TyKind> {
+    let t = TyKind::Var(VAR_T);
+    let u = TyKind::Var(VAR_U);
+
+    match name {
+        // map<T, U>(iterable: Slice<T>, f: fn(T) -> U) -> Slice<U>
+        // Also available as Functor::map
+        "map" | "Functor::map" => Some(mk_fn_ty(
+            vec![
+                TyKind::Slice(Box::new(mk_ty(t.clone()))),
+                mk_fn_ty(vec![t], u.clone()),
+            ],
+            TyKind::Slice(Box::new(mk_ty(u))),
+        )),
+        _ => None,
+    }
 }
 
 /// Look up the raw signature metadata for a built-in function by name.

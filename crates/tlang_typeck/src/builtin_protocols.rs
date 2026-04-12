@@ -179,6 +179,12 @@ pub fn builtin_symbols() -> Vec<(String, tlang_defs::DefKind)> {
         ),
     ]);
 
+    // Global protocol dispatch functions (free-function wrappers).
+    symbols.extend([
+        // map(iterable, f) — Functor::map dispatch
+        ("map".to_string(), tlang_defs::DefKind::Function(2)),
+    ]);
+
     symbols
 }
 
