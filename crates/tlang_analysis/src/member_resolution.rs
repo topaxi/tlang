@@ -12,6 +12,7 @@
 //! handle conversion to byte offsets and the lexer's mixed coordinate system
 //! so callers do not need to worry about coordinate mismatches.
 
+use tlang_defs::DefKind;
 use tlang_hir as hir;
 use tlang_hir::TyKind;
 use tlang_span::Span;
@@ -224,9 +225,14 @@ pub fn complete_members_for_type(
     if let Some(index) = symbol_index {
         for item in index.collect_method_completions(type_name) {
             if seen.insert(item.label.clone()) {
+                let kind = if item.kind == DefKind::StructField {
+                    MemberKind::Field
+                } else {
+                    MemberKind::Method
+                };
                 candidates.push(MemberCandidate {
                     name: item.label,
-                    kind: MemberKind::Method,
+                    kind,
                     signature: None,
                     return_ty: None,
                     def_span: None,
@@ -782,14 +788,19 @@ fn resolve_hir_member(
                 }
             }
             hir::StmtKind::ImplBlock(impl_block) => {
+                if impl_block.target_type.to_string() != type_name {
+                    continue;
+                }
                 for decl in &impl_block.methods {
-                    if decl.name() == dotted_name
-                        || (impl_block.target_type.to_string() == type_name
-                            && decl
-                                .name()
-                                .strip_prefix(&format!("{type_name}."))
-                                .is_some_and(|n| n == member_name))
-                    {
+                    // Match qualified names (e.g. "Type.member") or
+                    // unqualified names (e.g. "member") used by impl blocks.
+                    let is_match = decl.name() == dotted_name
+                        || decl.name() == member_name
+                        || decl
+                            .name()
+                            .strip_prefix(&format!("{type_name}."))
+                            .is_some_and(|n| n == member_name);
+                    if is_match {
                         let params: Vec<String> = decl
                             .parameters
                             .iter()
@@ -1052,6 +1063,34 @@ fn Vector.add(self, other: Vector) -> Vector {
         assert!(
             names.contains(&"add"),
             "should contain user-defined method 'add', got: {names:?}"
+        );
+    }
+
+    #[test]
+    fn complete_struct_fields_have_field_kind() {
+        let source = r#"
+struct Point { x: i64, y: i64 }
+fn Point.distance(self) -> i64 { self.x + self.y }
+"#;
+        let result = analyze_for_target(source, CompilationTarget::Js);
+        let hir = lower_and_typecheck(&result).expect("should succeed");
+        let index = crate::symbol_index::SymbolIndex::from_analyzer(&result.analyzer);
+        let candidates = complete_members_for_type(&hir, Some(&index), "Point");
+
+        let field_x = candidates.iter().find(|c| c.name == "x");
+        assert!(field_x.is_some(), "should contain field 'x'");
+        assert_eq!(
+            field_x.unwrap().kind,
+            MemberKind::Field,
+            "struct field 'x' should have Field kind"
+        );
+
+        let method = candidates.iter().find(|c| c.name == "distance");
+        assert!(method.is_some(), "should contain method 'distance'");
+        assert_eq!(
+            method.unwrap().kind,
+            MemberKind::Method,
+            "struct method 'distance' should have Method kind"
         );
     }
 }

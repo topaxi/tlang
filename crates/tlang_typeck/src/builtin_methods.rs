@@ -289,7 +289,7 @@ pub const BUILTIN_TYPE_NAMES: &[&str] =
 
 /// Enumerate all builtin methods available on a type.
 ///
-/// Returns an empty slice when `type_name` is not a recognised builtin type.
+/// Returns an empty `Vec` when `type_name` is not a recognised builtin type.
 /// The returned signatures have `self` excluded (same convention as [`lookup`]).
 pub fn methods_for(type_name: &str) -> Vec<BuiltinMethod> {
     match type_name {
