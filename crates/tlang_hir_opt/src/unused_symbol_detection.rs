@@ -24,7 +24,9 @@ use crate::hir_opt::{HirOptContext, HirOptError, HirPass};
 /// The pass is guarded so it only runs once per compilation.
 #[derive(Default)]
 pub struct UnusedSymbolDetector {
+    /// Guard to ensure the pass only runs once per compilation.
     ran: bool,
+    /// Stack of scope [`HirId`]s maintained during HIR traversal.
     scopes: Vec<HirId>,
 }
 
