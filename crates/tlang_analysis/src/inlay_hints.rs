@@ -129,9 +129,13 @@ fn collect_stmt_hints(stmt: &hir::Stmt, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
         }
         hir::StmtKind::EnumDeclaration(_)
         | hir::StmtKind::StructDeclaration(_)
-        | hir::StmtKind::ProtocolDeclaration(_)
-        | hir::StmtKind::ImplBlock(_) => {
+        | hir::StmtKind::ProtocolDeclaration(_) => {
             // Type declarations — no hints needed.
+        }
+        hir::StmtKind::ImplBlock(impl_block) => {
+            for method in &impl_block.methods {
+                collect_fn_decl_hints(method, ctx, hints);
+            }
         }
     }
 }
@@ -465,6 +469,9 @@ fn walk_block_for_type(
             return;
         }
         walk_stmt_for_type(stmt, type_table, line, col, out);
+    }
+    if out.is_none() && let Some(expr) = &block.expr {
+        walk_expr_for_type(expr, type_table, line, col, out);
     }
 }
 
@@ -1082,6 +1089,28 @@ fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, 
             ty.as_deref(),
             Some("fn(i64) -> i64"),
             "hover on closure `fn` should show full typed signature"
+        );
+    }
+
+    #[test]
+    fn hover_on_closure_inside_method_body() {
+        // Hovering on the `fn` keyword of a closure nested inside a
+        // dot-method body should still work.
+        let source = r#"
+struct Post { title: String }
+fn map<T, U>([]: List<T>, _: fn(T) -> U) -> List<U> { [] }
+fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, f)] }
+fn Post.render(Post { title }) {
+    [title] |> map(fn(s) { s })
+}
+"#;
+        let typed_hir = typed_hir_for(source);
+        // Line 5 (0-based): `    [title] |> map(fn(s) { s })`
+        // `fn` keyword — find its 0-based column.
+        let ty = type_at_definition(&typed_hir, 5, 19);
+        assert!(
+            ty.is_some(),
+            "hover on closure `fn` inside method body should show type, got None"
         );
     }
 }
