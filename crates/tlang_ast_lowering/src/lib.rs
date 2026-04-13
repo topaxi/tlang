@@ -546,6 +546,7 @@ impl LoweringContext {
                     .then_some(decl.params_span)
                     .into_iter()
                     .collect(),
+                return_hint_arm_indices: Vec::new(),
                 return_type,
                 has_return_type: decl.return_type_annotation.is_some(),
                 body,

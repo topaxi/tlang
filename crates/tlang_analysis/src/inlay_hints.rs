@@ -186,6 +186,41 @@ fn collect_fn_decl_hints(
 
     // Return type hint — show when no explicit return type was written.
     if !return_hint_spans.is_empty() {
+        if let Some(hir::Expr {
+            kind: hir::ExprKind::Match(_, arms),
+            ..
+        }) = decl.body.expr.as_ref()
+            && decl.return_hint_spans.len() == decl.return_hint_arm_indices.len()
+        {
+            let clause_returns: Option<Vec<_>> = return_hint_spans
+                .iter()
+                .zip(decl.return_hint_arm_indices.iter())
+                .map(|(span, arm_idx)| {
+                    let ret_kind = arms
+                        .get(*arm_idx)
+                        .and_then(|arm| arm.block.expr.as_ref().map(|e| &e.ty.kind))?;
+                    if matches!(ret_kind, TyKind::Unknown) || ty_contains_var(ret_kind) {
+                        return None;
+                    }
+                    Some((*span, ret_kind))
+                })
+                .collect();
+
+            if let Some(clause_returns) = clause_returns {
+                for (span, ret_kind) in clause_returns {
+                    push_hint(
+                        hints,
+                        ctx.range,
+                        return_type_hint_position(span),
+                        format!(" -> {ret_kind}"),
+                        InlayHintKind::ReturnType,
+                    );
+                }
+                collect_block_hints(&decl.body, ctx, hints);
+                return;
+            }
+        }
+
         // Try to get the inferred return type. Priority:
         // 1. The type checker may have written it back to decl.return_type.
         // 2. The type table entry for this declaration (Fn signature).
@@ -437,8 +472,10 @@ fn preferred_pattern_hint_ty<'a>(pat_ty: &'a TyKind, table_ty: Option<&'a TyKind
         Some(TyKind::Unknown) => pat_ty,
         Some(table_ty) if matches!(pat_ty, TyKind::Unknown) => table_ty,
         Some(table_ty)
-            if matches!(pat_ty, TyKind::Slice(_) | TyKind::Dict(_, _) | TyKind::Fn(_, _))
-                && matches!(table_ty, TyKind::Path(_)) =>
+            if matches!(
+                pat_ty,
+                TyKind::Slice(_) | TyKind::Dict(_, _) | TyKind::Fn(_, _)
+            ) && matches!(table_ty, TyKind::Path(_)) =>
         {
             pat_ty
         }
@@ -521,7 +558,9 @@ fn walk_block_for_type(
         }
         walk_stmt_for_type(stmt, type_table, line, col, out);
     }
-    if out.is_none() && let Some(expr) = &block.expr {
+    if out.is_none()
+        && let Some(expr) = &block.expr
+    {
         walk_expr_for_type(expr, type_table, line, col, out);
     }
 }
@@ -1280,6 +1319,35 @@ fn render(_) { 3 }
     }
 
     #[test]
+    fn multi_clause_function_shows_clause_local_return_hints() {
+        let source = r#"
+enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+fn Tree.to_list(Tree::Empty) { [] }
+fn Tree.to_list(Tree::Node { value, left, right }) {
+    [...left, value, ...right]
+}
+"#;
+        let hints = hints_for(source);
+
+        assert!(
+            hints.iter().any(|h| {
+                h.kind == InlayHintKind::ReturnType && h.line == 6 && h.label == " -> List"
+            }),
+            "expected empty-clause return hint `-> List`, got: {hints:?}"
+        );
+        assert!(
+            hints.iter().any(|h| {
+                h.kind == InlayHintKind::ReturnType && h.line == 7 && h.label == " -> List<isize>"
+            }),
+            "expected node-clause return hint `-> List<isize>`, got: {hints:?}"
+        );
+    }
+
+    #[test]
     fn unconstrained_multi_clause_function_has_no_return_hint() {
         let source = r#"
 fn foldl([], acc, _) { acc }
@@ -1376,14 +1444,12 @@ let total = for x in tree; with sum = 0 as isize {
 };
 "#;
         let hints = hints_for(source);
-        let x_hint = hints
-            .iter()
-            .find(|h| {
-                h.line == 13
-                    && h.character == 17
-                    && h.label == ": isize"
-                    && h.kind == InlayHintKind::Type
-            });
+        let x_hint = hints.iter().find(|h| {
+            h.line == 13
+                && h.character == 17
+                && h.label == ": isize"
+                && h.kind == InlayHintKind::Type
+        });
 
         assert!(
             x_hint.is_some(),
@@ -1412,16 +1478,67 @@ let total = for x in tree; with sum = 0 {
 "#;
         let hints = hints_for(source);
         let total_hint = hints.iter().find(|h| {
-            h.line == 13
-                && h.character == 9
-                && h.label == ": i64"
-                && h.kind == InlayHintKind::Type
+            h.line == 13 && h.character == 9 && h.label == ": i64" && h.kind == InlayHintKind::Type
         });
 
         assert!(
             total_hint.is_some(),
             "expected the loop result binding `total` to get the coerced numeric type, got: {hints:?}"
         );
+    }
+
+    #[test]
+    fn loop_accumulator_hint_uses_outer_expected_list_type() {
+        let source = r#"
+enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+impl Iterable<isize> for Tree {
+    fn iter(self) {
+        Iterable::iter([])
+    }
+}
+
+let tree = Tree::Empty;
+let evens: List<isize> = for x in tree; with acc = [] {
+    if x % 2 == 0 { [...acc, x] } else { acc }
+};
+"#;
+        let hints = hints_for(source);
+        let acc_hint = hints
+            .iter()
+            .find(|h| h.line == 13 && h.label == ": List<isize>" && h.kind == InlayHintKind::Type);
+
+        assert!(
+            acc_hint.is_some(),
+            "expected the loop accumulator binding `acc` to inherit the annotated result type, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn type_at_definition_for_loop_accumulator_uses_outer_expected_list_type() {
+        let source = r#"
+enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+impl Iterable<isize> for Tree {
+    fn iter(self) {
+        Iterable::iter([])
+    }
+}
+
+let tree = Tree::Empty;
+let evens: List<isize> = for x in tree; with acc = [] {
+    if x % 2 == 0 { [...acc, x] } else { acc }
+};
+        "#;
+        let typed_hir = typed_hir_for(source);
+        let ty = type_at_definition(&typed_hir, 13, 45);
+        assert_eq!(ty.as_deref(), Some("List<isize>"));
     }
 
     #[test]

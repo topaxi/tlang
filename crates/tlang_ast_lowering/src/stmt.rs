@@ -904,6 +904,12 @@ impl LoweringContext {
                     .filter(|d| d.return_type_annotation.is_none())
                     .map(|d| d.params_span)
                     .collect();
+                decl.return_hint_arm_indices = decls
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, d)| d.return_type_annotation.is_none())
+                    .map(|(i, _)| i)
+                    .collect();
                 // Multi-clause functions inherit visibility from the first clause.
                 decl.visibility = decls[0].visibility;
                 // Use the first clause's params_span so return-type hints land

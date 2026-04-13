@@ -1185,6 +1185,7 @@ impl Interpreter {
                     parameters: method.parameters.clone(),
                     params_span: tlang_span::Span::default(),
                     return_hint_spans: Vec::new(),
+                    return_hint_arm_indices: Vec::new(),
                     return_type: method.return_type.clone(),
                     has_return_type: !matches!(method.return_type.kind, hir::TyKind::Unknown),
                     body: body.clone(),

@@ -149,8 +149,22 @@ impl TypeChecker {
     /// When all elements agree on a single known type, the list is typed as
     /// `Slice(that_type)`.  Otherwise (empty list, mixed types, or unknown
     /// elements) falls back to the bare `List` path.
-    fn infer_list_type(elements: &[hir::Expr]) -> TyKind {
-        let common = Self::common_element_type(elements.iter().map(|e| &e.ty.kind));
+    fn infer_list_element_type(&self, expr: &hir::Expr) -> TyKind {
+        if let hir::ExprKind::Unary(UnaryOp::Spread, inner) = &expr.kind {
+            return self
+                .iterable_item_type(&inner.ty.kind)
+                .unwrap_or(TyKind::Unknown);
+        }
+
+        expr.ty.kind.clone()
+    }
+
+    fn infer_list_type(&self, elements: &[hir::Expr]) -> TyKind {
+        let element_tys: Vec<TyKind> = elements
+            .iter()
+            .map(|expr| self.infer_list_element_type(expr))
+            .collect();
+        let common = Self::common_element_type(element_tys.iter());
         match common {
             Some(elem_kind) => TyKind::Slice(Box::new(Ty {
                 kind: elem_kind,
@@ -185,7 +199,7 @@ impl TypeChecker {
     /// concrete type, `None` otherwise (empty, mixed, or all unknown).
     fn common_element_type<'a>(mut types: impl Iterator<Item = &'a TyKind>) -> Option<TyKind> {
         let first = types.find(|t| !matches!(t, TyKind::Unknown))?;
-        if types.all(|t| matches!(t, TyKind::Unknown) || t == first) {
+        if types.all(|t| matches!(t, TyKind::Unknown) || ty_kinds_compatible(t, first)) {
             Some(first.clone())
         } else {
             None
@@ -205,7 +219,7 @@ impl TypeChecker {
 
             match inferred {
                 None => inferred = Some(ty),
-                Some(prev) if prev == ty => {}
+                Some(prev) if ty_kinds_compatible(prev, ty) => {}
                 Some(_) => return None,
             }
         }
@@ -301,7 +315,7 @@ impl TypeChecker {
             // Assignment expressions evaluate to the assigned value.
             // Only preserve a concrete type when the assignment is type-compatible.
             BinaryOpKind::Assign => {
-                if lhs_ty == rhs_ty {
+                if ty_kinds_compatible(lhs_ty, rhs_ty) {
                     rhs_ty.clone()
                 } else {
                     TyKind::Unknown
@@ -1710,6 +1724,91 @@ impl TypeChecker {
         }
     }
 
+    fn apply_expected_block_type(&mut self, block: &mut hir::Block, expected: &TyKind) {
+        self.apply_expected_loop_accumulator_type(block, expected);
+
+        if let Some(expr) = &mut block.expr {
+            self.apply_expected_expr_type(expr, expected);
+        }
+    }
+
+    fn apply_expected_loop_accumulator_type(&mut self, block: &mut hir::Block, expected: &TyKind) {
+        for stmt in &mut block.stmts {
+            let hir::StmtKind::Let(pat, _, ty) = &mut stmt.kind else {
+                continue;
+            };
+            let hir::PatKind::Identifier(hir_id, ident) = &pat.kind else {
+                continue;
+            };
+            if ident.as_str() != "accumulator$$" || !matches!(ty.kind, TyKind::Unknown) {
+                continue;
+            }
+
+            ty.kind = expected.clone();
+            if matches!(pat.ty.kind, TyKind::Unknown) {
+                pat.ty.kind = expected.clone();
+            }
+            self.type_table.insert(
+                *hir_id,
+                TypeInfo {
+                    ty: Ty {
+                        kind: expected.clone(),
+                        ..Ty::default()
+                    },
+                },
+            );
+        }
+    }
+
+    fn apply_expected_expr_type(&mut self, expr: &mut hir::Expr, expected: &TyKind) {
+        if matches!(expected, TyKind::Unknown) || ty_contains_var(expected) {
+            return;
+        }
+
+        match &mut expr.kind {
+            hir::ExprKind::FunctionExpression(decl) => {
+                Self::apply_expected_closure_types(decl, expected);
+            }
+            hir::ExprKind::Binary(BinaryOpKind::Assign, lhs, rhs) => {
+                self.apply_expected_expr_type(lhs, expected);
+                self.apply_expected_expr_type(rhs, expected);
+            }
+            hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
+                self.apply_expected_block_type(block, expected);
+            }
+            hir::ExprKind::IfElse(_, then_block, else_clauses) => {
+                self.apply_expected_block_type(then_block, expected);
+                for else_clause in else_clauses {
+                    self.apply_expected_block_type(&mut else_clause.consequence, expected);
+                }
+            }
+            hir::ExprKind::Match(_, arms) => {
+                for arm in arms {
+                    self.apply_expected_block_type(&mut arm.block, expected);
+                }
+            }
+            hir::ExprKind::Break(Some(value)) => {
+                self.apply_expected_expr_type(value, expected);
+            }
+            hir::ExprKind::List(elements) => {
+                if let TyKind::Slice(inner) = expected {
+                    for element in elements {
+                        self.apply_expected_expr_type(element, &inner.kind);
+                    }
+                }
+            }
+            hir::ExprKind::Dict(entries) => {
+                if let TyKind::Dict(key_ty, value_ty) = expected {
+                    for (key, value) in entries {
+                        self.apply_expected_expr_type(key, &key_ty.kind);
+                        self.apply_expected_expr_type(value, &value_ty.kind);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Visit a FunctionExpression (closure): register parameters, visit
     /// body, infer return type, and set the expression's type to `Fn(…) → …`.
     fn visit_closure_expr(&mut self, decl: &mut hir::FunctionDeclaration, expr_ty: &mut Ty) {
@@ -1730,6 +1829,11 @@ impl TypeChecker {
 
         self.return_type_stack.push(decl.return_type.kind.clone());
         self.observed_return_types.push(Vec::new());
+        if !matches!(decl.return_type.kind, TyKind::Unknown)
+            && let Some(expr) = &mut decl.body.expr
+        {
+            self.apply_expected_expr_type(expr, &decl.return_type.kind);
+        }
         self.visit_block(&mut decl.body, &mut ());
 
         // Check that the closure body type matches the declared return type.
@@ -1807,6 +1911,11 @@ impl TypeChecker {
 
         self.return_type_stack.push(decl.return_type.kind.clone());
         self.observed_return_types.push(Vec::new());
+        if !matches!(decl.return_type.kind, TyKind::Unknown)
+            && let Some(expr) = &mut decl.body.expr
+        {
+            self.apply_expected_expr_type(expr, &decl.return_type.kind);
+        }
         self.visit_block(&mut decl.body, &mut ());
         self.check_function_body_return(decl);
 
@@ -1893,6 +2002,9 @@ impl<'hir> Visitor<'hir> for TypeChecker {
     fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
         match &mut stmt.kind {
             hir::StmtKind::Let(pat, expr, ty) => {
+                if !matches!(ty.kind, TyKind::Unknown) {
+                    self.apply_expected_expr_type(expr, &ty.kind);
+                }
                 self.visit_expr(expr, ctx);
                 self.record_iterator_binding_item_type(pat, expr);
 
@@ -1912,6 +2024,9 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 pat.ty.kind = binding_ty;
             }
             hir::StmtKind::Const(_, pat, expr, ty) => {
+                if !matches!(ty.kind, TyKind::Unknown) {
+                    self.apply_expected_expr_type(expr, &ty.kind);
+                }
                 self.visit_expr(expr, ctx);
 
                 let expr_ty_kind = expr.ty.kind.clone();
@@ -1932,6 +2047,9 @@ impl<'hir> Visitor<'hir> for TypeChecker {
             }
             hir::StmtKind::Return(expr) => {
                 if let Some(e) = expr.as_mut() {
+                    if let Some(expected_ret) = self.return_type_stack.last().cloned() {
+                        self.apply_expected_expr_type(e, &expected_ret);
+                    }
                     self.visit_expr(e, ctx);
                 }
                 let span = stmt.span;
@@ -2174,7 +2292,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 for elem in elements.iter_mut() {
                     self.visit_expr(elem, ctx);
                 }
-                let ty_kind = Self::infer_list_type(elements);
+                let ty_kind = self.infer_list_type(elements);
                 self.assign_expr_type(expr, ty_kind);
             }
             hir::ExprKind::Dict(entries) => {
@@ -2407,6 +2525,7 @@ mod tests {
             parameters: params,
             params_span: tlang_span::Span::default(),
             return_hint_spans: Vec::new(),
+            return_hint_arm_indices: Vec::new(),
             return_type: Ty {
                 kind: ret,
                 ..Ty::default()

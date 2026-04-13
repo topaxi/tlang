@@ -369,6 +369,53 @@ fn for_loop_accumulator_coerces_mixed_numeric_types() {
     );
 }
 
+#[test]
+fn loop_accumulator_infers_from_annotated_result_binding() {
+    common::typecheck_ok(
+        r#"
+        enum Tree {
+            Empty,
+            Node { value: isize, left: Tree, right: Tree },
+        }
+
+        impl Iterable<isize> for Tree {
+            fn iter(self) {
+                Iterable::iter([])
+            }
+        }
+
+        let tree = Tree::Empty;
+        let evens: List<isize> = for x in tree; with acc = [] {
+            if x % 2 == 0 { [...acc, x] } else { acc }
+        };
+        "#,
+    );
+}
+
+#[test]
+fn loop_accumulator_infers_from_function_return_type() {
+    common::typecheck_ok(
+        r#"
+        enum Tree {
+            Empty,
+            Node { value: isize, left: Tree, right: Tree },
+        }
+
+        impl Iterable<isize> for Tree {
+            fn iter(self) {
+                Iterable::iter([])
+            }
+        }
+
+        fn evens(tree: Tree) -> List<isize> {
+            for x in tree; with acc = [] {
+                if x % 2 == 0 { [...acc, x] } else { acc }
+            }
+        }
+        "#,
+    );
+}
+
 // ── Multiple errors ─────────────────────────────────────────────────────
 
 #[test]

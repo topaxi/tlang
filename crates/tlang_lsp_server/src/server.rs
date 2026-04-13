@@ -249,7 +249,9 @@ impl ServerState {
         // If standard symbol resolution didn't find anything, try the
         // shared member resolution module for `receiver.member` expressions
         // (e.g. `re"foo".replace_all` where the member is a builtin method).
-        if resolved.is_none() && let Some(member) = Self::resolve_member(state, uri, pos) {
+        if resolved.is_none()
+            && let Some(member) = Self::resolve_member(state, uri, pos)
+        {
             let hover_text = if let Some(sig) = &member.signature {
                 sig.label.clone()
             } else {

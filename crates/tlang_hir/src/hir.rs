@@ -987,6 +987,9 @@ pub struct FunctionDeclaration {
     /// Parameter-list spans that should receive inferred return-type inlay hints.
     /// Multi-clause functions preserve one span per unannotated clause.
     pub return_hint_spans: Vec<Span>,
+    /// Match-arm indices corresponding to `return_hint_spans` for multi-clause
+    /// functions, so editor hints can use each clause's own completion type.
+    pub return_hint_arm_indices: Vec<usize>,
     pub return_type: Ty,
     /// Whether the user wrote an explicit return type annotation.
     /// `false` when the return type was left unannotated (even if the type
@@ -1006,6 +1009,7 @@ impl FunctionDeclaration {
             parameters: params,
             params_span: Span::default(),
             return_hint_spans: Vec::new(),
+            return_hint_arm_indices: Vec::new(),
             return_type: Ty::default(),
             has_return_type: false,
             body,
