@@ -70,6 +70,8 @@ pub struct ImplInfo {
     pub target_type_name: String,
     /// Protocol type-argument keys (e.g. `["i64"]` for `impl Into<i64> for String`).
     pub protocol_type_args: Vec<String>,
+    /// Protocol type arguments preserved as types for inference.
+    pub protocol_type_arg_tys: Vec<Ty>,
     /// Whether this is a blanket impl (has impl-level type parameters).
     pub is_blanket: bool,
     /// Where clause predicates (type name → list of bound protocol names).

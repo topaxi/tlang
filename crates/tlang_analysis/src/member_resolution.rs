@@ -1067,6 +1067,30 @@ fn Vector.add(self, other: Vector) -> Vector {
     }
 
     #[test]
+    fn resolve_member_on_chained_custom_method_call() {
+        let source = r#"
+struct Counter {
+    value: i64,
+}
+
+fn Counter.inc(self) -> Counter {
+    Counter { value: self.value + 1 }
+}
+
+let start: Counter = Counter { value: 0 };
+let _ = start.inc().inc();
+"#;
+        let hir = typed_hir(source);
+        let line = source.lines().nth(10).unwrap();
+        let col = line.rfind("inc").unwrap() as u32;
+        let resolved = resolve_member_at_position(source, &hir, 10, col);
+        assert!(resolved.is_some(), "should resolve chained Counter.inc");
+        let resolved = resolved.unwrap();
+        assert_eq!(resolved.name, "inc");
+        assert_eq!(resolved.kind, MemberKind::Method);
+    }
+
+    #[test]
     fn complete_struct_fields_have_field_kind() {
         let source = r#"
 struct Point { x: i64, y: i64 }

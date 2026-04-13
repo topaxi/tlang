@@ -454,4 +454,62 @@ mod tests {
             "should resolve recursive `map` call in multi-clause function"
         );
     }
+
+    #[test]
+    fn resolve_for_loop_binding_definition() {
+        let source = r#"enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+impl Iterable<isize> for Tree {
+    fn iter(self) {
+        Iterable::iter(self.to_list())
+    }
+}
+
+fn Tree.to_list(Tree::Empty) { [] }
+fn Tree.to_list(Tree::Node { value, left, right }) {
+    [...left, value, ...right]
+}
+
+let tree = Tree::Empty;
+for x in tree {
+    x |> log();
+};"#;
+        let resolved = setup_and_resolve(source, 17, 4);
+        assert!(resolved.is_some(), "should resolve loop binding definition");
+        let resolved = resolved.unwrap();
+        assert_eq!(resolved.name, "x");
+        assert_eq!(resolved.def_kind, DefKind::Variable);
+    }
+
+    #[test]
+    fn resolve_for_loop_binding_reference() {
+        let source = r#"enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+impl Iterable<isize> for Tree {
+    fn iter(self) {
+        Iterable::iter(self.to_list())
+    }
+}
+
+fn Tree.to_list(Tree::Empty) { [] }
+fn Tree.to_list(Tree::Node { value, left, right }) {
+    [...left, value, ...right]
+}
+
+let tree = Tree::Empty;
+for x in tree {
+    x |> log();
+};"#;
+        let resolved = setup_and_resolve(source, 18, 4);
+        assert!(resolved.is_some(), "should resolve loop binding reference");
+        let resolved = resolved.unwrap();
+        assert_eq!(resolved.name, "x");
+        assert_eq!(resolved.def_kind, DefKind::Variable);
+    }
 }

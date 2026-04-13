@@ -7,10 +7,10 @@ enum Tree {
     Node { value: isize, left: Tree, right: Tree },
 }
 
-fn Tree.insert(Tree::Empty, value) {
+fn Tree.insert(Tree::Empty, value: isize) {
     Tree::Node { value: value, left: Tree::Empty, right: Tree::Empty }
 }
-fn Tree.insert(Tree::Node { value: node_val, left, right }, value) {
+fn Tree.insert(Tree::Node { value: node_val, left, right }, value: isize) {
     if value < node_val {
         Tree::Node { value: node_val, left: left.insert(value), right }
     } else if value > node_val {
@@ -27,9 +27,9 @@ fn Tree.to_list(Tree::Node { value, left, right }) {
 }
 
 // Make Tree iterable by delegating to the built-in List iterator
-impl Iterable for Tree {
-    fn iter(tree) {
-        Iterable::iter(tree.to_list())
+impl Iterable<isize> for Tree {
+    fn iter(self) {
+        Iterable::iter(self.to_list())
     }
 }
 

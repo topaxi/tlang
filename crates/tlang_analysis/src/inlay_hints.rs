@@ -8,8 +8,9 @@
 //! - **Variable/const bindings** without explicit type annotations.
 //! - **Function return types** when not annotated.
 //! - **Function parameters** without explicit type annotations.
-//! - **Pipeline chain steps** — intermediate types after each `|>` operator
-//!   when the chain spans multiple lines.
+//! - **Pipeline / chained expression steps** — intermediate types after each
+//!   `|>` operator and after wrapped member-access / method-call receivers when
+//!   the chain spans multiple lines.
 
 use std::collections::HashSet;
 
@@ -56,7 +57,8 @@ pub enum InlayHintKind {
     Type,
     /// Return type for a function declaration.
     ReturnType,
-    /// Intermediate type produced by one step of a multi-line `|>` pipeline.
+    /// Intermediate type produced by one step of a multi-line chain (`|>`,
+    /// member access, or method call).
     ChainedPipeline,
 }
 
@@ -103,14 +105,14 @@ fn collect_stmt_hints(stmt: &hir::Stmt, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
 
             // Show a type hint when no explicit annotation was written.
             if matches!(ty.kind, TyKind::Unknown) && !matches!(pat.ty.kind, TyKind::Unknown) {
-                collect_pat_type_hints(pat, ctx.range, hints);
+                collect_pat_type_hints(pat, ctx.type_table, ctx.range, hints);
             }
         }
         hir::StmtKind::Const(_, pat, expr, ty) => {
             collect_expr_hints(expr, ctx, hints);
 
             if matches!(ty.kind, TyKind::Unknown) && !matches!(pat.ty.kind, TyKind::Unknown) {
-                collect_pat_type_hints(pat, ctx.range, hints);
+                collect_pat_type_hints(pat, ctx.type_table, ctx.range, hints);
             }
         }
         hir::StmtKind::FunctionDeclaration(decl) => {
@@ -244,6 +246,25 @@ fn return_type_hint_position(params_span: Span) -> LineColumn {
     params_span.end_lc
 }
 
+fn push_multiline_chain_hint(
+    hints: &mut Vec<InlayHint>,
+    ctx: &HintCtx<'_>,
+    inner_expr: &hir::Expr,
+    outer_expr: &hir::Expr,
+) {
+    if inner_expr.span.end_lc.line < outer_expr.span.end_lc.line
+        && !matches!(inner_expr.ty.kind, TyKind::Unknown)
+    {
+        push_hint(
+            hints,
+            ctx.range,
+            inner_expr.span.end_lc,
+            format!(": {}", inner_expr.ty.kind),
+            InlayHintKind::ChainedPipeline,
+        );
+    }
+}
+
 // ── Expression traversal (recurse into nested functions / blocks) ──────
 
 #[allow(clippy::too_many_lines)]
@@ -313,6 +334,7 @@ fn collect_expr_hints(expr: &hir::Expr, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
             }
         }
         hir::ExprKind::FieldAccess(base, _) => {
+            push_multiline_chain_hint(hints, ctx, base, expr);
             collect_expr_hints(base, ctx, hints);
         }
         hir::ExprKind::IndexAccess(base, index) => {
@@ -324,9 +346,7 @@ fn collect_expr_hints(expr: &hir::Expr, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
             for arm in arms {
                 // Emit type hints for each binding introduced by the arm pattern
                 // (e.g. `title: string` for `Page { title, alerts, posts }`).
-                if !matches!(arm.pat.ty.kind, TyKind::Unknown) {
-                    collect_pat_type_hints(&arm.pat, ctx.range, hints);
-                }
+                collect_pat_type_hints(&arm.pat, ctx.type_table, ctx.range, hints);
                 if let Some(guard) = &arm.guard {
                     collect_expr_hints(guard, ctx, hints);
                 }
@@ -362,11 +382,25 @@ fn collect_expr_hints(expr: &hir::Expr, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
 // ── Pattern type hints ─────────────────────────────────────────────────
 
 /// Emit a type hint for a pattern binding (let/const).
-fn collect_pat_type_hints(pat: &hir::Pat, range: Option<(u32, u32)>, hints: &mut Vec<InlayHint>) {
+fn collect_pat_type_hints(
+    pat: &hir::Pat,
+    type_table: &TypeTable,
+    range: Option<(u32, u32)>,
+    hints: &mut Vec<InlayHint>,
+) {
     match &pat.kind {
-        hir::PatKind::Identifier(_, ident) => {
-            // Skip wildcard bindings (`_`).
-            if ident.as_str() == "_" {
+        hir::PatKind::Identifier(hir_id, ident) => {
+            // Skip wildcard bindings (`_`) and compiler-generated bindings such
+            // as loop temporaries, which carry default spans and are not
+            // user-authored source locations.
+            if ident.as_str() == "_" || ident.span == Span::default() {
+                return;
+            }
+            let inferred_ty = preferred_pattern_hint_ty(
+                &pat.ty.kind,
+                type_table.get(hir_id).map(|info| &info.ty.kind),
+            );
+            if matches!(inferred_ty, TyKind::Unknown) {
                 return;
             }
             let pos = ident.span.end_lc;
@@ -374,32 +408,41 @@ fn collect_pat_type_hints(pat: &hir::Pat, range: Option<(u32, u32)>, hints: &mut
                 hints,
                 range,
                 pos,
-                format!(": {}", pat.ty.kind),
+                format!(": {inferred_ty}"),
                 InlayHintKind::Type,
             );
         }
         hir::PatKind::List(pats) => {
             // For list destructuring, emit hints for each sub-pattern.
             for sub_pat in pats {
-                if !matches!(sub_pat.ty.kind, TyKind::Unknown) {
-                    collect_pat_type_hints(sub_pat, range, hints);
-                }
+                collect_pat_type_hints(sub_pat, type_table, range, hints);
             }
         }
         hir::PatKind::Rest(inner) => {
-            if !matches!(inner.ty.kind, TyKind::Unknown) {
-                collect_pat_type_hints(inner, range, hints);
-            }
+            collect_pat_type_hints(inner, type_table, range, hints);
         }
         hir::PatKind::Enum(_, fields) => {
             for (_, field_pat) in fields {
-                if !matches!(field_pat.ty.kind, TyKind::Unknown) {
-                    collect_pat_type_hints(field_pat, range, hints);
-                }
+                collect_pat_type_hints(field_pat, type_table, range, hints);
             }
         }
         // Wildcards and literal patterns don't need hints.
         hir::PatKind::Wildcard | hir::PatKind::Literal(_) => {}
+    }
+}
+
+fn preferred_pattern_hint_ty<'a>(pat_ty: &'a TyKind, table_ty: Option<&'a TyKind>) -> &'a TyKind {
+    match table_ty {
+        None => pat_ty,
+        Some(TyKind::Unknown) => pat_ty,
+        Some(table_ty) if matches!(pat_ty, TyKind::Unknown) => table_ty,
+        Some(table_ty)
+            if matches!(pat_ty, TyKind::Slice(_) | TyKind::Dict(_, _) | TyKind::Fn(_, _))
+                && matches!(table_ty, TyKind::Path(_)) =>
+        {
+            pat_ty
+        }
+        Some(table_ty) => table_ty,
     }
 }
 
@@ -833,6 +876,32 @@ mod tests {
     }
 
     #[test]
+    fn function_return_type_hint_for_if_else_enum_paths() {
+        let hints = hints_for(
+            r#"
+enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+fn insert(flag: bool, value: isize) {
+    if flag {
+        Tree::Node { value, left: Tree::Empty, right: Tree::Empty }
+    } else {
+        Tree::Node { value, left: Tree::Empty, right: Tree::Empty }
+    }
+}
+"#,
+        );
+        assert!(
+            hints
+                .iter()
+                .any(|h| h.label.contains("-> Tree") && h.kind == InlayHintKind::ReturnType),
+            "expected `-> Tree` return type hint, got: {hints:?}"
+        );
+    }
+
+    #[test]
     fn function_with_explicit_return_type_no_hint() {
         let hints = hints_for("fn add(a: i64, b: i64) -> i64 { a + b }");
         assert!(
@@ -1015,8 +1084,10 @@ fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, 
 let result = [1,2,3] |> map(fn (x) { x ** 2 });
 "#;
         let hints = hints_for(source);
-        // Find the hint for `result` binding specifically (label starts with ": List").
-        let result_hint = hints.iter().find(|h| h.label.starts_with(": List"));
+        // Find the hint for `result` binding specifically.
+        let result_hint = hints
+            .iter()
+            .find(|h| h.line == 3 && h.label.starts_with(": List"));
         assert!(
             result_hint.is_some(),
             "expected a type hint for `result`, got: {hints:?}"
@@ -1056,6 +1127,94 @@ let page = html"""
             !chain_hints.iter().any(|h| h.line == 5),
             "tagged string pipeline hint should not anchor to the opening line, got: {chain_hints:?}"
         );
+    }
+
+    #[test]
+    fn multiline_member_call_hint_anchors_after_wrapped_call() {
+        let source = r#"
+struct Counter { value: i64 }
+fn Counter.inc(self) -> Counter { self }
+fn make_counter() -> Counter {
+    Counter { value: 0 }
+}
+
+let _ = make_counter(
+)
+    .inc();
+"#;
+
+        let hints = hints_for(source);
+        let chain_hints: Vec<_> = hints
+            .iter()
+            .filter(|h| h.kind == InlayHintKind::ChainedPipeline)
+            .collect();
+
+        assert!(
+            chain_hints.iter().any(|h| h.line == 8),
+            "expected a chained member-call hint on the wrapped call closing line, got: {chain_hints:?}"
+        );
+        assert!(
+            !chain_hints.iter().any(|h| h.line == 7),
+            "member-call hint should not anchor to the opening call line, got: {chain_hints:?}"
+        );
+    }
+
+    #[test]
+    fn multiline_field_access_hint_anchors_after_wrapped_call() {
+        let source = r#"
+struct Counter { value: i64 }
+fn make_counter() -> Counter {
+    Counter { value: 0 }
+}
+
+let _ = make_counter(
+)
+    .value;
+"#;
+
+        let hints = hints_for(source);
+        let chain_hints: Vec<_> = hints
+            .iter()
+            .filter(|h| h.kind == InlayHintKind::ChainedPipeline)
+            .collect();
+
+        assert!(
+            chain_hints.iter().any(|h| h.line == 7),
+            "expected a chained field-access hint on the wrapped call closing line, got: {chain_hints:?}"
+        );
+        assert!(
+            !chain_hints.iter().any(|h| h.line == 6),
+            "field-access hint should not anchor to the opening call line, got: {chain_hints:?}"
+        );
+    }
+
+    #[test]
+    fn let_binding_hint_from_loop_expression_result() {
+        let source = r#"
+let sum = for x in [1, 2, 3]; with acc = 0 {
+    acc + x
+};
+"#;
+        let hints = hints_for(source);
+        let sum_hint = hints
+            .iter()
+            .find(|h| h.line == 1 && h.kind == InlayHintKind::Type && h.label == ": i64");
+        assert!(
+            sum_hint.is_some(),
+            "expected let-binding hint from loop expression result, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn type_at_definition_for_loop_expression_binding() {
+        let source = r#"
+let sum = for x in [1, 2, 3]; with acc = 0 {
+    acc + x
+};
+"#;
+        let typed_hir = typed_hir_for(source);
+        let ty = type_at_definition(&typed_hir, 1, 4);
+        assert_eq!(ty.as_deref(), Some("i64"));
     }
 
     #[test]
@@ -1118,6 +1277,215 @@ fn render(_) { 3 }
         assert!(return_hints.iter().any(|h| h.line == 1));
         assert!(return_hints.iter().any(|h| h.line == 2));
         assert!(return_hints.iter().any(|h| h.line == 3));
+    }
+
+    #[test]
+    fn unconstrained_multi_clause_function_has_no_return_hint() {
+        let source = r#"
+fn foldl([], acc, _) { acc }
+fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+"#;
+        let hints = hints_for(source);
+
+        assert!(
+            !hints.iter().any(|h| h.kind == InlayHintKind::ReturnType),
+            "expected no return-type hints for unconstrained foldl, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn synthetic_for_loop_bindings_do_not_emit_origin_hints() {
+        let source = r#"
+let total = for x in [1,2,3]; with sum = 0 {
+    sum + x
+};
+let evens = for x in [1,2,3]; with acc = [] {
+    if x % 2 == 0 { [...acc, x] } else { acc }
+};
+"#;
+        let hints = hints_for(source);
+
+        assert!(
+            !hints.iter().any(|h| h.line == 0 && h.character == 0),
+            "expected no hints at the file origin from synthetic loop bindings, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn loop_binding_hint_comes_from_iterable_rhs() {
+        let source = r#"
+let total = for x in [1,2,3]; with sum = 0 as isize {
+    sum
+};
+"#;
+        let hints = hints_for(source);
+
+        assert!(
+            hints.iter().any(|h| h.label == ": i64"),
+            "expected loop binding `x` to get `: i64` from the iterable rhs, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn loop_binding_hint_ignores_body_and_accumulator_types() {
+        let source = r#"
+enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+impl Iterable<isize> for Tree {
+    fn iter(self) {
+        Iterable::iter([])
+    }
+}
+
+let total = for x in Tree::Empty; with sum = 0 as isize {
+    sum + x
+};
+"#;
+        let hints = hints_for(source);
+
+        assert!(
+            hints.iter().any(|h| h.label == ": isize"),
+            "expected loop binding `x` to get `: isize` from Iterable<isize>, got: {hints:?}"
+        );
+        assert!(
+            !hints.iter().any(|h| h.label == ": i64"),
+            "loop binding should ignore accumulator/body literals, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn loop_binding_hint_for_typed_iterable_variable() {
+        let source = r#"
+enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+impl Iterable<isize> for Tree {
+    fn iter(self) {
+        Iterable::iter([])
+    }
+}
+
+let tree = Tree::Empty;
+let total = for x in tree; with sum = 0 as isize {
+    sum
+};
+"#;
+        let hints = hints_for(source);
+        let x_hint = hints
+            .iter()
+            .find(|h| {
+                h.line == 13
+                    && h.character == 17
+                    && h.label == ": isize"
+                    && h.kind == InlayHintKind::Type
+            });
+
+        assert!(
+            x_hint.is_some(),
+            "expected the loop item binding `x` to get `: isize`, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn loop_result_hint_uses_coerced_numeric_type() {
+        let source = r#"
+enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+impl Iterable<isize> for Tree {
+    fn iter(self) {
+        Iterable::iter([])
+    }
+}
+
+let tree = Tree::Empty;
+let total = for x in tree; with sum = 0 {
+    sum + x
+};
+"#;
+        let hints = hints_for(source);
+        let total_hint = hints.iter().find(|h| {
+            h.line == 13
+                && h.character == 9
+                && h.label == ": i64"
+                && h.kind == InlayHintKind::Type
+        });
+
+        assert!(
+            total_hint.is_some(),
+            "expected the loop result binding `total` to get the coerced numeric type, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn loop_binding_hint_for_typed_iterable_statement_loop() {
+        let source = r#"
+enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+impl Iterable<isize> for Tree {
+    fn iter(self) {
+        Iterable::iter(self.to_list())
+    }
+}
+
+fn Tree.to_list(Tree::Empty) { [] }
+fn Tree.to_list(Tree::Node { value, left, right }) {
+    [...left, value, ...right]
+}
+
+let tree = Tree::Empty;
+for x in tree {
+    x |> log();
+};
+"#;
+        let hints = hints_for(source);
+        let x_hint = hints
+            .iter()
+            .find(|h| h.line == 18 && h.character == 5 && h.label == ": isize");
+
+        assert!(
+            x_hint.is_some(),
+            "expected bare loop item binding `x` to get `: isize`, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn type_at_definition_for_typed_iterable_statement_loop_item() {
+        let source = r#"
+enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+impl Iterable<isize> for Tree {
+    fn iter(self) {
+        Iterable::iter(self.to_list())
+    }
+}
+
+fn Tree.to_list(Tree::Empty) { [] }
+fn Tree.to_list(Tree::Node { value, left, right }) {
+    [...left, value, ...right]
+}
+
+let tree = Tree::Empty;
+for x in tree {
+    x |> log();
+};
+"#;
+        let typed_hir = typed_hir_for(source);
+        let ty = type_at_definition(&typed_hir, 18, 4);
+        assert_eq!(ty.as_deref(), Some("isize"));
     }
 
     #[test]

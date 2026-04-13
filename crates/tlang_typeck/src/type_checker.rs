@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use tlang_ast::node::UnaryOp;
 use tlang_ast::token::Literal;
@@ -38,10 +38,12 @@ pub struct TypeChecker {
     /// body traversal.  Used to infer the return type when no annotation
     /// and no trailing expression are present (e.g. `fn f() { return 42; }`).
     observed_return_types: Vec<Vec<TyKind>>,
-    /// Dot-method names collected from the module's function declarations
-    /// (e.g. `"Animal.greet"` from `fn Animal.greet(self)`).  Pre-scanned
-    /// once at the start of `check_module` for `apply` conflict detection.
-    dot_methods: HashSet<String>,
+    /// Dot-method declarations keyed by their qualified `Type.method` name.
+    /// Pre-scanned once at the start of `check_module` so both field-access
+    /// typing and `apply` conflict detection can resolve user-defined methods.
+    dot_methods: HashMap<String, tlang_span::HirId>,
+    /// Synthetic for-loop iterator bindings keyed by the lowered iterator local.
+    iterator_item_types: HashMap<tlang_span::HirId, TyKind>,
 }
 
 impl TypeChecker {
@@ -54,6 +56,75 @@ impl TypeChecker {
             .last()
             .copied()
             .unwrap_or(TypingContext::Permissive)
+    }
+
+    fn iterable_item_type(&self, ty: &TyKind) -> Option<TyKind> {
+        match ty {
+            TyKind::Slice(inner) => Some(inner.kind.clone()),
+            TyKind::Primitive(PrimTy::String) => Some(TyKind::Primitive(PrimTy::Char)),
+            TyKind::Path(path) => self
+                .type_table
+                .impls()
+                .iter()
+                .find(|info| {
+                    info.protocol_name == "Iterable"
+                        && info.target_type_name == path.join("::")
+                        && info.protocol_type_arg_tys.len() == 1
+                })
+                .map(|info| info.protocol_type_arg_tys[0].kind.clone()),
+            _ => None,
+        }
+    }
+
+    fn record_iterator_binding_item_type(&mut self, pat: &hir::Pat, expr: &hir::Expr) {
+        let hir::PatKind::Identifier(hir_id, ident) = &pat.kind else {
+            return;
+        };
+        if ident.as_str() != "iterator$$" {
+            return;
+        }
+        let hir::ExprKind::Call(call) = &expr.kind else {
+            return;
+        };
+        let hir::ExprKind::Path(path) = &call.callee.kind else {
+            return;
+        };
+        if path.join("::") != "Iterable::iter" || call.arguments.len() != 1 {
+            return;
+        }
+        if let Some(item_ty) = self.iterable_item_type(&call.arguments[0].ty.kind) {
+            self.iterator_item_types.insert(*hir_id, item_ty);
+        }
+    }
+
+    fn iterator_next_item_type(&self, expr: &hir::Expr) -> Option<TyKind> {
+        let (hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call)) = &expr.kind else {
+            return None;
+        };
+        let hir::ExprKind::Path(path) = &call.callee.kind else {
+            return None;
+        };
+        if path.join("::") != "Iterator::next" || call.arguments.len() != 1 {
+            return None;
+        }
+        let hir::ExprKind::Path(iterator_path) = &call.arguments[0].kind else {
+            return None;
+        };
+        let hir_id = iterator_path.res.hir_id()?;
+        self.iterator_item_types.get(&hir_id).cloned()
+    }
+
+    fn register_iterator_next_pattern_bindings(&mut self, pat: &mut hir::Pat, item_ty: &TyKind) {
+        let hir::PatKind::Enum(path, fields) = &mut pat.kind else {
+            return;
+        };
+        if path.join("::") != "Option::Some" {
+            return;
+        }
+        if let Some((_, field_pat)) = fields.iter_mut().find(|(name, _)| name.as_str() == "0") {
+            field_pat.ty.kind = item_ty.clone();
+            self.register_pat_bindings(field_pat, item_ty);
+        }
     }
 
     fn push_context(&mut self, ctx: TypingContext) {
@@ -119,6 +190,27 @@ impl TypeChecker {
         } else {
             None
         }
+    }
+
+    /// Infer a branching expression type only when every completion resolves
+    /// to the same concrete type. Any unknown, type-variable, or conflicting
+    /// branch leaves the whole expression unresolved.
+    fn common_completion_type<'a>(types: impl Iterator<Item = &'a TyKind>) -> Option<TyKind> {
+        let mut inferred: Option<&TyKind> = None;
+
+        for ty in types {
+            if matches!(ty, TyKind::Unknown) || ty_contains_var(ty) {
+                return None;
+            }
+
+            match inferred {
+                None => inferred = Some(ty),
+                Some(prev) if prev == ty => {}
+                Some(_) => return None,
+            }
+        }
+
+        inferred.cloned()
     }
 
     /// Assign `ty_kind` to `expr.ty` and record it in the type table.
@@ -229,6 +321,30 @@ impl TypeChecker {
         self.check_arithmetic(BinaryOpKind::Add, lhs_ty, rhs_ty, span)
     }
 
+    fn coerced_numeric_result(lhs: PrimTy, rhs: PrimTy) -> Option<PrimTy> {
+        if !lhs.is_numeric() || !rhs.is_numeric() {
+            return None;
+        }
+
+        if lhs == rhs {
+            return Some(lhs);
+        }
+
+        if lhs.is_float() || rhs.is_float() {
+            return Some(PrimTy::F64);
+        }
+
+        if lhs.is_signed_integer() && rhs.is_signed_integer() {
+            return Some(PrimTy::I64);
+        }
+
+        if lhs.is_unsigned_integer() && rhs.is_unsigned_integer() {
+            return Some(PrimTy::U64);
+        }
+
+        Some(PrimTy::F64)
+    }
+
     fn check_arithmetic(
         &mut self,
         op: BinaryOpKind,
@@ -237,10 +353,18 @@ impl TypeChecker {
         span: tlang_span::Span,
     ) -> TyKind {
         match (lhs_ty, rhs_ty) {
-            (TyKind::Primitive(l), TyKind::Primitive(r))
-                if l.is_numeric() && r.is_numeric() && l == r =>
-            {
-                TyKind::Primitive(*l)
+            (TyKind::Primitive(l), TyKind::Primitive(r)) => {
+                if let Some(result) = Self::coerced_numeric_result(*l, *r) {
+                    TyKind::Primitive(result)
+                } else {
+                    self.errors.push(TypeError::InvalidBinaryOp {
+                        op: op.to_string(),
+                        lhs: lhs_ty.to_string(),
+                        rhs: rhs_ty.to_string(),
+                        span,
+                    });
+                    TyKind::Unknown
+                }
             }
             _ => {
                 self.errors.push(TypeError::InvalidBinaryOp {
@@ -1017,7 +1141,7 @@ impl TypeChecker {
         // dot-methods on the target type.
         for apply_method in &impl_block.apply_methods {
             let dot_name = format!("{target_type_name}.{}", apply_method.as_str());
-            if self.dot_methods.contains(&dot_name) {
+            if self.dot_methods.contains_key(&dot_name) {
                 self.errors.push(TypeError::ApplyConflict {
                     method: apply_method.as_str().to_string(),
                     target_type: target_type_name.clone(),
@@ -1152,6 +1276,40 @@ impl TypeChecker {
         None
     }
 
+    fn resolve_dot_method_type(&self, base_ty_kind: &TyKind, field_name: &str) -> Option<TyKind> {
+        let type_name = builtin_methods::type_name_from_kind(base_ty_kind)?;
+        let method_name = format!("{type_name}.{field_name}");
+        let method_hir_id = *self.dot_methods.get(&method_name)?;
+        let method_info = self.type_table.get(&method_hir_id)?;
+
+        let TyKind::Fn(param_tys, ret_ty) = &method_info.ty.kind else {
+            return None;
+        };
+
+        let mut bindings = HashMap::new();
+        if let Some(receiver_ty) = param_tys.first() {
+            collect_type_var_bindings(base_ty_kind, &receiver_ty.kind, &mut bindings);
+        }
+
+        let remaining_params = param_tys
+            .iter()
+            .skip(1)
+            .map(|param_ty| Ty {
+                kind: substitute_type_vars(&param_ty.kind, &bindings),
+                ..Ty::default()
+            })
+            .collect();
+        let return_ty = substitute_type_vars(&ret_ty.kind, &bindings);
+
+        Some(TyKind::Fn(
+            remaining_params,
+            Box::new(Ty {
+                kind: return_ty,
+                ..Ty::default()
+            }),
+        ))
+    }
+
     /// Resolve the HirId of a struct/enum type from a TyKind::Path.
     fn resolve_type_hir_id(ty_kind: &TyKind) -> Option<tlang_span::HirId> {
         match ty_kind {
@@ -1184,6 +1342,19 @@ impl TypeChecker {
                     },
                 );
                 return field_ty;
+            }
+
+            if let Some(method_ty) = self.resolve_dot_method_type(base_ty_kind, field_name) {
+                self.type_table.insert(
+                    expr_hir_id,
+                    TypeInfo {
+                        ty: Ty {
+                            kind: method_ty.clone(),
+                            ..Ty::default()
+                        },
+                    },
+                );
+                return method_ty;
             }
 
             // Base is a known struct but the field does not exist.
@@ -1236,12 +1407,12 @@ impl TypeChecker {
         // Pre-scan the module for impl blocks and dot-methods so that
         // validation is order-independent (an impl or dot-method declared
         // after the first use site is still visible).
-        let mut dot_methods = HashSet::new();
+        let mut dot_methods = HashMap::new();
         for stmt in &module.block.stmts {
             match &stmt.kind {
                 hir::StmtKind::FunctionDeclaration(decl) => {
                     if matches!(&decl.name.kind, hir::ExprKind::FieldAccess(..)) {
-                        dot_methods.insert(decl.name());
+                        dot_methods.insert(decl.name(), decl.hir_id);
                     }
                 }
                 hir::StmtKind::ImplBlock(impl_block) => {
@@ -1274,6 +1445,7 @@ impl TypeChecker {
                             .iter()
                             .map(|ty| ty.kind.to_string())
                             .collect(),
+                        protocol_type_arg_tys: impl_block.type_arguments.clone(),
                         is_blanket,
                         where_predicates,
                         associated_type_bindings,
@@ -1722,6 +1894,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
         match &mut stmt.kind {
             hir::StmtKind::Let(pat, expr, ty) => {
                 self.visit_expr(expr, ctx);
+                self.record_iterator_binding_item_type(pat, expr);
 
                 let expr_ty_kind = expr.ty.kind.clone();
 
@@ -1870,24 +2043,88 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     }
                 }
             }
+            hir::ExprKind::IfElse(cond, then_block, else_clauses) => {
+                self.visit_expr(cond, ctx);
+                self.visit_block(then_block, ctx);
+
+                let mut branch_tys = Vec::with_capacity(1 + else_clauses.len());
+                branch_tys.push(
+                    then_block
+                        .expr
+                        .as_ref()
+                        .map(|e| e.ty.kind.clone())
+                        .unwrap_or(TyKind::Unknown),
+                );
+
+                let mut has_final_else = false;
+                for clause in else_clauses.iter_mut() {
+                    if let Some(cond) = &mut clause.condition {
+                        self.visit_expr(cond, ctx);
+                    } else {
+                        has_final_else = true;
+                    }
+                    self.visit_block(&mut clause.consequence, ctx);
+                    branch_tys.push(
+                        clause
+                            .consequence
+                            .expr
+                            .as_ref()
+                            .map(|e| e.ty.kind.clone())
+                            .unwrap_or(TyKind::Unknown),
+                    );
+                }
+
+                let if_ty = if has_final_else {
+                    Self::common_completion_type(branch_tys.iter()).unwrap_or(TyKind::Unknown)
+                } else {
+                    TyKind::Unknown
+                };
+                self.assign_expr_type(expr, if_ty);
+            }
             hir::ExprKind::Match(scrutinee, arms) => {
                 self.visit_expr(scrutinee, ctx);
                 let scrutinee_ty = scrutinee.ty.kind.clone();
-                let mut match_ty = TyKind::Unknown;
+                let iterator_item_ty = self.iterator_next_item_type(scrutinee);
+                let mut arm_tys = Vec::with_capacity(arms.len());
                 for arm in arms.iter_mut() {
                     arm.pat.ty.kind = scrutinee_ty.clone();
                     self.register_pat_bindings(&mut arm.pat, &scrutinee_ty);
+                    if let Some(item_ty) = &iterator_item_ty {
+                        self.register_iterator_next_pattern_bindings(&mut arm.pat, item_ty);
+                    }
                     if let Some(guard) = &mut arm.guard {
                         self.visit_expr(guard, ctx);
                     }
                     self.visit_block(&mut arm.block, ctx);
-                    if matches!(match_ty, TyKind::Unknown)
-                        && let Some(e) = &arm.block.expr
-                    {
-                        match_ty = e.ty.kind.clone();
-                    }
+                    arm_tys.push(
+                        arm.block
+                            .expr
+                            .as_ref()
+                            .map(|e| e.ty.kind.clone())
+                            .unwrap_or(TyKind::Unknown),
+                    );
                 }
+                let match_ty =
+                    Self::common_completion_type(arm_tys.iter()).unwrap_or(TyKind::Unknown);
                 self.assign_expr_type(expr, match_ty);
+            }
+            hir::ExprKind::Loop(block) => {
+                self.visit_block(block, ctx);
+                let loop_ty = block
+                    .expr
+                    .as_ref()
+                    .map(|e| e.ty.kind.clone())
+                    .unwrap_or(TyKind::Unknown);
+                self.assign_expr_type(expr, loop_ty);
+            }
+            hir::ExprKind::Break(value) => {
+                let break_ty = if let Some(value) = value {
+                    self.visit_expr(value, ctx);
+                    value.ty.kind.clone()
+                } else {
+                    TyKind::Primitive(PrimTy::Nil)
+                };
+                self.assign_expr_type(expr, break_ty);
             }
             hir::ExprKind::Block(block) => {
                 self.visit_block(block, ctx);

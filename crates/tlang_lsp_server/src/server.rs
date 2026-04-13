@@ -249,16 +249,7 @@ impl ServerState {
         // If standard symbol resolution didn't find anything, try the
         // shared member resolution module for `receiver.member` expressions
         // (e.g. `re"foo".replace_all` where the member is a builtin method).
-        if resolved.is_none()
-            && let Some(doc) = state.store.get(uri)
-            && let Some(Some(typed_hir)) = doc.typed_hir.as_ref()
-            && let Some(member) = tlang_analysis::member_resolution::resolve_member_at_position(
-                &doc.source,
-                typed_hir,
-                pos.line,
-                pos.character,
-            )
-        {
+        if resolved.is_none() && let Some(member) = Self::resolve_member(state, uri, pos) {
             let hover_text = if let Some(sig) = &member.signature {
                 sig.label.clone()
             } else {
@@ -308,8 +299,14 @@ impl ServerState {
     > {
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
-        let result = Self::resolve_symbol(state, &uri, pos);
-        Box::pin(async move { Ok(result.and_then(|info| info.to_goto_definition(&uri))) })
+        Self::ensure_typed_hir(state, &uri);
+        let result = Self::resolve_symbol(state, &uri, pos)
+            .and_then(|info| info.to_goto_definition(&uri))
+            .or_else(|| {
+                Self::resolve_member(state, &uri, pos)
+                    .and_then(|m| member_to_goto_definition(&m, &uri))
+            });
+        Box::pin(async move { Ok(result) })
     }
 
     fn on_completion(
@@ -692,6 +689,22 @@ impl ServerState {
         tlang_analysis::query::resolve_symbol(&cache.module, index, pos.line, pos.character)
     }
 
+    fn resolve_member(
+        state: &mut Self,
+        uri: &Url,
+        pos: lsp_types::Position,
+    ) -> Option<tlang_analysis::member_resolution::ResolvedMember> {
+        Self::ensure_typed_hir(state, uri);
+        let doc = state.store.get(uri)?;
+        let typed_hir = doc.typed_hir.as_ref()?.as_ref()?;
+        tlang_analysis::member_resolution::resolve_member_at_position(
+            &doc.source,
+            typed_hir,
+            pos.line,
+            pos.character,
+        )
+    }
+
     /// Collect cached diagnostics from a document state (parse + semantic).
     fn collect_cached_diagnostics(
         state: &crate::document_store::DocumentState,
@@ -830,6 +843,21 @@ impl ResolvedSymbolLspExt for ResolvedSymbol {
             range,
         }))
     }
+}
+
+fn member_to_goto_definition(
+    member: &tlang_analysis::member_resolution::ResolvedMember,
+    uri: &Url,
+) -> Option<GotoDefinitionResponse> {
+    if member.builtin {
+        return None;
+    }
+    let def_span = member.def_span?;
+    let range = diagnostics::span_to_range(&def_span);
+    Some(GotoDefinitionResponse::Scalar(lsp_types::Location {
+        uri: uri.clone(),
+        range,
+    }))
 }
 
 /// Extract the identifier immediately before a dot at the given cursor position.
@@ -1252,6 +1280,30 @@ mod tests {
                     loc.range.start.character, 3,
                     "definition column should be 0-based (3 = position of 'a' in 'add')"
                 );
+            }
+            _ => panic!("expected scalar location"),
+        }
+    }
+
+    #[test]
+    fn goto_definition_falls_back_to_member_resolution_for_dot_methods() {
+        let source = "struct Vector { x: i64 }\nfn Vector.add(self, other: Vector) -> Vector { self }\nlet v = Vector { x: 1 };\nv.add(v);";
+        let mut state = setup_server_with_source(source);
+        let uri = test_uri();
+        let pos = lsp_types::Position {
+            line: 3,
+            character: 2,
+        };
+
+        let member = ServerState::resolve_member(&mut state, &uri, pos)
+            .expect("member resolution should find `v.add`");
+        let goto = member_to_goto_definition(&member, &uri)
+            .expect("goto should use member definition span");
+
+        match goto {
+            GotoDefinitionResponse::Scalar(loc) => {
+                assert_eq!(loc.range.start.line, 1);
+                assert_eq!(loc.range.start.character, 3);
             }
             _ => panic!("expected scalar location"),
         }

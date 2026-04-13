@@ -51,6 +51,16 @@ fn sub_same_numeric_ok() {
 }
 
 #[test]
+fn arithmetic_coerces_mixed_numeric_types() {
+    common::typecheck_ok(
+        r#"
+        let sum: i64 = 0 + (1 as isize);
+        let ratio: f64 = (1 as isize) / 2.0;
+        "#,
+    );
+}
+
+#[test]
 fn mul_same_numeric_ok() {
     common::typecheck_ok("let x = 4 * 5;");
 }
@@ -312,6 +322,53 @@ fn fully_typed_closure_is_strict() {
     );
 }
 
+#[test]
+fn for_loop_item_infers_from_typed_iterable_variable() {
+    common::typecheck_ok(
+        r#"
+        enum Tree {
+            Empty,
+            Node { value: isize, left: Tree, right: Tree },
+        }
+
+        impl Iterable<isize> for Tree {
+            fn iter(self) {
+                Iterable::iter([])
+            }
+        }
+
+        let tree = Tree::Empty;
+        let total = for x in tree; with sum = 0 as isize {
+            let item: isize = x;
+            sum
+        };
+        "#,
+    );
+}
+
+#[test]
+fn for_loop_accumulator_coerces_mixed_numeric_types() {
+    common::typecheck_ok(
+        r#"
+        enum Tree {
+            Empty,
+            Node { value: isize, left: Tree, right: Tree },
+        }
+
+        impl Iterable<isize> for Tree {
+            fn iter(self) {
+                Iterable::iter([])
+            }
+        }
+
+        let tree = Tree::Empty;
+        let total: i64 = for x in tree; with sum = 0 {
+            sum + x
+        };
+        "#,
+    );
+}
+
 // ── Multiple errors ─────────────────────────────────────────────────────
 
 #[test]
@@ -365,6 +422,53 @@ fn function_inferred_return_type() {
     common::typecheck_ok(
         r#"
         fn double(x: i64) { x + x }
+        "#,
+    );
+}
+
+#[test]
+fn function_inferred_return_type_from_if_else_enum_paths() {
+    common::typecheck_ok(
+        r#"
+        enum Tree {
+            Empty,
+            Node { value: isize, left: Tree, right: Tree },
+        }
+
+        fn insert(flag: bool, value: isize) {
+            if flag {
+                Tree::Node { value, left: Tree::Empty, right: Tree::Empty }
+            } else {
+                Tree::Node { value, left: Tree::Empty, right: Tree::Empty }
+            }
+        }
+
+        let tree: Tree = insert(true, 1 as isize);
+        "#,
+    );
+}
+
+#[test]
+fn loop_expression_result_infers_let_binding_type() {
+    common::typecheck_ok(
+        r#"
+        let sum: i64 = for x in [1, 2, 3]; with acc = 0 {
+            acc + x
+        };
+        "#,
+    );
+}
+
+#[test]
+fn loop_expression_result_flows_into_call_arguments() {
+    common::typecheck_ok(
+        r#"
+        fn takes_i64(x: i64) -> i64 { x }
+
+        let result = takes_i64(for x in [1, 2, 3]; with acc = 0 {
+            acc + x
+        });
+        let _: i64 = result;
         "#,
     );
 }
