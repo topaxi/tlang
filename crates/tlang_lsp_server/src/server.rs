@@ -278,6 +278,24 @@ impl ServerState {
             return Box::pin(async move { Ok(Some(hover)) });
         }
 
+        // Last resort: try type_at_definition directly at the cursor position.
+        // This handles cases like hovering on the `fn` keyword of a closure,
+        // which is not a symbol reference but has type information in the HIR.
+        if resolved.is_none()
+            && let Some(doc) = state.store.get(uri)
+            && let Some(Some(typed_hir)) = doc.typed_hir.as_ref()
+            && let Some(type_str) =
+                tlang_analysis::inlay_hints::type_at_definition(typed_hir, pos.line, pos.character)
+        {
+            let hover = lsp_types::Hover {
+                contents: lsp_types::HoverContents::Scalar(lsp_types::MarkedString::String(
+                    type_str,
+                )),
+                range: None,
+            };
+            return Box::pin(async move { Ok(Some(hover)) });
+        }
+
         Box::pin(async move { Ok(resolved.map(|info| info.to_hover())) })
     }
 
