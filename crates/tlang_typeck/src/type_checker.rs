@@ -834,11 +834,175 @@ impl TypeChecker {
             }
             match inferred {
                 None => inferred = Some(ty),
-                Some(prev) if prev == ty => {}
+                Some(prev) if ty_kinds_compatible(prev, ty) => {}
                 Some(_) => return None, // conflicting types
             }
         }
         inferred.cloned()
+    }
+
+    fn partial_completion_type<'a>(types: impl Iterator<Item = &'a TyKind>) -> Option<TyKind> {
+        let mut inferred: Option<&TyKind> = None;
+
+        for ty in types {
+            if matches!(ty, TyKind::Unknown) || ty_contains_var(ty) {
+                continue;
+            }
+
+            match inferred {
+                None => inferred = Some(ty),
+                Some(prev) if ty_kinds_compatible(prev, ty) => {}
+                Some(_) => return None,
+            }
+        }
+
+        inferred.cloned()
+    }
+
+    fn partial_completion_type_owned(types: impl Iterator<Item = TyKind>) -> Option<TyKind> {
+        let mut inferred: Option<TyKind> = None;
+
+        for ty in types {
+            if matches!(ty, TyKind::Unknown) || ty_contains_var(&ty) {
+                continue;
+            }
+
+            match inferred.as_ref() {
+                None => inferred = Some(ty),
+                Some(prev) if ty_kinds_compatible(prev, &ty) => {}
+                Some(_) => return None,
+            }
+        }
+
+        inferred
+    }
+
+    fn is_provisional_return_seed_candidate(ty: &TyKind) -> bool {
+        match ty {
+            TyKind::Primitive(_) | TyKind::Path(_) => true,
+            TyKind::Union(tys) => tys
+                .iter()
+                .all(|ty| Self::is_provisional_return_seed_candidate(&ty.kind)),
+            TyKind::Unknown
+            | TyKind::Fn(..)
+            | TyKind::Slice(..)
+            | TyKind::Dict(..)
+            | TyKind::Never
+            | TyKind::Var(_) => false,
+        }
+    }
+
+    fn pattern_binds_nested(pat: &hir::Pat, target: hir::HirId, nested: bool) -> bool {
+        match &pat.kind {
+            hir::PatKind::Identifier(hir_id, _) => *hir_id == target && nested,
+            hir::PatKind::List(items) => items
+                .iter()
+                .any(|item| Self::pattern_binds_nested(item, target, true)),
+            hir::PatKind::Rest(inner) => Self::pattern_binds_nested(inner, target, true),
+            hir::PatKind::Enum(_, fields) => fields
+                .iter()
+                .any(|(_, field)| Self::pattern_binds_nested(field, target, true)),
+            hir::PatKind::Wildcard | hir::PatKind::Literal(_) => false,
+        }
+    }
+
+    fn infer_provisional_return_type(expr: &hir::Expr) -> Option<TyKind> {
+        if !matches!(expr.ty.kind, TyKind::Unknown) && !ty_contains_var(&expr.ty.kind) {
+            return Some(expr.ty.kind.clone());
+        }
+
+        match &expr.kind {
+            hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => block
+                .expr
+                .as_ref()
+                .and_then(Self::infer_provisional_return_type),
+            hir::ExprKind::Break(Some(value)) => Self::infer_provisional_return_type(value),
+            hir::ExprKind::IfElse(_, then_block, else_clauses) => {
+                let has_final_else = else_clauses.iter().any(|clause| clause.condition.is_none());
+                if !has_final_else {
+                    return None;
+                }
+
+                Self::partial_completion_type(
+                    std::iter::once(
+                        then_block
+                            .expr
+                            .as_ref()
+                            .map(|e| &e.ty.kind)
+                            .unwrap_or(&TyKind::Unknown),
+                    )
+                    .chain(else_clauses.iter().map(|clause| {
+                        clause
+                            .consequence
+                            .expr
+                            .as_ref()
+                            .map(|e| &e.ty.kind)
+                            .unwrap_or(&TyKind::Unknown)
+                    })),
+                )
+            }
+            hir::ExprKind::Match(_, arms) => {
+                Self::partial_completion_type_owned(arms.iter().map(|arm| {
+                    arm.block.expr.as_ref().and_then(|expr| match &expr.kind {
+                        hir::ExprKind::Path(path)
+                            if !matches!(expr.ty.kind, TyKind::Unknown)
+                                && !ty_contains_var(&expr.ty.kind) =>
+                        {
+                            path.res.hir_id().and_then(|hir_id| {
+                                Self::pattern_binds_nested(&arm.pat, hir_id, false)
+                                    .then_some(expr.ty.kind.clone())
+                            })
+                        }
+                        _ => Self::infer_provisional_return_type(expr),
+                    })
+                    .unwrap_or(TyKind::Unknown)
+                }))
+            }
+            _ => None,
+        }
+    }
+
+    fn recheck_body_with_provisional_return(
+        &mut self,
+        decl: &mut hir::FunctionDeclaration,
+        error_checkpoint: usize,
+    ) {
+        if !matches!(decl.return_type.kind, TyKind::Unknown) {
+            return;
+        }
+
+        let provisional = decl
+            .body
+            .expr
+            .as_ref()
+            .and_then(Self::infer_provisional_return_type)
+            .or_else(|| self.infer_return_type_from_observed());
+
+        let Some(provisional) = provisional else {
+            return;
+        };
+        if matches!(provisional, TyKind::Unknown) || ty_contains_var(&provisional) {
+            return;
+        }
+        if !Self::is_provisional_return_seed_candidate(&provisional) {
+            return;
+        }
+
+        self.errors.truncate(error_checkpoint);
+        decl.return_type.kind = provisional.clone();
+        self.register_function_signature(decl);
+
+        if let Some(ret) = self.return_type_stack.last_mut() {
+            *ret = provisional.clone();
+        }
+        if let Some(observed) = self.observed_return_types.last_mut() {
+            observed.clear();
+        }
+
+        if let Some(expr) = &mut decl.body.expr {
+            self.apply_expected_expr_type(expr, &provisional);
+        }
+        self.visit_block(&mut decl.body, &mut ());
     }
 
     // ── Pattern binding registration ─────────────────────────────────
@@ -1829,12 +1993,14 @@ impl TypeChecker {
 
         self.return_type_stack.push(decl.return_type.kind.clone());
         self.observed_return_types.push(Vec::new());
+        let error_checkpoint = self.errors.len();
         if !matches!(decl.return_type.kind, TyKind::Unknown)
             && let Some(expr) = &mut decl.body.expr
         {
             self.apply_expected_expr_type(expr, &decl.return_type.kind);
         }
         self.visit_block(&mut decl.body, &mut ());
+        self.recheck_body_with_provisional_return(decl, error_checkpoint);
 
         // Check that the closure body type matches the declared return type.
         self.check_function_body_return(decl);
@@ -1911,12 +2077,14 @@ impl TypeChecker {
 
         self.return_type_stack.push(decl.return_type.kind.clone());
         self.observed_return_types.push(Vec::new());
+        let error_checkpoint = self.errors.len();
         if !matches!(decl.return_type.kind, TyKind::Unknown)
             && let Some(expr) = &mut decl.body.expr
         {
             self.apply_expected_expr_type(expr, &decl.return_type.kind);
         }
         self.visit_block(&mut decl.body, &mut ());
+        self.recheck_body_with_provisional_return(decl, error_checkpoint);
         self.check_function_body_return(decl);
 
         if matches!(decl.return_type.kind, TyKind::Unknown) {

@@ -184,6 +184,21 @@ fn collect_fn_decl_hints(
         decl.return_hint_spans.clone()
     };
 
+    let has_informative_clause_completion = |arms: &[hir::MatchArm]| {
+        arms.iter()
+            .filter_map(|arm| arm.block.expr.as_ref())
+            .any(|expr| match &expr.kind {
+                hir::ExprKind::Path(_) => false,
+                hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
+                    !matches!(
+                        &call.callee.kind,
+                        hir::ExprKind::Path(path) if path.res.hir_id() == Some(decl.hir_id)
+                    )
+                }
+                _ => true,
+            })
+    };
+
     // Return type hint — show when no explicit return type was written.
     if !return_hint_spans.is_empty() {
         if let Some(hir::Expr {
@@ -192,6 +207,11 @@ fn collect_fn_decl_hints(
         }) = decl.body.expr.as_ref()
             && decl.return_hint_spans.len() == decl.return_hint_arm_indices.len()
         {
+            if !has_informative_clause_completion(arms) {
+                collect_block_hints(&decl.body, ctx, hints);
+                return;
+            }
+
             let clause_returns: Option<Vec<_>> = return_hint_spans
                 .iter()
                 .zip(decl.return_hint_arm_indices.iter())
@@ -937,6 +957,36 @@ fn insert(flag: bool, value: isize) {
                 .iter()
                 .any(|h| h.label.contains("-> Tree") && h.kind == InlayHintKind::ReturnType),
             "expected `-> Tree` return type hint, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn recursive_multi_clause_function_return_type_hint() {
+        let hints = hints_for(
+            r#"
+enum Expr {
+    Value(isize),
+    Add(Expr, Expr),
+    Subtract(Expr, Expr),
+    Multiply(Expr, Expr),
+    Divide(Expr, Expr),
+}
+
+fn evaluate(Expr::Value(val)) { val }
+fn evaluate(Expr::Add(left, right)) { evaluate(left) + evaluate(right) }
+fn evaluate(Expr::Subtract(left, right)) { evaluate(left) - evaluate(right) }
+fn evaluate(Expr::Multiply(left, right)) { evaluate(left) * evaluate(right) }
+fn evaluate(Expr::Divide(left, right)) { evaluate(left) / evaluate(right) }
+"#,
+        );
+        let return_hints: Vec<_> = hints
+            .iter()
+            .filter(|h| h.kind == InlayHintKind::ReturnType && h.label == " -> isize")
+            .collect();
+        assert_eq!(
+            return_hints.len(),
+            5,
+            "expected one `-> isize` return hint per evaluate clause, got: {hints:?}"
         );
     }
 

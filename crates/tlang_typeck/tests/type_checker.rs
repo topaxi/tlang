@@ -496,6 +496,29 @@ fn function_inferred_return_type_from_if_else_enum_paths() {
 }
 
 #[test]
+fn recursive_multi_clause_function_infers_return_type() {
+    common::typecheck_ok(
+        r#"
+        enum Expr {
+            Value(isize),
+            Add(Expr, Expr),
+            Subtract(Expr, Expr),
+            Multiply(Expr, Expr),
+            Divide(Expr, Expr),
+        }
+
+        fn evaluate(Expr::Value(val)) { val }
+        fn evaluate(Expr::Add(left, right)) { evaluate(left) + evaluate(right) }
+        fn evaluate(Expr::Subtract(left, right)) { evaluate(left) - evaluate(right) }
+        fn evaluate(Expr::Multiply(left, right)) { evaluate(left) * evaluate(right) }
+        fn evaluate(Expr::Divide(left, right)) { evaluate(left) / evaluate(right) }
+
+        let _: isize = evaluate(Expr::Value(1 as isize));
+        "#,
+    );
+}
+
+#[test]
 fn loop_expression_result_infers_let_binding_type() {
     common::typecheck_ok(
         r#"
