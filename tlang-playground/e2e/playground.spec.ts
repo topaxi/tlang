@@ -56,6 +56,95 @@ function optimizationRadio(page: Page, label: 'Minimal' | 'Full') {
   return page.locator('t-menuitem-radio').filter({ hasText: label });
 }
 
+type PlaygroundConsoleMessage = {
+  type: string;
+  args?: unknown[];
+};
+
+type PlaygroundElement = {
+  consoleMessages?: PlaygroundConsoleMessage[];
+  selectedExample?: string;
+};
+
+function collectBrowserErrors(page: Page) {
+  const errors: string[] = [];
+
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      errors.push(message.text());
+    }
+  });
+
+  page.on('pageerror', (error) => {
+    errors.push(error.stack ?? error.message);
+  });
+
+  return errors;
+}
+
+async function getPlaygroundConsoleCount(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const playground = document.querySelector(
+      'tlang-playground',
+    ) as PlaygroundElement | null;
+
+    return playground?.consoleMessages?.length ?? 0;
+  });
+}
+
+async function getPlaygroundConsoleMessagesSince(page: Page, start: number) {
+  return page.evaluate((start) => {
+    const playground = document.querySelector(
+      'tlang-playground',
+    ) as PlaygroundElement | null;
+
+    return (playground?.consoleMessages ?? []).slice(start).map((message) => ({
+      type: message.type,
+      text: Array.isArray(message.args)
+        ? message.args
+            .map((arg) => {
+              if (typeof arg === 'string') {
+                return arg;
+              }
+
+              if (arg instanceof Error) {
+                return arg.stack ?? arg.message;
+              }
+
+              try {
+                return JSON.stringify(arg);
+              } catch {
+                return String(arg);
+              }
+            })
+            .join(' ')
+        : String(message.args ?? ''),
+    }));
+  }, start);
+}
+
+async function waitForSelectedExample(page: Page, example: string) {
+  await page.waitForFunction((expected) => {
+    const playground = document.querySelector(
+      'tlang-playground',
+    ) as PlaygroundElement | null;
+
+    return playground?.selectedExample === expected;
+  }, example);
+}
+
+async function runPlayground(page: Page, initialConsoleCount: number) {
+  await page.locator('t-button').filter({ hasText: 'Run' }).click();
+  await page.waitForFunction((count) => {
+    const playground = document.querySelector(
+      'tlang-playground',
+    ) as PlaygroundElement | null;
+    const messages = playground?.consoleMessages ?? [];
+
+    return messages.length > count && messages.at(-1)?.type === 'groupEnd';
+  }, initialConsoleCount);
+}
+
 test.describe('Tlang Playground', () => {
   test.beforeEach(async ({ page }) => {
     await gotoPlayground(page);
@@ -192,6 +281,61 @@ test.describe('Tlang Playground', () => {
     await constantFolding.click();
     await expect(constantFolding).toHaveJSProperty('checked', true);
   });
+});
+
+test('runs every dropdown example in interpreter mode without browser or playground errors', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+
+  const browserErrors = collectBrowserErrors(page);
+
+  await gotoPlayground(page);
+  await page
+    .locator('.toolbar__runner')
+    .locator('select')
+    .selectOption('Interpreter');
+
+  const exampleSelect = page.locator('.toolbar__example').locator('select');
+  const examples = await exampleSelect
+    .locator('option')
+    .evaluateAll((options) =>
+      options
+        .map((option) => (option as HTMLOptionElement).value)
+        .filter((value) => value.endsWith('.tlang')),
+    );
+
+  for (const example of examples) {
+    const browserErrorCount = browserErrors.length;
+    const consoleCount = await getPlaygroundConsoleCount(page);
+
+    await exampleSelect.selectOption(example);
+    await waitForSelectedExample(page, example);
+    await runPlayground(page, consoleCount);
+
+    const newBrowserErrors = browserErrors.slice(browserErrorCount);
+    if (newBrowserErrors.length > 0) {
+      throw new Error(
+        `${example} logged browser errors:\n${newBrowserErrors.join('\n\n')}`,
+      );
+    }
+
+    const newConsoleMessages = await getPlaygroundConsoleMessagesSince(
+      page,
+      consoleCount,
+    );
+    const consoleErrors = newConsoleMessages.filter(
+      (message) => message.type === 'error',
+    );
+
+    if (consoleErrors.length > 0) {
+      throw new Error(
+        `${example} logged playground console errors:\n${consoleErrors
+          .map((message) => message.text)
+          .join('\n\n')}`,
+      );
+    }
+  }
 });
 
 test.describe('Diagnostics panel', () => {

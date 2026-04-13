@@ -1306,6 +1306,18 @@ impl Interpreter {
                 &qualified_method,
                 fn_value,
             );
+
+            // Also register under the unqualified name so that dispatch
+            // paths which don't specify type arguments (e.g. Iterable::iter,
+            // Iterator::next) can still find this impl.
+            if !type_arg_suffix.is_empty() {
+                state.register_protocol_impl(
+                    protocol_id,
+                    target_type_shape_key,
+                    &method_name,
+                    fn_value,
+                );
+            }
         }
 
         for apply_ident in &impl_block.apply_methods {
