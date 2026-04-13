@@ -144,6 +144,7 @@ fn collect_stmt_hints(stmt: &hir::Stmt, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
 
 // ── Function declaration hints ─────────────────────────────────────────
 
+#[allow(clippy::too_many_lines)]
 fn collect_fn_decl_hints(
     decl: &hir::FunctionDeclaration,
     ctx: &HintCtx<'_>,
@@ -189,12 +190,10 @@ fn collect_fn_decl_hints(
             .filter_map(|arm| arm.block.expr.as_ref())
             .any(|expr| match &expr.kind {
                 hir::ExprKind::Path(_) => false,
-                hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
-                    !matches!(
-                        &call.callee.kind,
-                        hir::ExprKind::Path(path) if path.res.hir_id() == Some(decl.hir_id)
-                    )
-                }
+                hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => !matches!(
+                    &call.callee.kind,
+                    hir::ExprKind::Path(path) if path.res.hir_id() == Some(decl.hir_id)
+                ),
                 _ => true,
             })
     };

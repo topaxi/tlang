@@ -19,6 +19,7 @@ use tlang_parser::Parser;
 use tlang_parser::error::{ParseError, ParseIssue};
 use tlang_semantics::SemanticAnalyzer;
 use tlang_span::NodeId;
+use tlang_typeck::TypeChecker;
 use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
@@ -550,6 +551,11 @@ impl Tlang {
                         .unwrap_or_else(|err| panic!("{}", render_ice(&err)));
                 }
             }
+
+            let mut type_checker = TypeChecker::new();
+            type_checker
+                .optimize_hir(&mut module, &mut ctx)
+                .unwrap_or_else(|err| panic!("{}", render_ice(&err)));
 
             self.interpreter
                 .register_constant_pool_ids(constant_pool_ids);

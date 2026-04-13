@@ -695,6 +695,12 @@ impl HirPretty {
     }
 
     fn print_variable_declaration(&mut self, pat: &hir::Pat, expr: &hir::Expr, ty: &hir::Ty) {
+        let ty = if matches!(ty.kind, hir::TyKind::Unknown) {
+            &pat.ty
+        } else {
+            ty
+        };
+
         self.push_str("let ");
         self.print_pat(pat);
         self.push_str(": ");

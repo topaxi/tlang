@@ -453,6 +453,21 @@ fn get_hir_pretty_nonempty() -> Result<(), JsError> {
 }
 
 #[wasm_bindgen_test]
+fn hir_pretty_shows_inferred_types_after_typecheck() -> Result<(), JsError> {
+    let source = "fn inc(x: i64) { x + 1 }\ninc(2);";
+
+    let mut interpreter = Tlang::new(source.to_string(), Runner::Interpreter);
+    let interpreter_hir = interpreter.hir_pretty(None)?;
+    assert!(interpreter_hir.contains("fn inc(x: i64) -> i64 {"));
+
+    let mut javascript = Tlang::new(source.to_string(), Runner::JavaScript);
+    let javascript_hir = javascript.hir_pretty(None)?;
+    assert!(javascript_hir.contains("fn inc(x: i64) -> i64 {"));
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
 fn get_stdlib_source_nonempty() {
     assert!(!tlang_bindings_js::tlang::get_standard_library_source().is_empty());
 }

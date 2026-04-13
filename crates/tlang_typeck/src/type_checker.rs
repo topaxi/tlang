@@ -943,19 +943,22 @@ impl TypeChecker {
             }
             hir::ExprKind::Match(_, arms) => {
                 Self::partial_completion_type_owned(arms.iter().map(|arm| {
-                    arm.block.expr.as_ref().and_then(|expr| match &expr.kind {
-                        hir::ExprKind::Path(path)
-                            if !matches!(expr.ty.kind, TyKind::Unknown)
-                                && !ty_contains_var(&expr.ty.kind) =>
-                        {
-                            path.res.hir_id().and_then(|hir_id| {
-                                Self::pattern_binds_nested(&arm.pat, hir_id, false)
-                                    .then_some(expr.ty.kind.clone())
-                            })
-                        }
-                        _ => Self::infer_provisional_return_type(expr),
-                    })
-                    .unwrap_or(TyKind::Unknown)
+                    arm.block
+                        .expr
+                        .as_ref()
+                        .and_then(|expr| match &expr.kind {
+                            hir::ExprKind::Path(path)
+                                if !matches!(expr.ty.kind, TyKind::Unknown)
+                                    && !ty_contains_var(&expr.ty.kind) =>
+                            {
+                                path.res.hir_id().and_then(|hir_id| {
+                                    Self::pattern_binds_nested(&arm.pat, hir_id, false)
+                                        .then_some(expr.ty.kind.clone())
+                                })
+                            }
+                            _ => Self::infer_provisional_return_type(expr),
+                        })
+                        .unwrap_or(TyKind::Unknown)
                 }))
             }
             _ => None,
