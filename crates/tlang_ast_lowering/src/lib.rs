@@ -502,9 +502,8 @@ impl LoweringContext {
     fn lower_fn_param(&mut self, node: &ast::node::FunctionParameter) -> hir::FunctionParameter {
         let hir_id = self.lower_node_id(node.pattern.id);
         let name = self.lower_fn_param_pat(node);
-        let ty = self.lower_ty(node.type_annotation.as_ref());
-
         let has_type_annotation = node.type_annotation.is_some();
+        let ty = self.lower_ty(node.type_annotation.as_ref());
 
         hir::FunctionParameter {
             hir_id,

@@ -145,20 +145,32 @@ fn collect_fn_decl_hints(
 ) {
     // Parameter type hints — show when the user didn't annotate a type.
     for param in &decl.parameters {
-        if !param.has_type_annotation && !matches!(param.type_annotation.kind, TyKind::Unknown) {
+        if !param.has_type_annotation {
+            // Look up the inferred type from the type table first,
+            // falling back to the (possibly mutated) type_annotation.
+            let inferred_ty = ctx
+                .type_table
+                .get(&param.hir_id)
+                .map(|info| &info.ty.kind)
+                .unwrap_or(&param.type_annotation.kind);
+
+            if matches!(inferred_ty, TyKind::Unknown) {
+                continue;
+            }
+
             let pos = param.name.span.end_lc;
             push_hint(
                 hints,
                 ctx.range,
                 pos,
-                format!(": {}", param.type_annotation.kind),
+                format!(": {inferred_ty}"),
                 InlayHintKind::Type,
             );
         }
     }
 
     // Return type hint — show when no explicit return type was written.
-    if !decl.has_return_type {
+    if !decl.has_return_type || ty_contains_only_vars(&decl.return_type.kind) {
         // Try to get the inferred return type. Priority:
         // 1. The type checker may have written it back to decl.return_type.
         // 2. The type table entry for this declaration (Fn signature).
@@ -197,6 +209,13 @@ fn collect_fn_decl_hints(
 
     // Recurse into the function body.
     collect_block_hints(&decl.body, ctx, hints);
+}
+
+/// Check whether a type consists entirely of unresolved type variables.
+/// Used to detect return types that were set by bidirectional inference
+/// but not yet resolved to concrete types — these should still get hints.
+fn ty_contains_only_vars(ty: &TyKind) -> bool {
+    matches!(ty, TyKind::Var(_))
 }
 
 /// Determine the position for a return type hint.
@@ -500,24 +519,46 @@ fn walk_fn_decl_for_type(
         return;
     }
 
+    // Build the function signature string, preferring the fully-inferred
+    // types from the type table over the (possibly stale) AST annotations.
+    let fn_sig = || -> String {
+        if let Some(info) = type_table.get(&decl.hir_id)
+            && let TyKind::Fn(ref param_tys, ref ret_ty) = info.ty.kind
+        {
+            let params: Vec<String> = param_tys.iter().map(|p| format!("{}", p.kind)).collect();
+            format!("fn({}) -> {}", params.join(", "), ret_ty.kind)
+        } else {
+            let params: Vec<String> = decl
+                .parameters
+                .iter()
+                .map(|p| format!("{}", p.type_annotation.kind))
+                .collect();
+            let ret = &decl.return_type.kind;
+            format!("fn({}) -> {ret}", params.join(", "))
+        }
+    };
+
     // Check function name.
     let name_span = &decl.name.span;
     if name_span.start_lc.line == line && name_span.start_lc.column == col {
-        // Build function type signature from parameters and return type.
-        let params: Vec<String> = decl
-            .parameters
-            .iter()
-            .map(|p| format!("{}", p.type_annotation.kind))
-            .collect();
-        let ret = &decl.return_type.kind;
-        *out = Some(format!("fn({}) -> {ret}", params.join(", ")));
+        *out = Some(fn_sig());
+        return;
+    }
+
+    // For closures, also match the `fn` keyword — the declaration span
+    // starts at the `fn` token while the anonymous name has a zero span.
+    if decl.span.start_lc.line == line && decl.span.start_lc.column == col {
+        *out = Some(fn_sig());
         return;
     }
 
     // Check each parameter.
     for param in &decl.parameters {
         if param.name.span.start_lc.line == line && param.name.span.start_lc.column == col {
-            let ty = &param.type_annotation.kind;
+            let ty = type_table
+                .get(&param.hir_id)
+                .map(|info| &info.ty.kind)
+                .unwrap_or(&param.type_annotation.kind);
             if !matches!(ty, TyKind::Unknown) {
                 *out = Some(format!("{ty}"));
             }
@@ -790,9 +831,13 @@ mod tests {
         // Un-annotated parameters with unknown type should not show a hint —
         // only inferred concrete types are useful.
         let hints = hints_for("fn double(x) { x }");
+        let param_hints: Vec<_> = hints
+            .iter()
+            .filter(|h| h.kind == InlayHintKind::Type)
+            .collect();
         assert!(
-            !hints.iter().any(|h| h.label == ": unknown"),
-            "should not show `: unknown` hint for un-annotated parameter, got: {hints:?}"
+            param_hints.is_empty(),
+            "should not show hint for unresolvable parameter type, got: {param_hints:?}"
         );
     }
 
@@ -980,6 +1025,63 @@ let page = html"""
         assert!(
             !chain_hints.iter().any(|h| h.line == 5),
             "tagged string pipeline hint should not anchor to the opening line, got: {chain_hints:?}"
+        );
+    }
+
+    #[test]
+    fn closure_param_inlay_hint_from_generic_inference() {
+        // When a closure is passed to a generic function, the inferred
+        // parameter types should show as inlay hints.
+        let source = r#"
+fn map<T, U>([]: List<T>, _: fn(T) -> U) -> List<U> { [] }
+fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, f)] }
+[1,2,3] |> map(fn (x) { x ** 2 });
+"#;
+        let hints = hints_for(source);
+        // The closure `fn (x) { x ** 2 }` — `x` should get `: i64` hint.
+        let param_hint = hints
+            .iter()
+            .find(|h| h.line == 3 && h.kind == InlayHintKind::Type && h.label == ": i64");
+        assert!(
+            param_hint.is_some(),
+            "expected `: i64` hint for closure param `x`, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn closure_return_type_inlay_hint() {
+        // Closures without explicit return type should show inferred return type.
+        let source = r#"
+fn map<T, U>([]: List<T>, _: fn(T) -> U) -> List<U> { [] }
+fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, f)] }
+[1,2,3] |> map(fn (x) { x ** 2 });
+"#;
+        let hints = hints_for(source);
+        // The closure should get a `-> i64` return type hint.
+        let ret_hint = hints.iter().find(|h| {
+            h.line == 3 && h.kind == InlayHintKind::ReturnType && h.label.contains("i64")
+        });
+        assert!(
+            ret_hint.is_some(),
+            "expected `-> i64` return type hint for closure, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn hover_on_closure_fn_keyword_shows_signature() {
+        // Hovering on the `fn` keyword of a closure should show its full type.
+        let source = r#"
+fn map<T, U>([]: List<T>, _: fn(T) -> U) -> List<U> { [] }
+fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, f)] }
+[1,2,3] |> map(fn (x) { x ** 2 });
+"#;
+        let typed_hir = typed_hir_for(source);
+        // `fn` keyword is at line 3, col 15 (0-based).
+        let ty = type_at_definition(&typed_hir, 3, 15);
+        assert_eq!(
+            ty.as_deref(),
+            Some("fn(i64) -> i64"),
+            "hover on closure `fn` should show full typed signature"
         );
     }
 }

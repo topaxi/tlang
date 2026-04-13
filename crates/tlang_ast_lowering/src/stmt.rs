@@ -366,76 +366,7 @@ impl LoweringContext {
         let methods = decl
             .methods
             .iter()
-            .map(|method| {
-                let has_body = method.body.is_some();
-                let params: Vec<hir::FunctionParameter> = method
-                    .parameters
-                    .iter()
-                    .map(|param| self.lower_protocol_method_param(param, has_body))
-                    .collect();
-
-                // Find the `self` parameter for this method (pattern kind `_Self`).
-                let self_param = method
-                    .parameters
-                    .iter()
-                    .find(|p| matches!(p.pattern.kind, ast::node::PatKind::_Self));
-
-                // Lower the default body, activating self-dispatch rewriting when a
-                // `self` parameter is present and the method has a body.
-                //
-                // Calling `lower_node_id(method.id)` creates the mapping
-                // `method.id → HirId` in `node_id_to_hir_id`.  `symbol_tables()`
-                // later uses this mapping to translate the semantic analyser's
-                // `NodeId`-keyed scope to an `HirId`-keyed one, making the scope
-                // (which contains the `self` parameter) visible to HIR passes such
-                // as `SymbolResolution`.
-                let method_hir_id = if method.body.is_some() {
-                    self.lower_node_id(method.id)
-                } else {
-                    self.unique_id()
-                };
-
-                let body = if let Some(self_param) = self_param {
-                    method.body.as_ref().map(|b| {
-                        // Set up the dispatch context so that `lower_call_expr` can
-                        // rewrite `self.method(args)` → `OwningProtocol::method(self, args)`.
-                        // The map includes methods from constraint protocols too.
-                        let previous_ctx = self.protocol_dispatch_ctx.take();
-                        self.protocol_dispatch_ctx = Some(ProtocolDispatchContext {
-                            method_dispatch_map: method_dispatch_map.clone(),
-                            self_param_node_id: self_param.pattern.id,
-                        });
-
-                        // Enter the method's own scope (created by the semantic
-                        // analyser with key `method.id`) so that `SymbolResolution`
-                        // can later resolve `self` and other parameters inside the
-                        // default body.
-                        //
-                        // The semantic analyser already placed the correct symbols
-                        // (function self-ref + parameters) in this scope. Their
-                        // `hir_id`s will be assigned by `symbol_tables()` using
-                        // the NodeId→HirId mappings created by `lower_node_id`
-                        // above (for params) and at line 387+ (for method_hir_id).
-                        // We must NOT call `define_symbol` here, as that would
-                        // create duplicate entries and shift the slot indices.
-                        let result = self.with_scope(method.id, |this| this.lower_block(b));
-
-                        self.protocol_dispatch_ctx = previous_ctx;
-                        result
-                    })
-                } else {
-                    method.body.as_ref().map(|b| self.lower_block(b))
-                };
-
-                hir::ProtocolMethodSignature {
-                    hir_id: method_hir_id,
-                    name: method.name,
-                    parameters: params,
-                    return_type: self.lower_ty(method.return_type_annotation.as_ref()),
-                    body,
-                    span: method.span,
-                }
-            })
+            .map(|method| self.lower_protocol_method_signature(method, &method_dispatch_map))
             .collect();
 
         let protocol = hir::ProtocolDeclaration {
@@ -468,6 +399,54 @@ impl LoweringContext {
             span: node.span,
             leading_comments: node.leading_comments.clone(),
             trailing_comments: node.trailing_comments.clone(),
+        }
+    }
+
+    fn lower_protocol_method_signature(
+        &mut self,
+        method: &ast::node::ProtocolMethodSignature,
+        method_dispatch_map: &HashMap<String, Ident>,
+    ) -> hir::ProtocolMethodSignature {
+        let has_body = method.body.is_some();
+        let params: Vec<hir::FunctionParameter> = method
+            .parameters
+            .iter()
+            .map(|param| self.lower_protocol_method_param(param, has_body))
+            .collect();
+
+        let self_param = method
+            .parameters
+            .iter()
+            .find(|p| matches!(p.pattern.kind, ast::node::PatKind::_Self));
+
+        let method_hir_id = if method.body.is_some() {
+            self.lower_node_id(method.id)
+        } else {
+            self.unique_id()
+        };
+
+        let body = if let Some(self_param) = self_param {
+            method.body.as_ref().map(|b| {
+                let previous_ctx = self.protocol_dispatch_ctx.take();
+                self.protocol_dispatch_ctx = Some(ProtocolDispatchContext {
+                    method_dispatch_map: method_dispatch_map.clone(),
+                    self_param_node_id: self_param.pattern.id,
+                });
+                let result = self.with_scope(method.id, |this| this.lower_block(b));
+                self.protocol_dispatch_ctx = previous_ctx;
+                result
+            })
+        } else {
+            method.body.as_ref().map(|b| self.lower_block(b))
+        };
+
+        hir::ProtocolMethodSignature {
+            hir_id: method_hir_id,
+            name: method.name,
+            parameters: params,
+            return_type: self.lower_ty(method.return_type_annotation.as_ref()),
+            body,
+            span: method.span,
         }
     }
 

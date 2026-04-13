@@ -1576,7 +1576,20 @@ impl TypeChecker {
             .iter()
             .map(|p| p.type_annotation.clone())
             .collect();
-        expr_ty.kind = Self::make_fn_ty(param_tys, ret_ty);
+        let fn_ty = Self::make_fn_ty(param_tys, ret_ty);
+        expr_ty.kind = fn_ty.clone();
+
+        // Update the type table for the declaration so that inlay hints
+        // and hover can retrieve the fully-inferred closure signature.
+        self.type_table.insert(
+            decl.hir_id,
+            TypeInfo {
+                ty: Ty {
+                    kind: fn_ty,
+                    ..Ty::default()
+                },
+            },
+        );
 
         self.observed_return_types.pop();
         self.return_type_stack.pop();
