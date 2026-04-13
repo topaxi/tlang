@@ -446,6 +446,7 @@ mod tests {
             type_params: vec![],
             parameters: vec![],
             params_span: Span::default(),
+            return_hint_spans: Vec::new(),
             return_type: hir::Ty::default(),
             has_return_type: false,
             body: hir::Block {
@@ -547,6 +548,7 @@ mod tests {
             type_params: vec![],
             parameters: vec![],
             params_span: Span::default(),
+            return_hint_spans: Vec::new(),
             return_type: hir::Ty::default(),
             has_return_type: false,
             body: hir::Block {
@@ -608,6 +610,7 @@ mod tests {
             type_params: vec![],
             parameters: vec![],
             params_span: Span::default(),
+            return_hint_spans: Vec::new(),
             return_type: hir::Ty::default(),
             has_return_type: false,
             body: hir::Block {
@@ -664,6 +667,7 @@ mod tests {
             type_params: vec![],
             parameters: vec![],
             params_span: Span::default(),
+            return_hint_spans: Vec::new(),
             return_type: hir::Ty::default(),
             has_return_type: false,
             body,

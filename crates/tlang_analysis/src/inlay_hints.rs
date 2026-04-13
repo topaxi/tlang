@@ -173,8 +173,17 @@ fn collect_fn_decl_hints(
         }
     }
 
+    let return_hint_spans: Vec<Span> = if decl.return_hint_spans.is_empty() {
+        (!decl.has_return_type || ty_contains_only_vars(&decl.return_type.kind))
+            .then_some(decl.params_span)
+            .into_iter()
+            .collect()
+    } else {
+        decl.return_hint_spans.clone()
+    };
+
     // Return type hint — show when no explicit return type was written.
-    if !decl.has_return_type || ty_contains_only_vars(&decl.return_type.kind) {
+    if !return_hint_spans.is_empty() {
         // Try to get the inferred return type. Priority:
         // 1. The type checker may have written it back to decl.return_type.
         // 2. The type table entry for this declaration (Fn signature).
@@ -198,16 +207,15 @@ fn collect_fn_decl_hints(
             && !matches!(ret_kind, TyKind::Unknown)
             && !ty_contains_var(ret_kind)
         {
-            // Find the position after the closing `)` of the parameter list.
-            // Use the span of the last parameter, or the function name span.
-            let pos = return_type_hint_position(decl);
-            push_hint(
-                hints,
-                ctx.range,
-                pos,
-                format!(" -> {ret_kind}"),
-                InlayHintKind::ReturnType,
-            );
+            for span in return_hint_spans {
+                push_hint(
+                    hints,
+                    ctx.range,
+                    return_type_hint_position(span),
+                    format!(" -> {ret_kind}"),
+                    InlayHintKind::ReturnType,
+                );
+            }
         }
     }
 
@@ -232,8 +240,8 @@ fn ty_contains_only_vars(ty: &TyKind) -> bool {
 ///
 /// This also handles C-style brace placement cleanly: when `{` is on the
 /// next line the hint still lands at the end of the `)` line.
-fn return_type_hint_position(decl: &hir::FunctionDeclaration) -> LineColumn {
-    decl.params_span.end_lc
+fn return_type_hint_position(params_span: Span) -> LineColumn {
+    params_span.end_lc
 }
 
 // ── Expression traversal (recurse into nested functions / blocks) ──────
@@ -1072,6 +1080,29 @@ fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, 
             ret_hint.is_some(),
             "expected `-> i64` return type hint for closure, got: {hints:?}"
         );
+    }
+
+    #[test]
+    fn multi_clause_function_shows_return_hint_for_each_clause() {
+        let source = r#"
+fn render(0) { 1 }
+fn render(1) { 2 }
+fn render(_) { 3 }
+"#;
+        let hints = hints_for(source);
+        let return_hints: Vec<_> = hints
+            .iter()
+            .filter(|h| h.kind == InlayHintKind::ReturnType && h.label == " -> i64")
+            .collect();
+
+        assert_eq!(
+            return_hints.len(),
+            3,
+            "expected one inferred return-type hint per clause, got: {hints:?}"
+        );
+        assert!(return_hints.iter().any(|h| h.line == 1));
+        assert!(return_hints.iter().any(|h| h.line == 2));
+        assert!(return_hints.iter().any(|h| h.line == 3));
     }
 
     #[test]

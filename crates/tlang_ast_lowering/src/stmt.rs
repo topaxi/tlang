@@ -899,6 +899,11 @@ impl LoweringContext {
                 decl.type_params = type_params;
                 decl.return_type = return_type;
                 decl.has_return_type = decls.iter().any(|d| d.return_type_annotation.is_some());
+                decl.return_hint_spans = decls
+                    .iter()
+                    .filter(|d| d.return_type_annotation.is_none())
+                    .map(|d| d.params_span)
+                    .collect();
                 // Multi-clause functions inherit visibility from the first clause.
                 decl.visibility = decls[0].visibility;
                 // Use the first clause's params_span so return-type hints land

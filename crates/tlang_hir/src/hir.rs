@@ -984,6 +984,9 @@ pub struct FunctionDeclaration {
     /// Span of the `(…)` parameter list, from `(` through `)` inclusive.
     /// Used to place return-type inlay hints right after `)`.
     pub params_span: Span,
+    /// Parameter-list spans that should receive inferred return-type inlay hints.
+    /// Multi-clause functions preserve one span per unannotated clause.
+    pub return_hint_spans: Vec<Span>,
     pub return_type: Ty,
     /// Whether the user wrote an explicit return type annotation.
     /// `false` when the return type was left unannotated (even if the type
@@ -1002,6 +1005,7 @@ impl FunctionDeclaration {
             type_params: Vec::new(),
             parameters: params,
             params_span: Span::default(),
+            return_hint_spans: Vec::new(),
             return_type: Ty::default(),
             has_return_type: false,
             body,

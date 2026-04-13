@@ -309,6 +309,7 @@ fn fold_function_declaration<F: Folder>(
         type_params: decl.type_params,
         parameters: decl.parameters,
         params_span: decl.params_span,
+        return_hint_spans: decl.return_hint_spans,
         return_type: folder.fold_ty(decl.return_type),
         has_return_type: decl.has_return_type,
         body: folder.fold_block(decl.body),

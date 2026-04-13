@@ -540,6 +540,12 @@ impl LoweringContext {
                 type_params,
                 parameters,
                 params_span: decl.params_span,
+                return_hint_spans: decl
+                    .return_type_annotation
+                    .is_none()
+                    .then_some(decl.params_span)
+                    .into_iter()
+                    .collect(),
                 return_type,
                 has_return_type: decl.return_type_annotation.is_some(),
                 body,

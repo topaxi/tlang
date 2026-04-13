@@ -2154,6 +2154,7 @@ mod tests {
             type_params: Vec::new(),
             parameters: params,
             params_span: tlang_span::Span::default(),
+            return_hint_spans: Vec::new(),
             return_type: Ty {
                 kind: ret,
                 ..Ty::default()
