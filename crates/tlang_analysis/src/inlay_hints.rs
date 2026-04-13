@@ -899,6 +899,21 @@ mod tests {
     }
 
     #[test]
+    fn enum_destructuring_field_hints_include_builtin_struct_types() {
+        let source = r#"
+enum Expense {
+    Food(f32, Temporal::PlainDate),
+}
+fn Expense.date(Expense::Food(_, d)) { d }
+"#;
+        let hints = hints_for(source);
+        assert!(
+            hints.iter().any(|h| h.label == ": Temporal::PlainDate"),
+            "expected `: Temporal::PlainDate` hint for enum payload binding, got: {hints:?}"
+        );
+    }
+
+    #[test]
     fn function_parameter_with_annotation_no_hint() {
         let hints = hints_for("fn double(x: i64) { x * 2 }");
         // Only check that no Type hint exists for the parameter position.

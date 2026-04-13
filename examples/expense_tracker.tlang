@@ -84,7 +84,9 @@ log("Total spending:");
 total |> log();
 
 log("Number of transactions:");
-expenses |> len() |> log();
+expenses
+|> len()
+|> log();
 
 // ── Category Breakdown (pipeline + filter + fold) ──────────────────
 
@@ -92,16 +94,28 @@ log("");
 log("--- Spending by Category ---");
 
 log("Food:");
-expenses |> filter(Expense::is_food) |> sum_amounts() |> log();
+expenses
+|> filter(Expense::is_food)
+|> sum_amounts()
+|> log();
 
 log("Transport:");
-expenses |> filter(Expense::is_transport) |> sum_amounts() |> log();
+expenses
+|> filter(Expense::is_transport)
+|> sum_amounts()
+|> log();
 
 log("Entertainment:");
-expenses |> filter(Expense::is_entertainment) |> sum_amounts() |> log();
+expenses
+|> filter(Expense::is_entertainment)
+|> sum_amounts()
+|> log();
 
 log("Utilities:");
-expenses |> filter(Expense::is_utilities) |> sum_amounts() |> log();
+expenses
+|> filter(Expense::is_utilities)
+|> sum_amounts()
+|> log();
 
 // ── Transaction Counts (for-loop accumulator) ──────────────────────
 

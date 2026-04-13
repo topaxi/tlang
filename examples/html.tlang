@@ -82,7 +82,10 @@ fn dedent(s) {
         |> re"\n[ \t]*$".replace_first("");
     match re"^([ \t]+)".exec(trimmed) {
         Option::Some(indent) =>
-            trimmed |> re"^{indent}".flags("m").replace_all(""),
+            trimmed
+            |> re"^{indent}"
+                .flags("m")
+                .replace_all(""),
         Option::None => trimmed,
     }
 }
@@ -93,15 +96,21 @@ log("=== Auto-escaping ===");
 
 // Raw values are auto-escaped in templates — no manual text() needed.
 let user_input = "<script>alert('xss')</script>";
-html"<p>User said: {user_input}</p>" |> Display::to_string() |> log();
+html"<p>User said: {user_input}</p>"
+|> Display::to_string()
+|> log();
 
 let company = "O'Reilly & Sons";
-html"<span>{company}</span>" |> Display::to_string() |> log();
+html"<span>{company}</span>"
+|> Display::to_string()
+|> log();
 
 // Numbers are safe and pass through escaping unchanged.
 let count = 3;
 let limit = 10;
-html"<p>{count} of {limit} items loaded.</p>" |> Display::to_string() |> log();
+html"<p>{count} of {limit} items loaded.</p>"
+|> Display::to_string()
+|> log();
 
 // ── Demo: SafeHtml composition ──────────────────────────────────────────────
 
@@ -110,11 +119,14 @@ log("=== SafeHtml composition ===");
 // html"..." returns SafeHtml — embedding it preserves HTML without re-escaping.
 let link = html"""<a href="https://github.com/topaxi/tlang">tlang</a>""";
 let intro = html"<p>Built with {link} — a functional language.</p>";
-intro.to_string() |> log();
+intro.to_string()
+|> log();
 
 // text() wraps escaped input in SafeHtml — useful outside of templates.
 let safe_name = text("Alice <admin>");
-html"<span>Author: {safe_name}</span>" |> Display::to_string() |> log();
+html"<span>Author: {safe_name}</span>"
+|> Display::to_string()
+|> log();
 
 // ── Demo: Struct rendering with destructuring ───────────────────────────────
 
@@ -214,4 +226,5 @@ let page = Page {
     posts: posts,
 };
 
-page.render().to_string() |> log();
+page.render().to_string()
+|> log();

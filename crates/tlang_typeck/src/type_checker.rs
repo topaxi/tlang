@@ -803,7 +803,7 @@ impl TypeChecker {
                             })
                     };
 
-                    if let Some(field_ty) = field_ty.filter(Self::is_concrete_ty) {
+                    if let Some(field_ty) = field_ty.filter(Self::should_propagate_field_ty) {
                         p.ty.kind = field_ty.clone();
                         self.register_pat_bindings(p, &field_ty);
                     } else {
@@ -816,20 +816,35 @@ impl TypeChecker {
         }
     }
 
-    // ── Struct and enum declaration registration ──────────────────────
-
-    /// Returns `true` if `kind` represents a resolved, concrete type that is
-    /// worth propagating to pattern bindings.  Unknown types, type variables,
-    /// and unresolved path types (no HirId) are not concrete — treating them
-    /// as Unknown preserves the permissive behaviour of the type checker.
-    fn is_concrete_ty(kind: &TyKind) -> bool {
+    /// Field types declared in structs/enums are safe to propagate to
+    /// destructuring bindings when they are explicit types. Tuple-enum
+    /// payloads like `Dog(name)` use a lowercase placeholder that parses as
+    /// an unresolved single-segment path; keep those permissive.
+    fn should_propagate_field_ty(kind: &TyKind) -> bool {
         match kind {
-            TyKind::Unknown => false,
-            TyKind::Var(_) => false,
-            TyKind::Path(path) => path.res.hir_id().is_some(),
+            TyKind::Unknown | TyKind::Var(_) => false,
+            TyKind::Path(path) => {
+                if !path.res.is_unresolved() {
+                    return true;
+                }
+
+                let Some(first) = path.segments.first() else {
+                    return false;
+                };
+
+                path.segments.len() > 1
+                    || first
+                        .ident
+                        .as_str()
+                        .chars()
+                        .next()
+                        .is_some_and(char::is_uppercase)
+            }
             _ => true,
         }
     }
+
+    // ── Struct and enum declaration registration ──────────────────────
 
     /// Register a struct declaration in the type table: store field metadata
     /// and register a constructor function type `Fn(field_tys…) → Path(Struct)`.
