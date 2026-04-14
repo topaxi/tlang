@@ -691,6 +691,8 @@ impl LoweringContext {
 
         // Second pass: lower bounds with the scope active so that
         // references to sibling type params (e.g. `B: From<A>`) resolve.
+        // Safety: `hir_params` and `params` have the same length since
+        // `hir_params` was built from iterating `params` above.
         for (hir_param, ast_param) in hir_params.iter_mut().zip(params.iter()) {
             hir_param.bounds = ast_param
                 .bounds

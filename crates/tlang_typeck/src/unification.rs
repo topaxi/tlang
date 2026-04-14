@@ -60,14 +60,9 @@ impl UnificationTable {
         let mut path = Vec::new();
         let mut current = var;
 
-        loop {
-            match self.entries.get(&current) {
-                Some(Entry::Forward(next)) => {
-                    path.push(current);
-                    current = *next;
-                }
-                Some(Entry::Root(_)) | None => break,
-            }
+        while let Some(Entry::Forward(next)) = self.entries.get(&current) {
+            path.push(current);
+            current = *next;
         }
 
         // Path compression: point everything directly at the root.
