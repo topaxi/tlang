@@ -130,6 +130,50 @@ fn add(a: isize, b: isize) -> isize { a + b }
           right: (identifier))))))
 
 ================================================================================
+Generic function declaration with bounds
+================================================================================
+
+fn map<T: Ord, U>(xs: List<T>, f: fn(T) -> U) -> List<U> { [] }
+
+---
+
+(source_file
+  (function_declaration
+    name: (function_name
+      definition: (identifier))
+    type_params: (type_param_list
+      (type_param
+        name: (type_identifier)
+        bounds: (type_param_bounds
+          bound: (type_annotation
+            (type_identifier))))
+      (type_param
+        name: (type_identifier)))
+    parameters: (parameter_list
+      (function_parameter
+        (binding)
+        type: (type_annotation
+          (type_identifier)
+          (type_annotation
+            (type_identifier))))
+      (function_parameter
+        (binding)
+        type: (type_annotation
+          (function_type
+            (function_type_parameter
+              type: (type_annotation
+                (type_identifier)))
+            return_type: (type_annotation
+              (type_identifier))))))
+    return_type: (type_annotation
+      (type_identifier)
+      (type_annotation
+        (type_identifier)))
+    body: (block
+      (expression_statement
+        (list_expression)))))
+
+================================================================================
 Method declaration
 ================================================================================
 
@@ -196,6 +240,37 @@ enum Option {
       name: (type_identifier))))
 
 ================================================================================
+Generic enum declaration with bounds
+================================================================================
+
+enum Result<T, E: Display> {
+    Ok(T),
+    Err(E),
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (type_identifier)
+    type_params: (type_param_list
+      (type_param
+        name: (type_identifier))
+      (type_param
+        name: (type_identifier)
+        bounds: (type_param_bounds
+          bound: (type_annotation
+            (type_identifier)))))
+    (enum_variant
+      name: (type_identifier)
+      (type_annotation
+        (type_identifier)))
+    (enum_variant
+      name: (type_identifier)
+      (type_annotation
+        (type_identifier)))))
+
+================================================================================
 Struct declaration
 ================================================================================
 
@@ -217,6 +292,30 @@ struct Vector {
       name: (identifier)
       type: (type_annotation
         (identifier)))))
+
+================================================================================
+Generic struct declaration with bounds
+================================================================================
+
+struct Box<T: Clone> {
+    value: T,
+}
+
+---
+
+(source_file
+  (struct_declaration
+    name: (type_identifier)
+    type_params: (type_param_list
+      (type_param
+        name: (type_identifier)
+        bounds: (type_param_bounds
+          bound: (type_annotation
+            (type_identifier)))))
+    (struct_field
+      name: (identifier)
+      type: (type_annotation
+        (type_identifier)))))
 
 ================================================================================
 Return statement

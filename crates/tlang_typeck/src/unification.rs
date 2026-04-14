@@ -18,14 +18,29 @@ pub struct OccursCheckError {
     pub ty: TyKind,
 }
 
+/// Error returned when unification fails.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnificationError {
+    /// The requested unification would produce an infinite type.
+    OccursCheck(OccursCheckError),
+    /// Two already-bound types were incompatible.
+    Conflict { left: TyKind, right: TyKind },
+}
+
+impl From<OccursCheckError> for UnificationError {
+    fn from(value: OccursCheckError) -> Self {
+        Self::OccursCheck(value)
+    }
+}
+
 /// Union-Find table for type variable unification.
 ///
 /// Each type variable is either:
 /// - **Unbound**: not yet unified with any concrete type, or
 /// - **Bound**: unified to a specific `TyKind`.
 ///
-/// The table supports path compression and union by rank for efficient
-/// lookups across chains of forwarded type variables.
+/// The table supports path compression for efficient lookups across chains of
+/// forwarded type variables.
 #[derive(Debug, Default, Clone)]
 pub struct UnificationTable {
     /// Maps each known type variable to its current entry.
@@ -53,9 +68,15 @@ impl UnificationTable {
         self.entries.entry(var).or_insert(Entry::Root(None));
     }
 
+    fn ensure_registered(&mut self, var: TypeVarId) {
+        self.entries.entry(var).or_insert(Entry::Root(None));
+    }
+
     /// Find the root representative for a type variable, applying path
     /// compression along the way.
     fn find_root(&mut self, var: TypeVarId) -> TypeVarId {
+        self.ensure_registered(var);
+
         // Collect the chain so we can compress paths.
         let mut path = Vec::new();
         let mut current = var;
@@ -64,6 +85,8 @@ impl UnificationTable {
             path.push(current);
             current = *next;
         }
+
+        self.ensure_registered(current);
 
         // Path compression: point everything directly at the root.
         for id in path {
@@ -83,57 +106,132 @@ impl UnificationTable {
         }
     }
 
-    /// Unify a type variable with a concrete type, performing the occurs check.
-    ///
-    /// Returns `Err(OccursCheckError)` if `var` occurs inside `ty`.
-    pub fn unify_var_ty(&mut self, var: TypeVarId, ty: &TyKind) -> Result<(), OccursCheckError> {
-        let root = self.find_root(var);
+    /// Resolve a type through any top-level bound type-variable indirection.
+    fn resolve_top_level_ty(&mut self, ty: &TyKind) -> TyKind {
+        let mut resolved = ty.clone();
 
-        // If the variable is already bound, we don't re-bind it.
-        // The caller should check compatibility.
-        if let Some(Entry::Root(Some(_))) = self.entries.get(&root) {
-            return Ok(());
+        while let TyKind::Var(var) = resolved {
+            let root = self.find_root(var);
+            let Some(next) = self.probe(root) else {
+                return TyKind::Var(root);
+            };
+            resolved = next;
         }
 
-        // Skip trivial `Var(same)` binding.
-        if let TyKind::Var(other) = ty {
-            let other_root = self.find_root(*other);
-            if root == other_root {
-                return Ok(());
+        resolved
+    }
+
+    fn unify_types(&mut self, left: &TyKind, right: &TyKind) -> Result<(), UnificationError> {
+        let left = self.resolve_top_level_ty(left);
+        let right = self.resolve_top_level_ty(right);
+
+        match (&left, &right) {
+            (TyKind::Var(a), TyKind::Var(b)) => self.unify_var_var(*a, *b),
+            (TyKind::Var(var), ty) | (ty, TyKind::Var(var)) => self.unify_var_ty(*var, ty),
+            (TyKind::Unknown, TyKind::Unknown)
+            | (TyKind::Never, TyKind::Never)
+            | (TyKind::Primitive(_), TyKind::Primitive(_))
+            | (TyKind::Path(_), TyKind::Path(_)) => {
+                if left == right {
+                    Ok(())
+                } else {
+                    Err(UnificationError::Conflict { left, right })
+                }
             }
+            (TyKind::Slice(inner_left), TyKind::Slice(inner_right)) => {
+                self.unify_types(&inner_left.kind, &inner_right.kind)
+            }
+            (TyKind::Dict(key_left, value_left), TyKind::Dict(key_right, value_right)) => {
+                self.unify_types(&key_left.kind, &key_right.kind)?;
+                self.unify_types(&value_left.kind, &value_right.kind)
+            }
+            (TyKind::Fn(params_left, ret_left), TyKind::Fn(params_right, ret_right)) => {
+                if params_left.len() != params_right.len() {
+                    return Err(UnificationError::Conflict { left, right });
+                }
+
+                for (param_left, param_right) in params_left.iter().zip(params_right.iter()) {
+                    self.unify_types(&param_left.kind, &param_right.kind)?;
+                }
+
+                self.unify_types(&ret_left.kind, &ret_right.kind)
+            }
+            (TyKind::Union(types_left), TyKind::Union(types_right)) => {
+                if types_left.len() != types_right.len() {
+                    return Err(UnificationError::Conflict { left, right });
+                }
+
+                for (ty_left, ty_right) in types_left.iter().zip(types_right.iter()) {
+                    self.unify_types(&ty_left.kind, &ty_right.kind)?;
+                }
+
+                Ok(())
+            }
+            _ => Err(UnificationError::Conflict { left, right }),
+        }
+    }
+
+    /// Unify a type variable with a concrete type, performing the occurs check.
+    ///
+    /// Returns `Err(UnificationError)` if unification fails, including when
+    /// `var` occurs inside `ty`.
+    pub fn unify_var_ty(&mut self, var: TypeVarId, ty: &TyKind) -> Result<(), UnificationError> {
+        let root = self.find_root(var);
+        let ty = self.resolve_top_level_ty(ty);
+
+        if let TyKind::Var(other_root) = ty {
+            return self.unify_var_var(root, other_root);
+        }
+
+        if let Some(Entry::Root(Some(existing_ty))) = self.entries.get(&root).cloned() {
+            return self.unify_types(&existing_ty, &ty);
         }
 
         // Occurs check: var must not appear inside ty.
-        if occurs_in(root, ty, self) {
+        if occurs_in(root, &ty, self) {
             return Err(OccursCheckError {
                 var: root,
                 ty: ty.clone(),
-            });
+            }
+            .into());
         }
 
-        self.entries.insert(root, Entry::Root(Some(ty.clone())));
+        self.entries.insert(root, Entry::Root(Some(ty)));
         Ok(())
     }
 
     /// Unify two type variables so they share the same equivalence class.
-    pub fn unify_var_var(&mut self, a: TypeVarId, b: TypeVarId) {
+    pub fn unify_var_var(&mut self, a: TypeVarId, b: TypeVarId) -> Result<(), UnificationError> {
         let root_a = self.find_root(a);
         let root_b = self.find_root(b);
 
         if root_a == root_b {
-            return;
+            return Ok(());
         }
 
-        // If one has a binding, forward the other to it.
-        let (from, to) = match (
+        match (
             self.entries.get(&root_a).cloned(),
             self.entries.get(&root_b).cloned(),
         ) {
-            (Some(Entry::Root(Some(_))), _) => (root_b, root_a),
-            (_, Some(Entry::Root(Some(_)))) => (root_a, root_b),
-            _ => (root_b, root_a),
-        };
-        self.entries.insert(from, Entry::Forward(to));
+            (Some(Entry::Root(Some(ty_a))), Some(Entry::Root(Some(ty_b)))) => {
+                self.unify_types(&ty_a, &ty_b)?;
+                let zonked = self.zonk(&ty_a);
+                self.entries.insert(root_a, Entry::Root(Some(zonked)));
+                self.entries.insert(root_b, Entry::Forward(root_a));
+            }
+            (Some(Entry::Root(Some(_))), Some(Entry::Root(None))) => {
+                self.entries.insert(root_b, Entry::Forward(root_a));
+            }
+            (Some(Entry::Root(None)), Some(Entry::Root(Some(_)))) => {
+                self.entries.insert(root_a, Entry::Forward(root_b));
+            }
+            (Some(Entry::Root(None)), Some(Entry::Root(None))) => {
+                self.entries.insert(root_b, Entry::Forward(root_a));
+            }
+            _ => unreachable!("find_root always returns a registered root entry"),
+        }
+
+        Ok(())
     }
 
     /// Zonk a type: recursively replace all solved type variables with their
@@ -260,7 +358,7 @@ mod tests {
         table.register(u);
 
         // Unify T and U
-        table.unify_var_var(t, u);
+        table.unify_var_var(t, u).unwrap();
 
         // Bind one of them
         table
@@ -288,8 +386,13 @@ mod tests {
 
         let result = table.unify_var_ty(t, &infinite_ty);
         assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert_eq!(err.var, t);
+        assert_eq!(
+            result,
+            Err(UnificationError::OccursCheck(OccursCheckError {
+                var: t,
+                ty: infinite_ty,
+            }))
+        );
     }
 
     #[test]
@@ -382,8 +485,8 @@ mod tests {
         table.register(c);
 
         // Chain: a → b → c
-        table.unify_var_var(a, b);
-        table.unify_var_var(b, c);
+        table.unify_var_var(a, b).unwrap();
+        table.unify_var_var(b, c).unwrap();
 
         // Bind the root
         table
@@ -442,5 +545,67 @@ mod tests {
                 ..Ty::default()
             }))
         );
+    }
+
+    #[test]
+    fn conflicting_binding_returns_error() {
+        let mut alloc = TypeVarIdAllocator::new(1);
+        let t = alloc.next_id();
+
+        let mut table = UnificationTable::new();
+        table.register(t);
+        table
+            .unify_var_ty(t, &TyKind::Primitive(PrimTy::I64))
+            .unwrap();
+
+        let result = table.unify_var_ty(t, &TyKind::Primitive(PrimTy::Bool));
+        assert_eq!(
+            result,
+            Err(UnificationError::Conflict {
+                left: TyKind::Primitive(PrimTy::I64),
+                right: TyKind::Primitive(PrimTy::Bool),
+            })
+        );
+    }
+
+    #[test]
+    fn conflicting_var_bindings_return_error() {
+        let mut alloc = TypeVarIdAllocator::new(1);
+        let t = alloc.next_id();
+        let u = alloc.next_id();
+
+        let mut table = UnificationTable::new();
+        table.register(t);
+        table.register(u);
+        table
+            .unify_var_ty(t, &TyKind::Primitive(PrimTy::I64))
+            .unwrap();
+        table
+            .unify_var_ty(u, &TyKind::Primitive(PrimTy::Bool))
+            .unwrap();
+
+        let result = table.unify_var_var(t, u);
+        assert_eq!(
+            result,
+            Err(UnificationError::Conflict {
+                left: TyKind::Primitive(PrimTy::I64),
+                right: TyKind::Primitive(PrimTy::Bool),
+            })
+        );
+    }
+
+    #[test]
+    fn unify_var_var_registers_unknown_variables() {
+        let mut alloc = TypeVarIdAllocator::new(1);
+        let t = alloc.next_id();
+        let u = alloc.next_id();
+
+        let mut table = UnificationTable::new();
+        table.unify_var_var(t, u).unwrap();
+        table
+            .unify_var_ty(t, &TyKind::Primitive(PrimTy::I64))
+            .unwrap();
+
+        assert_eq!(table.probe(u), Some(TyKind::Primitive(PrimTy::I64)));
     }
 }

@@ -15,4 +15,4 @@ pub use type_table::{
     VariantInfo,
 };
 pub use typing_context::TypingContext;
-pub use unification::{OccursCheckError, UnificationTable};
+pub use unification::{OccursCheckError, UnificationError, UnificationTable};
