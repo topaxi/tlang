@@ -969,6 +969,9 @@ pub struct TypeParam {
     pub name: Ident,
     /// The `TypeVarId` used to represent this type parameter in `TyKind::Var`.
     pub type_var_id: TypeVarId,
+    /// Constraint bounds on the type parameter, e.g. `Display + Clone`
+    /// in `<T: Display + Clone>`.
+    pub bounds: Vec<Ty>,
     pub span: Span,
 }
 

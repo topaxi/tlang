@@ -1951,6 +1951,11 @@ impl<'src> Parser<'src> {
 
     /// Parse a type parameter list `<T, U, V>` for generic declarations.
     ///
+    /// Supports optional inline constraint bounds:
+    /// - `<T>` — unconstrained type parameter
+    /// - `<T: Display>` — single bound
+    /// - `<T: Display + Clone>` — multiple bounds
+    ///
     /// Returns an empty vec when no `<` follows the current position.
     fn parse_type_params(&mut self) -> Vec<TypeParam> {
         let mut type_params = Vec::new();
@@ -1964,10 +1969,25 @@ impl<'src> Parser<'src> {
         while self.not_at_closing(TokenKind::GreaterThan) {
             let mut span = self.create_span_from_current_token();
             let name = self.parse_identifier();
+
+            // Parse optional inline bounds: `T: Bound1 + Bound2`
+            let bounds = if matches!(self.current_token_kind(), TokenKind::Colon) {
+                self.advance(); // consume `:`
+                let mut bounds = vec![self.parse_type_annotation()];
+                while matches!(self.current_token_kind(), TokenKind::Plus) {
+                    self.advance(); // consume `+`
+                    bounds.push(self.parse_type_annotation());
+                }
+                bounds
+            } else {
+                Vec::new()
+            };
+
             self.end_span_from_previous_token(&mut span);
             type_params.push(TypeParam {
                 id: self.unique_id(),
                 name,
+                bounds,
                 span,
             });
             if matches!(self.current_token_kind(), TokenKind::Comma) {

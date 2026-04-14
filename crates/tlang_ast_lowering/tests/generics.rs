@@ -259,3 +259,67 @@ fn test_impl_block_associated_type_binding_lowered() {
         impl_block.associated_types[0].ty.kind
     );
 }
+
+// ── Type parameter bounds lowering ──────────────────────────────────────
+
+#[test]
+fn test_generic_fn_single_bound_lowered() {
+    let module = common::hir_from_str("fn sort<T: Ord>(list: T) -> T { list }");
+
+    let stmt = &module.block.stmts[0];
+    let decl = match &stmt.kind {
+        hir::StmtKind::FunctionDeclaration(decl) => decl,
+        other => panic!("expected FunctionDeclaration, got {other:?}"),
+    };
+
+    assert_eq!(decl.type_params.len(), 1);
+    let tp = &decl.type_params[0];
+    assert_eq!(tp.name.as_str(), "T");
+    assert_eq!(tp.bounds.len(), 1);
+    assert!(
+        matches!(&tp.bounds[0].kind, TyKind::Path(p) if p.to_string() == "Ord"),
+        "expected bound Path(Ord), got {:?}",
+        tp.bounds[0].kind,
+    );
+}
+
+#[test]
+fn test_generic_fn_multiple_bounds_lowered() {
+    let module =
+        common::hir_from_str("fn serialize<T: Display + Serialize>(value: T) -> T { value }");
+
+    let stmt = &module.block.stmts[0];
+    let decl = match &stmt.kind {
+        hir::StmtKind::FunctionDeclaration(decl) => decl,
+        other => panic!("expected FunctionDeclaration, got {other:?}"),
+    };
+
+    assert_eq!(decl.type_params.len(), 1);
+    let tp = &decl.type_params[0];
+    assert_eq!(tp.name.as_str(), "T");
+    assert_eq!(tp.bounds.len(), 2);
+    assert!(
+        matches!(&tp.bounds[0].kind, TyKind::Path(p) if p.to_string() == "Display"),
+        "expected bound Path(Display), got {:?}",
+        tp.bounds[0].kind,
+    );
+    assert!(
+        matches!(&tp.bounds[1].kind, TyKind::Path(p) if p.to_string() == "Serialize"),
+        "expected bound Path(Serialize), got {:?}",
+        tp.bounds[1].kind,
+    );
+}
+
+#[test]
+fn test_generic_fn_no_bounds_has_empty_bounds() {
+    let module = common::hir_from_str("fn identity<T>(x: T) -> T { x }");
+
+    let stmt = &module.block.stmts[0];
+    let decl = match &stmt.kind {
+        hir::StmtKind::FunctionDeclaration(decl) => decl,
+        other => panic!("expected FunctionDeclaration, got {other:?}"),
+    };
+
+    assert_eq!(decl.type_params.len(), 1);
+    assert!(decl.type_params[0].bounds.is_empty());
+}

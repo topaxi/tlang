@@ -119,3 +119,47 @@ fn test_protocol_phase1_syntax_parses() {
         }
     "});
 }
+
+#[test]
+fn test_generic_function_single_bound() {
+    assert_parser_snapshot!(indoc::indoc! {"
+        fn sort<T: Ord>(list: List<T>) -> List<T> { list }
+    "});
+}
+
+#[test]
+fn test_generic_function_multiple_bounds() {
+    assert_parser_snapshot!(indoc::indoc! {"
+        fn serialize<T: Display + Serialize>(value: T) -> String { value }
+    "});
+}
+
+#[test]
+fn test_generic_function_mixed_bound_and_unbound() {
+    let ast = parse!(indoc::indoc! {"
+        fn transform<T: Ord, U>(input: T) -> U { input }
+    "});
+
+    let decl = match &ast.statements[0].kind {
+        tlang_ast::node::StmtKind::FunctionDeclaration(decl) => decl,
+        other => panic!("expected FunctionDeclaration, got {other:?}"),
+    };
+
+    assert_eq!(decl.type_params.len(), 2);
+    // T has one bound: Ord
+    assert_eq!(decl.type_params[0].name.as_str(), "T");
+    assert_eq!(decl.type_params[0].bounds.len(), 1);
+    // U has no bounds
+    assert_eq!(decl.type_params[1].name.as_str(), "U");
+    assert!(decl.type_params[1].bounds.is_empty());
+}
+
+#[test]
+fn test_generic_struct_with_bounds() {
+    assert_parser_snapshot!(indoc::indoc! {"
+        struct SortedPair<T: Ord> {
+            first: T,
+            second: T,
+        }
+    "});
+}

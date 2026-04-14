@@ -110,6 +110,7 @@ module.exports = grammar({
           optional(field('visibility', $.visibility_modifier)),
           'fn',
           field('name', $.function_name),
+          optional(field('type_params', $.type_param_list)),
           field('parameters', $.parameter_list),
           optional(field('guard', $.guard_clause)),
           optional(seq('->', field('return_type', $.type_annotation))),
@@ -144,6 +145,7 @@ module.exports = grammar({
         optional(field('visibility', $.visibility_modifier)),
         'enum',
         field('name', $.type_identifier),
+        optional(field('type_params', $.type_param_list)),
         '{',
         commaSep($.enum_variant),
         '}',
@@ -169,6 +171,7 @@ module.exports = grammar({
         optional(field('visibility', $.visibility_modifier)),
         'struct',
         field('name', $.type_identifier),
+        optional(field('type_params', $.type_param_list)),
         '{',
         commaSep($.struct_field),
         '}',
@@ -205,7 +208,13 @@ module.exports = grammar({
       seq('<', commaSep1($.type_param), '>'),
 
     type_param: ($) =>
-      field('name', choice($.identifier, $.type_identifier)),
+      seq(
+        field('name', choice($.identifier, $.type_identifier)),
+        optional(field('bounds', $.type_param_bounds)),
+      ),
+
+    type_param_bounds: ($) =>
+      seq(':', field('bound', $.type_annotation), repeat(seq('+', field('bound', $.type_annotation)))),
 
     associated_type_declaration: ($) =>
       seq(
