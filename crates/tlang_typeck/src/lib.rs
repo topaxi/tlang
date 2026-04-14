@@ -6,6 +6,7 @@ mod type_checker;
 mod type_error;
 mod type_table;
 mod typing_context;
+pub mod unification;
 
 pub use type_checker::TypeChecker;
 pub use type_error::TypeError;
@@ -14,3 +15,4 @@ pub use type_table::{
     VariantInfo,
 };
 pub use typing_context::TypingContext;
+pub use unification::{OccursCheckError, UnificationTable};

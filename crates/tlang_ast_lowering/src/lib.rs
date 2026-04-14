@@ -663,11 +663,16 @@ impl LoweringContext {
     /// each. Also pushes a type parameter scope so that `lower_ty_path` can
     /// resolve type parameter names (e.g. `T`) to `TyKind::Var(id)`.
     ///
+    /// Constraint bounds (e.g. `T: Display + Clone`) are lowered after the
+    /// scope is pushed, so that bounds referencing other type parameters
+    /// (e.g. `<A, B: From<A>>`) can resolve correctly.
+    ///
     /// **Must** be paired with a call to [`pop_type_param_scope`] after lowering
     /// the body that uses these type parameters.
     fn lower_type_params(&mut self, params: &[ast::node::TypeParam]) -> Vec<hir::TypeParam> {
         let mut scope = HashMap::new();
-        let hir_params: Vec<_> = params
+        // First pass: allocate type variable IDs and build scope.
+        let mut hir_params: Vec<_> = params
             .iter()
             .map(|p| {
                 let hir_id = self.lower_node_id(p.id);
@@ -677,11 +682,23 @@ impl LoweringContext {
                     hir_id,
                     name: p.name,
                     type_var_id,
+                    bounds: Vec::new(),
                     span: p.span,
                 }
             })
             .collect();
         self.type_param_scopes.push(scope);
+
+        // Second pass: lower bounds with the scope active so that
+        // references to sibling type params (e.g. `B: From<A>`) resolve.
+        for (hir_param, ast_param) in hir_params.iter_mut().zip(params.iter()) {
+            hir_param.bounds = ast_param
+                .bounds
+                .iter()
+                .map(|b| self.lower_ty(Some(b)))
+                .collect();
+        }
+
         hir_params
     }
 

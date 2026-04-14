@@ -108,6 +108,12 @@ pub enum TypeError {
         bound: String,
         span: Span,
     },
+    /// An infinite type was detected during unification (occurs check).
+    InfiniteType {
+        type_param: String,
+        ty: String,
+        span: Span,
+    },
 }
 
 impl TypeError {
@@ -130,7 +136,8 @@ impl TypeError {
             | TypeError::ApplyConflict { span, .. }
             | TypeError::MissingAssociatedType { span, .. }
             | TypeError::UnexpectedAssociatedType { span, .. }
-            | TypeError::UnknownWhereClauseBound { span, .. } => *span,
+            | TypeError::UnknownWhereClauseBound { span, .. }
+            | TypeError::InfiniteType { span, .. } => *span,
         }
     }
 
@@ -241,6 +248,11 @@ impl TypeError {
                 type_param, bound, ..
             } => {
                 format!("unknown bound `{bound}` in where clause for type parameter `{type_param}`")
+            }
+            TypeError::InfiniteType { type_param, ty, .. } => {
+                format!(
+                    "infinite type detected: `{type_param}` occurs in `{ty}` during unification"
+                )
             }
         }
     }

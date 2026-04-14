@@ -116,12 +116,15 @@ pub struct ConstDeclaration {
 
 /// A type parameter in a generic declaration, e.g. `T` in `fn map<T>(...)`.
 ///
-/// Future: may include constraint bounds (e.g. `T: Display`).
+/// Supports optional constraint bounds, e.g. `T: Display + Clone`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct TypeParam {
     pub id: NodeId,
     pub name: Ident,
+    /// Optional constraint bounds on the type parameter, e.g. `Display + Clone`
+    /// in `<T: Display + Clone>`.
+    pub bounds: Vec<Ty>,
     pub span: Span,
 }
 

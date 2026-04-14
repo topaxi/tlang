@@ -205,7 +205,13 @@ module.exports = grammar({
       seq('<', commaSep1($.type_param), '>'),
 
     type_param: ($) =>
-      field('name', choice($.identifier, $.type_identifier)),
+      seq(
+        field('name', choice($.identifier, $.type_identifier)),
+        optional(field('bounds', $.type_param_bounds)),
+      ),
+
+    type_param_bounds: ($) =>
+      seq(':', field('bound', $.type_annotation), repeat(seq('+', field('bound', $.type_annotation)))),
 
     associated_type_declaration: ($) =>
       seq(

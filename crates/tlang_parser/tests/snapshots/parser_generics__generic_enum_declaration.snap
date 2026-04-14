@@ -42,6 +42,7 @@ Module(
                 ),
               ),
             ),
+            bounds: [],
             span: Span(
               start: 12,
               end: 13,
@@ -72,6 +73,7 @@ Module(
                 ),
               ),
             ),
+            bounds: [],
             span: Span(
               start: 15,
               end: 16,
