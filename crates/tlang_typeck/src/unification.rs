@@ -24,12 +24,24 @@ pub enum UnificationError {
     /// The requested unification would produce an infinite type.
     OccursCheck(OccursCheckError),
     /// Two already-bound types were incompatible.
-    Conflict { left: TyKind, right: TyKind },
+    Conflict {
+        left: Box<TyKind>,
+        right: Box<TyKind>,
+    },
 }
 
 impl From<OccursCheckError> for UnificationError {
     fn from(value: OccursCheckError) -> Self {
         Self::OccursCheck(value)
+    }
+}
+
+impl UnificationError {
+    fn conflict(left: TyKind, right: TyKind) -> Self {
+        Self::Conflict {
+            left: Box::new(left),
+            right: Box::new(right),
+        }
     }
 }
 
@@ -135,7 +147,7 @@ impl UnificationTable {
                 if left == right {
                     Ok(())
                 } else {
-                    Err(UnificationError::Conflict { left, right })
+                    Err(UnificationError::conflict(left, right))
                 }
             }
             (TyKind::Slice(inner_left), TyKind::Slice(inner_right)) => {
@@ -147,7 +159,7 @@ impl UnificationTable {
             }
             (TyKind::Fn(params_left, ret_left), TyKind::Fn(params_right, ret_right)) => {
                 if params_left.len() != params_right.len() {
-                    return Err(UnificationError::Conflict { left, right });
+                    return Err(UnificationError::conflict(left, right));
                 }
 
                 for (param_left, param_right) in params_left.iter().zip(params_right.iter()) {
@@ -158,7 +170,7 @@ impl UnificationTable {
             }
             (TyKind::Union(types_left), TyKind::Union(types_right)) => {
                 if types_left.len() != types_right.len() {
-                    return Err(UnificationError::Conflict { left, right });
+                    return Err(UnificationError::conflict(left, right));
                 }
 
                 for (ty_left, ty_right) in types_left.iter().zip(types_right.iter()) {
@@ -167,7 +179,7 @@ impl UnificationTable {
 
                 Ok(())
             }
-            _ => Err(UnificationError::Conflict { left, right }),
+            _ => Err(UnificationError::conflict(left, right)),
         }
     }
 
@@ -561,10 +573,10 @@ mod tests {
         let result = table.unify_var_ty(t, &TyKind::Primitive(PrimTy::Bool));
         assert_eq!(
             result,
-            Err(UnificationError::Conflict {
-                left: TyKind::Primitive(PrimTy::I64),
-                right: TyKind::Primitive(PrimTy::Bool),
-            })
+            Err(UnificationError::conflict(
+                TyKind::Primitive(PrimTy::I64),
+                TyKind::Primitive(PrimTy::Bool),
+            ))
         );
     }
 
@@ -587,10 +599,10 @@ mod tests {
         let result = table.unify_var_var(t, u);
         assert_eq!(
             result,
-            Err(UnificationError::Conflict {
-                left: TyKind::Primitive(PrimTy::I64),
-                right: TyKind::Primitive(PrimTy::Bool),
-            })
+            Err(UnificationError::conflict(
+                TyKind::Primitive(PrimTy::I64),
+                TyKind::Primitive(PrimTy::Bool),
+            ))
         );
     }
 
