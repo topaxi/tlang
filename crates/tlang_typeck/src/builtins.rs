@@ -75,8 +75,7 @@ fn lookup_generic(name: &str) -> Option<TyKind> {
 
     match name {
         // map<T, U>(iterable: Slice<T>, f: fn(T) -> U) -> Slice<U>
-        // Also available as Functor::map
-        "map" | "Functor::map" => Some(mk_fn_ty(
+        "map" => Some(mk_fn_ty(
             vec![
                 TyKind::Slice(Box::new(mk_ty(t.clone()))),
                 mk_fn_ty(vec![t], u.clone()),

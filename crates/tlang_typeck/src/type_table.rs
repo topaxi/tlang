@@ -174,6 +174,19 @@ impl TypeTable {
         &self.impl_info
     }
 
+    /// Find the most specific impl for `Protocol` on `Type`, preferring
+    /// concrete impls over blanket impls.
+    pub fn find_impl_for(&self, protocol_name: &str, target_type_name: &str) -> Option<&ImplInfo> {
+        self.impl_info
+            .iter()
+            .find(|i| {
+                i.protocol_name == protocol_name
+                    && i.target_type_name == target_type_name
+                    && !i.is_blanket
+            })
+            .or_else(|| self.find_blanket_impl_for(protocol_name, target_type_name))
+    }
+
     /// Check whether `impl Protocol for Type` has been registered.
     pub fn has_impl(&self, protocol_name: &str, target_type_name: &str) -> bool {
         self.impl_info

@@ -2368,6 +2368,32 @@ fn functor_map_closure_ok() {
 }
 
 #[test]
+fn builtin_functor_map_accepts_option_receiver() {
+    common::typecheck_ok(
+        r#"
+        let some = Option::Some(5);
+        Functor::map(some, fn(_) { "mapped" });
+
+        let none = Option::None;
+        Functor::map(none, fn(_) { "mapped" });
+        "#,
+    );
+}
+
+#[test]
+fn builtin_functor_map_accepts_result_receiver() {
+    common::typecheck_ok(
+        r#"
+        let ok = Result::Ok(10);
+        Functor::map(ok, fn(_) { "mapped" });
+
+        let err = Result::Err("error");
+        Functor::map(err, fn(_) { "mapped" });
+        "#,
+    );
+}
+
+#[test]
 fn pipeline_map_infers_closure_param_from_list() {
     // [1,2,3] |> map(fn(x) { "hello" }) → assigning to List<i64> should error
     let errs = common::typecheck_errors(

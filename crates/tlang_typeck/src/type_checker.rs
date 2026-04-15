@@ -663,7 +663,7 @@ impl TypeChecker {
         }
 
         // Try to resolve the callee to a function signature.
-        let fn_ty = self.resolve_callee_type(&call.callee);
+        let fn_ty = self.resolve_call_callee_type(call);
 
         match fn_ty {
             Some(TyKind::Fn(ref param_tys, ref ret_ty)) => {
@@ -784,6 +784,159 @@ impl TypeChecker {
                     _ => None,
                 }
             }
+        }
+    }
+
+    fn resolve_call_callee_type(&self, call: &hir::CallExpression) -> Option<TyKind> {
+        self.resolve_protocol_dispatch_callee_type(call)
+            .or_else(|| self.resolve_callee_type(&call.callee))
+    }
+
+    fn resolve_protocol_dispatch_callee_type(&self, call: &hir::CallExpression) -> Option<TyKind> {
+        let hir::ExprKind::Path(path) = &call.callee.kind else {
+            return None;
+        };
+        if path.segments.len() < 2 || call.arguments.is_empty() {
+            return None;
+        }
+
+        let method_name = path.last_ident().as_str();
+        let protocol_name = path.segments[..path.segments.len() - 1]
+            .iter()
+            .map(|segment| segment.ident.as_str())
+            .collect::<Vec<_>>()
+            .join("::");
+        let receiver_ty = &call.arguments[0].ty.kind;
+        let receiver_type_name = Self::receiver_dispatch_type_name(receiver_ty)?;
+
+        self.resolve_impl_protocol_dispatch_callee_type(
+            &protocol_name,
+            method_name,
+            receiver_ty,
+            &receiver_type_name,
+        )
+        .or_else(|| {
+            self.resolve_builtin_protocol_dispatch_callee_type(
+                &protocol_name,
+                method_name,
+                receiver_ty,
+                &receiver_type_name,
+            )
+        })
+    }
+
+    fn resolve_impl_protocol_dispatch_callee_type(
+        &self,
+        protocol_name: &str,
+        method_name: &str,
+        receiver_ty: &TyKind,
+        receiver_type_name: &str,
+    ) -> Option<TyKind> {
+        let proto_info = self.type_table.get_protocol_info(protocol_name)?;
+        let method = proto_info
+            .methods
+            .iter()
+            .find(|candidate| candidate.name.as_str() == method_name)?;
+        self.type_table
+            .find_impl_for(protocol_name, receiver_type_name)?;
+
+        let mut param_tys = method.param_tys.clone();
+        if let Some(self_param) = param_tys.first_mut() {
+            self_param.kind = receiver_ty.clone();
+        } else {
+            param_tys.push(Ty {
+                kind: receiver_ty.clone(),
+                ..Ty::default()
+            });
+        }
+
+        let return_ty = self.resolve_protocol_dispatch_return_type(
+            protocol_name,
+            receiver_type_name,
+            &method.return_ty,
+        );
+
+        Some(TyKind::Fn(param_tys, Box::new(return_ty)))
+    }
+
+    fn resolve_builtin_protocol_dispatch_callee_type(
+        &self,
+        protocol_name: &str,
+        method_name: &str,
+        receiver_ty: &TyKind,
+        receiver_type_name: &str,
+    ) -> Option<TyKind> {
+        let method_ty = builtin_methods::lookup(receiver_type_name, method_name)?;
+        let TyKind::Fn(method_params, method_ret) =
+            builtin_methods::substitute_receiver_type_vars(receiver_ty, &method_ty)
+        else {
+            return None;
+        };
+
+        let mut param_tys = Vec::with_capacity(method_params.len() + 1);
+        param_tys.push(Ty {
+            kind: receiver_ty.clone(),
+            ..Ty::default()
+        });
+        param_tys.extend(method_params);
+
+        let ret = if protocol_name == "Functor"
+            && method_name == "map"
+            && !matches!(receiver_ty, TyKind::Slice(_))
+        {
+            Ty {
+                kind: receiver_ty.clone(),
+                ..Ty::default()
+            }
+        } else {
+            *method_ret
+        };
+
+        Some(TyKind::Fn(param_tys, Box::new(ret)))
+    }
+
+    fn resolve_protocol_dispatch_return_type(
+        &self,
+        protocol_name: &str,
+        receiver_type_name: &str,
+        return_ty: &Ty,
+    ) -> Ty {
+        let TyKind::Path(path) = &return_ty.kind else {
+            return return_ty.clone();
+        };
+        if path.segments.len() != 1 {
+            return return_ty.clone();
+        }
+
+        let assoc_type_name = path.first_ident().as_str();
+        let Some(binding) = self.type_table.resolve_associated_type(
+            protocol_name,
+            receiver_type_name,
+            assoc_type_name,
+        ) else {
+            return return_ty.clone();
+        };
+
+        Ty {
+            kind: builtin_types::lookup(&binding).unwrap_or_else(|| {
+                TyKind::Path(hir::Path::new(
+                    vec![hir::PathSegment::from_str(
+                        &binding,
+                        tlang_span::Span::default(),
+                    )],
+                    tlang_span::Span::default(),
+                ))
+            }),
+            ..Ty::default()
+        }
+    }
+
+    fn receiver_dispatch_type_name(receiver_ty: &TyKind) -> Option<String> {
+        match receiver_ty {
+            TyKind::Slice(_) => Some("List".to_string()),
+            TyKind::Primitive(PrimTy::String) => Some("String".to_string()),
+            TyKind::Path(path) => Some(path.join("::")),
+            _ => None,
         }
     }
 
@@ -1807,7 +1960,16 @@ impl TypeChecker {
         // Visit callee first so its type is available for bidirectional
         // inference into closure arguments.
         self.visit_expr(&mut call.callee, &mut ());
-        let callee_fn_ty = self.resolve_callee_type(&call.callee);
+        let receiver_visited = matches!(&call.callee.kind, hir::ExprKind::Path(path) if path.segments.len() >= 2)
+            && call
+                .arguments
+                .first()
+                .is_some_and(|arg| !matches!(arg.kind, hir::ExprKind::FunctionExpression(_)))
+            && {
+                self.visit_expr(&mut call.arguments[0], &mut ());
+                true
+            };
+        let callee_fn_ty = self.resolve_call_callee_type(call);
 
         // When the callee is a generic function, we need to infer type
         // variable bindings from non-closure arguments first, then
@@ -1828,7 +1990,9 @@ impl TypeChecker {
                 // Pass 1: visit non-closure args and collect bindings.
                 for (i, arg) in call.arguments.iter_mut().enumerate() {
                     if !matches!(arg.kind, hir::ExprKind::FunctionExpression(_)) {
-                        self.visit_expr(arg, &mut ());
+                        if !receiver_visited || i != 0 {
+                            self.visit_expr(arg, &mut ());
+                        }
                         if let Some(param_ty) = param_tys.get(i) {
                             collect_type_var_bindings(&arg.ty.kind, &param_ty.kind, &mut bindings);
                         }
@@ -1851,6 +2015,9 @@ impl TypeChecker {
             // Simple path: visit all arguments in order with optional
             // bidirectional inference for closures.
             for (i, arg) in call.arguments.iter_mut().enumerate() {
+                if receiver_visited && i == 0 {
+                    continue;
+                }
                 if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind
                     && let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty
                     && let Some(expected_arg_ty) = param_tys.get(i)
