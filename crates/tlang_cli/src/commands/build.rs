@@ -131,8 +131,9 @@ fn generate_module_code(
     protocol_names: &[String],
 ) -> Option<String> {
     let mut hir_module = compiled.hir.clone();
-    let mut optimizer =
-        CompileTargetHirOptimizer::JavaScript(tlang_codegen_js::js_hir_opt::JsHirOptimizer::default());
+    let mut optimizer = CompileTargetHirOptimizer::JavaScript(
+        tlang_codegen_js::js_hir_opt::JsHirOptimizer::default(),
+    );
     let mut ctx = compiled.lower_meta.clone().into();
     if let Err(err) = run_hir_passes(&mut optimizer, &mut hir_module, &mut ctx) {
         eprint!("{}", render_ice(&err));

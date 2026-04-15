@@ -133,10 +133,7 @@ fn annotate_self_param(decl: &mut FunctionDeclaration) {
 #[derive(Debug, Clone, PartialEq)]
 enum PatternType {
     /// A named type (enum name or builtin type name).
-    Named {
-        name: String,
-        open_world_safe: bool,
-    },
+    Named { name: String, open_world_safe: bool },
 }
 
 /// Returns the `PatternType` contributed by a single pattern, or `None` if the
@@ -166,14 +163,12 @@ fn pattern_type(pat: &PatKind) -> Option<Result<PatternType, ()>> {
                 }
             }
         }
-        PatKind::Literal(lit) => {
-            builtin_type_for_literal(lit).map(|name| {
-                Ok(PatternType::Named {
-                    name: name.to_string(),
-                    open_world_safe: true,
-                })
+        PatKind::Literal(lit) => builtin_type_for_literal(lit).map(|name| {
+            Ok(PatternType::Named {
+                name: name.to_string(),
+                open_world_safe: true,
             })
-        }
+        }),
         PatKind::List(_) => Some(Ok(PatternType::Named {
             name: builtin_types::LIST.to_string(),
             open_world_safe: true,
@@ -248,7 +243,9 @@ fn infer_param_type(
                     has_open_world_unsafe_constraint |= !open_world_safe;
                     type_names.push(name);
                 }
-                Some(Ok(PatternType::Named { open_world_safe, .. })) => {
+                Some(Ok(PatternType::Named {
+                    open_world_safe, ..
+                })) => {
                     has_open_world_unsafe_constraint |= !open_world_safe;
                 }
             }

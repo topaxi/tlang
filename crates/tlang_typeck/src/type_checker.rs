@@ -1171,7 +1171,9 @@ impl TypeChecker {
         match (&mut pat.kind, &scrutinee.kind) {
             (hir::PatKind::List(pats), hir::ExprKind::List(items))
                 if pats.len() == items.len()
-                    && !pats.iter().any(|pat| matches!(pat.kind, hir::PatKind::Rest(_))) =>
+                    && !pats
+                        .iter()
+                        .any(|pat| matches!(pat.kind, hir::PatKind::Rest(_))) =>
             {
                 pat.ty.kind = scrutinee.ty.kind.clone();
                 for (item_pat, item_expr) in pats.iter_mut().zip(items.iter()) {
@@ -2003,8 +2005,10 @@ impl TypeChecker {
 
         match &mut expr.kind {
             hir::ExprKind::Literal(lit) => {
-                if matches!(lit.as_ref(), Literal::Integer(_) | Literal::UnsignedInteger(_))
-                    && let TyKind::Primitive(prim) = expected
+                if matches!(
+                    lit.as_ref(),
+                    Literal::Integer(_) | Literal::UnsignedInteger(_)
+                ) && let TyKind::Primitive(prim) = expected
                     && prim.is_numeric()
                 {
                     expr.ty.kind = expected.clone();
