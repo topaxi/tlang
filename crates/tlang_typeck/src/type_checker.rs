@@ -1815,8 +1815,8 @@ impl TypeChecker {
             prefixes.push(format!("{type_name}.{field_name}/"));
         }
         if let TyKind::Path(path) = base_ty_kind {
-            prefixes.push(format!("{}.{}{}", path.join("::"), field_name, "/"));
-            prefixes.push(format!("{}.{}{}", path.last_ident(), field_name, "/"));
+            prefixes.push(format!("{}.{}/", path.join("::"), field_name));
+            prefixes.push(format!("{}.{}/", path.last_ident(), field_name));
         }
 
         prefixes.into_iter().any(|prefix| {
