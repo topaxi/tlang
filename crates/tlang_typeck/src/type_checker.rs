@@ -144,14 +144,12 @@ impl TypeChecker {
 
     /// Resolve the result type of `base[index]`.
     ///
-    /// Slices produce their element type, dicts produce their value type, and
-    /// strings produce `String` for character access. Other receivers remain
-    /// unknown until the language defines additional indexing semantics.
+    /// Only slice indexing currently has aligned type-checker and runtime
+    /// semantics, so other receivers remain unknown until additional indexing
+    /// behavior is defined and implemented.
     fn index_access_result_type(&self, base_ty: &TyKind) -> TyKind {
         match base_ty {
             TyKind::Slice(inner) => inner.kind.clone(),
-            TyKind::Dict(_, value) => value.kind.clone(),
-            TyKind::Primitive(PrimTy::String) => TyKind::Primitive(PrimTy::String),
             _ => TyKind::Unknown,
         }
     }
