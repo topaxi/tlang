@@ -5,12 +5,12 @@ use std::process;
 
 use tlang_ast_lowering::lower_to_hir;
 use tlang_diagnostics::{
-    Diagnostic, render_diagnostics, render_ice, render_parse_issues, render_semantic_diagnostics,
+    render_diagnostics, render_ice, render_parse_issues, render_semantic_diagnostics,
 };
 use tlang_hir_opt::{HirOptimizer, HirPass};
 use tlang_semantics::SemanticAnalyzer;
 use tlang_semantics::diagnostic::Diagnostic as SemanticDiagnostic;
-use tlang_typeck::TypeChecker;
+use tlang_typeck::typecheck_module;
 use tlang_vm::VM;
 
 fn main() {
@@ -101,26 +101,34 @@ fn main() {
         process::exit(1);
     }
 
-    let mut type_checker = TypeChecker::new();
-    if let Err(err) = type_checker.optimize_hir(&mut module, &mut ctx) {
-        eprint!("{}", render_ice(&err));
-        process::exit(1);
-    }
+    let diagnostics = match typecheck_module(&mut module, &mut ctx) {
+        Ok(diagnostics) => diagnostics,
+        Err(err) => {
+            eprint!("{}", render_ice(&err));
+            process::exit(1);
+        }
+    };
 
-    let (errors, warnings): (Vec<Diagnostic>, Vec<Diagnostic>) = ctx
-        .diagnostics
-        .into_iter()
-        .partition(|diagnostic| diagnostic.is_error());
-    if !warnings.is_empty() {
+    if !diagnostics.warnings.is_empty() {
         eprint!(
             "{}",
-            render_diagnostics(filename, &code, &warnings, std::io::stderr().is_terminal())
+            render_diagnostics(
+                filename,
+                &code,
+                &diagnostics.warnings,
+                std::io::stderr().is_terminal()
+            )
         );
     }
-    if !errors.is_empty() {
+    if diagnostics.has_errors() {
         eprint!(
             "{}",
-            render_diagnostics(filename, &code, &errors, std::io::stderr().is_terminal())
+            render_diagnostics(
+                filename,
+                &code,
+                &diagnostics.errors,
+                std::io::stderr().is_terminal()
+            )
         );
         process::exit(1);
     }

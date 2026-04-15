@@ -18,7 +18,8 @@ use tlang_codegen_js::{
 use tlang_diagnostics::{Diagnostic, diagnostics_from_parse_error, render_diagnostics, render_ice};
 use tlang_hir_opt::{HirOptError, HirOptimizer, HirPass};
 use tlang_semantics::SemanticAnalyzer;
-use tlang_typeck::TypeChecker;
+
+use crate::commands::{optimize_and_typecheck, print_source_diagnostics};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CompileTargetArg {
@@ -70,28 +71,6 @@ fn get_compiled_standard_library() -> &'static str {
     STDLIB.get_or_init(CodegenJS::compile_stdlib_module)
 }
 
-fn render_warnings(source_name: &str, source: &str, warnings: &[Diagnostic]) {
-    if warnings.is_empty() {
-        return;
-    }
-
-    eprint!(
-        "{}",
-        render_diagnostics(
-            source_name,
-            source,
-            warnings,
-            std::io::IsTerminal::is_terminal(&std::io::stderr())
-        )
-    );
-}
-
-fn split_diagnostics(diagnostics: Vec<Diagnostic>) -> (Vec<Diagnostic>, Vec<Diagnostic>) {
-    diagnostics
-        .into_iter()
-        .partition(|diagnostic| diagnostic.is_error())
-}
-
 fn compile_to_hir(
     source_name: &str,
     source: &str,
@@ -115,7 +94,7 @@ fn compile_to_hir(
             .filter(|diagnostic| diagnostic.is_warning())
             .collect::<Vec<_>>();
 
-        render_warnings(source_name, source, &warnings);
+        print_source_diagnostics(source_name, source, &warnings);
     }
 
     let (mut module, meta) = lower_to_hir(
@@ -138,25 +117,20 @@ fn compile_to_hir(
         CompileTargetHirOptimizer::Interpreter(HirOptimizer::default())
     };
 
-    if let Err(err) = optimizer.optimize_hir(&mut module, &mut ctx) {
-        eprint!("{}", render_ice(&err));
-        std::process::exit(1);
-    }
-
-    let mut type_checker = TypeChecker::new();
-    if let Err(err) = type_checker.optimize_hir(&mut module, &mut ctx) {
-        eprint!("{}", render_ice(&err));
-        std::process::exit(1);
-    }
-
-    let (errors, warnings) = split_diagnostics(ctx.diagnostics);
+    let diagnostics = match optimize_and_typecheck(&mut optimizer, &mut module, &mut ctx) {
+        Ok(diagnostics) => diagnostics,
+        Err(err) => {
+            eprint!("{}", render_ice(&err));
+            std::process::exit(1);
+        }
+    };
 
     if show_warnings {
-        render_warnings(source_name, source, &warnings);
+        print_source_diagnostics(source_name, source, &diagnostics.warnings);
     }
 
-    if !errors.is_empty() {
-        return Err(errors);
+    if diagnostics.has_errors() {
+        return Err(diagnostics.errors);
     }
 
     Ok(module)
