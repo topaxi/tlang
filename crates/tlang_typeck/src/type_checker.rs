@@ -47,6 +47,8 @@ pub struct TypeChecker {
 }
 
 impl TypeChecker {
+    const MIN_PROTOCOL_PATH_SEGMENTS: usize = 2;
+
     pub fn new() -> Self {
         Self::default()
     }
@@ -796,7 +798,7 @@ impl TypeChecker {
         let hir::ExprKind::Path(path) = &call.callee.kind else {
             return None;
         };
-        if path.segments.len() < 2 || call.arguments.is_empty() {
+        if !Self::is_protocol_path(path) || call.arguments.is_empty() {
             return None;
         }
 
@@ -880,10 +882,11 @@ impl TypeChecker {
         });
         param_tys.extend(method_params);
 
-        let ret = if protocol_name == "Functor"
-            && method_name == "map"
-            && !matches!(receiver_ty, TyKind::Slice(_))
-        {
+        // For protocol-path dispatch on builtin Option/Result receivers we
+        // can't express `Wrapped<U>` precisely yet, but we can preserve the
+        // outer receiver shape so `Functor::map` doesn't collapse back to the
+        // list-only free-function signature.
+        let ret = if Self::preserves_receiver_shape(protocol_name, method_name, receiver_ty) {
             Ty {
                 kind: receiver_ty.clone(),
                 ..Ty::default()
@@ -938,6 +941,37 @@ impl TypeChecker {
             TyKind::Path(path) => Some(path.join("::")),
             _ => None,
         }
+    }
+
+    fn is_protocol_path(path: &hir::Path) -> bool {
+        path.segments.len() >= Self::MIN_PROTOCOL_PATH_SEGMENTS
+    }
+
+    fn preserves_receiver_shape(
+        protocol_name: &str,
+        method_name: &str,
+        receiver_ty: &TyKind,
+    ) -> bool {
+        protocol_name == "Functor"
+            && method_name == "map"
+            && !matches!(receiver_ty, TyKind::Slice(_))
+    }
+
+    fn visit_dispatch_receiver_arg(&mut self, call: &mut hir::CallExpression) -> bool {
+        let Some(receiver) = call.arguments.first_mut() else {
+            return false;
+        };
+        let hir::ExprKind::Path(path) = &call.callee.kind else {
+            return false;
+        };
+        if !Self::is_protocol_path(path)
+            || matches!(receiver.kind, hir::ExprKind::FunctionExpression(_))
+        {
+            return false;
+        }
+
+        self.visit_expr(receiver, &mut ());
+        true
     }
 
     // ── Return statement checking ────────────────────────────────────
@@ -1960,15 +1994,7 @@ impl TypeChecker {
         // Visit callee first so its type is available for bidirectional
         // inference into closure arguments.
         self.visit_expr(&mut call.callee, &mut ());
-        let receiver_visited = matches!(&call.callee.kind, hir::ExprKind::Path(path) if path.segments.len() >= 2)
-            && call
-                .arguments
-                .first()
-                .is_some_and(|arg| !matches!(arg.kind, hir::ExprKind::FunctionExpression(_)))
-            && {
-                self.visit_expr(&mut call.arguments[0], &mut ());
-                true
-            };
+        let receiver_visited = self.visit_dispatch_receiver_arg(call);
         let callee_fn_ty = self.resolve_call_callee_type(call);
 
         // When the callee is a generic function, we need to infer type
@@ -1989,10 +2015,11 @@ impl TypeChecker {
             if let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty {
                 // Pass 1: visit non-closure args and collect bindings.
                 for (i, arg) in call.arguments.iter_mut().enumerate() {
+                    if receiver_visited && i == 0 {
+                        continue;
+                    }
                     if !matches!(arg.kind, hir::ExprKind::FunctionExpression(_)) {
-                        if !receiver_visited || i != 0 {
-                            self.visit_expr(arg, &mut ());
-                        }
+                        self.visit_expr(arg, &mut ());
                         if let Some(param_ty) = param_tys.get(i) {
                             collect_type_var_bindings(&arg.ty.kind, &param_ty.kind, &mut bindings);
                         }
