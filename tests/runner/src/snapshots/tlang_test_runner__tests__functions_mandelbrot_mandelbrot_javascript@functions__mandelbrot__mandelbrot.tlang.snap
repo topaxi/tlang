@@ -4,20 +4,50 @@ description: "Backend: javascript"
 expression: "apply_redactions(&output, workspace_root)"
 input_file: tests/functions/mandelbrot/mandelbrot.tlang
 ---
-[stdin]:107
-    return method.call(impl, self, ...args);
-                  ^
-
-TypeError: Cannot read properties of null (reading 'call')
-    at #call ([stdin]:107:19)
-    at $Protocol.into ([stdin]:67:41)
-    at [stdin]:754:28
-    at [stdin]:284:28
-    at Array.map (<anonymous>)
-    at Object.map ([stdin]:284:17)
-    at #call ([stdin]:107:19)
-    at [stdin]:67:41
-    at render_row ([stdin]:753:12)
-    at render_row_sum ([stdin]:760:18)
-
-Node.js v24.0.2
+[
+  [
+     1, 1, 1, 1, 1, 2, 3,
+     3, 3, 3, 3, 4, 4, 6,
+    11, 4, 3, 3, 2
+  ],
+  [
+    1, 1, 1, 1, 2, 3, 3,
+    3, 3, 4, 4, 5, 6, 0,
+    0, 6, 5, 3, 3
+  ],
+  [
+    1, 1,  1, 1,  3,  3, 3,
+    3, 4,  5, 6, 14, 26, 0,
+    0, 0, 15, 5,  3
+  ],
+  [
+     1, 1, 1, 1, 3, 3, 4,
+    10, 7, 7, 8, 0, 0, 0,
+     0, 0, 0, 7, 3
+  ],
+  [
+     1, 1, 1,  3, 4, 5, 5,
+    12, 0, 0, 16, 0, 0, 0,
+     0, 0, 0,  6, 4
+  ],
+  [
+    1, 1,  1, 0, 0, 0, 0,
+    0, 0,  0, 0, 0, 0, 0,
+    0, 0, 12, 5, 4
+  ],
+  [
+     1, 1, 1,  3, 4, 5, 5,
+    12, 0, 0, 16, 0, 0, 0,
+     0, 0, 0,  6, 4
+  ],
+  [
+     1, 1, 1, 1, 3, 3, 4,
+    10, 7, 7, 8, 0, 0, 0,
+     0, 0, 0, 7, 3
+  ],
+  [
+    1, 1,  1, 1,  3,  3, 3,
+    3, 4,  5, 6, 14, 26, 0,
+    0, 0, 15, 5,  3
+  ]
+]

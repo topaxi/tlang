@@ -1767,9 +1767,18 @@ impl TypeChecker {
     }
 
     fn resolve_dot_method_type(&self, base_ty_kind: &TyKind, field_name: &str) -> Option<TyKind> {
-        let type_name = builtin_methods::type_name_from_kind(base_ty_kind)?;
-        let method_name = format!("{type_name}.{field_name}");
-        let method_hir_id = *self.dot_methods.get(&method_name)?;
+        let mut method_names = Vec::new();
+        if let Some(type_name) = builtin_methods::type_name_from_kind(base_ty_kind) {
+            method_names.push(format!("{type_name}.{field_name}"));
+        }
+        if let TyKind::Path(path) = base_ty_kind {
+            method_names.push(format!("{}.{}", path.join("::"), field_name));
+            method_names.push(format!("{}.{}", path.last_ident(), field_name));
+        }
+
+        let method_hir_id = method_names
+            .into_iter()
+            .find_map(|method_name| self.dot_methods.get(&method_name).copied())?;
         let method_info = self.type_table.get(&method_hir_id)?;
 
         let TyKind::Fn(param_tys, ret_ty) = &method_info.ty.kind else {
@@ -1798,6 +1807,23 @@ impl TypeChecker {
                 ..Ty::default()
             }),
         ))
+    }
+
+    fn has_dot_method_variant(&self, base_ty_kind: &TyKind, field_name: &str) -> bool {
+        let mut prefixes = Vec::new();
+        if let Some(type_name) = builtin_methods::type_name_from_kind(base_ty_kind) {
+            prefixes.push(format!("{type_name}.{field_name}/"));
+        }
+        if let TyKind::Path(path) = base_ty_kind {
+            prefixes.push(format!("{}.{}{}", path.join("::"), field_name, "/"));
+            prefixes.push(format!("{}.{}{}", path.last_ident(), field_name, "/"));
+        }
+
+        prefixes.into_iter().any(|prefix| {
+            self.dot_methods
+                .keys()
+                .any(|name| name.starts_with(&prefix))
+        })
     }
 
     /// Resolve the HirId of a struct/enum type from a TyKind::Path.
@@ -1845,6 +1871,12 @@ impl TypeChecker {
                     },
                 );
                 return method_ty;
+            }
+
+            if self.has_dot_method_variant(base_ty_kind, field_name) {
+                self.type_table
+                    .insert(expr_hir_id, TypeInfo { ty: Ty::unknown() });
+                return TyKind::Unknown;
             }
 
             // Base is a known struct but the field does not exist.

@@ -42,11 +42,7 @@ fn same_ast_ty_shape(lhs: &ast::node::Ty, rhs: &ast::node::Ty) -> bool {
                 && lhs_params
                     .iter()
                     .zip(rhs_params.iter())
-                    .all(|(lhs_param, rhs_param)| {
-                        lhs_param.name.map(|ident| ident.as_str().to_string())
-                            == rhs_param.name.map(|ident| ident.as_str().to_string())
-                            && same_ast_ty_shape(&lhs_param.ty, &rhs_param.ty)
-                    })
+                    .all(|(lhs_param, rhs_param)| same_ast_ty_shape(&lhs_param.ty, &rhs_param.ty))
                 && same_ast_ty_shape(lhs_ret, rhs_ret)
         }
         _ => false,

@@ -310,6 +310,13 @@ impl<'a> InnerCodegen<'a> {
     /// `Into` implementations will be called.
     fn generate_cast_expr(&mut self, inner: &hir::Expr, target_ty: &hir::Ty) -> Expression<'a> {
         let value = self.generate_expr(inner);
+        if let (hir::TyKind::Primitive(source), hir::TyKind::Primitive(target)) =
+            (&inner.ty.kind, &target_ty.kind)
+            && source.is_numeric()
+            && target.is_numeric()
+        {
+            return value;
+        }
         let into_fn = self.static_member_expr(
             self.ident_expr(&crate::generator::CodegenJS::protocol_js_name("Into")),
             "into",

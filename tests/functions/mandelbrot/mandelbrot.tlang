@@ -1,3 +1,9 @@
+fn foldl([], acc, _) { acc }
+fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+
+fn apply_map(f, acc, x) { [...acc, f(x)] }
+fn map(xs, f) { foldl(xs, [], apply_map(f, _, _)) }
+
 fn range(start: i64, end: i64) -> List<i64> {
     if start >= end {
         []
@@ -5,10 +11,6 @@ fn range(start: i64, end: i64) -> List<i64> {
         [start, ...range(start + 1, end)]
     }
 }
-
-fn foldl([]: List<i64>, acc: i64, _: fn(i64, i64) -> i64) -> i64 { acc }
-fn foldl([x, ...xs]: List<i64>, acc: i64, f: fn(i64, i64) -> i64) -> i64 { rec foldl(xs, f(acc, x), f) }
-fn add(acc: i64, x: i64) -> i64 { acc + x }
 
 fn mandelbrot(c_real: f64, c_imag: f64, max_iter: i64) -> i64 { mandelbrot_iter(c_real, c_imag, max_iter, 0.0, 0.0, 0) }
 fn mandelbrot_iter(_: f64, _: f64, 0, _: f64, _: f64, _: i64) -> i64 { 0 }
@@ -32,11 +34,6 @@ let width = 20;
 let height = 10;
 let max_iter = 50;
 
-fn render_row_sum(y: i64) -> i64 {
-    render_row(y, width, height, max_iter)
-    |> foldl(0, add)
-}
-
 range(0, height - 1)
-|> map(fn (y: i64) -> i64 { render_row_sum(y) })
+|> map(fn (y: i64) -> List<i64> { render_row(y, width, height, max_iter) })
 |> log();

@@ -4,12 +4,8 @@
 
 enum SafeHtml { Html(String) }
 
-fn render(v) {
-    match v {
-        SafeHtml::Html(value) => value,
-        _ => Display::to_string(v),
-    }
-}
+fn render(SafeHtml::Html(value)) { value }
+fn render(v) { Display::to_string(v) }
 
 log("=== Multi-dispatch enum fallthrough ===");
 
