@@ -938,6 +938,41 @@ fn struct_method_call_ok() {
     );
 }
 
+#[test]
+fn index_access_type_flows_in_strict_context() {
+    common::typecheck_ok(
+        r#"
+        fn head_plus_one(xs: List<i64>) -> i64 {
+            xs[0] + 1
+        }
+        "#,
+    );
+}
+
+#[test]
+fn dot_method_reference_matches_expected_fn_type() {
+    common::typecheck_ok(
+        r#"
+        struct Point { x: i64 }
+        fn Point.get_x(self) -> i64 { self.x }
+        fn apply_getter(getter: fn(Point) -> i64, point: Point) -> i64 { getter(point) }
+        let point = Point { x: 3 };
+        let value: i64 = apply_getter(Point::get_x, point);
+        "#,
+    );
+}
+
+#[test]
+fn dot_method_call_return_type_flows_in_strict_context() {
+    common::typecheck_ok(
+        r#"
+        struct Point { x: i64 }
+        fn Point.get_x(self) -> i64 { self.x }
+        fn increment(point: Point) -> i64 { point.get_x() + 1 }
+        "#,
+    );
+}
+
 // ── Struct binding type propagation ─────────────────────────────────────
 
 #[test]
