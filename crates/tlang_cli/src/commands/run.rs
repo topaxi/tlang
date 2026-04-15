@@ -11,8 +11,9 @@ use tlang_modules::{
     CompiledModule, ModulePath, MultiModuleCompileResult, compile_project_with_slots,
 };
 use tlang_semantics::SemanticAnalyzer;
+use tlang_typeck::typecheck_module;
 
-use crate::commands::{optimize_and_typecheck, print_source_diagnostics};
+use crate::commands::{print_source_diagnostics, run_hir_passes};
 
 pub fn handle_run(input_file: &str) {
     let path = Path::new(input_file);
@@ -217,7 +218,11 @@ fn compile(input_file: &str) -> (hir::Module, std::collections::HashSet<tlang_hi
     let constant_pool_ids = meta.constant_pool_ids.clone();
     let mut ctx = meta.into();
     let mut optimizer = HirOptimizer::default();
-    let diagnostics = match optimize_and_typecheck(&mut optimizer, &mut module, &mut ctx) {
+    if let Err(err) = run_hir_passes(&mut optimizer, &mut module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        std::process::exit(1);
+    }
+    let diagnostics = match typecheck_module(&mut module, &mut ctx) {
         Ok(diagnostics) => diagnostics,
         Err(err) => {
             eprint!("{}", render_ice(&err));
@@ -242,7 +247,11 @@ fn prepare_module_for_execution(
     let mut hir_module = compiled.hir.clone();
     let mut optimizer = HirOptimizer::default();
     let mut ctx = compiled.lower_meta.clone().into();
-    let diagnostics = match optimize_and_typecheck(&mut optimizer, &mut hir_module, &mut ctx) {
+    if let Err(err) = run_hir_passes(&mut optimizer, &mut hir_module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        std::process::exit(1);
+    }
+    let diagnostics = match typecheck_module(&mut hir_module, &mut ctx) {
         Ok(diagnostics) => diagnostics,
         Err(err) => {
             eprint!("{}", render_ice(&err));

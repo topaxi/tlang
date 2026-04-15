@@ -10,8 +10,8 @@ use std::sync::{Arc, RwLock};
 use tlang_defs::DefScope;
 use tlang_hir as hir;
 use tlang_span::{HirId, NodeId};
-use tlang_typeck::TypeChecker;
 use tlang_typeck::TypeTable;
+use tlang_typeck::typecheck_module;
 
 use crate::AnalysisResult;
 
@@ -68,14 +68,15 @@ pub fn lower_and_typecheck(result: &AnalysisResult) -> Option<TypedHir> {
     );
     optimizer.optimize_hir(&mut module, &mut ctx).ok()?;
 
-    // Run the type checker.
-    let mut tc = TypeChecker::new();
-    use tlang_hir_opt::HirPass;
-    tc.optimize_hir(&mut module, &mut ctx).ok()?;
+    // Run the type checker. Type-aware HIR passes should run after this phase.
+    let typecheck_result = typecheck_module(&mut module, &mut ctx).ok()?;
+    if typecheck_result.has_errors() {
+        return None;
+    }
 
     Some(TypedHir {
         module,
-        type_table: tc.type_table,
+        type_table: typecheck_result.type_table,
         pipeline_call_ids,
     })
 }

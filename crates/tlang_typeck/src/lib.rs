@@ -23,12 +23,13 @@ use tlang_hir_opt::HirPass;
 use tlang_hir_opt::hir_opt::{HirOptContext, HirOptError};
 
 #[derive(Debug, Default)]
-pub struct TypecheckDiagnostics {
+pub struct TypecheckResult {
+    pub type_table: TypeTable,
     pub errors: Vec<Diagnostic>,
     pub warnings: Vec<Diagnostic>,
 }
 
-impl TypecheckDiagnostics {
+impl TypecheckResult {
     pub fn has_errors(&self) -> bool {
         !self.errors.is_empty()
     }
@@ -37,7 +38,7 @@ impl TypecheckDiagnostics {
 pub fn typecheck_module(
     module: &mut hir::Module,
     ctx: &mut HirOptContext,
-) -> Result<TypecheckDiagnostics, HirOptError> {
+) -> Result<TypecheckResult, HirOptError> {
     let mut type_checker = TypeChecker::new();
     type_checker.optimize_hir(module, ctx)?;
 
@@ -45,5 +46,9 @@ pub fn typecheck_module(
         .into_iter()
         .partition(|diagnostic| diagnostic.is_error());
 
-    Ok(TypecheckDiagnostics { errors, warnings })
+    Ok(TypecheckResult {
+        type_table: type_checker.type_table,
+        errors,
+        warnings,
+    })
 }

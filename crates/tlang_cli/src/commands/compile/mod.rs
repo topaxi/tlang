@@ -18,8 +18,9 @@ use tlang_codegen_js::{
 use tlang_diagnostics::{Diagnostic, diagnostics_from_parse_error, render_diagnostics, render_ice};
 use tlang_hir_opt::{HirOptError, HirOptimizer, HirPass};
 use tlang_semantics::SemanticAnalyzer;
+use tlang_typeck::typecheck_module;
 
-use crate::commands::{optimize_and_typecheck, print_source_diagnostics};
+use crate::commands::{print_source_diagnostics, run_hir_passes};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CompileTargetArg {
@@ -117,7 +118,12 @@ fn compile_to_hir(
         CompileTargetHirOptimizer::Interpreter(HirOptimizer::default())
     };
 
-    let diagnostics = match optimize_and_typecheck(&mut optimizer, &mut module, &mut ctx) {
+    if let Err(err) = run_hir_passes(&mut optimizer, &mut module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        std::process::exit(1);
+    }
+
+    let diagnostics = match typecheck_module(&mut module, &mut ctx) {
         Ok(diagnostics) => diagnostics,
         Err(err) => {
             eprint!("{}", render_ice(&err));

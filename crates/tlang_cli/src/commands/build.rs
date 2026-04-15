@@ -4,9 +4,10 @@ use tlang_codegen_js::CodegenError;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_diagnostics::render_ice;
 use tlang_modules::{CompiledModule, ModulePath, MultiModuleCompileResult, compile_project};
+use tlang_typeck::typecheck_module;
 
 use crate::commands::compile::CompileTargetHirOptimizer;
-use crate::commands::{optimize_and_typecheck, print_source_diagnostics};
+use crate::commands::{print_source_diagnostics, run_hir_passes};
 
 #[derive(Debug)]
 pub struct BuildOptions {
@@ -134,7 +135,12 @@ fn generate_module_code(
         tlang_codegen_js::js_hir_opt::JsHirOptimizer::default(),
     );
     let mut ctx = compiled.lower_meta.clone().into();
-    let diagnostics = match optimize_and_typecheck(&mut optimizer, &mut hir_module, &mut ctx) {
+    if let Err(err) = run_hir_passes(&mut optimizer, &mut hir_module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        return None;
+    }
+
+    let diagnostics = match typecheck_module(&mut hir_module, &mut ctx) {
         Ok(diagnostics) => diagnostics,
         Err(err) => {
             eprint!("{}", render_ice(&err));
