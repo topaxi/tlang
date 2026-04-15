@@ -1799,6 +1799,7 @@ impl TypeChecker {
                 }
                 hir::StmtKind::ImplBlock(impl_block) => {
                     let is_blanket = !impl_block.type_params.is_empty();
+                    let target_type_name = impl_block.target_type.join("::");
                     let where_predicates: Vec<(String, Vec<String>)> = impl_block
                         .where_clause
                         .as_ref()
@@ -1821,11 +1822,11 @@ impl TypeChecker {
                         .collect();
                     self.type_table.insert_impl_info(ImplInfo {
                         protocol_name: impl_block.protocol_name.join("::"),
-                        target_type_name: impl_block.target_type.join("::"),
+                        target_type_name: target_type_name.clone(),
                         target_type_is_param: impl_block
                             .type_params
                             .iter()
-                            .any(|param| param.name.as_str() == impl_block.target_type.join("::")),
+                            .any(|param| param.name.as_str() == target_type_name),
                         protocol_type_args: impl_block
                             .type_arguments
                             .iter()
@@ -3167,5 +3168,35 @@ mod tests {
                 .protocol_dispatch_parts(functor_missing.path().unwrap())
                 .is_none()
         );
+    }
+
+    #[test]
+    fn visit_dispatch_receiver_arg_requires_known_protocol_dispatch_site() {
+        let mut checker = TypeChecker::new();
+        checker.type_table.insert_protocol_info(ProtocolInfo {
+            name: Ident::new("Functor", tlang_span::Span::default()),
+            methods: vec![ProtocolMethodInfo {
+                name: Ident::new("map", tlang_span::Span::default()),
+                param_tys: Vec::new(),
+                return_ty: Ty::unknown(),
+                has_default_body: false,
+            }],
+            constraints: Vec::new(),
+            associated_types: Vec::new(),
+        });
+
+        let mut protocol_call = hir::CallExpression {
+            hir_id: dummy_hir_id(),
+            callee: make_path_expr(&["Functor", "map"]),
+            arguments: vec![make_path_expr(&["value"])],
+        };
+        let mut non_protocol_call = hir::CallExpression {
+            hir_id: dummy_hir_id(),
+            callee: make_path_expr(&["Option", "map"]),
+            arguments: vec![make_path_expr(&["value"])],
+        };
+
+        assert!(checker.visit_dispatch_receiver_arg(&mut protocol_call));
+        assert!(!checker.visit_dispatch_receiver_arg(&mut non_protocol_call));
     }
 }
