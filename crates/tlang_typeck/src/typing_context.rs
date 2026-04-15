@@ -10,14 +10,21 @@ fn has_concrete_type(ty: &hir::Ty) -> bool {
             hir::TyKind::Slice(inner) => contains_var(&inner.kind),
             hir::TyKind::Dict(key, value) => contains_var(&key.kind) || contains_var(&value.kind),
             hir::TyKind::Union(types) => types.iter().any(|ty| contains_var(&ty.kind)),
-            hir::TyKind::Unknown
-            | hir::TyKind::Primitive(_)
-            | hir::TyKind::Never
-            | hir::TyKind::Path(_) => false,
+            hir::TyKind::Unknown | hir::TyKind::Primitive(_) | hir::TyKind::Never => false,
+            hir::TyKind::Path(path) => {
+                let name = path.first_ident().as_str();
+                matches!(name, "List" | "Dict" | "Option" | "Result")
+            }
         }
     }
 
-    !matches!(ty.kind, hir::TyKind::Unknown) && !contains_var(&ty.kind)
+    !matches!(ty.kind, hir::TyKind::Unknown)
+        && !contains_var(&ty.kind)
+        && !matches!(
+            &ty.kind,
+            hir::TyKind::Path(path)
+                if matches!(path.first_ident().as_str(), "List" | "Dict" | "Option" | "Result")
+        )
 }
 
 /// Whether `unknown` operands produce errors or propagate silently.

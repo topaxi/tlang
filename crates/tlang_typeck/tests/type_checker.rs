@@ -2469,6 +2469,48 @@ fn builtin_functor_map_accepts_result_receiver() {
 }
 
 #[test]
+fn user_protocol_dispatch_infers_receiver_type_for_closure() {
+    common::typecheck_ok(
+        r#"
+        protocol MyFunctor<T> {
+          type Wrapped<U>
+          fn map<U>(self, f: fn(T) -> U) -> Wrapped<U>
+        }
+
+        impl<T> MyFunctor<T> for Option<T> {
+          type Wrapped<U> = Option<U>
+          fn map<U>(Option::Some(x), f) { Option::Some(f(x)) }
+          fn map<U>(Option::None, _) { Option::None }
+        }
+
+        let mapped = MyFunctor::map(Option::Some(5), fn (x) { x * 2 });
+        "#,
+    );
+}
+
+#[test]
+fn spread_string_is_compatible_with_list_string_param() {
+    common::typecheck_ok(
+        r#"
+        fn reverse_chars([]: List<String>) -> String { "" }
+        fn reverse_chars([x, ...xs]: List<String>) -> String { reverse_chars(xs) + x }
+
+        fn reverse_string(str: String) -> String { reverse_chars([...str]) }
+        "#,
+    );
+}
+
+#[test]
+fn list_pattern_without_element_annotation_stays_permissive() {
+    common::typecheck_ok(
+        r#"
+        fn sum([], acc: i64) -> i64 { acc }
+        fn sum([x, ...xs], acc: i64) -> i64 { rec sum(xs, acc + x) }
+        "#,
+    );
+}
+
+#[test]
 fn pipeline_map_infers_closure_param_from_list() {
     // [1,2,3] |> map(fn(x) { "hello" }) → assigning to List<i64> should error
     let errs = common::typecheck_errors(

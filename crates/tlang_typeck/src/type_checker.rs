@@ -63,7 +63,7 @@ impl TypeChecker {
     fn iterable_item_type(&self, ty: &TyKind) -> Option<TyKind> {
         match ty {
             TyKind::Slice(inner) => Some(inner.kind.clone()),
-            TyKind::Primitive(PrimTy::String) => Some(TyKind::Primitive(PrimTy::Char)),
+            TyKind::Primitive(PrimTy::String) => Some(TyKind::Primitive(PrimTy::String)),
             TyKind::Path(path) => self
                 .type_table
                 .impls()
@@ -312,8 +312,8 @@ impl TypeChecker {
         let ctx = self.current_context();
 
         // Handle `unknown` operands.
-        let lhs_unknown = matches!(lhs_ty, TyKind::Unknown);
-        let rhs_unknown = matches!(rhs_ty, TyKind::Unknown);
+        let lhs_unknown = matches!(lhs_ty, TyKind::Unknown | TyKind::Var(_));
+        let rhs_unknown = matches!(rhs_ty, TyKind::Unknown | TyKind::Var(_));
 
         if lhs_unknown || rhs_unknown {
             if ctx.is_strict() {
@@ -711,6 +711,10 @@ impl TypeChecker {
             Some(TyKind::Fn(ref param_tys, ref ret_ty)) => {
                 let callee_name = callee_name_str(&call.callee);
                 let is_variadic = callee_name.as_deref().is_some_and(builtins::is_variadic);
+                let is_protocol_dispatch = matches!(
+                    &call.callee.kind,
+                    hir::ExprKind::Path(path) if self.protocol_dispatch_parts(path).is_some()
+                );
 
                 // Check argument count (skip for variadic builtins).
                 if !is_variadic && param_tys.len() != call.arguments.len() {
@@ -722,7 +726,13 @@ impl TypeChecker {
                     return ret_ty.kind.clone();
                 }
 
-                self.check_argument_types(call, param_tys, &callee_name, is_variadic);
+                self.check_argument_types(
+                    call,
+                    param_tys,
+                    &callee_name,
+                    is_variadic,
+                    is_protocol_dispatch,
+                );
 
                 // Instantiate generic return type: if the return type
                 // contains type variables, match argument types against
@@ -753,16 +763,17 @@ impl TypeChecker {
         param_tys: &[Ty],
         callee_name: &Option<String>,
         is_variadic: bool,
+        is_protocol_dispatch: bool,
     ) {
         if is_variadic {
             if let Some(param_ty) = param_tys.first() {
                 for (i, arg) in call.arguments.iter().enumerate() {
-                    self.check_single_arg(arg, param_ty, i, callee_name);
+                    self.check_single_arg(arg, param_ty, i, callee_name, is_protocol_dispatch);
                 }
             }
         } else {
             for (i, (arg, param_ty)) in call.arguments.iter().zip(param_tys.iter()).enumerate() {
-                self.check_single_arg(arg, param_ty, i, callee_name);
+                self.check_single_arg(arg, param_ty, i, callee_name, is_protocol_dispatch);
             }
         }
     }
@@ -773,8 +784,12 @@ impl TypeChecker {
         param_ty: &Ty,
         index: usize,
         callee_name: &Option<String>,
+        is_protocol_dispatch: bool,
     ) {
-        if matches!(param_ty.kind, TyKind::Unknown) || matches!(arg.ty.kind, TyKind::Unknown) {
+        if matches!(param_ty.kind, TyKind::Unknown)
+            || matches!(arg.ty.kind, TyKind::Unknown)
+            || is_protocol_dispatch && Self::is_protocol_generic_placeholder(&param_ty.kind)
+        {
             return;
         }
         if !ty_kinds_compatible(&arg.ty.kind, &param_ty.kind) {
@@ -789,6 +804,21 @@ impl TypeChecker {
                 span: arg.span,
             });
         }
+    }
+
+    fn is_protocol_generic_placeholder(kind: &TyKind) -> bool {
+        let TyKind::Path(path) = kind else {
+            return false;
+        };
+        if !path.res.is_unresolved() || path.segments.len() != 1 {
+            return false;
+        }
+        let name = path.first_ident().as_str();
+        name.len() == 1
+            && name
+                .chars()
+                .next()
+                .is_some_and(|ch| ch.is_ascii_uppercase())
     }
 
     /// Try to resolve the callee expression to a `TyKind::Fn`.
@@ -877,7 +907,19 @@ impl TypeChecker {
         self.type_table
             .find_impl_for(protocol_name, receiver_type_name)?;
 
-        let mut param_tys = method.param_tys.clone();
+        let mut receiver_bindings = HashMap::new();
+        if let Some(self_param) = method.param_tys.first() {
+            collect_type_var_bindings(receiver_ty, &self_param.kind, &mut receiver_bindings);
+        }
+
+        let mut param_tys = method
+            .param_tys
+            .iter()
+            .map(|ty| Ty {
+                kind: substitute_type_vars(&ty.kind, &receiver_bindings),
+                ..ty.clone()
+            })
+            .collect::<Vec<_>>();
         if let Some(self_param) = param_tys.first_mut() {
             self_param.kind = receiver_ty.clone();
         } else {
@@ -890,7 +932,10 @@ impl TypeChecker {
         let return_ty = self.resolve_protocol_dispatch_return_type(
             protocol_name,
             receiver_type_name,
-            &method.return_ty,
+            &Ty {
+                kind: substitute_type_vars(&method.return_ty.kind, &receiver_bindings),
+                ..method.return_ty.clone()
+            },
         );
 
         Some(TyKind::Fn(param_tys, Box::new(return_ty)))
@@ -1270,10 +1315,7 @@ impl TypeChecker {
                 // When the binding type is a list/slice, decompose it so that
                 // element patterns get the element type and rest patterns keep
                 // the full list type.
-                let elem_ty = match binding_ty {
-                    TyKind::Slice(inner) => Some(inner.kind.clone()),
-                    _ => None,
-                };
+                let elem_ty = self.iterable_item_type(binding_ty);
 
                 for p in pats {
                     let is_rest = matches!(p.kind, hir::PatKind::Rest(_));
@@ -1281,7 +1323,7 @@ impl TypeChecker {
                         // Rest patterns (`...xs`) keep the full list type.
                         self.register_pat_bindings(p, binding_ty);
                     } else {
-                        let ty = elem_ty.as_ref().unwrap_or(binding_ty);
+                        let ty = elem_ty.as_ref().unwrap_or(&TyKind::Unknown);
                         self.register_pat_bindings(p, ty);
                     }
                 }
@@ -2102,6 +2144,9 @@ impl TypeChecker {
                 // Pass 1: visit non-closure args and collect bindings.
                 for (i, arg) in call.arguments.iter_mut().enumerate() {
                     if receiver_visited && i == 0 {
+                        if let Some(param_ty) = param_tys.get(i) {
+                            collect_type_var_bindings(&arg.ty.kind, &param_ty.kind, &mut bindings);
+                        }
                         continue;
                     }
                     if !matches!(arg.kind, hir::ExprKind::FunctionExpression(_)) {

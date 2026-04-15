@@ -506,7 +506,7 @@ fn semantic_error_for_undefined_variable() -> Result<(), JsError> {
 #[wasm_bindgen_test]
 fn interpreter_eval_returns_type_errors() {
     let mut tlang = Tlang::new(
-        "fn takes(x: isize) { x }\ntakes(1);".to_string(),
+        "fn takes(x: isize) { x }\ntakes(\"1\");".to_string(),
         Runner::Interpreter,
     );
     let err = match tlang.eval() {
@@ -522,7 +522,7 @@ fn interpreter_eval_returns_type_errors() {
 #[wasm_bindgen_test]
 fn js_compile_returns_type_errors() {
     let mut tlang = Tlang::new(
-        "fn takes(x: isize) { x }\ntakes(1);".to_string(),
+        "fn takes(x: isize) { x }\ntakes(\"1\");".to_string(),
         Runner::JavaScript,
     );
     let err = tlang.compile_to_js().unwrap_err();
