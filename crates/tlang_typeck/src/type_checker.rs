@@ -114,6 +114,12 @@ impl TypeChecker {
         self.iterator_item_types.get(&hir_id).cloned()
     }
 
+    /// Seed the implicit receiver parameter of a dot-method declaration from
+    /// the owning type when lowering left it unknown.
+    ///
+    /// This only applies to `fn Type.method(...)` declarations whose method
+    /// name lowers to `ExprKind::FieldAccess`, have at least one parameter,
+    /// and whose first parameter still has an unknown type annotation.
     fn seed_dot_method_receiver_type(&self, decl: &mut hir::FunctionDeclaration) {
         let hir::ExprKind::FieldAccess(base, _) = &decl.name.kind else {
             return;
@@ -134,6 +140,11 @@ impl TypeChecker {
         };
     }
 
+    /// Resolve the result type of `base[index]`.
+    ///
+    /// Slices produce their element type, dicts produce their value type, and
+    /// strings produce `String` for character access. Other receivers remain
+    /// unknown until the language defines additional indexing semantics.
     fn index_access_result_type(&self, base_ty: &TyKind) -> TyKind {
         match base_ty {
             TyKind::Slice(inner) => inner.kind.clone(),
