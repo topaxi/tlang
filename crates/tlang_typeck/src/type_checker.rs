@@ -1800,6 +1800,7 @@ impl TypeChecker {
                 hir::StmtKind::ImplBlock(impl_block) => {
                     let is_blanket = !impl_block.type_params.is_empty();
                     let target_type_name = impl_block.target_type.join("::");
+                    let target_type_name_str = target_type_name.as_str();
                     let where_predicates: Vec<(String, Vec<String>)> = impl_block
                         .where_clause
                         .as_ref()
@@ -1826,7 +1827,7 @@ impl TypeChecker {
                         target_type_is_param: impl_block
                             .type_params
                             .iter()
-                            .any(|param| param.name.as_str() == target_type_name),
+                            .any(|param| param.name.as_str() == target_type_name_str),
                         protocol_type_args: impl_block
                             .type_arguments
                             .iter()
