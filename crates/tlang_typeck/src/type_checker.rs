@@ -114,6 +114,35 @@ impl TypeChecker {
         self.iterator_item_types.get(&hir_id).cloned()
     }
 
+    fn seed_dot_method_receiver_type(&self, decl: &mut hir::FunctionDeclaration) {
+        let hir::ExprKind::FieldAccess(base, _) = &decl.name.kind else {
+            return;
+        };
+        let Some(receiver_path) = base.path() else {
+            return;
+        };
+        let Some(receiver_param) = decl.parameters.first_mut() else {
+            return;
+        };
+        if !matches!(receiver_param.type_annotation.kind, TyKind::Unknown) {
+            return;
+        }
+
+        receiver_param.type_annotation = Ty {
+            kind: TyKind::Path(receiver_path.clone()),
+            ..Ty::default()
+        };
+    }
+
+    fn index_access_result_type(&self, base_ty: &TyKind) -> TyKind {
+        match base_ty {
+            TyKind::Slice(inner) => inner.kind.clone(),
+            TyKind::Dict(_, value) => value.kind.clone(),
+            TyKind::Primitive(PrimTy::String) => TyKind::Primitive(PrimTy::String),
+            _ => TyKind::Unknown,
+        }
+    }
+
     fn register_iterator_next_pattern_bindings(&mut self, pat: &mut hir::Pat, item_ty: &TyKind) {
         let hir::PatKind::Enum(path, fields) = &mut pat.kind else {
             return;
@@ -2065,6 +2094,7 @@ impl TypeChecker {
     /// and infer return types.  Used by both top-level function declarations
     /// and impl block methods.
     fn typecheck_function_decl(&mut self, decl: &mut hir::FunctionDeclaration) {
+        self.seed_dot_method_receiver_type(decl);
         let fn_ctx = TypingContext::for_function(decl);
         self.push_context(fn_ctx);
         self.register_function_signature(decl);
@@ -2428,6 +2458,12 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 let base_ty = base.ty.kind.clone();
                 expr.ty.kind =
                     self.check_field_access(&base_ty, field_name, expr.hir_id, expr.span);
+            }
+            hir::ExprKind::IndexAccess(base, index) => {
+                self.visit_expr(base, ctx);
+                self.visit_expr(index, ctx);
+                let result_ty = self.index_access_result_type(&base.ty.kind);
+                self.assign_expr_type(expr, result_ty);
             }
             hir::ExprKind::Implements(inner_expr, _path) => {
                 let hir_id = expr.hir_id;
