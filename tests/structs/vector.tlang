@@ -18,9 +18,17 @@ fn Vector.scale(self, scalar: i64) -> Vector {
     Vector::new(self.x * scalar, self.y * scalar)
 }
 
-// Vector.magnitude(self) -> f64
-fn Vector.magnitude(self) -> f64 {
-    math::sqrt((self.x ** 2 + self.y ** 2) as f64)
+fn int_sqrt(n: i64, guess: i64) -> i64 {
+    if guess * guess >= n {
+        guess
+    } else {
+        rec int_sqrt(n, guess + 1)
+    }
+}
+
+// Vector.magnitude(self) -> i64
+fn Vector.magnitude(self) -> i64 {
+    int_sqrt(self.x * self.x + self.y * self.y, 0)
 }
 
 // Example usage

@@ -1,4 +1,4 @@
 pub fn double(x: i64) -> i64 { x * 2 }
 pub fn halve(x: i64) -> i64 { x / 2 }
-pub fn abs(x: i64) -> i64 if x < 0 { 0 - x }
+pub fn abs(x: i64) if x < 0 -> i64 { 0 - x }
 pub fn abs(x: i64) -> i64 { x }

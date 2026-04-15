@@ -1,11 +1,12 @@
 enum Shape {
     Circle(f64),
     Rectangle(f64, f64),
-    Triangle(f64, f64),
+    _Triangle(f64, f64),
 }
 
 let circle = Shape::Circle(5.0);
 let rect = Shape::Rectangle(3.0, 4.0);
+let _triangle = Shape::_Triangle(6.0, 7.0);
 
 // Basic enum variant check
 let is_circle = circle matches Shape::Circle(_);

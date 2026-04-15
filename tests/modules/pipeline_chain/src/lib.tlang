@@ -7,9 +7,10 @@ use list_utils::sum;
 5 |> double() |> increment() |> square() |> log();
 
 // Pipeline with list operations using imported functions
-[1, 2, 3, 4, 5]
-  |> map(double)
-  |> map(increment)
+let numbers: List<i64> = [1, 2, 3, 4, 5];
+let doubled: List<i64> = numbers |> map(fn(x: i64) -> i64 { double(x) });
+let incremented: List<i64> = doubled |> map(fn(x: i64) -> i64 { increment(x) });
+incremented
   |> sum(0)
   |> log();
 

@@ -1,4 +1,6 @@
 let add_ten: fn(i64) -> i64 = fn (x: i64) -> i64 { x + 10 };
 
+Option::Some(15) |> log();
+
 let incremented: List<i64> = [1, 2, 3] |> Functor::map(add_ten);
 incremented |> log();

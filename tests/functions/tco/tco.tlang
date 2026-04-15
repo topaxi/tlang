@@ -1,8 +1,10 @@
-fn range(start: i64, end: i64) -> List<i64> {
+fn range(start: i64, end: i64) -> List<i64> { range_acc(start, end, []) }
+
+fn range_acc(start: i64, end: i64, acc: List<i64>) -> List<i64> {
     if start >= end {
-        []
+        acc
     } else {
-        [start, ...range(start + 1, end)]
+        rec range_acc(start + 1, end, [...acc, start])
     }
 }
 
