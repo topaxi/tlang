@@ -47,6 +47,8 @@ pub struct TypeChecker {
 }
 
 impl TypeChecker {
+    const MIN_PROTOCOL_PATH_SEGMENTS: usize = 2;
+
     pub fn new() -> Self {
         Self::default()
     }
@@ -703,7 +705,7 @@ impl TypeChecker {
         }
 
         // Try to resolve the callee to a function signature.
-        let fn_ty = self.resolve_callee_type(&call.callee);
+        let fn_ty = self.resolve_call_callee_type(call);
 
         match fn_ty {
             Some(TyKind::Fn(ref param_tys, ref ret_ty)) => {
@@ -825,6 +827,205 @@ impl TypeChecker {
                 }
             }
         }
+    }
+
+    fn resolve_call_callee_type(&self, call: &hir::CallExpression) -> Option<TyKind> {
+        self.resolve_protocol_dispatch_callee_type(call)
+            .or_else(|| self.resolve_callee_type(&call.callee))
+    }
+
+    fn resolve_protocol_dispatch_callee_type(&self, call: &hir::CallExpression) -> Option<TyKind> {
+        let hir::ExprKind::Path(path) = &call.callee.kind else {
+            return None;
+        };
+        if call.arguments.is_empty() {
+            return None;
+        }
+
+        let (protocol_name, method_name) = self.protocol_dispatch_parts(path)?;
+        let receiver_ty = &call.arguments[0].ty.kind;
+        let receiver_type_name = Self::receiver_dispatch_type_name(receiver_ty)?;
+
+        self.resolve_impl_protocol_dispatch_callee_type(
+            &protocol_name,
+            &method_name,
+            receiver_ty,
+            &receiver_type_name,
+        )
+        .or_else(|| {
+            self.resolve_builtin_protocol_dispatch_callee_type(
+                &protocol_name,
+                &method_name,
+                receiver_ty,
+                &receiver_type_name,
+            )
+        })
+    }
+
+    fn resolve_impl_protocol_dispatch_callee_type(
+        &self,
+        protocol_name: &str,
+        method_name: &str,
+        receiver_ty: &TyKind,
+        receiver_type_name: &str,
+    ) -> Option<TyKind> {
+        let proto_info = self.type_table.get_protocol_info(protocol_name)?;
+        let method = proto_info
+            .methods
+            .iter()
+            .find(|candidate| candidate.name.as_str() == method_name)?;
+        self.type_table
+            .find_impl_for(protocol_name, receiver_type_name)?;
+
+        let mut param_tys = method.param_tys.clone();
+        if let Some(self_param) = param_tys.first_mut() {
+            self_param.kind = receiver_ty.clone();
+        } else {
+            param_tys.push(Ty {
+                kind: receiver_ty.clone(),
+                ..Ty::default()
+            });
+        }
+
+        let return_ty = self.resolve_protocol_dispatch_return_type(
+            protocol_name,
+            receiver_type_name,
+            &method.return_ty,
+        );
+
+        Some(TyKind::Fn(param_tys, Box::new(return_ty)))
+    }
+
+    fn resolve_builtin_protocol_dispatch_callee_type(
+        &self,
+        protocol_name: &str,
+        method_name: &str,
+        receiver_ty: &TyKind,
+        receiver_type_name: &str,
+    ) -> Option<TyKind> {
+        let method_ty = builtin_methods::lookup(receiver_type_name, method_name)?;
+        let TyKind::Fn(method_params, method_ret) =
+            builtin_methods::substitute_receiver_type_vars(receiver_ty, &method_ty)
+        else {
+            return None;
+        };
+
+        let mut param_tys = Vec::with_capacity(method_params.len() + 1);
+        param_tys.push(Ty {
+            kind: receiver_ty.clone(),
+            ..Ty::default()
+        });
+        param_tys.extend(method_params);
+
+        // For protocol-path dispatch on builtin Option/Result receivers we
+        // can't express `Wrapped<U>` precisely yet, but we can preserve the
+        // outer receiver shape so `Functor::map` doesn't collapse back to the
+        // list-only free-function signature.
+        let ret = if Self::preserves_receiver_shape(protocol_name, method_name, receiver_ty) {
+            Ty {
+                kind: receiver_ty.clone(),
+                ..Ty::default()
+            }
+        } else {
+            *method_ret
+        };
+
+        Some(TyKind::Fn(param_tys, Box::new(ret)))
+    }
+
+    fn resolve_protocol_dispatch_return_type(
+        &self,
+        protocol_name: &str,
+        receiver_type_name: &str,
+        return_ty: &Ty,
+    ) -> Ty {
+        let TyKind::Path(path) = &return_ty.kind else {
+            return return_ty.clone();
+        };
+        if path.segments.len() != 1 {
+            return return_ty.clone();
+        }
+
+        let assoc_type_name = path.first_ident().as_str();
+        let Some(binding) = self.type_table.resolve_associated_type(
+            protocol_name,
+            receiver_type_name,
+            assoc_type_name,
+        ) else {
+            return return_ty.clone();
+        };
+
+        Ty {
+            kind: builtin_types::lookup(&binding).unwrap_or_else(|| {
+                TyKind::Path(hir::Path::new(
+                    vec![hir::PathSegment::from_str(
+                        &binding,
+                        tlang_span::Span::default(),
+                    )],
+                    tlang_span::Span::default(),
+                ))
+            }),
+            ..Ty::default()
+        }
+    }
+
+    fn receiver_dispatch_type_name(receiver_ty: &TyKind) -> Option<String> {
+        match receiver_ty {
+            TyKind::Slice(_) => Some("List".to_string()),
+            TyKind::Primitive(PrimTy::String) => Some("String".to_string()),
+            TyKind::Path(path) => Some(path.join("::")),
+            _ => None,
+        }
+    }
+
+    fn protocol_dispatch_parts(&self, path: &hir::Path) -> Option<(String, String)> {
+        if !Self::is_protocol_path(path) {
+            return None;
+        }
+
+        let method_name = path.last_ident().as_str().to_string();
+        let protocol_name = path.segments[..path.segments.len() - 1]
+            .iter()
+            .map(|segment| segment.ident.as_str())
+            .collect::<Vec<_>>()
+            .join("::");
+        let proto_info = self.type_table.get_protocol_info(&protocol_name)?;
+        proto_info
+            .methods
+            .iter()
+            .any(|method| method.name.as_str() == method_name)
+            .then_some((protocol_name, method_name))
+    }
+
+    fn is_protocol_path(path: &hir::Path) -> bool {
+        path.segments.len() >= Self::MIN_PROTOCOL_PATH_SEGMENTS
+    }
+
+    fn preserves_receiver_shape(
+        protocol_name: &str,
+        method_name: &str,
+        receiver_ty: &TyKind,
+    ) -> bool {
+        protocol_name == "Functor"
+            && method_name == "map"
+            && !matches!(receiver_ty, TyKind::Slice(_))
+    }
+
+    fn visit_dispatch_receiver_arg(&mut self, call: &mut hir::CallExpression) -> bool {
+        let Some(receiver) = call.arguments.first_mut() else {
+            return false;
+        };
+        let hir::ExprKind::Path(path) = &call.callee.kind else {
+            return false;
+        };
+        if self.protocol_dispatch_parts(path).is_none()
+            || matches!(receiver.kind, hir::ExprKind::FunctionExpression(_))
+        {
+            return false;
+        }
+
+        self.visit_expr(receiver, &mut ());
+        true
     }
 
     // ── Return statement checking ────────────────────────────────────
@@ -1664,6 +1865,8 @@ impl TypeChecker {
                 }
                 hir::StmtKind::ImplBlock(impl_block) => {
                     let is_blanket = !impl_block.type_params.is_empty();
+                    let target_type_name = impl_block.target_type.join("::");
+                    let target_type_name_str = target_type_name.as_str();
                     let where_predicates: Vec<(String, Vec<String>)> = impl_block
                         .where_clause
                         .as_ref()
@@ -1686,7 +1889,11 @@ impl TypeChecker {
                         .collect();
                     self.type_table.insert_impl_info(ImplInfo {
                         protocol_name: impl_block.protocol_name.join("::"),
-                        target_type_name: impl_block.target_type.join("::"),
+                        target_type_name: target_type_name.clone(),
+                        target_type_is_param: impl_block
+                            .type_params
+                            .iter()
+                            .any(|param| param.name.as_str() == target_type_name_str),
                         protocol_type_args: impl_block
                             .type_arguments
                             .iter()
@@ -1873,7 +2080,8 @@ impl TypeChecker {
         // Visit callee first so its type is available for bidirectional
         // inference into closure arguments.
         self.visit_expr(&mut call.callee, &mut ());
-        let callee_fn_ty = self.resolve_callee_type(&call.callee);
+        let receiver_visited = self.visit_dispatch_receiver_arg(call);
+        let callee_fn_ty = self.resolve_call_callee_type(call);
 
         // When the callee is a generic function, we need to infer type
         // variable bindings from non-closure arguments first, then
@@ -1893,6 +2101,9 @@ impl TypeChecker {
             if let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty {
                 // Pass 1: visit non-closure args and collect bindings.
                 for (i, arg) in call.arguments.iter_mut().enumerate() {
+                    if receiver_visited && i == 0 {
+                        continue;
+                    }
                     if !matches!(arg.kind, hir::ExprKind::FunctionExpression(_)) {
                         if let Some(param_ty) = param_tys.get(i) {
                             self.apply_expected_expr_type(arg, &param_ty.kind);
@@ -1906,20 +2117,24 @@ impl TypeChecker {
 
                 // Pass 2: visit closure args with substituted expected types.
                 for (i, arg) in call.arguments.iter_mut().enumerate() {
-                    if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind {
-                        if let Some(expected_arg_ty) = param_tys.get(i) {
-                            let substituted =
-                                substitute_type_vars(&expected_arg_ty.kind, &bindings);
-                            Self::apply_expected_closure_types(decl, &substituted);
-                        }
+                    if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind
+                        && let Some(expected_arg_ty) = param_tys.get(i)
+                    {
+                        let substituted = substitute_type_vars(&expected_arg_ty.kind, &bindings);
+                        Self::apply_expected_closure_types(decl, &substituted);
                         self.visit_expr(arg, &mut ());
+                        continue;
                     }
+                    self.visit_expr(arg, &mut ());
                 }
             }
         } else {
             // Simple path: visit all arguments in order with optional
             // bidirectional inference for closures.
             for (i, arg) in call.arguments.iter_mut().enumerate() {
+                if receiver_visited && i == 0 {
+                    continue;
+                }
                 if let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty
                     && let Some(expected_arg_ty) = param_tys.get(i)
                 {
@@ -3001,5 +3216,85 @@ mod tests {
         let ty = TyKind::Var(u);
         let result = substitute_type_vars(&ty, &bindings);
         assert_eq!(result, TyKind::Var(u));
+    }
+
+    fn make_path_expr(segments: &[&str]) -> hir::Expr {
+        hir::Expr {
+            hir_id: dummy_hir_id(),
+            kind: hir::ExprKind::Path(Box::new(hir::Path::new(
+                segments
+                    .iter()
+                    .map(|segment| hir::PathSegment::from_str(segment, tlang_span::Span::default()))
+                    .collect(),
+                tlang_span::Span::default(),
+            ))),
+            ty: Ty::default(),
+            span: tlang_span::Span::default(),
+        }
+    }
+
+    #[test]
+    fn protocol_dispatch_parts_requires_known_protocol_method() {
+        let mut checker = TypeChecker::new();
+        checker.type_table.insert_protocol_info(ProtocolInfo {
+            name: Ident::new("Functor", tlang_span::Span::default()),
+            methods: vec![ProtocolMethodInfo {
+                name: Ident::new("map", tlang_span::Span::default()),
+                param_tys: Vec::new(),
+                return_ty: Ty::unknown(),
+                has_default_body: false,
+            }],
+            constraints: Vec::new(),
+            associated_types: Vec::new(),
+        });
+
+        let functor_map = make_path_expr(&["Functor", "map"]);
+        let option_map = make_path_expr(&["Option", "map"]);
+        let functor_missing = make_path_expr(&["Functor", "missing"]);
+
+        assert_eq!(
+            checker.protocol_dispatch_parts(functor_map.path().unwrap()),
+            Some(("Functor".to_string(), "map".to_string()))
+        );
+        assert!(
+            checker
+                .protocol_dispatch_parts(option_map.path().unwrap())
+                .is_none()
+        );
+        assert!(
+            checker
+                .protocol_dispatch_parts(functor_missing.path().unwrap())
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn visit_dispatch_receiver_arg_requires_known_protocol_dispatch_site() {
+        let mut checker = TypeChecker::new();
+        checker.type_table.insert_protocol_info(ProtocolInfo {
+            name: Ident::new("Functor", tlang_span::Span::default()),
+            methods: vec![ProtocolMethodInfo {
+                name: Ident::new("map", tlang_span::Span::default()),
+                param_tys: Vec::new(),
+                return_ty: Ty::unknown(),
+                has_default_body: false,
+            }],
+            constraints: Vec::new(),
+            associated_types: Vec::new(),
+        });
+
+        let mut protocol_call = hir::CallExpression {
+            hir_id: dummy_hir_id(),
+            callee: make_path_expr(&["Functor", "map"]),
+            arguments: vec![make_path_expr(&["value"])],
+        };
+        let mut non_protocol_call = hir::CallExpression {
+            hir_id: dummy_hir_id(),
+            callee: make_path_expr(&["Option", "map"]),
+            arguments: vec![make_path_expr(&["value"])],
+        };
+
+        assert!(checker.visit_dispatch_receiver_arg(&mut protocol_call));
+        assert!(!checker.visit_dispatch_receiver_arg(&mut non_protocol_call));
     }
 }

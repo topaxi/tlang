@@ -8,6 +8,51 @@ use tlang_hir as hir;
 
 use crate::{LoweringContext, ProtocolDispatchContext};
 
+fn same_ast_ty_shape(lhs: &ast::node::Ty, rhs: &ast::node::Ty) -> bool {
+    if lhs.parameters.len() != rhs.parameters.len() {
+        return false;
+    }
+
+    if !lhs
+        .parameters
+        .iter()
+        .zip(rhs.parameters.iter())
+        .all(|(lhs, rhs)| same_ast_ty_shape(lhs, rhs))
+    {
+        return false;
+    }
+
+    match (&lhs.kind, &rhs.kind) {
+        (ast::node::TyKind::Unknown, ast::node::TyKind::Unknown) => true,
+        (ast::node::TyKind::Path(lhs_path), ast::node::TyKind::Path(rhs_path)) => {
+            lhs_path.join("::") == rhs_path.join("::")
+        }
+        (ast::node::TyKind::Union(lhs_paths), ast::node::TyKind::Union(rhs_paths)) => {
+            lhs_paths.len() == rhs_paths.len()
+                && lhs_paths
+                    .iter()
+                    .zip(rhs_paths.iter())
+                    .all(|(lhs_path, rhs_path)| lhs_path.join("::") == rhs_path.join("::"))
+        }
+        (
+            ast::node::TyKind::Fn(lhs_params, lhs_ret),
+            ast::node::TyKind::Fn(rhs_params, rhs_ret),
+        ) => {
+            lhs_params.len() == rhs_params.len()
+                && lhs_params
+                    .iter()
+                    .zip(rhs_params.iter())
+                    .all(|(lhs_param, rhs_param)| {
+                        lhs_param.name.map(|ident| ident.as_str().to_string())
+                            == rhs_param.name.map(|ident| ident.as_str().to_string())
+                            && same_ast_ty_shape(&lhs_param.ty, &rhs_param.ty)
+                    })
+                && same_ast_ty_shape(lhs_ret, rhs_ret)
+        }
+        _ => false,
+    }
+}
+
 impl LoweringContext {
     pub(crate) fn lower_stmt(&mut self, node: &ast::node::Stmt) -> Vec<hir::Stmt> {
         debug!("Lowering statement {:?}", node.kind);
@@ -721,17 +766,14 @@ impl LoweringContext {
                     .iter()
                     .map(|d| d.parameters.get(i).and_then(|p| p.type_annotation.as_ref()))
                     .collect::<Vec<_>>();
-                let lowered_annotations = type_annotations
-                    .iter()
-                    .flatten()
-                    .map(|ty| self.lower_ty(Some(*ty)))
-                    .collect::<Vec<_>>();
-                let type_annotation = if lowered_annotations.len() == decls.len()
-                    && lowered_annotations
-                        .iter()
-                        .all(|ty| ty == &lowered_annotations[0])
-                {
-                    lowered_annotations[0].clone()
+                let type_annotation = if type_annotations.len() == decls.len()
+                    && let Some(first_annotation) = type_annotations.first().copied().flatten()
+                    && type_annotations.iter().all(|annotation| {
+                        annotation.is_some_and(|annotation| {
+                            same_ast_ty_shape(annotation, first_annotation)
+                        })
+                    }) {
+                    self.lower_ty(Some(first_annotation))
                 } else {
                     hir::Ty::default()
                 };
