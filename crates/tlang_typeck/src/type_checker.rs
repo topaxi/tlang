@@ -798,29 +798,24 @@ impl TypeChecker {
         let hir::ExprKind::Path(path) = &call.callee.kind else {
             return None;
         };
-        if !Self::is_protocol_path(path) || call.arguments.is_empty() {
+        if call.arguments.is_empty() {
             return None;
         }
 
-        let method_name = path.last_ident().as_str();
-        let protocol_name = path.segments[..path.segments.len() - 1]
-            .iter()
-            .map(|segment| segment.ident.as_str())
-            .collect::<Vec<_>>()
-            .join("::");
+        let (protocol_name, method_name) = self.protocol_dispatch_parts(path)?;
         let receiver_ty = &call.arguments[0].ty.kind;
         let receiver_type_name = Self::receiver_dispatch_type_name(receiver_ty)?;
 
         self.resolve_impl_protocol_dispatch_callee_type(
             &protocol_name,
-            method_name,
+            &method_name,
             receiver_ty,
             &receiver_type_name,
         )
         .or_else(|| {
             self.resolve_builtin_protocol_dispatch_callee_type(
                 &protocol_name,
-                method_name,
+                &method_name,
                 receiver_ty,
                 &receiver_type_name,
             )
@@ -943,6 +938,25 @@ impl TypeChecker {
         }
     }
 
+    fn protocol_dispatch_parts(&self, path: &hir::Path) -> Option<(String, String)> {
+        if !Self::is_protocol_path(path) {
+            return None;
+        }
+
+        let method_name = path.last_ident().as_str().to_string();
+        let protocol_name = path.segments[..path.segments.len() - 1]
+            .iter()
+            .map(|segment| segment.ident.as_str())
+            .collect::<Vec<_>>()
+            .join("::");
+        let proto_info = self.type_table.get_protocol_info(&protocol_name)?;
+        proto_info
+            .methods
+            .iter()
+            .any(|method| method.name.as_str() == method_name)
+            .then_some((protocol_name, method_name))
+    }
+
     fn is_protocol_path(path: &hir::Path) -> bool {
         path.segments.len() >= Self::MIN_PROTOCOL_PATH_SEGMENTS
     }
@@ -964,7 +978,7 @@ impl TypeChecker {
         let hir::ExprKind::Path(path) = &call.callee.kind else {
             return false;
         };
-        if !Self::is_protocol_path(path)
+        if self.protocol_dispatch_parts(path).is_none()
             || matches!(receiver.kind, hir::ExprKind::FunctionExpression(_))
         {
             return false;
@@ -1808,6 +1822,10 @@ impl TypeChecker {
                     self.type_table.insert_impl_info(ImplInfo {
                         protocol_name: impl_block.protocol_name.join("::"),
                         target_type_name: impl_block.target_type.join("::"),
+                        target_type_is_param: impl_block
+                            .type_params
+                            .iter()
+                            .any(|param| param.name.as_str() == impl_block.target_type.join("::")),
                         protocol_type_args: impl_block
                             .type_arguments
                             .iter()
@@ -3099,5 +3117,55 @@ mod tests {
         let ty = TyKind::Var(u);
         let result = substitute_type_vars(&ty, &bindings);
         assert_eq!(result, TyKind::Var(u));
+    }
+
+    fn make_path_expr(segments: &[&str]) -> hir::Expr {
+        hir::Expr {
+            hir_id: dummy_hir_id(),
+            kind: hir::ExprKind::Path(Box::new(hir::Path::new(
+                segments
+                    .iter()
+                    .map(|segment| hir::PathSegment::from_str(segment, tlang_span::Span::default()))
+                    .collect(),
+                tlang_span::Span::default(),
+            ))),
+            ty: Ty::default(),
+            span: tlang_span::Span::default(),
+        }
+    }
+
+    #[test]
+    fn protocol_dispatch_parts_requires_known_protocol_method() {
+        let mut checker = TypeChecker::new();
+        checker.type_table.insert_protocol_info(ProtocolInfo {
+            name: Ident::new("Functor", tlang_span::Span::default()),
+            methods: vec![ProtocolMethodInfo {
+                name: Ident::new("map", tlang_span::Span::default()),
+                param_tys: Vec::new(),
+                return_ty: Ty::unknown(),
+                has_default_body: false,
+            }],
+            constraints: Vec::new(),
+            associated_types: Vec::new(),
+        });
+
+        let functor_map = make_path_expr(&["Functor", "map"]);
+        let option_map = make_path_expr(&["Option", "map"]);
+        let functor_missing = make_path_expr(&["Functor", "missing"]);
+
+        assert_eq!(
+            checker.protocol_dispatch_parts(functor_map.path().unwrap()),
+            Some(("Functor".to_string(), "map".to_string()))
+        );
+        assert!(
+            checker
+                .protocol_dispatch_parts(option_map.path().unwrap())
+                .is_none()
+        );
+        assert!(
+            checker
+                .protocol_dispatch_parts(functor_missing.path().unwrap())
+                .is_none()
+        );
     }
 }
