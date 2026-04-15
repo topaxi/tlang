@@ -202,6 +202,17 @@ fn test_mixed_enum_types_produce_union() {
 // ── No-inference cases ────────────────────────────────────────────────────────
 
 #[test]
+fn test_enum_pattern_with_catch_all_stays_untyped() {
+    let decls = analyze_fn_decls(
+        "enum SafeHtml { Html(String) }
+         fn render(SafeHtml::Html(v)) { v }
+         fn render(v) { v }",
+    );
+    assert!(decls[0].parameters[0].type_annotation.is_none());
+    assert!(decls[1].parameters[0].type_annotation.is_none());
+}
+
+#[test]
 fn test_no_inference_when_pattern_blocks() {
     // Rest pattern at top level — cannot infer type
     let decls = analyze_fn_decls(

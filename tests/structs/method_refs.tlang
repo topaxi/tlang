@@ -2,8 +2,8 @@
 // qualified `Type::method` alias syntax.
 
 enum Shape {
-    Circle(radius),
-    Rectangle(width, height),
+    Circle(f64),
+    Rectangle(f64, f64),
 }
 
 fn Shape.area(Shape::Circle(r)) { math::pi * r ** 2 }

@@ -18,6 +18,9 @@ use tlang_codegen_js::{
 use tlang_diagnostics::{Diagnostic, diagnostics_from_parse_error, render_diagnostics, render_ice};
 use tlang_hir_opt::{HirOptError, HirOptimizer, HirPass};
 use tlang_semantics::SemanticAnalyzer;
+use tlang_typeck::typecheck_module;
+
+use crate::commands::{print_source_diagnostics, run_hir_passes};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CompileTargetArg {
@@ -92,17 +95,7 @@ fn compile_to_hir(
             .filter(|diagnostic| diagnostic.is_warning())
             .collect::<Vec<_>>();
 
-        if !warnings.is_empty() {
-            eprint!(
-                "{}",
-                render_diagnostics(
-                    source_name,
-                    source,
-                    &warnings,
-                    std::io::IsTerminal::is_terminal(&std::io::stderr())
-                )
-            );
-        }
+        print_source_diagnostics(source_name, source, &warnings);
     }
 
     let (mut module, meta) = lower_to_hir(
@@ -125,31 +118,25 @@ fn compile_to_hir(
         CompileTargetHirOptimizer::Interpreter(HirOptimizer::default())
     };
 
-    if let Err(err) = optimizer.optimize_hir(&mut module, &mut ctx) {
+    if let Err(err) = run_hir_passes(&mut optimizer, &mut module, &mut ctx) {
         eprint!("{}", render_ice(&err));
         std::process::exit(1);
     }
 
-    // Display HIR optimizer warnings (e.g. non-self-referencing tail calls)
-    if show_warnings {
-        let warnings: Vec<_> = ctx
-            .diagnostics
-            .iter()
-            .filter(|d| d.is_warning())
-            .cloned()
-            .collect();
-
-        if !warnings.is_empty() {
-            eprint!(
-                "{}",
-                render_diagnostics(
-                    source_name,
-                    source,
-                    &warnings,
-                    std::io::IsTerminal::is_terminal(&std::io::stderr())
-                )
-            );
+    let diagnostics = match typecheck_module(&mut module, &mut ctx) {
+        Ok(diagnostics) => diagnostics,
+        Err(err) => {
+            eprint!("{}", render_ice(&err));
+            std::process::exit(1);
         }
+    };
+
+    if show_warnings {
+        print_source_diagnostics(source_name, source, &diagnostics.warnings);
+    }
+
+    if diagnostics.has_errors() {
+        return Err(diagnostics.errors);
     }
 
     Ok(module)

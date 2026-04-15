@@ -15,9 +15,12 @@ let p = Point { x: 3, y: 4 };
 get_x(p) |> log();
 get_sum(p) |> log();
 
-// Multi-dispatch: struct pattern clause + wildcard fallback
-fn describe(SafeHtml { value }) { "html: " + value }
-fn describe(_) { "unknown" }
+fn describe(value) {
+    match value {
+        SafeHtml { value } => "html: " + value,
+        _ => "unknown",
+    }
+}
 
 describe(sh) |> log();
 describe(42) |> log();

@@ -3,14 +3,14 @@
 
 enum Tree {
     Empty,
-    Node { value: isize, left: Tree, right: Tree },
+    Node { value: i64, left: Tree, right: Tree },
 }
 
-// insert(Tree, isize) -> Tree
-fn insert(Tree::Empty, value) {
+// insert(Tree, i64) -> Tree
+fn insert(Tree::Empty, value: i64) {
     Tree::Node { value: value, left: Tree::Empty, right: Tree::Empty }
 }
-fn insert(Tree::Node { value: node_val, left: left_tree, right: right_tree }, value) {
+fn insert(Tree::Node { value: node_val, left: left_tree, right: right_tree }, value: i64) {
     if value < node_val {
         Tree::Node { 
             value: node_val, 
@@ -26,9 +26,9 @@ fn insert(Tree::Node { value: node_val, left: left_tree, right: right_tree }, va
     }
 }
 
-// contains(Tree, isize) -> bool
-fn contains(Tree::Empty, _) { false }
-fn contains(Tree::Node { value: node_val, left: left_tree, right: right_tree }, value) {
+// contains(Tree, i64) -> bool
+fn contains(Tree::Empty, _: i64) { false }
+fn contains(Tree::Node { value: node_val, left: left_tree, right: right_tree }, value: i64) {
     if value == node_val {
         true
     } else if value < node_val {

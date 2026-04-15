@@ -1,4 +1,4 @@
-enum SafeHtml { Html(string) }
+enum SafeHtml { Html(String) }
 
 protocol Display {
   fn to_string(self)

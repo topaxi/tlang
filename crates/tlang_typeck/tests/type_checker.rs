@@ -8,6 +8,21 @@ fn integer_literal_ok() {
 }
 
 #[test]
+fn integer_literal_uses_typed_binding_context() {
+    common::typecheck_ok("let x: i32 = 42;");
+}
+
+#[test]
+fn integer_literal_uses_call_argument_context() {
+    common::typecheck_ok(
+        r#"
+        enum Expr { Number(i32) }
+        let _ = Expr::Number(42);
+        "#,
+    );
+}
+
+#[test]
 fn float_literal_ok() {
     common::typecheck_ok("let x = 3.14;");
 }
@@ -768,6 +783,31 @@ fn function_calls_another_function_ok() {
     );
 }
 
+#[test]
+fn typed_recursive_higher_order_function_infers_closure_types() {
+    common::typecheck_ok(
+        r#"
+        fn map<T, U>([]: List<T>, _: fn(T) -> U) -> List<U> { [] }
+        fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, f)] }
+
+        let ys = map([1, 2, 3], fn(x) { x + 1 });
+        "#,
+    );
+}
+
+#[test]
+fn closure_with_generic_expected_return_stays_permissive() {
+    common::typecheck_ok(
+        r#"
+        fn map<T, U>([]: List<T>, _: fn(T) -> U) -> List<U> { [] }
+        fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, f)] }
+        fn identity(x) { x }
+
+        let ys = map([1, 2, 3], fn(n) { identity(n) == identity(n) });
+        "#,
+    );
+}
+
 // ── Closure type checking ───────────────────────────────────────────────
 
 #[test]
@@ -894,6 +934,41 @@ fn struct_method_call_ok() {
         fn Point.get_x(self) -> isize { self.x }
         let p = Point { x: 3, y: 4 };
         let x = Point::get_x(p);
+        "#,
+    );
+}
+
+#[test]
+fn index_access_type_flows_in_strict_context() {
+    common::typecheck_ok(
+        r#"
+        fn head_plus_one(xs: List<i64>) -> i64 {
+            xs[0] + 1
+        }
+        "#,
+    );
+}
+
+#[test]
+fn dot_method_reference_matches_expected_fn_type() {
+    common::typecheck_ok(
+        r#"
+        struct Point { x: i64 }
+        fn Point.get_x(self) -> i64 { self.x }
+        fn apply_getter(getter: fn(Point) -> i64, point: Point) -> i64 { getter(point) }
+        let point = Point { x: 3 };
+        let value: i64 = apply_getter(Point::get_x, point);
+        "#,
+    );
+}
+
+#[test]
+fn dot_method_call_return_type_flows_in_strict_context() {
+    common::typecheck_ok(
+        r#"
+        struct Point { x: i64 }
+        fn Point.get_x(self) -> i64 { self.x }
+        fn increment(point: Point) -> i64 { point.get_x() + 1 }
         "#,
     );
 }

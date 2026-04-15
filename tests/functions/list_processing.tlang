@@ -1,17 +1,15 @@
 // List Processing with Recursion
 // Demonstrates: recursion, list operations, functional programming patterns
 
-// filter(a[], fn(a) -> bool) -> a[]
-fn filter([], _) { [] }
-fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
-fn filter([_, ...xs], f) { rec filter(xs, f) }
+fn filter([]: List<i64>, _: fn(i64) -> bool) -> List<i64> { [] }
+fn filter([x, ...xs]: List<i64>, f: fn(i64) -> bool) if f(x) -> List<i64> { [x, ...filter(xs, f)] }
+fn filter([_, ...xs]: List<i64>, f: fn(i64) -> bool) -> List<i64> { rec filter(xs, f) }
 
-// foldl(a[], b, fn(b, a) -> b) -> b
-fn foldl([], acc, _) { acc }
-fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+fn foldl([]: List<i64>, acc: i64, _: fn(i64, i64) -> i64) -> i64 { acc }
+fn foldl([x, ...xs]: List<i64>, acc: i64, f: fn(i64, i64) -> i64) -> i64 { rec foldl(xs, f(acc, x), f) }
 
 // range(isize, isize) -> isize[]
-fn range(start, end) {
+fn range(start: i64, end: i64) -> List<i64> {
     if start >= end {
         []
     } else {
@@ -21,25 +19,29 @@ fn range(start, end) {
 
 log("=== List Processing Demo ===");
 
+fn square(x: i64) -> i64 { x * x }
+fn is_even(x: i64) -> bool { x % 2 == 0 }
+fn add(acc: i64, x: i64) -> i64 { acc + x }
+
 // Generate test data
-let numbers = range(1, 11);  // [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+let numbers: List<i64> = range(1, 11);  // [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 log("Original numbers:");
 numbers |> log();
 
 // Basic transformations
 log("Squared numbers:");
-numbers |> map(fn(x) { x * x }) |> log();
+numbers |> map(square) |> log();
 
 log("Even numbers only:");
-numbers |> filter(fn(x) { x % 2 == 0 }) |> log();
+numbers |> filter(is_even) |> log();
 
 log("Sum of all numbers:");
-numbers |> foldl(0, fn(acc, x) { acc + x }) |> log();
+numbers |> foldl(0, add) |> log();
 
 // Complex pipeline
 log("Process evens, square them, sum result:");
 let result = numbers
-|> filter(fn(x) { x % 2 == 0 })
-|> map(fn(x) { x * x })
-|> foldl(0, fn(acc, x) { acc + x });
+|> filter(is_even)
+|> map(square)
+|> foldl(0, add);
 result |> log();

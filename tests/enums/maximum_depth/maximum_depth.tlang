@@ -1,5 +1,5 @@
 enum Tree {
-    Leaf(unknown),
+    Leaf(i64),
     Node { left: Tree, right: Tree },
 }
 

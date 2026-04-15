@@ -1,33 +1,42 @@
-fn foldl([], acc, _) { acc }
-fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+fn range(start: i64, end: i64) -> List<i64> {
+    if start >= end {
+        []
+    } else {
+        [start, ...range(start + 1, end)]
+    }
+}
 
-fn apply_map(f, acc, x) { [...acc, f(x)] }
-fn map(xs, f) { foldl(xs, [], apply_map(f, _, _)) }
+fn foldl([]: List<i64>, acc: i64, _: fn(i64, i64) -> i64) -> i64 { acc }
+fn foldl([x, ...xs]: List<i64>, acc: i64, f: fn(i64, i64) -> i64) -> i64 { rec foldl(xs, f(acc, x), f) }
+fn add(acc: i64, x: i64) -> i64 { acc + x }
 
-fn range(start, end) { range(start, end, []) }
-fn range(start, end, acc) if start >= end; { acc }
-fn range(start, end, acc) { rec range(start + 1, end, [...acc, start]) }
-
-fn mandelbrot(c_real, c_imag, max_iter) { mandelbrot(c_real, c_imag, max_iter, 0, 0, 0) }
-fn mandelbrot(_, _, 0, _, _, _) { 0 }
-fn mandelbrot(_, _, _, z_real, z_imag, iter) if z_real * z_real + z_imag * z_imag > 4 { iter }
-fn mandelbrot(c_real, c_imag, max_iter, z_real, z_imag, iter) {
+fn mandelbrot(c_real: f64, c_imag: f64, max_iter: i64) -> i64 { mandelbrot_iter(c_real, c_imag, max_iter, 0.0, 0.0, 0) }
+fn mandelbrot_iter(_: f64, _: f64, 0, _: f64, _: f64, _: i64) -> i64 { 0 }
+fn mandelbrot_iter(_: f64, _: f64, _: i64, z_real: f64, z_imag: f64, iter: i64) if z_real * z_real + z_imag * z_imag > 4.0 { iter }
+fn mandelbrot_iter(c_real: f64, c_imag: f64, max_iter: i64, z_real: f64, z_imag: f64, iter: i64) -> i64 {
     let new_real = z_real * z_real - z_imag * z_imag + c_real;
-    let new_imag = 2 * z_real * z_imag + c_imag;
-    rec mandelbrot(c_real, c_imag, max_iter - 1, new_real, new_imag, iter + 1)
+    let new_imag = 2.0 * z_real * z_imag + c_imag;
+    rec mandelbrot_iter(c_real, c_imag, max_iter - 1, new_real, new_imag, iter + 1)
+}
+
+fn render_row(y: i64, width: i64, height: i64, max_iter: i64) -> List<i64> {
+    range(0, width - 1)
+    |> map(fn (x: i64) -> i64 {
+        let c_real = ((x as f64) / (width as f64)) * 3.5 - 2.5;
+        let c_imag = ((y as f64) / (height as f64)) * 2.0 - 1.0;
+        mandelbrot(c_real, c_imag, max_iter)
+    })
 }
 
 let width = 20;
 let height = 10;
 let max_iter = 50;
 
+fn render_row_sum(y: i64) -> i64 {
+    render_row(y, width, height, max_iter)
+    |> foldl(0, add)
+}
+
 range(0, height - 1)
-|> map(fn (y) {
-    range(0, width - 1)
-    |> map(fn (x) {
-        let c_real = (x / width) * 3.5 - 2.5;
-        let c_imag = (y / height) * 2.0 - 1.0;
-        mandelbrot(c_real, c_imag, max_iter)
-    })
-})
+|> map(fn (y: i64) -> i64 { render_row_sum(y) })
 |> log();

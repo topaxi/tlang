@@ -713,19 +713,29 @@ impl LoweringContext {
             .iter()
             .enumerate()
             .map(|(i, ident)| {
-                let has_type_annotation = decls.iter().any(|d| {
-                    d.parameters
-                        .get(i)
-                        .and_then(|p| p.type_annotation.as_ref())
-                        .is_some()
-                });
-
-                // Pick up any type annotation inferred by the semantic analysis phase.
-                let type_annotation = decls
+                // Preserve a concrete synthesized parameter type only when every
+                // clause agrees on the same annotation/inferred type. Mixed
+                // typed/untyped clauses must stay permissive so catch-all arms
+                // (e.g. `fn render(v)`) continue to participate in dispatch.
+                let type_annotations = decls
                     .iter()
-                    .find_map(|d| d.parameters.get(i).and_then(|p| p.type_annotation.as_ref()))
-                    .map(|ty| self.lower_ty(Some(ty)))
-                    .unwrap_or_default();
+                    .map(|d| d.parameters.get(i).and_then(|p| p.type_annotation.as_ref()))
+                    .collect::<Vec<_>>();
+                let lowered_annotations = type_annotations
+                    .iter()
+                    .flatten()
+                    .map(|ty| self.lower_ty(Some(*ty)))
+                    .collect::<Vec<_>>();
+                let type_annotation = if lowered_annotations.len() == decls.len()
+                    && lowered_annotations
+                        .iter()
+                        .all(|ty| ty == &lowered_annotations[0])
+                {
+                    lowered_annotations[0].clone()
+                } else {
+                    hir::Ty::default()
+                };
+                let has_type_annotation = !matches!(type_annotation.kind, hir::TyKind::Unknown);
 
                 hir::FunctionParameter {
                     hir_id: self.unique_id(),
