@@ -1,5 +1,12 @@
 use tlang_hir as hir;
 
+fn is_unspecialized_generic_builtin_path(path: &hir::Path) -> bool {
+    matches!(
+        path.first_ident().as_str(),
+        "List" | "Dict" | "Option" | "Result"
+    )
+}
+
 fn has_concrete_type(ty: &hir::Ty) -> bool {
     fn contains_var(kind: &hir::TyKind) -> bool {
         match kind {
@@ -11,10 +18,7 @@ fn has_concrete_type(ty: &hir::Ty) -> bool {
             hir::TyKind::Dict(key, value) => contains_var(&key.kind) || contains_var(&value.kind),
             hir::TyKind::Union(types) => types.iter().any(|ty| contains_var(&ty.kind)),
             hir::TyKind::Unknown | hir::TyKind::Primitive(_) | hir::TyKind::Never => false,
-            hir::TyKind::Path(path) => {
-                let name = path.first_ident().as_str();
-                matches!(name, "List" | "Dict" | "Option" | "Result")
-            }
+            hir::TyKind::Path(path) => is_unspecialized_generic_builtin_path(path),
         }
     }
 
@@ -22,8 +26,7 @@ fn has_concrete_type(ty: &hir::Ty) -> bool {
         && !contains_var(&ty.kind)
         && !matches!(
             &ty.kind,
-            hir::TyKind::Path(path)
-                if matches!(path.first_ident().as_str(), "List" | "Dict" | "Option" | "Result")
+            hir::TyKind::Path(path) if is_unspecialized_generic_builtin_path(path)
         )
 }
 
