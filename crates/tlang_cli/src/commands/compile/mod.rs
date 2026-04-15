@@ -18,6 +18,7 @@ use tlang_codegen_js::{
 use tlang_diagnostics::{Diagnostic, diagnostics_from_parse_error, render_diagnostics, render_ice};
 use tlang_hir_opt::{HirOptError, HirOptimizer, HirPass};
 use tlang_semantics::SemanticAnalyzer;
+use tlang_typeck::TypeChecker;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CompileTargetArg {
@@ -69,6 +70,28 @@ fn get_compiled_standard_library() -> &'static str {
     STDLIB.get_or_init(CodegenJS::compile_stdlib_module)
 }
 
+fn render_warnings(source_name: &str, source: &str, warnings: &[Diagnostic]) {
+    if warnings.is_empty() {
+        return;
+    }
+
+    eprint!(
+        "{}",
+        render_diagnostics(
+            source_name,
+            source,
+            warnings,
+            std::io::IsTerminal::is_terminal(&std::io::stderr())
+        )
+    );
+}
+
+fn split_diagnostics(diagnostics: Vec<Diagnostic>) -> (Vec<Diagnostic>, Vec<Diagnostic>) {
+    diagnostics
+        .into_iter()
+        .partition(|diagnostic| diagnostic.is_error())
+}
+
 fn compile_to_hir(
     source_name: &str,
     source: &str,
@@ -92,17 +115,7 @@ fn compile_to_hir(
             .filter(|diagnostic| diagnostic.is_warning())
             .collect::<Vec<_>>();
 
-        if !warnings.is_empty() {
-            eprint!(
-                "{}",
-                render_diagnostics(
-                    source_name,
-                    source,
-                    &warnings,
-                    std::io::IsTerminal::is_terminal(&std::io::stderr())
-                )
-            );
-        }
+        render_warnings(source_name, source, &warnings);
     }
 
     let (mut module, meta) = lower_to_hir(
@@ -130,26 +143,20 @@ fn compile_to_hir(
         std::process::exit(1);
     }
 
-    // Display HIR optimizer warnings (e.g. non-self-referencing tail calls)
-    if show_warnings {
-        let warnings: Vec<_> = ctx
-            .diagnostics
-            .iter()
-            .filter(|d| d.is_warning())
-            .cloned()
-            .collect();
+    let mut type_checker = TypeChecker::new();
+    if let Err(err) = type_checker.optimize_hir(&mut module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        std::process::exit(1);
+    }
 
-        if !warnings.is_empty() {
-            eprint!(
-                "{}",
-                render_diagnostics(
-                    source_name,
-                    source,
-                    &warnings,
-                    std::io::IsTerminal::is_terminal(&std::io::stderr())
-                )
-            );
-        }
+    let (errors, warnings) = split_diagnostics(ctx.diagnostics);
+
+    if show_warnings {
+        render_warnings(source_name, source, &warnings);
+    }
+
+    if !errors.is_empty() {
+        return Err(errors);
     }
 
     Ok(module)

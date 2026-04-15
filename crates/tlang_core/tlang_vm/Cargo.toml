@@ -5,7 +5,7 @@ edition.workspace = true
 
 [features]
 default = ["stdlib"]
-binary = ["dep:tlang_ast_lowering", "dep:tlang_diagnostics", "dep:tlang_hir_opt", "dep:tlang_parser", "dep:tlang_semantics", "dep:env_logger"]
+binary = ["dep:tlang_ast_lowering", "dep:tlang_diagnostics", "dep:tlang_hir_opt", "dep:tlang_parser", "dep:tlang_semantics", "dep:tlang_typeck", "dep:env_logger"]
 stdlib = ["tlang_interpreter/stdlib"]
 # Activates the pipeline deps needed for integration tests
 testing = ["binary"]
@@ -24,6 +24,7 @@ tlang_interpreter = { path = "../tlang_interpreter", default-features = false }
 tlang_memory = { path = "../tlang_memory" }
 tlang_parser = { path = "../../tlang_parser", optional = true }
 tlang_semantics = { path = "../../tlang_semantics", optional = true }
+tlang_typeck = { path = "../../tlang_typeck", optional = true }
 tlang_defs = { path = "../../tlang_defs" }
 inventory = { workspace = true }
 log = { workspace = true }

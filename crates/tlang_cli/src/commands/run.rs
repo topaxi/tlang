@@ -4,11 +4,14 @@ use std::{fs::File, io::Read};
 
 use tlang_ast_lowering::lower_to_hir;
 use tlang_core::{memory::TlangValue, vm::VM};
-use tlang_diagnostics::{render_ice, render_parse_issues, render_semantic_diagnostics};
+use tlang_diagnostics::{
+    Diagnostic, render_diagnostics, render_ice, render_parse_issues, render_semantic_diagnostics,
+};
 use tlang_hir as hir;
-use tlang_hir_opt::HirOptimizer;
+use tlang_hir_opt::{HirOptimizer, HirPass};
 use tlang_modules::{ModulePath, compile_project_with_slots};
 use tlang_semantics::SemanticAnalyzer;
+use tlang_typeck::TypeChecker;
 
 pub fn handle_run(input_file: &str) {
     let path = Path::new(input_file);
@@ -83,6 +86,13 @@ fn handle_run_project(project_dir: &Path) {
             std::process::exit(1);
         }
 
+        abort_on_type_errors(
+            &result.graph.modules[path].file_path,
+            &result.graph.modules[path].source,
+            &mut hir_module,
+            &mut ctx,
+        );
+
         vm.eval_module(&hir_module);
 
         // Copy exported function values to the global slots used by importing modules
@@ -98,6 +108,14 @@ fn handle_run_project(project_dir: &Path) {
             eprint!("{}", render_ice(&err));
             std::process::exit(1);
         }
+
+        let root_module = &result.graph.modules[&ModulePath::root()];
+        abort_on_type_errors(
+            &root_module.file_path,
+            &root_module.source,
+            &mut hir_module,
+            &mut ctx,
+        );
 
         // Copy exported function values for root module imports
         populate_import_slots(&mut vm, &ModulePath::root(), &result);
@@ -230,5 +248,49 @@ fn compile(input_file: &str) -> (hir::Module, std::collections::HashSet<tlang_hi
         std::process::exit(1);
     }
 
+    abort_on_type_errors(path, &source, &mut module, &mut ctx);
+
     (module, constant_pool_ids)
+}
+
+fn abort_on_type_errors(
+    file_path: &Path,
+    source: &str,
+    module: &mut hir::Module,
+    ctx: &mut tlang_hir_opt::hir_opt::HirOptContext,
+) {
+    let mut type_checker = TypeChecker::new();
+    if let Err(err) = type_checker.optimize_hir(module, ctx) {
+        eprint!("{}", render_ice(&err));
+        std::process::exit(1);
+    }
+
+    let (errors, warnings): (Vec<Diagnostic>, Vec<Diagnostic>) = ctx
+        .diagnostics
+        .drain(..)
+        .partition(|diagnostic| diagnostic.is_error());
+    let source_name = file_path.to_string_lossy();
+
+    if !warnings.is_empty() {
+        eprint!(
+            "{}",
+            render_diagnostics(
+                &source_name,
+                source,
+                &warnings,
+                std::io::stderr().is_terminal()
+            )
+        );
+    }
+
+    if !errors.is_empty() {
+        let rendered = render_diagnostics(
+            &source_name,
+            source,
+            &errors,
+            std::io::stderr().is_terminal(),
+        );
+        eprint!("{rendered}");
+        std::process::exit(1);
+    }
 }

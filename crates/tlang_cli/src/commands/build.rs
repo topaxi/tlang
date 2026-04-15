@@ -2,9 +2,10 @@ use std::path::Path;
 
 use tlang_codegen_js::CodegenError;
 use tlang_codegen_js::generator::CodegenJS;
-use tlang_diagnostics::render_ice;
+use tlang_diagnostics::{Diagnostic, render_diagnostics, render_ice};
 use tlang_hir_opt::HirPass;
 use tlang_modules::{ModulePath, compile_project};
+use tlang_typeck::TypeChecker;
 
 use crate::commands::compile::CompileTargetHirOptimizer;
 
@@ -28,6 +29,15 @@ fn render_codegen_errors(module_path: &ModulePath, errors: &[CodegenError]) -> S
         ));
     }
     out
+}
+
+fn render_type_diagnostics(source_name: &str, source: &str, diagnostics: &[Diagnostic]) -> String {
+    render_diagnostics(
+        source_name,
+        source,
+        diagnostics,
+        std::io::IsTerminal::is_terminal(&std::io::stderr()),
+    )
 }
 
 pub fn handle_build(options: &BuildOptions) -> bool {
@@ -79,6 +89,33 @@ pub fn handle_build(options: &BuildOptions) -> bool {
             return false;
         }
 
+        let mut type_checker = TypeChecker::new();
+        if let Err(err) = type_checker.optimize_hir(&mut hir_module, &mut ctx) {
+            eprint!("{}", render_ice(&err));
+            return false;
+        }
+
+        if let Some(parsed_module) = result.graph.modules.get(path) {
+            let source_name = parsed_module.file_path.to_string_lossy();
+            let (errors, warnings): (Vec<_>, Vec<_>) = ctx
+                .diagnostics
+                .into_iter()
+                .partition(|diagnostic| diagnostic.is_error());
+            if !warnings.is_empty() {
+                eprint!(
+                    "{}",
+                    render_type_diagnostics(&source_name, &parsed_module.source, &warnings)
+                );
+            }
+            if !errors.is_empty() {
+                eprint!(
+                    "{}",
+                    render_type_diagnostics(&source_name, &parsed_module.source, &errors)
+                );
+                return false;
+            }
+        }
+
         let mut codegen = CodegenJS::default();
         codegen.set_bundle_mode(true);
         for name in &protocol_names {
@@ -123,6 +160,33 @@ pub fn handle_build(options: &BuildOptions) -> bool {
         if let Err(err) = optimizer.optimize_hir(&mut hir_module, &mut ctx) {
             eprint!("{}", render_ice(&err));
             return false;
+        }
+
+        let mut type_checker = TypeChecker::new();
+        if let Err(err) = type_checker.optimize_hir(&mut hir_module, &mut ctx) {
+            eprint!("{}", render_ice(&err));
+            return false;
+        }
+
+        if let Some(parsed_module) = result.graph.modules.get(&ModulePath::root()) {
+            let source_name = parsed_module.file_path.to_string_lossy();
+            let (errors, warnings): (Vec<_>, Vec<_>) = ctx
+                .diagnostics
+                .into_iter()
+                .partition(|diagnostic| diagnostic.is_error());
+            if !warnings.is_empty() {
+                eprint!(
+                    "{}",
+                    render_type_diagnostics(&source_name, &parsed_module.source, &warnings)
+                );
+            }
+            if !errors.is_empty() {
+                eprint!(
+                    "{}",
+                    render_type_diagnostics(&source_name, &parsed_module.source, &errors)
+                );
+                return false;
+            }
         }
 
         let mut codegen = CodegenJS::default();

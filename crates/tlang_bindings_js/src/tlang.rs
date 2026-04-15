@@ -204,15 +204,31 @@ impl Tlang {
         self.build.hir.as_ref()
     }
 
+    fn build_failure_message(&mut self) -> Option<String> {
+        let parse_errors = self.render_parse_errors();
+        if !parse_errors.is_empty() {
+            return Some(parse_errors);
+        }
+
+        let error_diagnostics = self.render_error_diagnostics();
+        if !error_diagnostics.is_empty() {
+            return Some(error_diagnostics);
+        }
+
+        None
+    }
+
     #[wasm_bindgen]
     pub fn eval(&mut self) -> Result<JsUnknown, JsError> {
         self.lower_to_hir();
 
-        let hir = self
-            .build
-            .hir
-            .as_ref()
-            .ok_or_else(|| JsError::new("Failed to generate HIR"))?;
+        let Some(hir) = self.build.hir.as_ref() else {
+            return Err(JsError::new(
+                self.build_failure_message()
+                    .as_deref()
+                    .unwrap_or("Failed to generate HIR"),
+            ));
+        };
 
         Ok(self.interpreter.eval(hir).into())
     }
@@ -395,8 +411,20 @@ impl Tlang {
             return;
         }
 
+        self.build.hir = None;
+        self.build.hir_opt_diagnostics.clear();
+
         if !self.build.analyzed {
             self.analyze();
+        }
+
+        if self
+            .analyzer
+            .get_diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.is_error())
+        {
+            return;
         }
 
         if let Some(ast) = self.ast() {
@@ -428,13 +456,7 @@ impl Tlang {
                         .iter()
                         .map(|e| tlang_diagnostics::Diagnostic::error(&e.to_string(), e.span()))
                         .collect();
-                    let rendered = render_semantic_diagnostics(
-                        "playground.tlang",
-                        &self.source,
-                        &diagnostics,
-                        false,
-                    );
-                    log::error!("{rendered}");
+                    self.build.hir_opt_diagnostics = diagnostics;
                     return;
                 }
             };
@@ -557,9 +579,18 @@ impl Tlang {
                 .optimize_hir(&mut module, &mut ctx)
                 .unwrap_or_else(|err| panic!("{}", render_ice(&err)));
 
+            let has_type_errors = ctx
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.is_error());
+            self.build.hir_opt_diagnostics = ctx.diagnostics;
+
+            if has_type_errors {
+                return;
+            }
+
             self.interpreter
                 .register_constant_pool_ids(constant_pool_ids);
-            self.build.hir_opt_diagnostics = ctx.diagnostics;
             self.build.hir = Some(module);
         }
     }
@@ -577,14 +608,19 @@ impl Tlang {
         if self.js.get_output().is_empty() {
             let _ = self.parse();
             self.lower_to_hir();
-            if let Some(hir) = self.build.hir.as_ref() {
-                self.js
-                    .generate_code_with_source_map(hir, "playground.tlang", &self.source)
-                    .map_err(|errors| {
-                        let msgs: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
-                        JsError::new(&msgs.join("\n"))
-                    })?;
-            }
+            let Some(hir) = self.build.hir.as_ref() else {
+                return Err(JsError::new(
+                    self.build_failure_message()
+                        .as_deref()
+                        .unwrap_or("Failed to generate HIR"),
+                ));
+            };
+            self.js
+                .generate_code_with_source_map(hir, "playground.tlang", &self.source)
+                .map_err(|errors| {
+                    let msgs: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
+                    JsError::new(&msgs.join("\n"))
+                })?;
         }
 
         Ok(())

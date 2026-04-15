@@ -19,6 +19,7 @@ tlang_codegen_js = { path = "../tlang_codegen_js" }
 tlang_modules = { path = "../tlang_modules" }
 tlang_span = { path = "../tlang_span" }
 tlang_semantics = { path = "../tlang_semantics" }
+tlang_typeck = { path = "../tlang_typeck" }
 tlang_core = { path = "../tlang_core" }
 ron = { workspace = true }
 clap = { workspace = true, features = ["cargo"] }

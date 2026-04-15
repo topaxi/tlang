@@ -4,10 +4,13 @@ use std::io::IsTerminal;
 use std::process;
 
 use tlang_ast_lowering::lower_to_hir;
-use tlang_diagnostics::{render_ice, render_parse_issues, render_semantic_diagnostics};
-use tlang_hir_opt::HirOptimizer;
+use tlang_diagnostics::{
+    Diagnostic, render_diagnostics, render_ice, render_parse_issues, render_semantic_diagnostics,
+};
+use tlang_hir_opt::{HirOptimizer, HirPass};
 use tlang_semantics::SemanticAnalyzer;
-use tlang_semantics::diagnostic::Diagnostic;
+use tlang_semantics::diagnostic::Diagnostic as SemanticDiagnostic;
+use tlang_typeck::TypeChecker;
 use tlang_vm::VM;
 
 fn main() {
@@ -71,7 +74,7 @@ fn main() {
                 )
             );
 
-            if diagnostics.iter().any(Diagnostic::is_error) {
+            if diagnostics.iter().any(SemanticDiagnostic::is_error) {
                 process::exit(1);
             }
         }
@@ -95,6 +98,30 @@ fn main() {
     let mut ctx = meta.into();
     if let Err(err) = optimizer.optimize_hir(&mut module, &mut ctx) {
         eprint!("{}", render_ice(&err));
+        process::exit(1);
+    }
+
+    let mut type_checker = TypeChecker::new();
+    if let Err(err) = type_checker.optimize_hir(&mut module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        process::exit(1);
+    }
+
+    let (errors, warnings): (Vec<Diagnostic>, Vec<Diagnostic>) = ctx
+        .diagnostics
+        .into_iter()
+        .partition(|diagnostic| diagnostic.is_error());
+    if !warnings.is_empty() {
+        eprint!(
+            "{}",
+            render_diagnostics(filename, &code, &warnings, std::io::stderr().is_terminal())
+        );
+    }
+    if !errors.is_empty() {
+        eprint!(
+            "{}",
+            render_diagnostics(filename, &code, &errors, std::io::stderr().is_terminal())
+        );
         process::exit(1);
     }
 
