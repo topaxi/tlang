@@ -7,12 +7,13 @@ use tlang_ast_lowering::lower_to_hir;
 use tlang_diagnostics::{
     render_diagnostics, render_ice, render_parse_issues, render_semantic_diagnostics,
 };
-use tlang_hir_opt::{HirOptimizer, HirPass};
+use tlang_hir_opt::HirOptimizer;
 use tlang_semantics::SemanticAnalyzer;
 use tlang_semantics::diagnostic::Diagnostic as SemanticDiagnostic;
 use tlang_typeck::typecheck_module;
 use tlang_vm::VM;
 
+#[allow(clippy::too_many_lines)]
 fn main() {
     let stress_gc = env::var("TLANG_STRESS_GC").is_ok();
 

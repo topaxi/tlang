@@ -2117,14 +2117,15 @@ impl TypeChecker {
 
                 // Pass 2: visit closure args with substituted expected types.
                 for (i, arg) in call.arguments.iter_mut().enumerate() {
-                    if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind {
-                        if let Some(expected_arg_ty) = param_tys.get(i) {
-                            let substituted =
-                                substitute_type_vars(&expected_arg_ty.kind, &bindings);
-                            Self::apply_expected_closure_types(decl, &substituted);
-                        }
+                    if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind
+                        && let Some(expected_arg_ty) = param_tys.get(i)
+                    {
+                        let substituted = substitute_type_vars(&expected_arg_ty.kind, &bindings);
+                        Self::apply_expected_closure_types(decl, &substituted);
                         self.visit_expr(arg, &mut ());
+                        continue;
                     }
+                    self.visit_expr(arg, &mut ());
                 }
             }
         } else {
@@ -2134,8 +2135,7 @@ impl TypeChecker {
                 if receiver_visited && i == 0 {
                     continue;
                 }
-                if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind
-                    && let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty
+                if let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty
                     && let Some(expected_arg_ty) = param_tys.get(i)
                 {
                     self.apply_expected_expr_type(arg, &expected_arg_ty.kind);
