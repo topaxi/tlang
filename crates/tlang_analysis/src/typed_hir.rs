@@ -69,10 +69,9 @@ pub fn lower_and_typecheck(result: &AnalysisResult) -> Option<TypedHir> {
     optimizer.optimize_hir(&mut module, &mut ctx).ok()?;
 
     // Run the type checker. Type-aware HIR passes should run after this phase.
+    // Editor features still consume partially typed HIR even when diagnostics
+    // are present; executable entry points gate on type errors separately.
     let typecheck_result = typecheck_module(&mut module, &mut ctx).ok()?;
-    if typecheck_result.has_errors() {
-        return None;
-    }
 
     Some(TypedHir {
         module,

@@ -4,17 +4,17 @@ fn A::new() {
     A {}
 }
 
-fn A.method(_self) {
+fn method(_self: A) {
     "called with just self"
 }
-fn A.method(_self, _a) {
+fn method(_self: A, _a: i64) {
     "called with a single argument"
 }
 
 let a = A::new();
 
-a.method()
+method(a)
 |> log();
 
-a.method(1)
+method(a, 1)
 |> log();

@@ -1,11 +1,11 @@
 enum TreeNode {
-    Leaf(i32),
+    Leaf(i64),
     Branch(TreeNode, TreeNode),
     TriBranch(TreeNode, TreeNode, TreeNode),
 }
 
 enum Expression {
-    Number(i32),
+    Number(i64),
     Add(Expression, Expression),
     Multiply(Expression, Expression),
     Conditional(Expression, Expression, Expression),

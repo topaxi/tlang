@@ -1,10 +1,16 @@
-fn range(start, end) { range(start, end, []) }
-fn range(start, end, acc) if start >= end; { acc }
-fn range(start, end, acc) { rec range(start + 1, end, [...acc, start]) }
+fn range(start: i64, end: i64) -> List<i64> {
+    if start >= end {
+        []
+    } else {
+        [start, ...range(start + 1, end)]
+    }
+}
 
-fn foldl([], acc, _) { acc }
-fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+fn foldl([]: List<i64>, acc: i64, _: fn(i64, i64) -> i64) -> i64 { acc }
+fn foldl([x, ...xs]: List<i64>, acc: i64, f: fn(i64, i64) -> i64) -> i64 { rec foldl(xs, f(acc, x), f) }
+
+fn add(acc: i64, x: i64) -> i64 { acc + x }
 
 range(0, 10000)
-|> foldl(0, fn (acc, x) { acc + x })
+|> foldl(0, add)
 |> log();

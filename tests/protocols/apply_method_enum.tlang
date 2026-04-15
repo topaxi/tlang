@@ -3,8 +3,8 @@ protocol Greet {
 }
 
 enum Animal {
-  Dog(name),
-  Cat(name),
+  Dog(String),
+  Cat(String),
 }
 
 impl Greet for Animal {

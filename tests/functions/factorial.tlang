@@ -9,7 +9,7 @@ fn factorial(n) { n * factorial(n - 1) }
 fn factorial_tail(n) { factorial_tail_helper(n, 1) }
 
 fn factorial_tail_helper(0, acc) { acc }
-fn factorial_tail_helper(n, acc) { 
+fn factorial_tail_helper(n, acc) {
     rec factorial_tail_helper(n - 1, n * acc) 
 }
 

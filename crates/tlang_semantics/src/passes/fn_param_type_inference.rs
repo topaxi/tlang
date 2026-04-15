@@ -133,7 +133,10 @@ fn annotate_self_param(decl: &mut FunctionDeclaration) {
 #[derive(Debug, Clone, PartialEq)]
 enum PatternType {
     /// A named type (enum name or builtin type name).
-    Named(String),
+    Named {
+        name: String,
+        open_world_safe: bool,
+    },
 }
 
 /// Returns the `PatternType` contributed by a single pattern, or `None` if the
@@ -147,20 +150,34 @@ fn pattern_type(pat: &PatKind) -> Option<Result<PatternType, ()>> {
                 1 => {
                     // Struct pattern: `Page { title }` — the type is the struct
                     // name itself (the single path segment).
-                    Some(Ok(PatternType::Named(segs[0].to_string())))
+                    Some(Ok(PatternType::Named {
+                        name: segs[0].to_string(),
+                        open_world_safe: false,
+                    }))
                 }
                 _ => {
                     // Enum variant pattern: `Option::Some(x)` — the type is the
                     // second-to-last segment (e.g. "Option" from "Option::Some").
                     let name = segs[segs.len() - 2].to_string();
-                    Some(Ok(PatternType::Named(name)))
+                    Some(Ok(PatternType::Named {
+                        name,
+                        open_world_safe: false,
+                    }))
                 }
             }
         }
         PatKind::Literal(lit) => {
-            builtin_type_for_literal(lit).map(|name| Ok(PatternType::Named(name.to_string())))
+            builtin_type_for_literal(lit).map(|name| {
+                Ok(PatternType::Named {
+                    name: name.to_string(),
+                    open_world_safe: true,
+                })
+            })
         }
-        PatKind::List(_) => Some(Ok(PatternType::Named(builtin_types::LIST.to_string()))),
+        PatKind::List(_) => Some(Ok(PatternType::Named {
+            name: builtin_types::LIST.to_string(),
+            open_world_safe: true,
+        })),
         // Unconstrained — don't block or contribute to inference.
         PatKind::Identifier(_) | PatKind::Wildcard | PatKind::_Self => None,
         // Rest patterns at the top level, None patterns — block inference.
@@ -216,21 +233,33 @@ fn infer_param_type(
     enum_decl_ids: &HashMap<String, NodeId>,
 ) -> Option<Ty> {
     let mut type_names: Vec<String> = Vec::new();
+    let mut saw_unconstrained = false;
+    let mut has_open_world_unsafe_constraint = false;
 
     for decl in decls {
         if let Some(param) = decl.parameters.get(param_idx) {
             match pattern_type(&param.pattern.kind) {
-                None => {}                    // unconstrained, skip
+                None => saw_unconstrained = true,
                 Some(Err(())) => return None, // blocks inference
-                Some(Ok(PatternType::Named(name))) if !type_names.contains(&name) => {
+                Some(Ok(PatternType::Named {
+                    name,
+                    open_world_safe,
+                })) if !type_names.contains(&name) => {
+                    has_open_world_unsafe_constraint |= !open_world_safe;
                     type_names.push(name);
                 }
-                Some(Ok(PatternType::Named(_))) => {}
+                Some(Ok(PatternType::Named { open_world_safe, .. })) => {
+                    has_open_world_unsafe_constraint |= !open_world_safe;
+                }
             }
         }
     }
 
     if type_names.is_empty() {
+        return None;
+    }
+
+    if saw_unconstrained && has_open_world_unsafe_constraint {
         return None;
     }
 

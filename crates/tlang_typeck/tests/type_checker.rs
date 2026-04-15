@@ -8,6 +8,21 @@ fn integer_literal_ok() {
 }
 
 #[test]
+fn integer_literal_uses_typed_binding_context() {
+    common::typecheck_ok("let x: i32 = 42;");
+}
+
+#[test]
+fn integer_literal_uses_call_argument_context() {
+    common::typecheck_ok(
+        r#"
+        enum Expr { Number(i32) }
+        let _ = Expr::Number(42);
+        "#,
+    );
+}
+
+#[test]
 fn float_literal_ok() {
     common::typecheck_ok("let x = 3.14;");
 }
@@ -764,6 +779,31 @@ fn function_calls_another_function_ok() {
         r#"
         fn add(a: i64, b: i64) -> i64 { a + b }
         fn double(x: i64) -> i64 { add(x, x) }
+        "#,
+    );
+}
+
+#[test]
+fn typed_recursive_higher_order_function_infers_closure_types() {
+    common::typecheck_ok(
+        r#"
+        fn map<T, U>([]: List<T>, _: fn(T) -> U) -> List<U> { [] }
+        fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, f)] }
+
+        let ys = map([1, 2, 3], fn(x) { x + 1 });
+        "#,
+    );
+}
+
+#[test]
+fn closure_with_generic_expected_return_stays_permissive() {
+    common::typecheck_ok(
+        r#"
+        fn map<T, U>([]: List<T>, _: fn(T) -> U) -> List<U> { [] }
+        fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, f)] }
+        fn identity(x) { x }
+
+        let ys = map([1, 2, 3], fn(n) { identity(n) == identity(n) });
         "#,
     );
 }

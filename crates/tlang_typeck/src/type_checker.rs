@@ -1121,6 +1121,30 @@ impl TypeChecker {
         }
     }
 
+    /// Register pattern bindings against the scrutinee expression itself.
+    ///
+    /// This preserves heterogeneous element types for synthetic match
+    /// scrutinees like `[arg0, arg1]` used by multi-clause function lowering.
+    /// Falling back to the aggregate list type would smear every element into a
+    /// homogeneous `List`, which breaks typed multi-parameter dispatch.
+    fn register_match_pat_bindings(&mut self, pat: &mut hir::Pat, scrutinee: &hir::Expr) {
+        match (&mut pat.kind, &scrutinee.kind) {
+            (hir::PatKind::List(pats), hir::ExprKind::List(items))
+                if pats.len() == items.len()
+                    && !pats.iter().any(|pat| matches!(pat.kind, hir::PatKind::Rest(_))) =>
+            {
+                pat.ty.kind = scrutinee.ty.kind.clone();
+                for (item_pat, item_expr) in pats.iter_mut().zip(items.iter()) {
+                    self.register_match_pat_bindings(item_pat, item_expr);
+                }
+            }
+            _ => {
+                pat.ty.kind = scrutinee.ty.kind.clone();
+                self.register_pat_bindings(pat, &scrutinee.ty.kind);
+            }
+        }
+    }
+
     /// Field types declared in structs/enums are safe to propagate to
     /// destructuring bindings when they are explicit types. Tuple-enum
     /// payloads like `Dog(name)` use a lowercase placeholder that parses as
@@ -1828,6 +1852,9 @@ impl TypeChecker {
                 // Pass 1: visit non-closure args and collect bindings.
                 for (i, arg) in call.arguments.iter_mut().enumerate() {
                     if !matches!(arg.kind, hir::ExprKind::FunctionExpression(_)) {
+                        if let Some(param_ty) = param_tys.get(i) {
+                            self.apply_expected_expr_type(arg, &param_ty.kind);
+                        }
                         self.visit_expr(arg, &mut ());
                         if let Some(param_ty) = param_tys.get(i) {
                             collect_type_var_bindings(&arg.ty.kind, &param_ty.kind, &mut bindings);
@@ -1851,11 +1878,13 @@ impl TypeChecker {
             // Simple path: visit all arguments in order with optional
             // bidirectional inference for closures.
             for (i, arg) in call.arguments.iter_mut().enumerate() {
-                if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind
-                    && let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty
+                if let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty
                     && let Some(expected_arg_ty) = param_tys.get(i)
                 {
-                    Self::apply_expected_closure_types(decl, &expected_arg_ty.kind);
+                    self.apply_expected_expr_type(arg, &expected_arg_ty.kind);
+                    if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind {
+                        Self::apply_expected_closure_types(decl, &expected_arg_ty.kind);
+                    }
                 }
                 self.visit_expr(arg, &mut ());
             }
@@ -1933,6 +1962,14 @@ impl TypeChecker {
         }
 
         match &mut expr.kind {
+            hir::ExprKind::Literal(lit) => {
+                if matches!(lit.as_ref(), Literal::Integer(_) | Literal::UnsignedInteger(_))
+                    && let TyKind::Primitive(prim) = expected
+                    && prim.is_numeric()
+                {
+                    expr.ty.kind = expected.clone();
+                }
+            }
             hir::ExprKind::FunctionExpression(decl) => {
                 Self::apply_expected_closure_types(decl, expected);
             }
@@ -2271,7 +2308,17 @@ impl<'hir> Visitor<'hir> for TypeChecker {
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
         match &mut expr.kind {
             hir::ExprKind::Literal(lit) => {
-                let ty_kind = Self::type_of_literal(lit);
+                let ty_kind = match lit.as_ref() {
+                    Literal::Integer(_) | Literal::UnsignedInteger(_)
+                        if matches!(
+                            expr.ty.kind,
+                            TyKind::Primitive(prim) if prim.is_numeric()
+                        ) =>
+                    {
+                        expr.ty.kind.clone()
+                    }
+                    _ => Self::type_of_literal(lit),
+                };
                 expr.ty.kind = ty_kind.clone();
                 self.type_table.insert(
                     expr.hir_id,
@@ -2372,12 +2419,10 @@ impl<'hir> Visitor<'hir> for TypeChecker {
             }
             hir::ExprKind::Match(scrutinee, arms) => {
                 self.visit_expr(scrutinee, ctx);
-                let scrutinee_ty = scrutinee.ty.kind.clone();
                 let iterator_item_ty = self.iterator_next_item_type(scrutinee);
                 let mut arm_tys = Vec::with_capacity(arms.len());
                 for arm in arms.iter_mut() {
-                    arm.pat.ty.kind = scrutinee_ty.clone();
-                    self.register_pat_bindings(&mut arm.pat, &scrutinee_ty);
+                    self.register_match_pat_bindings(&mut arm.pat, scrutinee);
                     if let Some(item_ty) = &iterator_item_ty {
                         self.register_iterator_next_pattern_bindings(&mut arm.pat, item_ty);
                     }

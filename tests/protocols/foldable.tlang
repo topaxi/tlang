@@ -4,7 +4,7 @@ protocol Foldable {
 
 enum List {
   Nil,
-  Cons(unknown, List),
+  Cons(i64, List),
 }
 
 impl Foldable for List {

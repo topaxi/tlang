@@ -3,7 +3,7 @@
 
 // Define a more complex enum for expression trees
 enum Expr {
-    Num(isize),
+    Num(i64),
     Add(Expr, Expr),
     Mul(Expr, Expr),
     Sub(Expr, Expr),
@@ -58,10 +58,10 @@ fn describe_list(list) {
 }
 
 // Pattern matching with conditions
-fn classify_number(n) if n < 0 { "negative" }
+fn classify_number(n: i64) if n < 0 { "negative" }
 fn classify_number(0) { "zero" }
-fn classify_number(n) if n > 0 && n < 10 { "small_positive" }
-fn classify_number(n) if n >= 10 && n < 100 { "medium" }
+fn classify_number(n: i64) if n > 0 && n < 10 { "small_positive" }
+fn classify_number(n: i64) if n >= 10 && n < 100 { "medium" }
 fn classify_number(_) { "large" }
 
 log("=== Advanced Pattern Matching Demo ===");

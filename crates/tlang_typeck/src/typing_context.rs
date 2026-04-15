@@ -1,5 +1,25 @@
 use tlang_hir as hir;
 
+fn has_concrete_type(ty: &hir::Ty) -> bool {
+    fn contains_var(kind: &hir::TyKind) -> bool {
+        match kind {
+            hir::TyKind::Var(_) => true,
+            hir::TyKind::Fn(params, ret) => {
+                params.iter().any(|param| contains_var(&param.kind)) || contains_var(&ret.kind)
+            }
+            hir::TyKind::Slice(inner) => contains_var(&inner.kind),
+            hir::TyKind::Dict(key, value) => contains_var(&key.kind) || contains_var(&value.kind),
+            hir::TyKind::Union(types) => types.iter().any(|ty| contains_var(&ty.kind)),
+            hir::TyKind::Unknown
+            | hir::TyKind::Primitive(_)
+            | hir::TyKind::Never
+            | hir::TyKind::Path(_) => false,
+        }
+    }
+
+    !matches!(ty.kind, hir::TyKind::Unknown) && !contains_var(&ty.kind)
+}
+
 /// Whether `unknown` operands produce errors or propagate silently.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TypingContext {
@@ -19,14 +39,14 @@ impl TypingContext {
 
     /// Determine the typing context for a function declaration.
     ///
-    /// A function is strict if **all** parameters have non-`unknown` type
-    /// annotations **and** the return type is non-`unknown`.
+    /// A function is strict only when every parameter and the return type are
+    /// fully concrete. Unresolved generic vars still belong to permissive mode.
     pub fn for_function(decl: &hir::FunctionDeclaration) -> Self {
         let all_params_typed = decl
             .parameters
             .iter()
-            .all(|p| !matches!(p.type_annotation.kind, hir::TyKind::Unknown));
-        let return_typed = !matches!(decl.return_type.kind, hir::TyKind::Unknown);
+            .all(|p| has_concrete_type(&p.type_annotation));
+        let return_typed = has_concrete_type(&decl.return_type);
 
         if all_params_typed && return_typed {
             TypingContext::Strict

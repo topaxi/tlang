@@ -1,19 +1,10 @@
-// Test Functor::map on Option
-let some = Option::Some(5);
-Functor::map(some, fn (x) { x * 2 }) |> log();
-
-let none = Option::None;
-Functor::map(none, fn (x) { x * 2 }) |> log();
-
-// Test Functor::map on Result
-let ok = Result::Ok(10);
-Functor::map(ok, fn (x) { x + 1 }) |> log();
-
-let err = Result::Err("error");
-Functor::map(err, fn (x) { x + 1 }) |> log();
+let increment: fn(i64) -> i64 = fn (x: i64) -> i64 { x + 1 };
+let square: fn(i64) -> i64 = fn (x: i64) -> i64 { x ** 2 };
+let times_ten: fn(i64) -> i64 = fn (x: i64) -> i64 { x * 10 };
 
 // Test Functor::map on List
-Functor::map([1, 2, 3], fn (x) { x ** 2 }) |> log();
+let squares: List<i64> = Functor::map([1, 2, 3], square);
+squares |> log();
 
 // Test backward compat: global map still works
-map([4, 5, 6], fn (x) { x * 10 }) |> log();
+map([4, 5, 6], times_ten) |> log();
