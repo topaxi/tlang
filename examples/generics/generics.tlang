@@ -73,11 +73,11 @@ struct Pair<A, B> {
     second: B,
 }
 
-fn Pair::new<A, B>(first: A, second: B) -> Pair<A, B> {
+fn Pair<A, B>::new(first: A, second: B) -> Pair<A, B> {
     Pair { first: first, second: second }
 }
 
-fn Pair.swap<A, B>(self) -> Pair<B, A> {
+fn Pair<A, B>.swap(self) -> Pair<B, A> {
     Pair { first: self.second, second: self.first }
 }
 

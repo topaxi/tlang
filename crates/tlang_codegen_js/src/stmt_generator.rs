@@ -443,6 +443,7 @@ impl<'a> InnerCodegen<'a> {
             hir_id: method.hir_id,
             visibility: Visibility::Private,
             name,
+            owner_type_params: Vec::new(),
             type_params: Vec::new(),
             parameters: method.parameters.clone(),
             params_span: tlang_span::Span::default(),

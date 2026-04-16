@@ -900,15 +900,20 @@ impl LoweringContext {
         );
 
         self.with_new_scope(|this, _scope| {
-            // Push method-level type parameter scope (e.g. `<U>` from `fn map<U>`)
+            // Push owner type parameter scope first (e.g. `<A>` from
+            // `fn Pair<A>.swap(...)`), then method-level type parameters
+            // (e.g. `<U>` from `fn map<U>`)
             // before lowering any type annotations so that references like
             // `fn(T) -> U` in parameter types resolve `U` to `TyKind::Var`.
             // Type params are taken from the first clause — subsequent clauses
             // must use identical params (enforced by convention, not yet validated).
+            let owner_type_params = this.lower_type_params(&decls[0].owner_type_params);
             let type_params = this.lower_type_params(&decls[0].type_params);
 
             let (hir_id, fn_name, params, span) =
                 this.setup_function_declaration_metadata(decls, all_param_names);
+            let mut params = params;
+            this.seed_dot_method_receiver_type(&fn_name, &owner_type_params, &mut params);
 
             let fn_name_str = this.fn_name_or_error(&decls[0]);
             this.define_function_symbols(hir_id, &fn_name_str, &decls[0], &params);
@@ -945,9 +950,11 @@ impl LoweringContext {
             );
 
             this.pop_type_param_scope();
+            this.pop_type_param_scope();
 
             (hir_id, {
                 let mut decl = hir::FunctionDeclaration::new(hir_id, fn_name, params, body);
+                decl.owner_type_params = owner_type_params;
                 decl.type_params = type_params;
                 decl.return_type = return_type;
                 decl.has_return_type = decls.iter().any(|d| d.return_type_annotation.is_some());

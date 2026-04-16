@@ -209,6 +209,35 @@ fn test_protocol_method_type_params_lowered() {
 }
 
 #[test]
+fn test_method_head_owner_and_method_type_params_lowered() {
+    let module = common::hir_from_str("fn Pair<A, B>.swap<T>(self, value: T) -> A { self }");
+
+    let stmt = &module.block.stmts[0];
+    let decl = match &stmt.kind {
+        hir::StmtKind::FunctionDeclaration(decl) => decl,
+        other => panic!("expected FunctionDeclaration, got {other:?}"),
+    };
+
+    assert_eq!(decl.owner_type_params.len(), 2);
+    assert_eq!(decl.type_params.len(), 1);
+
+    let tv_a = decl.owner_type_params[0].type_var_id;
+    let tv_b = decl.owner_type_params[1].type_var_id;
+    let tv_t = decl.type_params[0].type_var_id;
+
+    assert_ne!(tv_a, tv_b);
+    assert_ne!(tv_a, tv_t);
+    assert_ne!(tv_b, tv_t);
+
+    assert_eq!(
+        decl.parameters[0].type_annotation.kind.to_string(),
+        format!("Pair<?{tv_a}, ?{tv_b}>")
+    );
+    assert_eq!(decl.parameters[1].type_annotation.kind, TyKind::Var(tv_t));
+    assert_eq!(decl.return_type.kind, TyKind::Var(tv_a));
+}
+
+#[test]
 fn test_impl_block_type_params_lowered() {
     let module = common::hir_from_str(
         "protocol Functor {

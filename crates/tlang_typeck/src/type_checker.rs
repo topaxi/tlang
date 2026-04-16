@@ -137,7 +137,16 @@ impl TypeChecker {
         }
 
         receiver_param.type_annotation = Ty {
-            kind: TyKind::Path(receiver_path.clone(), Vec::new()),
+            kind: TyKind::Path(
+                receiver_path.clone(),
+                decl.owner_type_params
+                    .iter()
+                    .map(|type_param| Ty {
+                        kind: TyKind::Var(type_param.type_var_id),
+                        ..Ty::default()
+                    })
+                    .collect(),
+            ),
             ..Ty::default()
         };
     }
@@ -3298,6 +3307,7 @@ mod tests {
             hir_id: dummy_hir_id(),
             visibility: tlang_ast::node::Visibility::Private,
             name: dummy_name,
+            owner_type_params: Vec::new(),
             type_params: Vec::new(),
             parameters: params,
             params_span: tlang_span::Span::default(),

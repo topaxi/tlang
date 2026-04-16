@@ -514,6 +514,40 @@ impl LoweringContext {
         }
     }
 
+    fn seed_dot_method_receiver_type(
+        &self,
+        name: &hir::Expr,
+        owner_type_params: &[hir::TypeParam],
+        parameters: &mut [hir::FunctionParameter],
+    ) {
+        let hir::ExprKind::FieldAccess(base, _) = &name.kind else {
+            return;
+        };
+        let Some(receiver_path) = base.path() else {
+            return;
+        };
+        let Some(receiver_param) = parameters.first_mut() else {
+            return;
+        };
+        if !matches!(receiver_param.type_annotation.kind, hir::TyKind::Unknown) {
+            return;
+        }
+
+        receiver_param.type_annotation = hir::Ty {
+            kind: hir::TyKind::Path(
+                receiver_path.clone(),
+                owner_type_params
+                    .iter()
+                    .map(|type_param| hir::Ty {
+                        kind: hir::TyKind::Var(type_param.type_var_id),
+                        ..hir::Ty::default()
+                    })
+                    .collect(),
+            ),
+            ..hir::Ty::default()
+        };
+    }
+
     fn lower_fn_decl(&mut self, decl: &FunctionDeclaration) -> hir::FunctionDeclaration {
         self.with_scope(decl.id, |this| {
             let hir_id = this.lower_node_id(decl.id);
@@ -521,22 +555,26 @@ impl LoweringContext {
 
             // Push type parameter scope *before* lowering parameters, return
             // type and body so that type annotations can resolve `T` → Var(id).
+            let owner_type_params = this.lower_type_params(&decl.owner_type_params);
             let type_params = this.lower_type_params(&decl.type_params);
 
-            let parameters = decl
+            let mut parameters = decl
                 .parameters
                 .iter()
                 .map(|param| this.lower_fn_param(param))
-                .collect();
+                .collect::<Vec<_>>();
+            this.seed_dot_method_receiver_type(&name, &owner_type_params, &mut parameters);
             let body = this.lower_block_in_current_scope(&decl.body);
             let return_type = this.lower_ty(decl.return_type_annotation.as_ref());
 
+            this.pop_type_param_scope();
             this.pop_type_param_scope();
 
             hir::FunctionDeclaration {
                 hir_id,
                 visibility: decl.visibility,
                 name,
+                owner_type_params,
                 type_params,
                 parameters,
                 params_span: decl.params_span,

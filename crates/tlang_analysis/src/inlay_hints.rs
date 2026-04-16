@@ -158,7 +158,10 @@ fn collect_fn_decl_hints(
     let fn_ctx = HintCtx {
         type_table: ctx.type_table,
         pipeline_call_ids: ctx.pipeline_call_ids,
-        type_var_names: extend_type_var_names(&ctx.type_var_names, &decl.type_params),
+        type_var_names: extend_type_var_names(
+            &ctx.type_var_names,
+            &decl.all_type_params().cloned().collect::<Vec<_>>(),
+        ),
         range: ctx.range,
     };
 
@@ -730,7 +733,10 @@ fn walk_fn_decl_for_type(
         return;
     }
 
-    let type_var_names = extend_type_var_names(parent_type_var_names, &decl.type_params);
+    let type_var_names = extend_type_var_names(
+        parent_type_var_names,
+        &decl.all_type_params().cloned().collect::<Vec<_>>(),
+    );
 
     // Build the function signature string, preferring the fully-inferred
     // types from the type table over the (possibly stale) AST annotations.
@@ -765,7 +771,7 @@ fn walk_fn_decl_for_type(
 
         if let Some(info) = type_table.get(&decl.hir_id)
             && let TyKind::Fn(ref param_tys, ref ret_ty) = info.ty.kind
-            && (!decl.type_params.is_empty()
+            && (!(decl.owner_type_params.is_empty() && decl.type_params.is_empty())
                 && (param_tys.iter().any(|param| ty_contains_var(&param.kind))
                     || ty_contains_var(&ret_ty.kind)))
         {

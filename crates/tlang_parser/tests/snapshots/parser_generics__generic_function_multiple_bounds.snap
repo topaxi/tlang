@@ -6,9 +6,9 @@ Module(
   id: 2,
   statements: [
     Stmt(
-      id: 14,
+      id: 17,
       kind: FunctionDeclaration(FunctionDeclaration(
-        id: 13,
+        id: 16,
         visibility: Private,
         name: Expr(
           id: 3,
@@ -48,20 +48,21 @@ Module(
           trailing_comments: [],
           span: Span(
             start: 3,
-            end: 12,
+            end: 36,
             start_lc: LineColumn(
               line: 0,
               column: 3,
             ),
             end_lc: LineColumn(
               line: 0,
-              column: 12,
+              column: 36,
             ),
           ),
         ),
+        owner_type_params: [],
         type_params: [
           TypeParam(
-            id: 6,
+            id: 9,
             name: Ident(
               name: "T",
               span: Span(
@@ -79,7 +80,7 @@ Module(
             ),
             bounds: [
               Ty(
-                id: 4,
+                id: 7,
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -127,7 +128,7 @@ Module(
                 ),
               ),
               Ty(
-                id: 5,
+                id: 8,
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -192,7 +193,7 @@ Module(
         parameters: [
           FunctionParameter(
             pattern: Pat(
-              id: 7,
+              id: 10,
               kind: Identifier(Ident(
                 name: "value",
                 span: Span(
@@ -224,7 +225,7 @@ Module(
               ),
             ),
             type_annotation: Some(Ty(
-              id: 8,
+              id: 11,
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -299,7 +300,7 @@ Module(
         ),
         guard: None,
         return_type_annotation: Some(Ty(
-          id: 9,
+          id: 12,
           kind: Path(Path(
             segments: [
               Ident(
@@ -347,10 +348,10 @@ Module(
           ),
         )),
         body: Block(
-          id: 12,
+          id: 15,
           statements: [],
           expression: Some(Expr(
-            id: 11,
+            id: 14,
             kind: Path(Path(
               segments: [
                 Ident(

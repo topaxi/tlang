@@ -69,6 +69,31 @@ fn test_protocol_associated_type_and_method_generics() {
 }
 
 #[test]
+fn test_method_head_owner_and_method_generics_parse_separately() {
+    let ast = parse!(indoc::indoc! {"
+        fn Pair<A, B>.swap<T>(self, value: T) -> A { self.first }
+        fn Pair<A, B>::new(first: A, second: B) -> Pair<A, B> { Pair { first, second } }
+    "});
+
+    let swap = match &ast.statements[0].kind {
+        tlang_ast::node::StmtKind::FunctionDeclaration(decl) => decl,
+        other => panic!("expected FunctionDeclaration, got {other:?}"),
+    };
+    assert_eq!(swap.owner_type_params.len(), 2);
+    assert_eq!(swap.owner_type_params[0].name.as_str(), "A");
+    assert_eq!(swap.owner_type_params[1].name.as_str(), "B");
+    assert_eq!(swap.type_params.len(), 1);
+    assert_eq!(swap.type_params[0].name.as_str(), "T");
+
+    let new_fn = match &ast.statements[1].kind {
+        tlang_ast::node::StmtKind::FunctionDeclaration(decl) => decl,
+        other => panic!("expected FunctionDeclaration, got {other:?}"),
+    };
+    assert_eq!(new_fn.owner_type_params.len(), 2);
+    assert!(new_fn.type_params.is_empty());
+}
+
+#[test]
 fn test_impl_type_params_where_clause_and_associated_type_binding() {
     let ast = parse!(indoc::indoc! {"
         impl<T, U, I, F> Functor for I

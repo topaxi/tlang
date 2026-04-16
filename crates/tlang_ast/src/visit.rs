@@ -359,6 +359,12 @@ pub fn walk_fn_decl<'ast, V: Visitor<'ast>>(
     ctx: &mut V::Context,
 ) {
     visitor.visit_expr(&declaration.name, ctx);
+    for type_param in declaration.all_type_params() {
+        visitor.visit_ident(&type_param.name, ctx);
+        for bound in &type_param.bounds {
+            visitor.visit_ty(bound, ctx);
+        }
+    }
     visitor.enter_scope(declaration.id, ctx);
     for parameter in &declaration.parameters {
         visitor.visit_fn_param(parameter, ctx);
@@ -739,6 +745,7 @@ mod tests {
                     Span::default(),
                 )]))),
             ),
+            owner_type_params: vec![],
             type_params: vec![],
             parameters: vec![node::FunctionParameter {
                 pattern: node::Pat::new(

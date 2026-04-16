@@ -995,6 +995,9 @@ pub struct FunctionDeclaration {
     pub hir_id: HirId,
     pub visibility: Visibility,
     pub name: Expr,
+    /// Type parameters declared on the owning type in a method head, e.g.
+    /// `<A>` in `fn Pair<A>.swap(...)`.
+    pub owner_type_params: Vec<TypeParam>,
     /// Type parameters for generic functions, e.g. `<T, U>` in `fn map<T, U>(...)`.
     pub type_params: Vec<TypeParam>,
     pub parameters: Vec<FunctionParameter>,
@@ -1022,6 +1025,7 @@ impl FunctionDeclaration {
             hir_id,
             visibility: Visibility::Private,
             name,
+            owner_type_params: Vec::new(),
             type_params: Vec::new(),
             parameters: params,
             params_span: Span::default(),
@@ -1043,6 +1047,10 @@ impl FunctionDeclaration {
             }
             _ => unreachable!(),
         }
+    }
+
+    pub fn all_type_params(&self) -> impl Iterator<Item = &TypeParam> {
+        self.owner_type_params.iter().chain(self.type_params.iter())
     }
 }
 
