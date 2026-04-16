@@ -1,8 +1,10 @@
 //! Shared signature-help analysis for the LSP server and browser bindings.
 
+use std::collections::HashMap;
+
 use tlang_hir as hir;
-use tlang_hir::Ty;
-use tlang_span::{HirId, Span};
+use tlang_hir::{Ty, TyKind};
+use tlang_span::{HirId, Span, TypeVarId};
 use tlang_typeck::{TypeTable, builtins};
 
 use crate::inlay_hints::TypedHir;
@@ -371,7 +373,7 @@ fn signature_from_stmt_hir_id(
             for method in &decl.methods {
                 if method.hir_id == hir_id {
                     return Some(signature_from_protocol_method(
-                        decl.name.as_str(),
+                        decl,
                         method,
                         omit_first_param,
                     ));
@@ -487,30 +489,37 @@ fn signature_from_function_decl(
     decl: &hir::FunctionDeclaration,
     omit_first_param: bool,
 ) -> SignatureInformation {
+    let type_var_names = extend_type_var_names(HashMap::new(), decl.all_type_params());
     signature_from_named_params(
-        &decl.name(),
+        &format_function_decl_name(decl),
         decl.parameters
             .iter()
             .map(|param| (param.name.to_string(), &param.type_annotation))
             .collect::<Vec<_>>(),
         &decl.return_type,
+        &type_var_names,
         omit_first_param,
     )
 }
 
 fn signature_from_protocol_method(
-    protocol_name: &str,
+    protocol: &hir::ProtocolDeclaration,
     method: &hir::ProtocolMethodSignature,
     omit_first_param: bool,
 ) -> SignatureInformation {
+    let type_var_names = extend_type_var_names(
+        extend_type_var_names(HashMap::new(), protocol.type_params.iter()),
+        method.type_params.iter(),
+    );
     signature_from_named_params(
-        &format!("{protocol_name}::{}", method.name),
+        &format_protocol_method_name(protocol, method),
         method
             .parameters
             .iter()
             .map(|param| (param.name.to_string(), &param.type_annotation))
             .collect::<Vec<_>>(),
         &method.return_type,
+        &type_var_names,
         omit_first_param,
     )
 }
@@ -542,21 +551,143 @@ fn signature_from_named_params(
     name: &str,
     params: Vec<(String, &Ty)>,
     ret: &Ty,
+    type_var_names: &TypeVarNames,
     omit_first_param: bool,
 ) -> SignatureInformation {
     let params: Vec<String> = params
         .into_iter()
         .skip(usize::from(omit_first_param))
-        .map(|(name, ty)| format!("{name}: {}", ty.kind))
+        .map(|(name, ty)| format!("{name}: {}", format_ty_kind(&ty.kind, type_var_names)))
         .collect();
 
     SignatureInformation {
-        label: format!("{name}({}) -> {}", params.join(", "), ret.kind),
+        label: format!(
+            "{name}({}) -> {}",
+            params.join(", "),
+            format_ty_kind(&ret.kind, type_var_names)
+        ),
         parameters: params
             .into_iter()
             .map(|label| ParameterInformation { label })
             .collect(),
     }
+}
+
+type TypeVarNames = HashMap<TypeVarId, String>;
+
+fn extend_type_var_names<'a>(
+    mut names: TypeVarNames,
+    type_params: impl IntoIterator<Item = &'a hir::TypeParam>,
+) -> TypeVarNames {
+    for type_param in type_params {
+        names.insert(type_param.type_var_id, type_param.name.to_string());
+    }
+    names
+}
+
+fn format_ty_kind(ty: &TyKind, type_var_names: &TypeVarNames) -> String {
+    match ty {
+        TyKind::Unknown => "unknown".to_string(),
+        TyKind::Primitive(prim) => prim.to_string(),
+        TyKind::Fn(params, ret) => format!(
+            "fn({}) -> {}",
+            params
+                .iter()
+                .map(|param| format_ty_kind(&param.kind, type_var_names))
+                .collect::<Vec<_>>()
+                .join(", "),
+            format_ty_kind(&ret.kind, type_var_names)
+        ),
+        TyKind::Slice(inner) => format!("List<{}>", format_ty_kind(&inner.kind, type_var_names)),
+        TyKind::Dict(key, value) => format!(
+            "Dict<{}, {}>",
+            format_ty_kind(&key.kind, type_var_names),
+            format_ty_kind(&value.kind, type_var_names)
+        ),
+        TyKind::Never => "never".to_string(),
+        TyKind::Var(id) => type_var_names
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| format!("?{id}")),
+        TyKind::Path(path, type_args) => {
+            if type_args.is_empty() {
+                path.to_string()
+            } else {
+                format!(
+                    "{path}<{}>",
+                    type_args
+                        .iter()
+                        .map(|ty| format_ty_kind(&ty.kind, type_var_names))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+        }
+        TyKind::Union(types) => types
+            .iter()
+            .map(|ty| format_ty_kind(&ty.kind, type_var_names))
+            .collect::<Vec<_>>()
+            .join(" | "),
+    }
+}
+
+fn format_type_params(type_params: &[hir::TypeParam]) -> String {
+    if type_params.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<{}>",
+            type_params
+                .iter()
+                .map(|type_param| type_param.name.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+}
+
+fn format_function_decl_name(decl: &hir::FunctionDeclaration) -> String {
+    let method_type_params = format_type_params(&decl.type_params);
+    match &decl.name.kind {
+        hir::ExprKind::Path(path) => {
+            let owner_type_params = format_type_params(&decl.owner_type_params);
+            if !decl.owner_type_params.is_empty() && path.segments.len() > 1 {
+                let owner = path.segments[..path.segments.len() - 1]
+                    .iter()
+                    .map(|segment| segment.ident.as_str())
+                    .collect::<Vec<_>>()
+                    .join("::");
+                format!(
+                    "{owner}{owner_type_params}::{}{method_type_params}",
+                    path.last_ident()
+                )
+            } else {
+                format!("{path}{method_type_params}")
+            }
+        }
+        hir::ExprKind::FieldAccess(base, ident) => {
+            let base_name = base.path().map_or_else(String::new, ToString::to_string);
+            format!(
+                "{base_name}{}.{}{method_type_params}",
+                format_type_params(&decl.owner_type_params),
+                ident
+            )
+        }
+        _ => decl.name(),
+    }
+}
+
+fn format_protocol_method_name(
+    protocol: &hir::ProtocolDeclaration,
+    method: &hir::ProtocolMethodSignature,
+) -> String {
+    format!(
+        "{}{}::{}{}",
+        protocol.name,
+        format_type_params(&protocol.type_params),
+        method.name,
+        format_type_params(&method.type_params)
+    )
 }
 
 fn signature_from_ty(
@@ -605,7 +736,14 @@ fn signature_from_types(
 
 fn rename_signature(mut signature: SignatureInformation, name: &str) -> SignatureInformation {
     if let Some((_, rest)) = signature.label.split_once('(') {
-        signature.label = format!("{name}({rest}");
+        let prefix = signature
+            .label
+            .split_once('(')
+            .map(|(prefix, _)| prefix)
+            .unwrap_or_default();
+        if !prefix.contains('<') {
+            signature.label = format!("{name}({rest}");
+        }
     } else {
         signature.label = name.to_string();
     }
@@ -619,8 +757,13 @@ fn clamp_active_parameter(signature: &SignatureInformation, active_parameter: u3
 }
 
 fn type_name_for_expr(expr: &hir::Expr) -> Option<String> {
-    let name = expr.ty.kind.to_string();
-    if name == "unknown" { None } else { Some(name) }
+    match &expr.ty.kind {
+        TyKind::Path(path, _) => Some(path.to_string()),
+        _ => {
+            let name = expr.ty.kind.to_string();
+            if name == "unknown" { None } else { Some(name) }
+        }
+    }
 }
 
 fn find_innermost_call(block: &hir::Block, offset: u32) -> Option<&hir::CallExpression> {
@@ -926,6 +1069,28 @@ mod tests {
         );
         assert_eq!(help.signatures[0].parameters.len(), 1);
         assert_eq!(help.signatures[0].parameters[0].label, "other: Vector");
+    }
+
+    #[test]
+    fn signature_help_for_generic_function_uses_declared_type_param_names() {
+        let source = "fn id<T>(x: T) -> T { x }\nlet _ = id(1);";
+        let typed_hir = typed_hir(source);
+        let help = signature_help_at(source, &typed_hir, 1, 12).expect("signature help");
+
+        assert_eq!(help.signatures[0].label, "id<T>(x: T) -> T");
+    }
+
+    #[test]
+    fn signature_help_for_owner_and_method_generics_formats_both_scopes() {
+        let source = "struct Pair<A, B> { first: A, second: B }\nfn Pair<A, B>.swap<T>(self, value: T) -> A { self.first }\nlet p = Pair { first: 1, second: \"one\" };\nlet _ = p.swap(2);";
+        let typed_hir = typed_hir(source);
+        let help = signature_help_at(source, &typed_hir, 3, 16).expect("signature help");
+
+        assert_eq!(
+            help.signatures[0].label,
+            "Pair<A, B>.swap<T>(value: T) -> A"
+        );
+        assert_eq!(help.signatures[0].parameters[0].label, "value: T");
     }
 
     #[test]

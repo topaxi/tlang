@@ -1,7 +1,6 @@
 use tlang_ast::node::{Ident, UnaryOp, Visibility};
 use tlang_ast::token::{CommentKind, CommentToken, Literal};
 use tlang_hir as hir;
-use tlang_span::HirId;
 
 pub struct HirPrettyOptions {
     pub tab_indent: bool,
@@ -631,23 +630,63 @@ impl HirPretty {
         self.push_char(')');
     }
 
-    fn print_function_name(&mut self, name: &hir::Expr, hir_id: HirId) {
-        if let hir::ExprKind::Path(path) = &name.kind {
-            self.push_string(path.to_string());
-        } else {
-            self.print_expr(name);
+    fn print_type_params(&mut self, type_params: &[hir::TypeParam]) {
+        if type_params.is_empty() {
+            return;
         }
+
+        self.push_char('<');
+        for (i, type_param) in type_params.iter().enumerate() {
+            if i > 0 {
+                self.push_str(", ");
+            }
+            self.print_ident(&type_param.name);
+        }
+        self.push_char('>');
+    }
+
+    fn print_function_name(&mut self, decl: &hir::FunctionDeclaration) {
+        match &decl.name.kind {
+            hir::ExprKind::Path(path) => {
+                if !decl.owner_type_params.is_empty() && path.segments.len() > 1 {
+                    let owner = path.segments[..path.segments.len() - 1]
+                        .iter()
+                        .map(|segment| segment.ident.as_str())
+                        .collect::<Vec<_>>()
+                        .join("::");
+                    self.push_str(&owner);
+                    self.print_type_params(&decl.owner_type_params);
+                    self.push_str("::");
+                    self.print_ident(path.last_ident());
+                } else {
+                    self.push_string(path.to_string());
+                }
+            }
+            hir::ExprKind::FieldAccess(base, ident) => {
+                if let Some(path) = base.path() {
+                    self.push_string(path.to_string());
+                } else {
+                    self.print_expr(base);
+                }
+                self.print_type_params(&decl.owner_type_params);
+                self.push_char('.');
+                self.print_ident(ident);
+            }
+            _ => self.print_expr(&decl.name),
+        }
+
+        self.print_type_params(&decl.type_params);
 
         if self.options.print_ids {
             self.push_char('#');
-            self.push_str(&hir_id.to_string());
+            self.push_str(&decl.hir_id.to_string());
         }
     }
 
     fn print_function_declaration(&mut self, decl: &hir::FunctionDeclaration) {
         self.print_visibility(decl.visibility);
         self.push_str("fn ");
-        self.print_function_name(&decl.name, decl.hir_id);
+        self.print_function_name(decl);
         self.push_char('(');
         for (i, param) in decl.parameters.iter().enumerate() {
             if i > 0 {
@@ -670,7 +709,15 @@ impl HirPretty {
 
     fn print_dyn_function_declaration(&mut self, decl: &hir::DynFunctionDeclaration) {
         self.push_str("dyn fn ");
-        self.print_function_name(&decl.name, decl.hir_id);
+        if let hir::ExprKind::Path(path) = &decl.name.kind {
+            self.push_string(path.to_string());
+        } else {
+            self.print_expr(&decl.name);
+        }
+        if self.options.print_ids {
+            self.push_char('#');
+            self.push_str(&decl.hir_id.to_string());
+        }
         self.inc_indent();
         for variant in &decl.variants {
             self.push_newline();
@@ -858,5 +905,74 @@ impl HirPretty {
             Literal::Float(f) => self.push_string(f.to_string()),
             Literal::None => self.push_string("nil".to_string()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tlang_span::{HirId, Span, TypeVarId};
+
+    fn path_expr(hir_id: usize, segments: &[&str]) -> hir::Expr {
+        hir::Expr {
+            hir_id: HirId::new(hir_id),
+            kind: hir::ExprKind::Path(Box::new(hir::Path::new(
+                segments
+                    .iter()
+                    .map(|segment| hir::PathSegment::from_str(segment, Span::default()))
+                    .collect(),
+                Span::default(),
+            ))),
+            ty: hir::Ty::unknown(),
+            span: Span::default(),
+        }
+    }
+
+    fn type_param(name: &str, id: usize) -> hir::TypeParam {
+        hir::TypeParam {
+            hir_id: HirId::new(id),
+            name: Ident::new(name, Span::default()),
+            type_var_id: TypeVarId::new(id),
+            bounds: Vec::new(),
+            span: Span::default(),
+        }
+    }
+
+    #[test]
+    fn pretty_prints_owner_and_method_generics_in_function_heads() {
+        let name = hir::Expr {
+            hir_id: HirId::new(1),
+            kind: hir::ExprKind::FieldAccess(
+                Box::new(path_expr(2, &["Pair"])),
+                Ident::new("swap", Span::default()),
+            ),
+            ty: hir::Ty::unknown(),
+            span: Span::default(),
+        };
+
+        let mut decl = hir::FunctionDeclaration::new(
+            HirId::new(3),
+            name,
+            vec![hir::FunctionParameter {
+                hir_id: HirId::new(4),
+                name: Ident::new("self", Span::default()),
+                type_annotation: hir::Ty::unknown(),
+                has_type_annotation: false,
+                span: Span::default(),
+            }],
+            hir::Block::new(HirId::new(5), vec![], None, Span::default()),
+        );
+        decl.owner_type_params = vec![type_param("A", 1), type_param("B", 2)];
+        decl.type_params = vec![type_param("T", 3)];
+
+        let mut module = hir::Module::default();
+        module.block.stmts.push(hir::Stmt::new(
+            HirId::new(6),
+            hir::StmtKind::FunctionDeclaration(Box::new(decl)),
+            Span::default(),
+        ));
+
+        let printed = HirPretty::pretty_print(&module);
+        assert!(printed.contains("fn Pair<A, B>.swap<T>("), "got: {printed}");
     }
 }
