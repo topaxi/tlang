@@ -202,7 +202,10 @@ fn test_protocol_method_type_params_lowered() {
         method.parameters[1].type_annotation.kind.to_string(),
         format!("fn(?{tv_t}) -> ?{tv_u}")
     );
-    assert_eq!(method.return_type.kind.to_string(), "Wrapped");
+    assert_eq!(
+        method.return_type.kind.to_string(),
+        format!("Wrapped<?{tv_u}>")
+    );
 }
 
 #[test]
@@ -282,7 +285,7 @@ fn test_impl_block_associated_type_binding_lowered() {
     assert_eq!(impl_block.associated_types[0].name.as_str(), "Wrapped");
     // The type should be a Path pointing to "List"
     assert!(
-        matches!(&impl_block.associated_types[0].ty.kind, TyKind::Path(p) if p.to_string() == "List"),
+        matches!(&impl_block.associated_types[0].ty.kind, TyKind::Path(p, _) if p.to_string() == "List"),
         "expected Path(List), got {:?}",
         impl_block.associated_types[0].ty.kind
     );
@@ -305,7 +308,7 @@ fn test_generic_fn_single_bound_lowered() {
     assert_eq!(tp.name.as_str(), "T");
     assert_eq!(tp.bounds.len(), 1);
     assert!(
-        matches!(&tp.bounds[0].kind, TyKind::Path(p) if p.to_string() == "Ord"),
+        matches!(&tp.bounds[0].kind, TyKind::Path(p, _) if p.to_string() == "Ord"),
         "expected bound Path(Ord), got {:?}",
         tp.bounds[0].kind,
     );
@@ -327,12 +330,12 @@ fn test_generic_fn_multiple_bounds_lowered() {
     assert_eq!(tp.name.as_str(), "T");
     assert_eq!(tp.bounds.len(), 2);
     assert!(
-        matches!(&tp.bounds[0].kind, TyKind::Path(p) if p.to_string() == "Display"),
+        matches!(&tp.bounds[0].kind, TyKind::Path(p, _) if p.to_string() == "Display"),
         "expected bound Path(Display), got {:?}",
         tp.bounds[0].kind,
     );
     assert!(
-        matches!(&tp.bounds[1].kind, TyKind::Path(p) if p.to_string() == "Serialize"),
+        matches!(&tp.bounds[1].kind, TyKind::Path(p, _) if p.to_string() == "Serialize"),
         "expected bound Path(Serialize), got {:?}",
         tp.bounds[1].kind,
     );

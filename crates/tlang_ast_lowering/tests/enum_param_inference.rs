@@ -107,7 +107,7 @@ fn test_enum_param_type_propagated_to_match_arm_patterns() {
     // Each arm's top-level pattern should carry the inferred LinkedList type.
     for (i, arm) in arms.iter().enumerate() {
         match &arm.pat.ty.kind {
-            TyKind::Path(path) => {
+            TyKind::Path(path, _) => {
                 let name = path.segments.last().unwrap().ident.to_string();
                 assert_eq!(
                     name, "LinkedList",

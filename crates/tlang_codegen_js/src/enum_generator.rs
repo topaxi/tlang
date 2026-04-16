@@ -349,7 +349,7 @@ impl<'a> InnerCodegen<'a> {
 
     fn infer_parameter_name_from_type(&mut self, ty: &hir::Ty) -> String {
         match &ty.kind {
-            hir::TyKind::Path(path) => self.name_map.alloc_name(&path.join("_")),
+            hir::TyKind::Path(path, _) => self.name_map.alloc_name(&path.join("_")),
             _ => self.name_map.alloc_name("arg"),
         }
     }

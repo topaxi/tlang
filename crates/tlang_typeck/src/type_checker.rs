@@ -64,7 +64,7 @@ impl TypeChecker {
         match ty {
             TyKind::Slice(inner) => Some(inner.kind.clone()),
             TyKind::Primitive(PrimTy::String) => Some(TyKind::Primitive(PrimTy::String)),
-            TyKind::Path(path) => self
+            TyKind::Path(path, _) => self
                 .type_table
                 .impls()
                 .iter()
@@ -137,7 +137,7 @@ impl TypeChecker {
         }
 
         receiver_param.type_annotation = Ty {
-            kind: TyKind::Path(receiver_path.clone()),
+            kind: TyKind::Path(receiver_path.clone(), Vec::new()),
             ..Ty::default()
         };
     }
@@ -710,20 +710,18 @@ impl TypeChecker {
                 // enum variants, use the registered constructor signature's
                 // return type instead of rebuilding a path with `as_init()`,
                 // which drops `Path.res`.
+                if let Some(hir_id) = path.res.hir_id()
+                    && let Some(info) = self.type_table.get(&hir_id)
+                    && let TyKind::Fn(_, ret) = &info.ty.kind
+                {
+                    return ret.kind.clone();
+                }
+
                 return match binding_kind {
-                    hir::BindingKind::Struct => TyKind::Path((**path).clone()),
-                    hir::BindingKind::Variant => {
-                        if let Some(hir_id) = path.res.hir_id()
-                            && let Some(info) = self.type_table.get(&hir_id)
-                            && let TyKind::Fn(_, ret) = &info.ty.kind
-                        {
-                            ret.kind.clone()
-                        } else {
-                            unreachable!(
-                                "enum variant constructors must have a registered function signature"
-                            )
-                        }
-                    }
+                    hir::BindingKind::Struct => TyKind::Path((**path).clone(), Vec::new()),
+                    hir::BindingKind::Variant => unreachable!(
+                        "enum variant constructors must have a registered function signature"
+                    ),
                     _ => unreachable!(),
                 };
             }
@@ -841,7 +839,7 @@ impl TypeChecker {
     }
 
     fn is_protocol_generic_placeholder(kind: &TyKind) -> bool {
-        let TyKind::Path(path) = kind else {
+        let TyKind::Path(path, _) = kind else {
             return false;
         };
         if !path.res.is_unresolved() || path.segments.len() != 1 {
@@ -1095,7 +1093,7 @@ impl TypeChecker {
         receiver_type_name: &str,
         return_ty: &Ty,
     ) -> Ty {
-        let TyKind::Path(path) = &return_ty.kind else {
+        let TyKind::Path(path, _) = &return_ty.kind else {
             return return_ty.clone();
         };
         if path.segments.len() != 1 {
@@ -1113,13 +1111,16 @@ impl TypeChecker {
 
         Ty {
             kind: builtin_types::lookup(&binding).unwrap_or_else(|| {
-                TyKind::Path(hir::Path::new(
-                    vec![hir::PathSegment::from_str(
-                        &binding,
+                TyKind::Path(
+                    hir::Path::new(
+                        vec![hir::PathSegment::from_str(
+                            &binding,
+                            tlang_span::Span::default(),
+                        )],
                         tlang_span::Span::default(),
-                    )],
-                    tlang_span::Span::default(),
-                ))
+                    ),
+                    Vec::new(),
+                )
             }),
             ..Ty::default()
         }
@@ -1129,7 +1130,7 @@ impl TypeChecker {
         match receiver_ty {
             TyKind::Slice(_) => Some("List".to_string()),
             TyKind::Primitive(PrimTy::String) => Some("String".to_string()),
-            TyKind::Path(path) => Some(path.join("::")),
+            TyKind::Path(path, _) => Some(path.join("::")),
             _ => None,
         }
     }
@@ -1276,7 +1277,7 @@ impl TypeChecker {
 
     fn is_provisional_return_seed_candidate(ty: &TyKind) -> bool {
         match ty {
-            TyKind::Primitive(_) | TyKind::Path(_) => true,
+            TyKind::Primitive(_) | TyKind::Path(..) => true,
             TyKind::Union(tys) => tys
                 .iter()
                 .all(|ty| Self::is_provisional_return_seed_candidate(&ty.kind)),
@@ -1489,7 +1490,9 @@ impl TypeChecker {
                     } else {
                         // Struct pattern: look up struct field type.
                         struct_hir_id
-                            .and_then(|id| self.resolve_field_type(&id, field_key.as_str()))
+                            .and_then(|id| {
+                                self.resolve_field_type(binding_ty, &id, field_key.as_str())
+                            })
                             .or_else(|| {
                                 self.type_table
                                     .get_struct_info_by_name(&last_ident)
@@ -1548,7 +1551,7 @@ impl TypeChecker {
     fn should_propagate_field_ty(kind: &TyKind) -> bool {
         match kind {
             TyKind::Unknown | TyKind::Var(_) => false,
-            TyKind::Path(path) => {
+            TyKind::Path(path, _) => {
                 if !path.res.is_unresolved() {
                     return true;
                 }
@@ -1589,7 +1592,16 @@ impl TypeChecker {
         // Set the resolution so that field access can find the struct info.
         struct_path.res.set_hir_id(decl.hir_id);
         struct_path.res.set_binding_kind(hir::BindingKind::Struct);
-        let struct_ty_kind = TyKind::Path(struct_path);
+        let struct_ty_kind = TyKind::Path(
+            struct_path,
+            decl.type_params
+                .iter()
+                .map(|type_param| Ty {
+                    kind: TyKind::Var(type_param.type_var_id),
+                    ..Ty::default()
+                })
+                .collect(),
+        );
 
         // Store struct field metadata.
         let fields: Vec<(tlang_ast::node::Ident, Ty)> =
@@ -1598,6 +1610,7 @@ impl TypeChecker {
             decl.hir_id,
             StructInfo {
                 name: decl.name,
+                type_param_var_ids: decl.type_params.iter().map(|tp| tp.type_var_id).collect(),
                 fields: fields.clone(),
             },
         );
@@ -1626,7 +1639,16 @@ impl TypeChecker {
         // Set the resolution so that variant access can find the enum info.
         enum_path.res.set_hir_id(decl.hir_id);
         enum_path.res.set_binding_kind(hir::BindingKind::Enum);
-        let enum_ty_kind = TyKind::Path(enum_path);
+        let enum_ty_kind = TyKind::Path(
+            enum_path,
+            decl.type_params
+                .iter()
+                .map(|type_param| Ty {
+                    kind: TyKind::Var(type_param.type_var_id),
+                    ..Ty::default()
+                })
+                .collect(),
+        );
 
         // Collect variant info.
         let variants: Vec<VariantInfo> = decl
@@ -1646,6 +1668,7 @@ impl TypeChecker {
             decl.hir_id,
             EnumInfo {
                 name: decl.name,
+                type_param_var_ids: decl.type_params.iter().map(|tp| tp.type_var_id).collect(),
                 variants,
             },
         );
@@ -1881,13 +1904,34 @@ impl TypeChecker {
     }
     fn resolve_field_type(
         &self,
+        base_ty_kind: &TyKind,
         struct_hir_id: &tlang_span::HirId,
         field_name: &str,
     ) -> Option<TyKind> {
         if let Some(info) = self.type_table.get_struct_info(struct_hir_id) {
+            let mut bindings = HashMap::new();
+            if !info.type_param_var_ids.is_empty() {
+                let mut struct_path = hir::Path::new(
+                    vec![hir::PathSegment { ident: info.name }],
+                    tlang_span::Span::default(),
+                );
+                struct_path.res.set_hir_id(*struct_hir_id);
+                struct_path.res.set_binding_kind(hir::BindingKind::Struct);
+                let struct_pattern = TyKind::Path(
+                    struct_path,
+                    info.type_param_var_ids
+                        .iter()
+                        .map(|id| Ty {
+                            kind: TyKind::Var(*id),
+                            ..Ty::default()
+                        })
+                        .collect(),
+                );
+                collect_type_var_bindings(base_ty_kind, &struct_pattern, &mut bindings);
+            }
             for (name, ty) in &info.fields {
                 if name.as_str() == field_name {
-                    return Some(ty.kind.clone());
+                    return Some(substitute_type_vars(&ty.kind, &bindings));
                 }
             }
         }
@@ -1899,7 +1943,7 @@ impl TypeChecker {
         if let Some(type_name) = builtin_methods::type_name_from_kind(base_ty_kind) {
             method_names.push(format!("{type_name}.{field_name}"));
         }
-        if let TyKind::Path(path) = base_ty_kind {
+        if let TyKind::Path(path, _) = base_ty_kind {
             method_names.push(format!("{}.{}", path.join("::"), field_name));
             method_names.push(format!("{}.{}", path.last_ident(), field_name));
         }
@@ -1914,13 +1958,16 @@ impl TypeChecker {
         };
 
         let mut bindings = HashMap::new();
-        if let Some(receiver_ty) = param_tys.first() {
+        let has_receiver = param_tys.first().is_some_and(|receiver_ty| {
+            Self::dot_method_has_receiver(base_ty_kind, &receiver_ty.kind)
+        });
+        if has_receiver && let Some(receiver_ty) = param_tys.first() {
             collect_type_var_bindings(base_ty_kind, &receiver_ty.kind, &mut bindings);
         }
 
         let remaining_params = param_tys
             .iter()
-            .skip(1)
+            .skip(usize::from(has_receiver))
             .map(|param_ty| Ty {
                 kind: substitute_type_vars(&param_ty.kind, &bindings),
                 ..Ty::default()
@@ -1937,12 +1984,24 @@ impl TypeChecker {
         ))
     }
 
+    fn dot_method_has_receiver(base_ty_kind: &TyKind, candidate_receiver_ty: &TyKind) -> bool {
+        match (base_ty_kind, candidate_receiver_ty) {
+            (TyKind::Path(base_path, _), TyKind::Path(receiver_path, _)) => {
+                base_path == receiver_path
+            }
+            (TyKind::Slice(_), TyKind::Slice(_)) => true,
+            (TyKind::Dict(..), TyKind::Dict(..)) => true,
+            (TyKind::Primitive(lhs), TyKind::Primitive(rhs)) => lhs == rhs,
+            _ => false,
+        }
+    }
+
     fn has_dot_method_variant(&self, base_ty_kind: &TyKind, field_name: &str) -> bool {
         let mut prefixes = Vec::new();
         if let Some(type_name) = builtin_methods::type_name_from_kind(base_ty_kind) {
             prefixes.push(format!("{type_name}.{field_name}/"));
         }
-        if let TyKind::Path(path) = base_ty_kind {
+        if let TyKind::Path(path, _) = base_ty_kind {
             prefixes.push(format!("{}.{}/", path.join("::"), field_name));
             prefixes.push(format!("{}.{}/", path.last_ident(), field_name));
         }
@@ -1957,7 +2016,7 @@ impl TypeChecker {
     /// Resolve the HirId of a struct/enum type from a TyKind::Path.
     fn resolve_type_hir_id(ty_kind: &TyKind) -> Option<tlang_span::HirId> {
         match ty_kind {
-            TyKind::Path(path) => path.res.hir_id(),
+            TyKind::Path(path, _) => path.res.hir_id(),
             _ => None,
         }
     }
@@ -1975,7 +2034,7 @@ impl TypeChecker {
         span: tlang_span::Span,
     ) -> TyKind {
         if let Some(hir_id) = Self::resolve_type_hir_id(base_ty_kind) {
-            if let Some(field_ty) = self.resolve_field_type(&hir_id, field_name) {
+            if let Some(field_ty) = self.resolve_field_type(base_ty_kind, &hir_id, field_name) {
                 self.type_table.insert(
                     expr_hir_id,
                     TypeInfo {
@@ -2607,12 +2666,18 @@ impl TypeChecker {
                 decl.return_type.kind = body_ty.clone();
             }
 
+            let signature_ret_ty = if decl.has_return_type {
+                decl.return_type.kind.clone()
+            } else {
+                body_ty.clone()
+            };
+
             let param_tys: Vec<Ty> = decl
                 .parameters
                 .iter()
                 .map(|p| p.type_annotation.clone())
                 .collect();
-            let fn_ty = Self::make_fn_ty(param_tys, body_ty);
+            let fn_ty = Self::make_fn_ty(param_tys, signature_ret_ty);
             self.type_table.insert(
                 decl.hir_id,
                 TypeInfo {
@@ -3045,16 +3110,23 @@ fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
         (TyKind::Dict(ka, va), TyKind::Dict(kb, vb)) => {
             ty_kinds_compatible(&ka.kind, &kb.kind) && ty_kinds_compatible(&va.kind, &vb.kind)
         }
-        (TyKind::Path(pa), TyKind::Path(pb)) => pa == pb,
+        (TyKind::Path(pa, a_args), TyKind::Path(pb, b_args)) => {
+            pa == pb
+                && a_args.len() == b_args.len()
+                && a_args
+                    .iter()
+                    .zip(b_args.iter())
+                    .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
+        }
         // A bare `List`/`Dict` path annotation is compatible with any
         // parameterised `Slice(_)`/`Dict(_, _)` — the annotation just doesn't
         // constrain the element type.
-        (TyKind::Path(p), TyKind::Slice(_)) | (TyKind::Slice(_), TyKind::Path(p))
+        (TyKind::Path(p, _), TyKind::Slice(_)) | (TyKind::Slice(_), TyKind::Path(p, _))
             if p.to_string() == "List" =>
         {
             true
         }
-        (TyKind::Path(p), TyKind::Dict(..)) | (TyKind::Dict(..), TyKind::Path(p))
+        (TyKind::Path(p, _), TyKind::Dict(..)) | (TyKind::Dict(..), TyKind::Path(p, _))
             if p.to_string() == "Dict" =>
         {
             true
@@ -3086,6 +3158,7 @@ fn ty_contains_var(ty: &TyKind) -> bool {
         TyKind::Fn(params, ret) => {
             params.iter().any(|p| ty_contains_var(&p.kind)) || ty_contains_var(&ret.kind)
         }
+        TyKind::Path(_, type_args) => type_args.iter().any(|arg| ty_contains_var(&arg.kind)),
         TyKind::Union(tys) => tys.iter().any(|t| ty_contains_var(&t.kind)),
         _ => false,
     }
@@ -3122,6 +3195,13 @@ fn collect_type_var_bindings(
                 collect_type_var_bindings(&cp.kind, &pp.kind, bindings);
             }
             collect_type_var_bindings(&c_ret.kind, &p_ret.kind, bindings);
+        }
+        (TyKind::Path(concrete_path, concrete_args), TyKind::Path(pattern_path, pattern_args))
+            if concrete_path == pattern_path && concrete_args.len() == pattern_args.len() =>
+        {
+            for (concrete_arg, pattern_arg) in concrete_args.iter().zip(pattern_args.iter()) {
+                collect_type_var_bindings(&concrete_arg.kind, &pattern_arg.kind, bindings);
+            }
         }
         // Bare `List` path (unparameterised) vs Slice(Var(T)): no binding.
         // Bare `Dict` path vs Dict(Var, Var): no binding.
@@ -3167,6 +3247,16 @@ fn substitute_type_vars(ty: &TyKind, bindings: &HashMap<TypeVarId, TyKind>) -> T
             tys.iter()
                 .map(|t| Ty {
                     kind: substitute_type_vars(&t.kind, bindings),
+                    ..Ty::default()
+                })
+                .collect(),
+        ),
+        TyKind::Path(path, type_args) => TyKind::Path(
+            path.clone(),
+            type_args
+                .iter()
+                .map(|arg| Ty {
+                    kind: substitute_type_vars(&arg.kind, bindings),
                     ..Ty::default()
                 })
                 .collect(),

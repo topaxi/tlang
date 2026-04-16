@@ -77,7 +77,7 @@ fn Pair::new<A, B>(first: A, second: B) -> Pair<A, B> {
     Pair { first: first, second: second }
 }
 
-fn Pair.swap<A, B>(self: Pair<A, B>) -> Pair<B, A> {
+fn Pair.swap<A, B>(self) -> Pair<B, A> {
     Pair { first: self.second, second: self.first }
 }
 

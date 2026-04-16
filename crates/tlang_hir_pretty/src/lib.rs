@@ -808,7 +808,19 @@ impl HirPretty {
                 self.push_str("?T");
                 self.push_string(id.as_usize().to_string());
             }
-            hir::TyKind::Path(path) => self.print_path(path),
+            hir::TyKind::Path(path, type_args) => {
+                self.print_path(path);
+                if !type_args.is_empty() {
+                    self.push_str("<");
+                    for (i, ty) in type_args.iter().enumerate() {
+                        if i > 0 {
+                            self.push_str(", ");
+                        }
+                        self.print_ty(ty);
+                    }
+                    self.push_str(">");
+                }
+            }
             hir::TyKind::Union(tys) => {
                 for (i, inner_ty) in tys.iter().enumerate() {
                     if i > 0 {

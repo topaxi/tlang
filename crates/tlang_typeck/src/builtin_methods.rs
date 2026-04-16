@@ -274,7 +274,7 @@ pub fn type_name_from_kind(kind: &TyKind) -> Option<&str> {
         TyKind::Primitive(PrimTy::String) => Some("String"),
         TyKind::Primitive(PrimTy::Bool) => Some("bool"),
         TyKind::Primitive(PrimTy::I64) => Some("i64"),
-        TyKind::Path(path) => {
+        TyKind::Path(path, _) => {
             let name = path.segments.last().map(|s| s.ident.as_str())?;
             Some(name)
         }
@@ -450,6 +450,16 @@ fn substitute_ty(ty: &TyKind, bindings: &std::collections::HashMap<TypeVarId, Ty
             });
             TyKind::Fn(params, ret)
         }
+        TyKind::Path(path, type_args) => TyKind::Path(
+            path.clone(),
+            type_args
+                .iter()
+                .map(|arg| Ty {
+                    kind: substitute_ty(&arg.kind, bindings),
+                    ..Ty::default()
+                })
+                .collect(),
+        ),
         _ => ty.clone(),
     }
 }

@@ -143,7 +143,7 @@ impl UnificationTable {
             (TyKind::Unknown, TyKind::Unknown)
             | (TyKind::Never, TyKind::Never)
             | (TyKind::Primitive(_), TyKind::Primitive(_))
-            | (TyKind::Path(_), TyKind::Path(_)) => {
+            | (TyKind::Path(..), TyKind::Path(..)) => {
                 if left == right {
                     Ok(())
                 } else {

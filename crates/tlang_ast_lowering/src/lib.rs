@@ -804,7 +804,13 @@ impl LoweringContext {
                 return hir::TyKind::Var(type_var_id);
             }
         }
-        hir::TyKind::Path(self.lower_path(path))
+        hir::TyKind::Path(
+            self.lower_path(path),
+            params
+                .iter()
+                .map(|param| self.lower_ty(Some(param)))
+                .collect(),
+        )
     }
 
     fn name_to_prim_ty(name: &str) -> Option<hir::PrimTy> {

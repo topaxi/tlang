@@ -1651,7 +1651,8 @@ fn builtin_types_list_lookup_returns_prim_ty_res() {
 
     let ty = builtin_types::lookup("List").expect("List should be a known builtin type");
     match ty {
-        TyKind::Path(path) => {
+        TyKind::Path(path, type_args) => {
+            assert!(type_args.is_empty());
             assert!(path.res.is_prim_ty(), "List path should carry Res::PrimTy");
             assert_eq!(path.join("::"), "List");
         }
@@ -1666,7 +1667,8 @@ fn builtin_types_dict_lookup_returns_prim_ty_res() {
 
     let ty = builtin_types::lookup("Dict").expect("Dict should be a known builtin type");
     match ty {
-        TyKind::Path(path) => {
+        TyKind::Path(path, type_args) => {
+            assert!(type_args.is_empty());
             assert!(path.res.is_prim_ty(), "Dict path should carry Res::PrimTy");
             assert_eq!(path.join("::"), "Dict");
         }

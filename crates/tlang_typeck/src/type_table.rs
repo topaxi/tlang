@@ -20,6 +20,7 @@ pub struct TypeInfo {
 #[derive(Debug, Clone)]
 pub struct StructInfo {
     pub name: Ident,
+    pub type_param_var_ids: Vec<TypeVarId>,
     pub fields: Vec<(Ident, Ty)>,
 }
 
@@ -34,6 +35,7 @@ pub struct VariantInfo {
 #[derive(Debug, Clone)]
 pub struct EnumInfo {
     pub name: Ident,
+    pub type_param_var_ids: Vec<TypeVarId>,
     pub variants: Vec<VariantInfo>,
 }
 

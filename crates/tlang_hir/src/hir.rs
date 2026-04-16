@@ -909,8 +909,9 @@ pub enum TyKind {
     Never,
     /// Placeholder for future generic type variables (Phase 8: Generics).
     Var(TypeVarId),
-    /// User-defined types (structs, enums).
-    Path(Path),
+    /// User-defined nominal types (structs, enums), optionally specialised with
+    /// type arguments such as `Pair<i64, String>`.
+    Path(Path, Vec<Ty>),
     /// Union of multiple types.
     Union(Vec<Ty>),
 }
@@ -934,7 +935,20 @@ impl Display for TyKind {
             TyKind::Dict(k, v) => write!(f, "Dict<{}, {}>", k.kind, v.kind),
             TyKind::Never => write!(f, "never"),
             TyKind::Var(id) => write!(f, "?{id}"),
-            TyKind::Path(path) => write!(f, "{path}"),
+            TyKind::Path(path, type_args) => {
+                write!(f, "{path}")?;
+                if !type_args.is_empty() {
+                    write!(f, "<")?;
+                    for (i, ty) in type_args.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(f, "{}", ty.kind)?;
+                    }
+                    write!(f, ">")?;
+                }
+                Ok(())
+            }
             TyKind::Union(tys) => {
                 for (i, ty) in tys.iter().enumerate() {
                     if i > 0 {
