@@ -1203,6 +1203,7 @@ pub struct WhereClause {
 pub struct ProtocolMethodSignature {
     pub hir_id: HirId,
     pub name: Ident,
+    pub type_params: Vec<TypeParam>,
     pub parameters: Vec<FunctionParameter>,
     pub return_type: Ty,
     pub body: Option<Block>,

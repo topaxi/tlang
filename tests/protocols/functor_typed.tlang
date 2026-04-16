@@ -44,5 +44,3 @@ Foldable::foldl([1, 2, 3, 4, 5], 0, fn (acc, x) { acc + x }) |> log();
 |> Functor::map(fn (x) { x + 10 })
 |> Foldable::foldl(0, fn (acc, x) { acc + x })
 |> log();
-
-

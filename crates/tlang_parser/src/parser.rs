@@ -1858,9 +1858,13 @@ impl<'src> Parser<'src> {
                 let parameters = self.parse_type_annotation_parameters();
                 self.end_span_from_previous_token(&mut span);
 
-                Ty::new(self.unique_id(), identifier)
-                    .with_parameters(parameters)
-                    .with_span(span)
+                if parameters.is_empty() && identifier.to_string() == "unknown" {
+                    Ty::new_unknown(self.unique_id()).with_span(span)
+                } else {
+                    Ty::new(self.unique_id(), identifier)
+                        .with_parameters(parameters)
+                        .with_span(span)
+                }
             }
             _ => Ty::new_unknown(self.unique_id()),
         }

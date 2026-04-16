@@ -215,6 +215,7 @@ fn to_protocol_info(p: &BuiltinProtocol) -> ProtocolInfo {
 
     ProtocolInfo {
         name: ident(p.name),
+        type_param_var_ids: Vec::new(),
         methods,
         constraints: Vec::new(),
         associated_types,

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use tlang_ast::node::Ident;
 use tlang_hir::Ty;
 use tlang_span::HirId;
+use tlang_span::TypeVarId;
 
 /// Supplementary type metadata for a given HIR node.
 ///
@@ -57,6 +58,7 @@ pub struct AssociatedTypeInfo {
 #[derive(Debug, Clone)]
 pub struct ProtocolInfo {
     pub name: Ident,
+    pub type_param_var_ids: Vec<TypeVarId>,
     pub methods: Vec<ProtocolMethodInfo>,
     pub constraints: Vec<String>,
     /// Associated types declared in this protocol.
@@ -68,6 +70,7 @@ pub struct ProtocolInfo {
 pub struct ImplInfo {
     pub protocol_name: String,
     pub target_type_name: String,
+    pub target_type_arguments: Vec<Ty>,
     /// Whether the impl target is a bare impl-level type parameter, e.g. the
     /// `T` in `impl<T> Foo for T`.
     pub target_type_is_param: bool,
@@ -289,6 +292,7 @@ mod tests {
         ImplInfo {
             protocol_name: protocol_name.to_string(),
             target_type_name: target_type_name.to_string(),
+            target_type_arguments: Vec::new(),
             target_type_is_param,
             protocol_type_args: Vec::new(),
             protocol_type_arg_tys: Vec::new(),

@@ -42,12 +42,12 @@ clamp(3, 0, 5)  |> log(); // 3
 
 // ── Generic higher-order functions ───────────────────────────────────────────
 
-fn map<T, U>([], _: fn(T) -> U) -> List<U> { [] }
+fn map<T, U>([]: List<T>, _: fn(T) -> U) -> List<U> { [] }
 fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> {
     [f(x), ...map(xs, f)]
 }
 
-fn filter<T>([], _: fn(T) -> bool) -> List<T> { [] }
+fn filter<T>([] :List<T>, _: fn(T) -> bool) -> List<T> { [] }
 fn filter<T>([x, ...xs]: List<T>, f: fn(T) -> bool) if f(x) -> List<T> {
     [x, ...filter(xs, f)]
 }
@@ -55,7 +55,7 @@ fn filter<T>([_, ...xs]: List<T>, f: fn(T) -> bool) -> List<T> {
     rec filter(xs, f)
 }
 
-fn foldl<T, U>([], acc: U, _: fn(U, T) -> U) -> U { acc }
+fn foldl<T, U>([]: List<T>, acc: U, _: fn(U, T) -> U) -> U { acc }
 fn foldl<T, U>([x, ...xs]: List<T>, acc: U, f: fn(U, T) -> U) -> U {
     rec foldl(xs, f(acc, x), f)
 }

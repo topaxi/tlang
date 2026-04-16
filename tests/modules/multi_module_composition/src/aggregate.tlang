@@ -1,6 +1,6 @@
 use transform::numeric::{double, abs};
 
 pub fn process([], acc: i64) -> i64 { acc }
-pub fn process([x, ...xs], acc: i64) -> i64 {
+pub fn process([x, ...xs]: List<i64>, acc: i64) -> i64 {
   rec process(xs, acc + abs(double(x)))
 }

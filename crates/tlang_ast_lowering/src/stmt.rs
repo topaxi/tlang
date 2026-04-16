@@ -448,6 +448,7 @@ impl LoweringContext {
         method: &ast::node::ProtocolMethodSignature,
         method_dispatch_map: &HashMap<String, Ident>,
     ) -> hir::ProtocolMethodSignature {
+        let type_params = self.lower_type_params(&method.type_params);
         let has_body = method.body.is_some();
         let params: Vec<hir::FunctionParameter> = method
             .parameters
@@ -481,14 +482,17 @@ impl LoweringContext {
             method.body.as_ref().map(|b| self.lower_block(b))
         };
 
-        hir::ProtocolMethodSignature {
+        let signature = hir::ProtocolMethodSignature {
             hir_id: method_hir_id,
             name: method.name,
+            type_params,
             parameters: params,
             return_type: self.lower_ty(method.return_type_annotation.as_ref()),
             body,
             span: method.span,
-        }
+        };
+        self.pop_type_param_scope();
+        signature
     }
 
     fn lower_protocol_method_param(

@@ -202,6 +202,61 @@ fn unknown_in_permissive_mode_ok() {
     );
 }
 
+#[test]
+fn unresolved_generic_closure_param_in_permissive_mode_ok() {
+    common::typecheck_ok(
+        r#"
+        fn use_fn<T>(f: fn(T) -> i64) { 0 }
+        use_fn(fn(x) { x * 2 });
+        "#,
+    );
+}
+
+#[test]
+fn unresolved_generic_closure_param_comparison_in_permissive_mode_ok() {
+    common::typecheck_ok(
+        r#"
+        fn use_pred<T>(f: fn(T) -> bool) { true }
+        use_pred(fn(x) { x > 5 });
+        "#,
+    );
+}
+
+#[test]
+fn generic_call_accepts_distinct_type_var_ids() {
+    common::typecheck_ok(
+        r#"
+        fn max_of<T: Ord>(a: T, b: T) -> T {
+            if a >= b { a } else { b }
+        }
+
+        fn clamp<T: Ord>(value: T, lo: T, hi: T) -> T {
+            value |> max_of(lo) |> max_of(hi)
+        }
+        "#,
+    );
+}
+
+#[test]
+fn float_literal_adopts_expected_numeric_type_in_call_context() {
+    common::typecheck_ok(
+        r#"
+        enum Expense { Food(f32) }
+        let x = Expense::Food(45.50);
+        "#,
+    );
+}
+
+#[test]
+fn list_slice_allows_single_start_argument() {
+    common::typecheck_ok(
+        r#"
+        let xs = [1, 2, 3, 4];
+        let tail = xs.slice(1);
+        "#,
+    );
+}
+
 // ── Strict mode (fully typed functions) ─────────────────────────────────
 
 #[test]
@@ -2183,6 +2238,15 @@ fn builtin_re_returns_regex() {
     common::typecheck_ok(
         r#"
         let result: String = re"test".replace_all("input", "output");
+        "#,
+    );
+}
+
+#[test]
+fn regex_flags_allows_zero_argument_getter() {
+    common::typecheck_ok(
+        r#"
+        let flags: String = re"hello".flags();
         "#,
     );
 }

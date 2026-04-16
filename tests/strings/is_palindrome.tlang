@@ -1,11 +1,9 @@
-fn reverse_chars([]: List<String>) -> String { "" }
-fn reverse_chars([x, ...xs]: List<String>) -> String { reverse_chars(xs) + x }
-
-// reverse_string(string) -> string
-fn reverse_string(str: String) -> String { reverse_chars([...str]) }
+fn reverse_string(str) { reverse_string(str, "") }
+fn reverse_string("", acc) { acc }
+fn reverse_string([x, ...xs], acc) { rec reverse_string(xs, x + acc) }
 
 // is_palindrome(string) -> bool
-fn is_palindrome(str: String) -> bool { str == reverse_string(str) }
+fn is_palindrome(str) { str == reverse_string(str) }
 
 "racecar"
 |> is_palindrome()

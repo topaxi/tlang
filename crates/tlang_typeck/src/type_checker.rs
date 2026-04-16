@@ -406,6 +406,24 @@ impl TypeChecker {
         rhs_ty: &TyKind,
         span: tlang_span::Span,
     ) -> TyKind {
+        if matches!(self.current_context(), TypingContext::Permissive)
+            && (matches!(lhs_ty, TyKind::Var(_)) || matches!(rhs_ty, TyKind::Var(_)))
+        {
+            return match (lhs_ty, rhs_ty) {
+                (TyKind::Primitive(l), TyKind::Primitive(r)) => {
+                    Self::coerced_numeric_result(*l, *r)
+                        .map(TyKind::Primitive)
+                        .unwrap_or(TyKind::Unknown)
+                }
+                (TyKind::Var(_), TyKind::Primitive(r)) | (TyKind::Primitive(r), TyKind::Var(_))
+                    if r.is_numeric() =>
+                {
+                    TyKind::Primitive(*r)
+                }
+                _ => TyKind::Unknown,
+            };
+        }
+
         match (lhs_ty, rhs_ty) {
             (TyKind::Primitive(l), TyKind::Primitive(r)) => {
                 if let Some(result) = Self::coerced_numeric_result(*l, *r) {
@@ -439,7 +457,25 @@ impl TypeChecker {
         rhs_ty: &TyKind,
         span: tlang_span::Span,
     ) -> TyKind {
-        if lhs_ty == rhs_ty {
+        if matches!(self.current_context(), TypingContext::Permissive)
+            && (matches!(lhs_ty, TyKind::Var(_)) || matches!(rhs_ty, TyKind::Var(_)))
+        {
+            return match (lhs_ty, rhs_ty) {
+                (TyKind::Primitive(l), TyKind::Primitive(r))
+                    if l.is_numeric() && r.is_numeric() =>
+                {
+                    TyKind::Primitive(PrimTy::Bool)
+                }
+                (TyKind::Var(_), TyKind::Primitive(r)) | (TyKind::Primitive(r), TyKind::Var(_))
+                    if r.is_numeric() =>
+                {
+                    TyKind::Primitive(PrimTy::Bool)
+                }
+                _ => TyKind::Unknown,
+            };
+        }
+
+        if ty_kinds_compatible(lhs_ty, rhs_ty) {
             TyKind::Primitive(PrimTy::Bool)
         } else {
             self.errors.push(TypeError::InvalidBinaryOp {
@@ -859,7 +895,31 @@ impl TypeChecker {
 
     fn resolve_call_callee_type(&self, call: &hir::CallExpression) -> Option<TyKind> {
         self.resolve_protocol_dispatch_callee_type(call)
+            .or_else(|| self.resolve_builtin_method_call_callee_type(call))
             .or_else(|| self.resolve_callee_type(&call.callee))
+    }
+
+    fn resolve_builtin_method_call_callee_type(
+        &self,
+        call: &hir::CallExpression,
+    ) -> Option<TyKind> {
+        let hir::ExprKind::FieldAccess(base, method) = &call.callee.kind else {
+            return None;
+        };
+
+        let type_name = builtin_methods::type_name_from_kind(&base.ty.kind)?;
+        let candidates = builtin_methods::lookup_all(type_name, method.as_str());
+        let selected = candidates
+            .iter()
+            .find(|candidate| {
+                matches!(candidate, TyKind::Fn(params, _) if params.len() == call.arguments.len())
+            })
+            .or_else(|| candidates.first())?;
+
+        Some(builtin_methods::substitute_receiver_type_vars(
+            &base.ty.kind,
+            selected,
+        ))
     }
 
     fn resolve_protocol_dispatch_callee_type(&self, call: &hir::CallExpression) -> Option<TyKind> {
@@ -902,22 +962,26 @@ impl TypeChecker {
             .methods
             .iter()
             .find(|candidate| candidate.name.as_str() == method_name)?;
-        self.type_table
+        let impl_info = self
+            .type_table
             .find_impl_for(protocol_name, receiver_type_name)?;
+        let protocol_bindings =
+            self.resolve_protocol_dispatch_type_bindings(proto_info, impl_info, receiver_ty);
 
-        let mut receiver_bindings = HashMap::new();
+        let mut type_bindings = protocol_bindings.clone();
         if let Some(self_param) = method.param_tys.first() {
-            collect_type_var_bindings(receiver_ty, &self_param.kind, &mut receiver_bindings);
+            let receiver_pattern = substitute_type_vars(&self_param.kind, &protocol_bindings);
+            collect_type_var_bindings(receiver_ty, &receiver_pattern, &mut type_bindings);
         }
 
-        let mut param_tys = method
+        let mut param_tys: Vec<Ty> = method
             .param_tys
             .iter()
             .map(|ty| Ty {
-                kind: substitute_type_vars(&ty.kind, &receiver_bindings),
+                kind: substitute_type_vars(&ty.kind, &type_bindings),
                 ..ty.clone()
             })
-            .collect::<Vec<_>>();
+            .collect();
         if let Some(self_param) = param_tys.first_mut() {
             self_param.kind = receiver_ty.clone();
         } else {
@@ -927,16 +991,65 @@ impl TypeChecker {
             });
         }
 
+        let substituted_return_ty = Ty {
+            kind: substitute_type_vars(&method.return_ty.kind, &type_bindings),
+            ..method.return_ty.clone()
+        };
         let return_ty = self.resolve_protocol_dispatch_return_type(
             protocol_name,
             receiver_type_name,
-            &Ty {
-                kind: substitute_type_vars(&method.return_ty.kind, &receiver_bindings),
-                ..method.return_ty.clone()
-            },
+            &substituted_return_ty,
         );
 
         Some(TyKind::Fn(param_tys, Box::new(return_ty)))
+    }
+
+    fn resolve_protocol_dispatch_type_bindings(
+        &self,
+        proto_info: &ProtocolInfo,
+        impl_info: &ImplInfo,
+        receiver_ty: &TyKind,
+    ) -> HashMap<TypeVarId, TyKind> {
+        let mut receiver_bindings = HashMap::new();
+        self.collect_receiver_type_arg_bindings(receiver_ty, impl_info, &mut receiver_bindings);
+
+        let mut protocol_bindings = HashMap::new();
+        for (proto_type_param, impl_protocol_arg) in proto_info
+            .type_param_var_ids
+            .iter()
+            .zip(impl_info.protocol_type_arg_tys.iter())
+        {
+            protocol_bindings.insert(
+                *proto_type_param,
+                substitute_type_vars(&impl_protocol_arg.kind, &receiver_bindings),
+            );
+        }
+
+        protocol_bindings
+    }
+
+    fn collect_receiver_type_arg_bindings(
+        &self,
+        receiver_ty: &TyKind,
+        impl_info: &ImplInfo,
+        bindings: &mut HashMap<TypeVarId, TyKind>,
+    ) {
+        match receiver_ty {
+            TyKind::Slice(inner) if impl_info.target_type_name == "List" => {
+                if let Some(pattern) = impl_info.target_type_arguments.first() {
+                    collect_type_var_bindings(&inner.kind, &pattern.kind, bindings);
+                }
+            }
+            TyKind::Dict(key, value) if impl_info.target_type_name == "Dict" => {
+                if let Some(pattern) = impl_info.target_type_arguments.first() {
+                    collect_type_var_bindings(&key.kind, &pattern.kind, bindings);
+                }
+                if let Some(pattern) = impl_info.target_type_arguments.get(1) {
+                    collect_type_var_bindings(&value.kind, &pattern.kind, bindings);
+                }
+            }
+            _ => {}
+        }
     }
 
     fn resolve_builtin_protocol_dispatch_callee_type(
@@ -1456,6 +1569,14 @@ impl TypeChecker {
         }
     }
 
+    fn constructor_param_ty(ty: &Ty) -> Ty {
+        if Self::should_propagate_field_ty(&ty.kind) {
+            ty.clone()
+        } else {
+            Ty::unknown()
+        }
+    }
+
     // ── Struct and enum declaration registration ──────────────────────
 
     /// Register a struct declaration in the type table: store field metadata
@@ -1544,7 +1665,11 @@ impl TypeChecker {
                 );
             } else {
                 // Constructor variant: Fn(param_types…) → EnumPath
-                let param_tys: Vec<Ty> = variant.parameters.iter().map(|p| p.ty.clone()).collect();
+                let param_tys: Vec<Ty> = variant
+                    .parameters
+                    .iter()
+                    .map(|p| Self::constructor_param_ty(&p.ty))
+                    .collect();
                 let fn_ty = Self::make_fn_ty(param_tys, enum_ty_kind.clone());
                 self.type_table.insert(
                     variant.hir_id,
@@ -1589,6 +1714,11 @@ impl TypeChecker {
             .collect();
         self.type_table.insert_protocol_info(ProtocolInfo {
             name: decl.name,
+            type_param_var_ids: decl
+                .type_params
+                .iter()
+                .map(|param| param.type_var_id)
+                .collect(),
             methods,
             constraints,
             associated_types,
@@ -1962,6 +2092,7 @@ impl TypeChecker {
                     self.type_table.insert_impl_info(ImplInfo {
                         protocol_name: impl_block.protocol_name.join("::"),
                         target_type_name: target_type_name.clone(),
+                        target_type_arguments: impl_block.target_type_arguments.clone(),
                         target_type_is_param: impl_block
                             .type_params
                             .iter()
@@ -2935,7 +3066,6 @@ fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
                     .zip(ub.iter())
                     .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
         }
-        (TyKind::Var(a), TyKind::Var(b)) => a == b,
         // A type variable in either position is compatible with anything —
         // this is needed so that generic signatures do not spuriously trigger
         // type-mismatch errors during argument checking.
@@ -3313,6 +3443,7 @@ mod tests {
         let mut checker = TypeChecker::new();
         checker.type_table.insert_protocol_info(ProtocolInfo {
             name: Ident::new("Functor", tlang_span::Span::default()),
+            type_param_var_ids: Vec::new(),
             methods: vec![ProtocolMethodInfo {
                 name: Ident::new("map", tlang_span::Span::default()),
                 param_tys: Vec::new(),
@@ -3348,6 +3479,7 @@ mod tests {
         let mut checker = TypeChecker::new();
         checker.type_table.insert_protocol_info(ProtocolInfo {
             name: Ident::new("Functor", tlang_span::Span::default()),
+            type_param_var_ids: Vec::new(),
             methods: vec![ProtocolMethodInfo {
                 name: Ident::new("map", tlang_span::Span::default()),
                 param_tys: Vec::new(),

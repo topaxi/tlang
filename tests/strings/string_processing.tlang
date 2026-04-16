@@ -1,36 +1,40 @@
 // String processing and manipulation
 // Demonstrates: string operations, recursion, pattern matching on strings
 
-fn reverse_chars([]: List<String>) -> String { "" }
-fn reverse_chars([c, ...rest]: List<String>) -> String { reverse_chars(rest) + c }
-
 // String reverse function
-fn reverse_string(str: String) -> String { reverse_chars([...str]) }
+fn reverse_string(str: String) -> String {
+    match str {
+        "" => "",
+        [c, ...rest] => reverse_string(rest) + c,
+    }
+}
 
 // Check if string is palindrome
-fn is_palindrome(str: String) -> bool { str == reverse_string(str) }
-
-fn count_chars([]: List<String>, _: String) -> i64 { 0 }
-fn count_chars([c, ...rest]: List<String>, target: String) if c == target -> i64 {
-    1 + count_chars(rest, target)
-}
-fn count_chars([_, ...rest]: List<String>, target: String) -> i64 {
-    rec count_chars(rest, target)
-}
+fn is_palindrome(str) { str == reverse_string(str) }
 
 // Count character occurrences
-fn count_char(str: String, target: String) -> i64 { count_chars([...str], target) }
-
-fn is_alpha_chars([]: List<String>) -> bool { true }
-fn is_alpha_chars([c, ...rest]: List<String>) -> bool {
-    let code = string::char_code_at(c, 0);
-    let is_upper = code >= 65 && code <= 90;   // A-Z
-    let is_lower = code >= 97 && code <= 122;  // a-z
-    (is_upper || is_lower) && is_alpha_chars(rest)
+fn count_char(str: String, target: String) -> i64 {
+    match str {
+        "" => 0,
+        [c, ...rest] => {
+            let current = if c == target { 1 } else { 0 };
+            current + count_char(rest, target)
+        }
+    }
 }
 
 // Check if string contains only alphabetic characters
-fn is_alpha(str: String) -> bool { is_alpha_chars([...str]) }
+fn is_alpha(str: String) -> bool {
+    match str {
+        "" => true,
+        [c, ...rest] => {
+            let code = string::char_code_at(c, 0);
+            let is_upper = code >= 65 && code <= 90;   // A-Z
+            let is_lower = code >= 97 && code <= 122;  // a-z
+            (is_upper || is_lower) && is_alpha(rest)
+        }
+    }
+}
 
 log("=== String Processing Demo ===");
 

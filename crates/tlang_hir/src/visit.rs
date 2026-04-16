@@ -146,6 +146,12 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
             }
             for method in &mut decl.methods {
                 visitor.visit_ident(&mut method.name, ctx);
+                for type_param in &mut method.type_params {
+                    visitor.visit_ident(&mut type_param.name, ctx);
+                    for bound in &mut type_param.bounds {
+                        visitor.visit_ty(bound, ctx);
+                    }
+                }
                 // Visit default method bodies with their own scope so that
                 // `SymbolResolution` (and other HIR passes) can resolve
                 // identifiers like `self` and other parameters inside them.

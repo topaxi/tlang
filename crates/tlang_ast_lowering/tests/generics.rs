@@ -178,6 +178,34 @@ fn test_protocol_associated_type_with_type_params_lowered() {
 }
 
 #[test]
+fn test_protocol_method_type_params_lowered() {
+    let module = common::hir_from_str(
+        "protocol Functor<T> {
+            type Wrapped<U>
+            fn map<U>(self, f: fn(T) -> U) -> Wrapped<U>
+        }",
+    );
+
+    let stmt = &module.block.stmts[0];
+    let decl = match &stmt.kind {
+        hir::StmtKind::ProtocolDeclaration(decl) => decl,
+        other => panic!("expected ProtocolDeclaration, got {other:?}"),
+    };
+
+    assert_eq!(decl.methods.len(), 1);
+    let method = &decl.methods[0];
+    assert_eq!(method.type_params.len(), 1);
+    assert_eq!(method.type_params[0].name.as_str(), "U");
+    let tv_t = decl.type_params[0].type_var_id;
+    let tv_u = method.type_params[0].type_var_id;
+    assert_eq!(
+        method.parameters[1].type_annotation.kind.to_string(),
+        format!("fn(?{tv_t}) -> ?{tv_u}")
+    );
+    assert_eq!(method.return_type.kind.to_string(), "Wrapped");
+}
+
+#[test]
 fn test_impl_block_type_params_lowered() {
     let module = common::hir_from_str(
         "protocol Functor {
