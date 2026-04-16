@@ -2297,7 +2297,7 @@ impl TypeChecker {
             hir::ExprKind::Literal(lit) => {
                 if matches!(
                     lit.as_ref(),
-                    Literal::Integer(_) | Literal::UnsignedInteger(_)
+                    Literal::Integer(_) | Literal::UnsignedInteger(_) | Literal::Float(_)
                 ) && let TyKind::Primitive(prim) = expected
                     && prim.is_numeric()
                 {
@@ -2644,7 +2644,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
         match &mut expr.kind {
             hir::ExprKind::Literal(lit) => {
                 let ty_kind = match lit.as_ref() {
-                    Literal::Integer(_) | Literal::UnsignedInteger(_)
+                    Literal::Integer(_) | Literal::UnsignedInteger(_) | Literal::Float(_)
                         if matches!(
                             expr.ty.kind,
                             TyKind::Primitive(prim) if prim.is_numeric()
