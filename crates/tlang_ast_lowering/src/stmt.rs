@@ -25,14 +25,14 @@ fn same_ast_ty_shape(lhs: &ast::node::Ty, rhs: &ast::node::Ty) -> bool {
     match (&lhs.kind, &rhs.kind) {
         (ast::node::TyKind::Unknown, ast::node::TyKind::Unknown) => true,
         (ast::node::TyKind::Path(lhs_path), ast::node::TyKind::Path(rhs_path)) => {
-            lhs_path.join("::") == rhs_path.join("::")
+            lhs_path.segments == rhs_path.segments
         }
         (ast::node::TyKind::Union(lhs_paths), ast::node::TyKind::Union(rhs_paths)) => {
             lhs_paths.len() == rhs_paths.len()
                 && lhs_paths
                     .iter()
                     .zip(rhs_paths.iter())
-                    .all(|(lhs_path, rhs_path)| lhs_path.join("::") == rhs_path.join("::"))
+                    .all(|(lhs_path, rhs_path)| lhs_path.segments == rhs_path.segments)
         }
         (
             ast::node::TyKind::Fn(lhs_params, lhs_ret),

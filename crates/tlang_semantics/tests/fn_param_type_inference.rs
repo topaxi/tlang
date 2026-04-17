@@ -203,6 +203,9 @@ fn test_mixed_enum_types_produce_union() {
 
 #[test]
 fn test_enum_pattern_with_catch_all_stays_untyped() {
+    // When a catch-all clause exists alongside constrained patterns,
+    // inference is suppressed because the catch-all can accept any type
+    // at runtime via multi-dispatch fallthrough.
     let decls = analyze_fn_decls(
         "enum SafeHtml { Html(String) }
          fn render(SafeHtml::Html(v)) { v }

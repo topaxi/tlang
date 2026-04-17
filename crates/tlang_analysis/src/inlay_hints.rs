@@ -715,7 +715,7 @@ fn walk_stmt_for_type(
             }
         }
         hir::StmtKind::Return(Some(e)) => {
-            walk_expr_for_type(e, type_table, type_var_names, line, col, out)
+            walk_expr_for_type(e, type_table, type_var_names, line, col, out);
         }
         _ => {}
     }

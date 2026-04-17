@@ -366,10 +366,8 @@ impl TypeChecker {
             // as `let $anf = nil;`), adopt the RHS type so information flows
             // from match arms back to the consuming binding.
             BinaryOpKind::Assign => {
-                if matches!(
-                    lhs_ty,
-                    TyKind::Unknown | TyKind::Primitive(PrimTy::Nil)
-                ) || ty_kinds_compatible(lhs_ty, rhs_ty)
+                if matches!(lhs_ty, TyKind::Unknown | TyKind::Primitive(PrimTy::Nil))
+                    || ty_kinds_compatible(lhs_ty, rhs_ty)
                 {
                     rhs_ty.clone()
                 } else {
@@ -1067,7 +1065,7 @@ impl TypeChecker {
 
     fn resolve_builtin_protocol_dispatch_callee_type(
         &self,
-        protocol_name: &str,
+        _protocol_name: &str,
         method_name: &str,
         receiver_ty: &TyKind,
         receiver_type_name: &str,
@@ -1086,20 +1084,7 @@ impl TypeChecker {
         });
         param_tys.extend(method_params);
 
-        // For protocol-path dispatch on builtin Option/Result receivers we
-        // can't express `Wrapped<U>` precisely yet, but we can preserve the
-        // outer receiver shape so `Functor::map` doesn't collapse back to the
-        // list-only free-function signature.
-        let ret = if Self::preserves_receiver_shape(protocol_name, method_name, receiver_ty) {
-            Ty {
-                kind: receiver_ty.clone(),
-                ..Ty::default()
-            }
-        } else {
-            *method_ret
-        };
-
-        Some(TyKind::Fn(param_tys, Box::new(ret)))
+        Some(TyKind::Fn(param_tys, method_ret))
     }
 
     fn resolve_protocol_dispatch_return_type(
@@ -1171,16 +1156,6 @@ impl TypeChecker {
 
     fn is_protocol_path(path: &hir::Path) -> bool {
         path.segments.len() >= Self::MIN_PROTOCOL_PATH_SEGMENTS
-    }
-
-    fn preserves_receiver_shape(
-        protocol_name: &str,
-        method_name: &str,
-        receiver_ty: &TyKind,
-    ) -> bool {
-        protocol_name == "Functor"
-            && method_name == "map"
-            && !matches!(receiver_ty, TyKind::Slice(_))
     }
 
     fn visit_dispatch_receiver_arg(&mut self, call: &mut hir::CallExpression) -> bool {
@@ -2221,18 +2196,18 @@ impl TypeChecker {
             )
         {
             lhs.ty.kind = result_ty.clone();
-            if let hir::ExprKind::Path(path) = &lhs.kind {
-                if let Some(hir_id) = path.res.hir_id() {
-                    self.type_table.insert(
-                        hir_id,
-                        TypeInfo {
-                            ty: Ty {
-                                kind: result_ty.clone(),
-                                ..Ty::default()
-                            },
+            if let hir::ExprKind::Path(path) = &lhs.kind
+                && let Some(hir_id) = path.res.hir_id()
+            {
+                self.type_table.insert(
+                    hir_id,
+                    TypeInfo {
+                        ty: Ty {
+                            kind: result_ty.clone(),
+                            ..Ty::default()
                         },
-                    );
-                }
+                    },
+                );
             }
         }
 
