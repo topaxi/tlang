@@ -1,12 +1,11 @@
 enum Shape {
-    Circle(f64),
-    Rectangle(f64, f64),
-    _Triangle(f64, f64),
+    Circle(radius),
+    Rectangle(width, height),
+    Triangle(base, height),
 }
 
 let circle = Shape::Circle(5.0);
 let rect = Shape::Rectangle(3.0, 4.0);
-let _triangle = Shape::_Triangle(6.0, 7.0);
 
 // Basic enum variant check
 let is_circle = circle matches Shape::Circle(_);
@@ -32,8 +31,7 @@ let x = 5;
 (x matches 5) |> log();
 (x matches 0) |> log();
 
-// Negation without relying on `not` coercion
-if rect matches Shape::Circle(_) {
-} else {
+// Negation with not
+if not (rect matches Shape::Circle(_)) {
     log("not a circle");
 }

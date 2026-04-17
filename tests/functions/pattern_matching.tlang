@@ -1,51 +1,32 @@
 // Pattern Matching Examples
 // Demonstrates: comprehensive pattern matching, guards, recursion
 
-fn list_length(xs: List<i64>) -> i64 {
-    match xs {
-        [] => 0,
-        [_, ...rest] => 1 + list_length(rest),
-    }
-}
+// list_length(a[]) -> usize
+fn list_length([]) { 0 }
+fn list_length([_, ...xs]) { 1 + list_length(xs) }
 
-fn list_sum(xs: List<i64>) -> i64 {
-    match xs {
-        [] => 0,
-        [x, ...rest] => x + list_sum(rest),
-    }
-}
+// list_sum(isize[]) -> isize
+fn list_sum([]) { 0 }
+fn list_sum([x, ...xs]) { x + list_sum(xs) }
 
-fn classify_number(n: i64) -> String {
-    if n < 0 {
-        "negative"
-    } else if n == 0 {
-        "zero"
-    } else if n < 10 {
-        "single digit"
-    } else if n < 100 {
-        "double digit"
-    } else {
-        "large number"
-    }
-}
+// classify_number(isize) -> string
+fn classify_number(n) if n < 0 { "negative" }
+fn classify_number(0) { "zero" }
+fn classify_number(n) if n > 0 && n < 10 { "single digit" }
+fn classify_number(n) if n >= 10 && n < 100 { "double digit" }
+fn classify_number(_) { "large number" }
 
-fn fibonacci_pattern(n: i64) -> i64 {
-    if n <= 1 {
-        n
-    } else {
-        fibonacci_pattern(n - 1) + fibonacci_pattern(n - 2)
-    }
-}
+// fibonacci_pattern(isize) -> isize
+fn fibonacci_pattern(0) { 0 }
+fn fibonacci_pattern(1) { 1 }
+fn fibonacci_pattern(n) { fibonacci_pattern(n - 1) + fibonacci_pattern(n - 2) }
 
-fn quicksort_simple(xs: List<i64>) -> List<i64> {
-    match xs {
-        [] => [],
-        [pivot, ...rest] => {
-            let smaller = rest |> filter(fn(x: i64) -> bool { x <= pivot });
-            let larger = rest |> filter(fn(x: i64) -> bool { x > pivot });
-            [...quicksort_simple(smaller), pivot, ...quicksort_simple(larger)]
-        },
-    }
+// quicksort_simple(isize[]) -> isize[]
+fn quicksort_simple([]) { [] }
+fn quicksort_simple([pivot, ...rest]) {
+    let smaller = rest |> filter(fn(x) { x <= pivot });
+    let larger = rest |> filter(fn(x) { x > pivot });
+    [...quicksort_simple(smaller), pivot, ...quicksort_simple(larger)]
 }
 
 // filter(a[], fn(a) -> bool) -> a[]
@@ -55,7 +36,7 @@ fn filter([_, ...xs], f) { rec filter(xs, f) }
 
 log("=== Advanced Pattern Matching Demo ===");
 
-let test_numbers: List<i64> = [64, 34, 25, 12, 22, 11, 90];
+let test_numbers = [64, 34, 25, 12, 22, 11, 90];
 
 log("Original list:");
 test_numbers |> log();

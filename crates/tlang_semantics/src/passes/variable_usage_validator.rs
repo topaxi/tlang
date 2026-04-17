@@ -88,6 +88,18 @@ impl VariableUsageValidator {
                     unused_symbol.name,
                     unused_symbol.kind.arity().unwrap_or(0),
                 ));
+            } else if matches!(
+                unused_symbol.kind,
+                DefKind::EnumVariant(_) | DefKind::Enum
+            ) {
+                // Enum variants and enums are structural definitions; the
+                // underscore-prefix convention doesn't apply to them.
+                ctx.add_diagnostic(diagnostic::warn_at!(
+                    unused_symbol.defined_at,
+                    "Unused {} `{}`",
+                    unused_symbol.kind,
+                    unused_symbol.name,
+                ));
             } else {
                 ctx.add_diagnostic(diagnostic::warn_at!(
                     unused_symbol.defined_at,

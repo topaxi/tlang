@@ -362,9 +362,15 @@ impl TypeChecker {
             | BinaryOpKind::RightShift => self.check_bitwise(op, lhs_ty, rhs_ty, span),
 
             // Assignment expressions evaluate to the assigned value.
-            // Only preserve a concrete type when the assignment is type-compatible.
+            // When the LHS is nil or unknown (e.g. ANF temporaries initialised
+            // as `let $anf = nil;`), adopt the RHS type so information flows
+            // from match arms back to the consuming binding.
             BinaryOpKind::Assign => {
-                if ty_kinds_compatible(lhs_ty, rhs_ty) {
+                if matches!(
+                    lhs_ty,
+                    TyKind::Unknown | TyKind::Primitive(PrimTy::Nil)
+                ) || ty_kinds_compatible(lhs_ty, rhs_ty)
+                {
                     rhs_ty.clone()
                 } else {
                     TyKind::Unknown
@@ -2203,6 +2209,33 @@ impl TypeChecker {
         self.visit_expr(lhs, &mut ());
         self.visit_expr(rhs, &mut ());
         let result_ty = self.check_binary_op(op, &lhs.ty.kind, &rhs.ty.kind, expr_span);
+
+        // For assignments to ANF temporaries (or any variable whose current
+        // type is nil/unknown), propagate the RHS type back to the LHS
+        // binding so that subsequent reads see the concrete type.
+        if op == BinaryOpKind::Assign
+            && !matches!(result_ty, TyKind::Unknown)
+            && matches!(
+                lhs.ty.kind,
+                TyKind::Unknown | TyKind::Primitive(PrimTy::Nil)
+            )
+        {
+            lhs.ty.kind = result_ty.clone();
+            if let hir::ExprKind::Path(path) = &lhs.kind {
+                if let Some(hir_id) = path.res.hir_id() {
+                    self.type_table.insert(
+                        hir_id,
+                        TypeInfo {
+                            ty: Ty {
+                                kind: result_ty.clone(),
+                                ..Ty::default()
+                            },
+                        },
+                    );
+                }
+            }
+        }
+
         expr_ty.kind = result_ty.clone();
         self.type_table.insert(
             expr_hir_id,

@@ -1,15 +1,15 @@
-fn binary_search(list, target) { binary_search_loop(list, target, 0, len(list) - 1) }
-fn binary_search_loop(_, _, low, high) if low > high; { -1 }
-fn binary_search_loop(list, target, low, high) {
+fn binary_search(list, target) { binary_search(list, target, 0, len(list) - 1) }
+fn binary_search(_, _, low, high) if low > high; { -1 }
+fn binary_search(list, target, low, high) {
     let mid = math::floor((low + high) / 2);
-    let mid_value = list[mid];
+    let midValue = list[mid];
 
-    if mid_value == target {
+    if midValue == target; {
         mid
-    } else if mid_value < target {
-        rec binary_search_loop(list, target, mid + 1, high)
+    } else if midValue < target; {
+        rec binary_search(list, target, mid + 1, high)
     } else {
-        rec binary_search_loop(list, target, low, mid - 1)
+        rec binary_search(list, target, low, mid - 1)
     }
 }
 

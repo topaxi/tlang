@@ -1,5 +1,5 @@
 // random_int(isize) -> isize
-fn random_int(max: i64) -> i64 { math::random() * max |> math::floor() }
+fn random_int(max) { math::random() * max |> math::floor() }
 
 // partition(a[], fn(a) -> bool) -> (a[], a[])
 fn partition([], _) { [[], []] }
@@ -18,7 +18,7 @@ fn quicksort([], _) { [] }
 fn quicksort(list, predicate) {
   let pivotIndex = random_int(len(list));
   let pivot = list[pivotIndex];
-  let list = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex + 1, len(list))];
+  let list = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex+1)];
 
   let [smaller, greater] = list |> partition(fn partitioner(x) { predicate(x, pivot) < 0 });
 
@@ -29,5 +29,5 @@ fn quicksort(list, predicate) {
 }
 
 [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
-|> quicksort(fn cmp(a: i64, b: i64) -> i64 { b - a })
+|> quicksort(fn cmp(a, b) { b - a })
 |> log();

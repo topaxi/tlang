@@ -1,27 +1,17 @@
-fn search_index(list: List<i64>, target: i64, index: i64) -> i64 {
-    match list {
-        [] => -1,
-        [value, ...rest] => {
-            if value == target {
-                index
-            } else {
-                rec search_index(rest, target, index + 1)
-            }
-        },
-    }
-}
+fn binary_search(list, target) { binary_search(list, target, 0, len(list) - 1) }
+fn binary_search(_, _, low, high) if low > high; { -1 }
+fn binary_search(list, target, low, high) {
+    let mid = math::floor((low + high) / 2);
+    let midValue = list[mid];
 
-fn binary_search_loop(list: List<i64>, target: i64, _: i64, _: i64) -> i64 {
-    if len(list) == 0 {
-        -1
+    if midValue == target; {
+        mid
+    } else if midValue < target; {
+        rec binary_search(list, target, mid + 1, high)
     } else {
-        search_index(list, target, 0)
+        rec binary_search(list, target, low, mid - 1)
     }
 }
-
-let binary_search: fn(List<i64>, i64) -> i64 = fn(list: List<i64>, target: i64) -> i64 {
-    binary_search_loop(list, target, 0, len(list) - 1)
-};
 
 let search = binary_search;
 

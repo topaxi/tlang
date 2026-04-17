@@ -1,6 +1,8 @@
-let add_ten: fn(i64) -> i64 = fn (x: i64) -> i64 { x + 10 };
+// Test Functor::map with pipeline operator
+Option::Some(5)
+|> Functor::map(fn (x) { x * 3 })
+|> log();
 
-Option::Some(15) |> log();
-
-let incremented: List<i64> = [1, 2, 3] |> Functor::map(add_ten);
-incremented |> log();
+[1, 2, 3]
+|> Functor::map(fn (x) { x + 10 })
+|> log();
