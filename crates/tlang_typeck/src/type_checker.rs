@@ -629,7 +629,7 @@ impl TypeChecker {
             return;
         }
 
-        if !ty_kinds_compatible(&declared_ty.kind, expr_ty) {
+        if !ty_kinds_assignable(&declared_ty.kind, expr_ty) {
             self.errors.push(TypeError::BindingTypeMismatch {
                 declared: declared_ty.kind.to_string(),
                 actual: expr_ty.to_string(),
@@ -691,7 +691,7 @@ impl TypeChecker {
             return;
         }
 
-        if !ty_kinds_compatible(declared_ret, body_ty) {
+        if !ty_kinds_assignable(declared_ret, body_ty) {
             self.errors.push(TypeError::ReturnTypeMismatch {
                 expected: declared_ret.to_string(),
                 actual: body_ty.to_string(),
@@ -837,7 +837,7 @@ impl TypeChecker {
         {
             return;
         }
-        if !ty_kinds_compatible(&arg.ty.kind, &param_ty.kind) {
+        if !ty_kinds_assignable(&param_ty.kind, &arg.ty.kind) {
             let param_name = callee_name
                 .as_deref()
                 .map(|n| format!("arg{index} of `{n}`"))
@@ -1200,7 +1200,7 @@ impl TypeChecker {
             return; // Unknown value — skip.
         }
 
-        if !ty_kinds_compatible(expected, actual) {
+        if !ty_kinds_assignable(expected, actual) {
             self.errors.push(TypeError::ReturnTypeMismatch {
                 expected: expected.to_string(),
                 actual: actual.to_string(),
@@ -2317,7 +2317,7 @@ impl TypeChecker {
                 self.assign_expr_type(expr, target_kind.clone());
             }
             // Same type → identity cast, always fine.
-            _ if ty_kinds_compatible(source_kind, target_kind) => {
+            _ if ty_kinds_assignable(target_kind, source_kind) => {
                 self.assign_expr_type(expr, target_kind.clone());
             }
             _ => {
@@ -2488,6 +2488,21 @@ impl TypeChecker {
     }
 
     fn apply_expected_loop_accumulator_type(&mut self, block: &mut hir::Block, expected: &TyKind) {
+        fn can_refine_from_expected(kind: &TyKind) -> bool {
+            match kind {
+                TyKind::Unknown => true,
+                TyKind::List(inner) | TyKind::Slice(inner) => matches!(inner.kind, TyKind::Unknown),
+                TyKind::Dict(key, value) => {
+                    matches!(key.kind, TyKind::Unknown) && matches!(value.kind, TyKind::Unknown)
+                }
+                TyKind::Path(path, type_args) => {
+                    type_args.is_empty()
+                        && matches!(path.to_string().as_str(), "List" | "Slice" | "Dict")
+                }
+                _ => false,
+            }
+        }
+
         for stmt in &mut block.stmts {
             let hir::StmtKind::Let(pat, _, ty) = &mut stmt.kind else {
                 continue;
@@ -2495,7 +2510,7 @@ impl TypeChecker {
             let hir::PatKind::Identifier(hir_id, ident) = &pat.kind else {
                 continue;
             };
-            if ident.as_str() != "accumulator$$" || !matches!(ty.kind, TyKind::Unknown) {
+            if ident.as_str() != "accumulator$$" || !can_refine_from_expected(&ty.kind) {
                 continue;
             }
 
@@ -2557,6 +2572,9 @@ impl TypeChecker {
             }
             hir::ExprKind::List(elements) => {
                 if let TyKind::List(inner) | TyKind::Slice(inner) = expected {
+                    if elements.is_empty() {
+                        expr.ty.kind = expected.clone();
+                    }
                     for element in elements {
                         self.apply_expected_expr_type(element, &inner.kind);
                     }
@@ -2564,6 +2582,9 @@ impl TypeChecker {
             }
             hir::ExprKind::Dict(entries) => {
                 if let TyKind::Dict(key_ty, value_ty) = expected {
+                    if entries.is_empty() {
+                        expr.ty.kind = expected.clone();
+                    }
                     for (key, value) in entries {
                         self.apply_expected_expr_type(key, &key_ty.kind);
                         self.apply_expected_expr_type(value, &value_ty.kind);
@@ -3082,7 +3103,13 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 for elem in elements.iter_mut() {
                     self.visit_expr(elem, ctx);
                 }
-                let ty_kind = self.infer_list_type(elements);
+                let ty_kind = if elements.is_empty()
+                    && matches!(expr.ty.kind, TyKind::List(_) | TyKind::Slice(_))
+                {
+                    expr.ty.kind.clone()
+                } else {
+                    self.infer_list_type(elements)
+                };
                 self.assign_expr_type(expr, ty_kind);
             }
             hir::ExprKind::Dict(entries) => {
@@ -3090,7 +3117,11 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     self.visit_expr(key, ctx);
                     self.visit_expr(val, ctx);
                 }
-                let ty_kind = Self::infer_dict_type(entries);
+                let ty_kind = if entries.is_empty() && matches!(expr.ty.kind, TyKind::Dict(..)) {
+                    expr.ty.kind.clone()
+                } else {
+                    Self::infer_dict_type(entries)
+                };
                 self.assign_expr_type(expr, ty_kind);
             }
             hir::ExprKind::TaggedString {
@@ -3132,65 +3163,88 @@ fn callee_name_str(callee: &hir::Expr) -> Option<String> {
 /// from different source locations (e.g. an annotation vs an inferred
 /// expression type) need to be compared purely by shape.
 fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
-    match (a, b) {
-        // Unknown is a wildcard: it represents an undetermined type and is
-        // compatible with any other type.
-        (TyKind::Unknown, _) | (_, TyKind::Unknown) => true,
-        (TyKind::Never, TyKind::Never) => true,
-        (TyKind::Primitive(pa), TyKind::Primitive(pb)) => pa == pb,
-        (TyKind::Fn(pa, ra), TyKind::Fn(pb, rb)) => {
-            pa.len() == pb.len()
-                && pa
-                    .iter()
-                    .zip(pb.iter())
-                    .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
-                && ty_kinds_compatible(&ra.kind, &rb.kind)
-        }
-        (TyKind::List(a), TyKind::List(b))
-        | (TyKind::Slice(a), TyKind::Slice(b))
-        | (TyKind::List(a), TyKind::Slice(b))
-        | (TyKind::Slice(a), TyKind::List(b)) => ty_kinds_compatible(&a.kind, &b.kind),
-        (TyKind::Dict(ka, va), TyKind::Dict(kb, vb)) => {
-            ty_kinds_compatible(&ka.kind, &kb.kind) && ty_kinds_compatible(&va.kind, &vb.kind)
-        }
-        (TyKind::Path(pa, a_args), TyKind::Path(pb, b_args)) => {
-            pa == pb
-                && a_args.len() == b_args.len()
-                && a_args
-                    .iter()
-                    .zip(b_args.iter())
-                    .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
-        }
-        // A bare `List`/`Dict` path annotation is compatible with any
-        // parameterised `List(_)`/`Slice(_)`/`Dict(_, _)` — the annotation
-        // just doesn't constrain the element type.
-        (TyKind::Path(p, _), TyKind::List(_) | TyKind::Slice(_))
-        | (TyKind::List(_) | TyKind::Slice(_), TyKind::Path(p, _))
-            if p.to_string() == "List" =>
-        {
-            true
-        }
-        (TyKind::Path(p, _), TyKind::Dict(..)) | (TyKind::Dict(..), TyKind::Path(p, _))
-            if p.to_string() == "Dict" =>
-        {
-            true
-        }
-        (TyKind::Union(ua), TyKind::Union(ub)) => {
-            ua.len() == ub.len()
-                && ua
-                    .iter()
-                    .zip(ub.iter())
-                    .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
-        }
-        // A concrete type is compatible with a union that contains it:
-        // e.g. String is compatible with String | List.
-        (arg, TyKind::Union(members)) | (TyKind::Union(members), arg) => {
-            members.iter().any(|m| ty_kinds_compatible(arg, &m.kind))
-        }
-        // A type variable in either position is compatible with anything —
-        // this is needed so that generic signatures do not spuriously trigger
-        // type-mismatch errors during argument checking.
+    ty_kinds_assignable(a, b) || ty_kinds_assignable(b, a)
+}
+
+/// Check whether `actual` can be used where `expected` is required.
+///
+/// This is directional:
+/// - `List<unknown>` accepts `List<i64>`
+/// - `List<i64>` does *not* accept `List<unknown>`
+fn ty_kinds_assignable(expected: &TyKind, actual: &TyKind) -> bool {
+    match (expected, actual) {
+        // Type variables are placeholders during generic checking and should
+        // not force mismatches.
         (TyKind::Var(_), _) | (_, TyKind::Var(_)) => true,
+        (TyKind::Unknown, _) => true,
+        (_, TyKind::Unknown) => false,
+        (TyKind::Never, TyKind::Never) => true,
+        (TyKind::Primitive(expected), TyKind::Primitive(actual)) => expected == actual,
+        (TyKind::Fn(expected_params, expected_ret), TyKind::Fn(actual_params, actual_ret)) => {
+            expected_params.len() == actual_params.len()
+                && expected_params
+                    .iter()
+                    .zip(actual_params.iter())
+                    .all(|(expected, actual)| ty_kinds_assignable(&expected.kind, &actual.kind))
+                && ty_kinds_assignable(&expected_ret.kind, &actual_ret.kind)
+        }
+        (TyKind::List(expected), TyKind::List(actual))
+        | (TyKind::Slice(expected), TyKind::Slice(actual))
+        | (TyKind::List(expected), TyKind::Slice(actual))
+        | (TyKind::Slice(expected), TyKind::List(actual)) => {
+            ty_kinds_assignable(&expected.kind, &actual.kind)
+        }
+        (TyKind::Dict(expected_key, expected_val), TyKind::Dict(actual_key, actual_val)) => {
+            ty_kinds_assignable(&expected_key.kind, &actual_key.kind)
+                && ty_kinds_assignable(&expected_val.kind, &actual_val.kind)
+        }
+        (TyKind::Path(expected_path, expected_args), TyKind::Path(actual_path, actual_args)) => {
+            expected_path == actual_path
+                && expected_args.len() == actual_args.len()
+                && expected_args
+                    .iter()
+                    .zip(actual_args.iter())
+                    .all(|(expected, actual)| ty_kinds_assignable(&expected.kind, &actual.kind))
+        }
+        // Remaining bare builtin-generic paths act like unconstrained
+        // annotations on the expected side only.
+        (TyKind::Path(path, _), TyKind::List(_) | TyKind::Slice(_))
+            if path.to_string() == "List" =>
+        {
+            true
+        }
+        (TyKind::Path(path, _), TyKind::Dict(..)) if path.to_string() == "Dict" => true,
+        // If a builtin collection is still represented as a bare path on the
+        // actual side, treat it as carrying unknown inner types.
+        (TyKind::List(expected), TyKind::Path(path, type_args))
+        | (TyKind::Slice(expected), TyKind::Path(path, type_args))
+            if type_args.is_empty() && path.to_string() == "List" =>
+        {
+            ty_kinds_assignable(&expected.kind, &TyKind::Unknown)
+        }
+        (TyKind::Dict(expected_key, expected_val), TyKind::Path(path, type_args))
+            if type_args.is_empty() && path.to_string() == "Dict" =>
+        {
+            ty_kinds_assignable(&expected_key.kind, &TyKind::Unknown)
+                && ty_kinds_assignable(&expected_val.kind, &TyKind::Unknown)
+        }
+        (TyKind::Union(expected_members), TyKind::Union(actual_members)) => {
+            actual_members.iter().all(|actual_member| {
+                expected_members.iter().any(|expected_member| {
+                    ty_kinds_assignable(&expected_member.kind, &actual_member.kind)
+                })
+            })
+        }
+        // A concrete type is assignable to a union when at least one member
+        // accepts it.
+        (TyKind::Union(members), actual) => members
+            .iter()
+            .any(|member| ty_kinds_assignable(&member.kind, actual)),
+        // A union value is assignable to a concrete type only if every member
+        // is assignable to that target.
+        (expected, TyKind::Union(members)) => members
+            .iter()
+            .all(|member| ty_kinds_assignable(expected, &member.kind)),
         _ => false,
     }
 }

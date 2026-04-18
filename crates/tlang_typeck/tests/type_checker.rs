@@ -1608,6 +1608,23 @@ fn list_literal_annotation_matches_ok() {
 }
 
 #[test]
+fn bare_list_annotation_is_not_assignable_to_typed_list() {
+    let errs = common::typecheck_errors(
+        r#"
+        fn id(xs: List) -> List { xs }
+
+        fn typed(xs: List<i64>) -> List<i64> {
+            id(xs)
+        }
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("return type mismatch")),
+        "expected return type mismatch, got: {errs:?}"
+    );
+}
+
+#[test]
 fn list_literal_annotation_mismatch_error() {
     let errs = common::typecheck_errors("let a: i64 = [1, 2];");
     assert!(
@@ -2426,6 +2443,17 @@ fn string_split_returns_list() {
         r#"
         fn words(s: String) -> List {
             s.split(" ")
+        }
+        "#,
+    );
+}
+
+#[test]
+fn typed_list_return_accepts_bare_list_on_expected_side_only() {
+    common::typecheck_ok(
+        r#"
+        fn erase(xs: List<i64>) -> List {
+            xs
         }
         "#,
     );
