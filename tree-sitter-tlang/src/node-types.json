@@ -28,6 +28,10 @@
         "named": true
       },
       {
+        "type": "cast_expression",
+        "named": true
+      },
+      {
         "type": "continue_expression",
         "named": true
       },
@@ -48,6 +52,10 @@
         "named": true
       },
       {
+        "type": "implements_expression",
+        "named": true
+      },
+      {
         "type": "index_expression",
         "named": true
       },
@@ -61,6 +69,10 @@
       },
       {
         "type": "match_expression",
+        "named": true
+      },
+      {
+        "type": "matches_expression",
         "named": true
       },
       {
@@ -89,6 +101,10 @@
       },
       {
         "type": "struct_expression",
+        "named": true
+      },
+      {
+        "type": "try_cast_expression",
         "named": true
       },
       {
@@ -536,6 +552,32 @@
         "types": [
           {
             "type": "_expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "cast_expression",
+    "named": true,
+    "fields": {
+      "left": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_expression",
+            "named": true
+          }
+        ]
+      },
+      "type": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_annotation",
             "named": true
           }
         ]
@@ -1113,6 +1155,32 @@
     }
   },
   {
+    "type": "implements_expression",
+    "named": true,
+    "fields": {
+      "left": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_expression",
+            "named": true
+          }
+        ]
+      },
+      "protocol": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "protocol_path",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "index_expression",
     "named": true,
     "fields": {
@@ -1293,6 +1361,32 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "matches_expression",
+    "named": true,
+    "fields": {
+      "left": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_expression",
+            "named": true
+          }
+        ]
+      },
+      "pattern": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_pattern",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -1654,6 +1748,25 @@
     }
   },
   {
+    "type": "protocol_path",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "type_identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "rec_expression",
     "named": true,
     "fields": {
@@ -1913,6 +2026,32 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "try_cast_expression",
+    "named": true,
+    "fields": {
+      "left": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_expression",
+            "named": true
+          }
+        ]
+      },
+      "type": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_annotation",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -2259,6 +2398,10 @@
     "named": false
   },
   {
+    "type": "?",
+    "named": false
+  },
+  {
     "type": "[",
     "named": false
   },
@@ -2280,6 +2423,10 @@
   },
   {
     "type": "apply",
+    "named": false
+  },
+  {
+    "type": "as",
     "named": false
   },
   {
@@ -2332,6 +2479,10 @@
     "named": false
   },
   {
+    "type": "implements",
+    "named": false
+  },
+  {
     "type": "in",
     "named": false
   },
@@ -2350,6 +2501,10 @@
   },
   {
     "type": "match",
+    "named": false
+  },
+  {
+    "type": "matches",
     "named": false
   },
   {

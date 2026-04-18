@@ -1,0 +1,31 @@
+# Implements operator before pipeline
+
+circle implements Drawable |> log()
+
+==>
+
+Script(ExpressionStatement(BinaryExpression(ImplementsExpression(VariableName,implements,ProtocolPath),Pipeline,CallExpression(VariableName,ArgList))))
+
+# Matches operator
+
+value matches Some(item)
+
+==>
+
+Script(ExpressionStatement(MatchesExpression(VariableName,matches,MatchesEnumPattern(VariableDefinition))))
+
+# Cast operator
+
+value as i64
+
+==>
+
+Script(ExpressionStatement(CastExpression(VariableName,as,TypeAnnotation)))
+
+# Try cast operator
+
+value as? Result
+
+==>
+
+Script(ExpressionStatement(TryCastExpression(VariableName,as,TypeAnnotation)))

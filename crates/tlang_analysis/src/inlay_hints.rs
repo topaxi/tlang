@@ -1492,6 +1492,42 @@ let _ = make_counter(
     }
 
     #[test]
+    fn multiline_pipeline_hint_anchors_after_implements_expression() {
+        let source = r#"
+protocol Drawable {
+    fn draw(self)
+}
+
+struct Circle {}
+
+impl Drawable for Circle {
+    fn draw(self) {}
+}
+
+let circle = Circle {};
+circle implements Drawable
+|> log();
+"#;
+
+        let hints = hints_for(source);
+        let chain_hints: Vec<_> = hints
+            .iter()
+            .filter(|h| h.kind == InlayHintKind::ChainedPipeline)
+            .collect();
+
+        assert!(
+            chain_hints
+                .iter()
+                .any(|h| h.line == 12 && h.label == ": bool"),
+            "expected chained pipeline hint on the `implements` line, got: {chain_hints:?}"
+        );
+        assert!(
+            !chain_hints.iter().any(|h| h.line == 0),
+            "implements pipeline hint should not anchor to the top of the file, got: {chain_hints:?}"
+        );
+    }
+
+    #[test]
     fn let_binding_hint_from_loop_expression_result() {
         let source = r#"
 let sum = for x in [1, 2, 3]; with acc = 0 {

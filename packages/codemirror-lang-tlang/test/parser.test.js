@@ -21,3 +21,7 @@ describe('tagged strings', () => {
 describe('triple-quoted strings', () => {
   runCorpus('triple-strings.txt');
 });
+
+describe('keyword suffix expressions', () => {
+  runCorpus('keyword-suffix-operators.txt');
+});

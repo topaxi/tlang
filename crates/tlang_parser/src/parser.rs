@@ -2612,9 +2612,10 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_keyword_suffix(&mut self, lhs: Expr) -> Expr {
+        let mut span = lhs.span;
         let keyword = self.current_token_kind();
         self.advance();
-        match keyword {
+        let expr = match keyword {
             TokenKind::Keyword(Keyword::Implements) => {
                 let path = self.parse_path();
                 node::expr!(self.unique_id(), Implements(Box::new(lhs), Box::new(path)))
@@ -2637,7 +2638,9 @@ impl<'src> Parser<'src> {
                 }
             }
             _ => unreachable!(),
-        }
+        };
+        self.end_span_from_previous_token(&mut span);
+        expr.with_span(span)
     }
 
     fn fn_name_identifier_to_string(&mut self, identifier: &Expr) -> String {

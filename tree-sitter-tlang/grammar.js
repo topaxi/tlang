@@ -285,22 +285,26 @@ module.exports = grammar({
     // =========================================================================
 
     type_annotation: ($) =>
-      choice(
-        $.function_type,
-        seq(
-          choice($.type_identifier, $.identifier),
-          repeat(seq('::', choice($.type_identifier, $.identifier))),
-          optional(seq('<', commaSep($.type_annotation), '>')),
+      prec.right(
+        choice(
+          $.function_type,
+          seq(
+            choice($.type_identifier, $.identifier),
+            repeat(seq('::', choice($.type_identifier, $.identifier))),
+            optional(seq('<', commaSep($.type_annotation), '>')),
+          ),
         ),
       ),
 
     function_type: ($) =>
-      seq(
-        'fn',
-        '(',
-        commaSep($.function_type_parameter),
-        ')',
-        optional(seq('->', field('return_type', $.type_annotation))),
+      prec.right(
+        seq(
+          'fn',
+          '(',
+          commaSep($.function_type_parameter),
+          ')',
+          optional(seq('->', field('return_type', $.type_annotation))),
+        ),
       ),
 
     function_type_parameter: ($) =>
@@ -422,6 +426,10 @@ module.exports = grammar({
         $.block,
         $.unary_expression,
         $.binary_expression,
+        $.implements_expression,
+        $.matches_expression,
+        $.try_cast_expression,
+        $.cast_expression,
         $.assignment_expression,
         $.call_expression,
         $.struct_expression,
@@ -465,6 +473,12 @@ module.exports = grammar({
         repeat1(seq('::', choice($.type_identifier, $.identifier))),
       ),
 
+    protocol_path: ($) =>
+      seq(
+        choice($.type_identifier, $.identifier),
+        repeat(seq('::', choice($.type_identifier, $.identifier))),
+      ),
+
     // A type path consists of uppercase-only identifiers separated by "::".
     // Used for struct/enum type instantiation to avoid ambiguity with blocks.
     type_path: ($) =>
@@ -497,6 +511,47 @@ module.exports = grammar({
         seq(
           field('operator', choice('!', 'not', '+', '-')),
           field('operand', $._expression),
+        ),
+      ),
+
+    implements_expression: ($) =>
+      prec.left(
+        PREC.REL,
+        seq(
+          field('left', $._expression),
+          'implements',
+          field('protocol', $.protocol_path),
+        ),
+      ),
+
+    matches_expression: ($) =>
+      prec.left(
+        PREC.REL,
+        seq(
+          field('left', $._expression),
+          'matches',
+          field('pattern', $._pattern),
+        ),
+      ),
+
+    try_cast_expression: ($) =>
+      prec.left(
+        PREC.REL,
+        seq(
+          field('left', $._expression),
+          'as',
+          '?',
+          field('type', $.type_annotation),
+        ),
+      ),
+
+    cast_expression: ($) =>
+      prec.left(
+        PREC.REL,
+        seq(
+          field('left', $._expression),
+          'as',
+          field('type', $.type_annotation),
         ),
       ),
 

@@ -150,6 +150,10 @@ TypeAnnotation {
   identifier ("::" identifier)* ("<" commaSep<TypeAnnotation> ">")?
 }
 
+ProtocolPath {
+  identifier ("::" identifier)*
+}
+
 //!protocoldeclaration
 
 TypeParamList {
@@ -216,14 +220,30 @@ pattern {
   VariableDefinition
 }
 
+matchesPattern {
+  WildcardPattern { kw<"_"> } |
+  LiteralPattern { "-"? Number | String | TripleString | TaggedString | BooleanLiteral } |
+  MatchesEnumPattern |
+  MatchesStructPattern |
+  ArrayPattern |
+  ObjectPattern
+}
+
 // Requires at least one "::" to distinguish from plain VariableDefinition
 EnumPattern {
   identifier ("::" identifier)+ "(" commaSep<"..."? pattern> ")"
 }
 
-// Requires at least one "::" to distinguish from plain VariableDefinition
 StructPattern {
   identifier ("::" identifier)+ "{" commaSep<StructPatternField> "}"
+}
+
+MatchesEnumPattern {
+  identifier ("::" identifier)* !call "(" commaSep<"..."? pattern> ")"
+}
+
+MatchesStructPattern {
+  identifier ("::" identifier)* !statement "{" commaSep<StructPatternField> "}"
 }
 
 StructPatternField {
@@ -275,6 +295,10 @@ expression[@isGroup=Expression] {
   IndexExpression |
   FunctionExpression |
   BinaryExpression |
+  ImplementsExpression |
+  MatchesExpression |
+  TryCastExpression |
+  CastExpression |
   AssignmentExpression |
   RecExpression |
   BreakExpression |
@@ -325,6 +349,22 @@ BinaryExpression {
   expression !and (LogicOp<"&&"> | kw<"and">) expression |
   expression !or (LogicOp<"||"> | kw<"or">) expression |
   expression !pipeline "|>" expression
+}
+
+ImplementsExpression {
+  expression !rel kw<"implements"> ProtocolPath
+}
+
+MatchesExpression {
+  expression !rel kw<"matches"> matchesPattern
+}
+
+TryCastExpression {
+  expression !rel kw<"as"> "?" TypeAnnotation
+}
+
+CastExpression {
+  expression !rel kw<"as"> TypeAnnotation
 }
 
 //!assign
@@ -503,6 +543,7 @@ TaggedStringInterpolation[isolate] {
   @precedence { "|>", LogicOp<"||">, BitOp<"|"> }
   @precedence { LogicOp<"&&">, BitOp<"&"> }
   @precedence { ArithOp<"**">, ArithOp<"*"> }
+  @precedence { "<", ">", CompareOp }
   @precedence { "::", ":" }
   @precedence { UpdateOp, "=" }
 }

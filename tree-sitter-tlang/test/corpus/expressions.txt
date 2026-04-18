@@ -374,6 +374,71 @@ x |> f
       right: (identifier))))
 
 ================================================================================
+Implements operator before pipeline
+================================================================================
+
+circle implements Drawable |> log()
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (implements_expression
+        left: (identifier)
+        protocol: (protocol_path
+          (type_identifier)))
+      right: (call_expression
+        callee: (identifier)
+        arguments: (argument_list)))))
+
+================================================================================
+Matches operator
+================================================================================
+
+value matches Some(item)
+
+---
+
+(source_file
+  (expression_statement
+    (matches_expression
+      left: (identifier)
+      pattern: (enum_pattern
+        (type_identifier)
+        (binding)))))
+
+================================================================================
+Cast operator
+================================================================================
+
+value as i64
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      left: (identifier)
+      type: (type_annotation
+        (identifier)))))
+
+================================================================================
+Try cast operator
+================================================================================
+
+value as? Result
+
+---
+
+(source_file
+  (expression_statement
+    (try_cast_expression
+      left: (identifier)
+      type: (type_annotation
+        (type_identifier)))))
+
+================================================================================
 Unary not
 ================================================================================
 
