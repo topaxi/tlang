@@ -838,8 +838,13 @@ impl HirPretty {
                 self.push_str(") -> ");
                 self.print_ty(ret);
             }
-            hir::TyKind::Slice(inner) => {
+            hir::TyKind::List(inner) => {
                 self.push_str("List<");
+                self.print_ty(inner);
+                self.push_str(">");
+            }
+            hir::TyKind::Slice(inner) => {
+                self.push_str("Slice<");
                 self.print_ty(inner);
                 self.push_str(">");
             }

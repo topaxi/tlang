@@ -62,7 +62,7 @@ impl TypeChecker {
 
     fn iterable_item_type(&self, ty: &TyKind) -> Option<TyKind> {
         match ty {
-            TyKind::Slice(inner) => Some(inner.kind.clone()),
+            TyKind::List(inner) | TyKind::Slice(inner) => Some(inner.kind.clone()),
             TyKind::Primitive(PrimTy::String) => Some(TyKind::Primitive(PrimTy::String)),
             TyKind::Path(path, _) => self
                 .type_table
@@ -158,7 +158,7 @@ impl TypeChecker {
     /// behavior is defined and implemented.
     fn index_access_result_type(&self, base_ty: &TyKind) -> TyKind {
         match base_ty {
-            TyKind::Slice(inner) => inner.kind.clone(),
+            TyKind::List(inner) | TyKind::Slice(inner) => inner.kind.clone(),
             _ => TyKind::Unknown,
         }
     }
@@ -193,10 +193,10 @@ impl TypeChecker {
             .unwrap_or_else(|| panic!("unknown builtin collection type: {name}"))
     }
 
-    /// Infer `Slice(elem_ty)` from a list literal's elements.
+    /// Infer `List(elem_ty)` from a list literal's elements.
     ///
     /// When all elements agree on a single known type, the list is typed as
-    /// `Slice(that_type)`.  Otherwise (empty list, mixed types, or unknown
+    /// `List(that_type)`.  Otherwise (empty list, mixed types, or unknown
     /// elements) falls back to the bare `List` path.
     fn infer_list_element_type(&self, expr: &hir::Expr) -> TyKind {
         if let hir::ExprKind::Unary(UnaryOp::Spread, inner) = &expr.kind {
@@ -215,7 +215,7 @@ impl TypeChecker {
             .collect();
         let common = Self::common_element_type(element_tys.iter());
         match common {
-            Some(elem_kind) => TyKind::Slice(Box::new(Ty {
+            Some(elem_kind) => TyKind::List(Box::new(Ty {
                 kind: elem_kind,
                 ..Ty::default()
             })),
@@ -1046,7 +1046,7 @@ impl TypeChecker {
         bindings: &mut HashMap<TypeVarId, TyKind>,
     ) {
         match receiver_ty {
-            TyKind::Slice(inner) if impl_info.target_type_name == "List" => {
+            TyKind::List(inner) | TyKind::Slice(inner) if impl_info.target_type_name == "List" => {
                 if let Some(pattern) = impl_info.target_type_arguments.first() {
                     collect_type_var_bindings(&inner.kind, &pattern.kind, bindings);
                 }
@@ -1128,7 +1128,7 @@ impl TypeChecker {
 
     fn receiver_dispatch_type_name(receiver_ty: &TyKind) -> Option<String> {
         match receiver_ty {
-            TyKind::Slice(_) => Some("List".to_string()),
+            TyKind::List(_) | TyKind::Slice(_) => Some("List".to_string()),
             TyKind::Primitive(PrimTy::String) => Some("String".to_string()),
             TyKind::Path(path, _) => Some(path.join("::")),
             _ => None,
@@ -1273,6 +1273,7 @@ impl TypeChecker {
                 .all(|ty| Self::is_provisional_return_seed_candidate(&ty.kind)),
             TyKind::Unknown
             | TyKind::Fn(..)
+            | TyKind::List(..)
             | TyKind::Slice(..)
             | TyKind::Dict(..)
             | TyKind::Never
@@ -1415,15 +1416,41 @@ impl TypeChecker {
             }
             hir::PatKind::List(pats) => {
                 // When the binding type is a list/slice, decompose it so that
-                // element patterns get the element type and rest patterns keep
-                // the full list type.
+                // element patterns get the element type and rest patterns get
+                // a Slice type (the view into remaining elements).
                 let elem_ty = self.iterable_item_type(binding_ty);
+
+                // Rest patterns produce a Slice<T> regardless of whether the
+                // original collection is List<T> or Slice<T>.
+                // For bare `List` paths (no type args), produce `Slice<Unknown>`.
+                let rest_ty: Option<TyKind> = match binding_ty {
+                    TyKind::List(inner) | TyKind::Slice(inner) => {
+                        Some(TyKind::Slice(Box::new(inner.as_ref().clone())))
+                    }
+                    TyKind::Path(p, _)
+                        if p.segments.last().is_some_and(|s| {
+                            s.ident.as_str() == "List" || s.ident.as_str() == "Slice"
+                        }) =>
+                    {
+                        // Bare `List`/`Slice` path without type args — element
+                        // type is unknown but the rest is still a Slice.
+                        Some(TyKind::Slice(Box::new(Ty {
+                            kind: elem_ty.clone().unwrap_or(TyKind::Unknown),
+                            ..Ty::default()
+                        })))
+                    }
+                    _ if elem_ty.is_some() => Some(TyKind::Slice(Box::new(Ty {
+                        kind: elem_ty.clone().unwrap(),
+                        ..Ty::default()
+                    }))),
+                    _ => None,
+                };
 
                 for p in pats {
                     let is_rest = matches!(p.kind, hir::PatKind::Rest(_));
                     if is_rest {
-                        // Rest patterns (`...xs`) keep the full list type.
-                        self.register_pat_bindings(p, binding_ty);
+                        let ty = rest_ty.as_ref().unwrap_or(binding_ty);
+                        self.register_pat_bindings(p, ty);
                     } else {
                         let ty = elem_ty.as_ref().unwrap_or(&TyKind::Unknown);
                         self.register_pat_bindings(p, ty);
@@ -1979,7 +2006,10 @@ impl TypeChecker {
             (TyKind::Path(base_path, _), TyKind::Path(receiver_path, _)) => {
                 base_path == receiver_path
             }
-            (TyKind::Slice(_), TyKind::Slice(_)) => true,
+            (TyKind::List(_), TyKind::List(_))
+            | (TyKind::Slice(_), TyKind::Slice(_))
+            | (TyKind::List(_), TyKind::Slice(_))
+            | (TyKind::Slice(_), TyKind::List(_)) => true,
             (TyKind::Dict(..), TyKind::Dict(..)) => true,
             (TyKind::Primitive(lhs), TyKind::Primitive(rhs)) => lhs == rhs,
             _ => false,
@@ -2536,7 +2566,7 @@ impl TypeChecker {
                 self.apply_expected_expr_type(value, expected);
             }
             hir::ExprKind::List(elements) => {
-                if let TyKind::Slice(inner) = expected {
+                if let TyKind::List(inner) | TyKind::Slice(inner) = expected {
                     for element in elements {
                         self.apply_expected_expr_type(element, &inner.kind);
                     }
@@ -3123,7 +3153,10 @@ fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
                     .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
                 && ty_kinds_compatible(&ra.kind, &rb.kind)
         }
-        (TyKind::Slice(a), TyKind::Slice(b)) => ty_kinds_compatible(&a.kind, &b.kind),
+        (TyKind::List(a), TyKind::List(b))
+        | (TyKind::Slice(a), TyKind::Slice(b))
+        | (TyKind::List(a), TyKind::Slice(b))
+        | (TyKind::Slice(a), TyKind::List(b)) => ty_kinds_compatible(&a.kind, &b.kind),
         (TyKind::Dict(ka, va), TyKind::Dict(kb, vb)) => {
             ty_kinds_compatible(&ka.kind, &kb.kind) && ty_kinds_compatible(&va.kind, &vb.kind)
         }
@@ -3136,9 +3169,10 @@ fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
                     .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
         }
         // A bare `List`/`Dict` path annotation is compatible with any
-        // parameterised `Slice(_)`/`Dict(_, _)` — the annotation just doesn't
-        // constrain the element type.
-        (TyKind::Path(p, _), TyKind::Slice(_)) | (TyKind::Slice(_), TyKind::Path(p, _))
+        // parameterised `List(_)`/`Slice(_)`/`Dict(_, _)` — the annotation
+        // just doesn't constrain the element type.
+        (TyKind::Path(p, _), TyKind::List(_) | TyKind::Slice(_))
+        | (TyKind::List(_) | TyKind::Slice(_), TyKind::Path(p, _))
             if p.to_string() == "List" =>
         {
             true
@@ -3175,7 +3209,7 @@ fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
 fn ty_contains_var(ty: &TyKind) -> bool {
     match ty {
         TyKind::Var(_) => true,
-        TyKind::Slice(inner) => ty_contains_var(&inner.kind),
+        TyKind::List(inner) | TyKind::Slice(inner) => ty_contains_var(&inner.kind),
         TyKind::Dict(k, v) => ty_contains_var(&k.kind) || ty_contains_var(&v.kind),
         TyKind::Fn(params, ret) => {
             params.iter().any(|p| ty_contains_var(&p.kind)) || ty_contains_var(&ret.kind)
@@ -3189,7 +3223,7 @@ fn ty_contains_var(ty: &TyKind) -> bool {
 /// Structurally match a concrete type against a pattern that may contain
 /// `Var` placeholders, and collect the bindings into `bindings`.
 ///
-/// For example, matching `Slice(i64)` against `Slice(Var(T))` adds
+/// For example, matching `List(i64)` against `List(Var(T))` adds
 /// `T → i64`.  Conflicting bindings (the same `Var` mapped to different
 /// concrete types) are silently ignored (first-wins).
 fn collect_type_var_bindings(
@@ -3205,7 +3239,10 @@ fn collect_type_var_bindings(
         (_, TyKind::Var(id)) => {
             bindings.entry(*id).or_insert_with(|| concrete.clone());
         }
-        (TyKind::Slice(c), TyKind::Slice(p)) => {
+        (TyKind::List(c), TyKind::List(p))
+        | (TyKind::Slice(c), TyKind::Slice(p))
+        | (TyKind::List(c), TyKind::Slice(p))
+        | (TyKind::Slice(c), TyKind::List(p)) => {
             collect_type_var_bindings(&c.kind, &p.kind, bindings);
         }
         (TyKind::Dict(ck, cv), TyKind::Dict(pk, pv)) => {
@@ -3225,7 +3262,7 @@ fn collect_type_var_bindings(
                 collect_type_var_bindings(&concrete_arg.kind, &pattern_arg.kind, bindings);
             }
         }
-        // Bare `List` path (unparameterised) vs Slice(Var(T)): no binding.
+        // Bare `List` path (unparameterised) vs List/Slice(Var(T)): no binding.
         // Bare `Dict` path vs Dict(Var, Var): no binding.
         _ => {}
     }
@@ -3237,6 +3274,10 @@ fn collect_type_var_bindings(
 fn substitute_type_vars(ty: &TyKind, bindings: &HashMap<TypeVarId, TyKind>) -> TyKind {
     match ty {
         TyKind::Var(id) => bindings.get(id).cloned().unwrap_or_else(|| ty.clone()),
+        TyKind::List(inner) => TyKind::List(Box::new(Ty {
+            kind: substitute_type_vars(&inner.kind, bindings),
+            ..Ty::default()
+        })),
         TyKind::Slice(inner) => TyKind::Slice(Box::new(Ty {
             kind: substitute_type_vars(&inner.kind, bindings),
             ..Ty::default()

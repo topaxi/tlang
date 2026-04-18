@@ -14,7 +14,7 @@ fn has_concrete_type(ty: &hir::Ty) -> bool {
             hir::TyKind::Fn(params, ret) => {
                 params.iter().any(|param| contains_var(&param.kind)) || contains_var(&ret.kind)
             }
-            hir::TyKind::Slice(inner) => contains_var(&inner.kind),
+            hir::TyKind::List(inner) | hir::TyKind::Slice(inner) => contains_var(&inner.kind),
             hir::TyKind::Dict(key, value) => contains_var(&key.kind) || contains_var(&value.kind),
             hir::TyKind::Union(types) => types.iter().any(|ty| contains_var(&ty.kind)),
             hir::TyKind::Unknown | hir::TyKind::Primitive(_) | hir::TyKind::Never => false,

@@ -198,12 +198,12 @@ fn lookup_list(method: &str) -> Vec<TyKind> {
         // fn map<U>(self, f: fn(T) -> U) -> List<U>
         "map" => vec![fn_ty(
             vec![fn_ty(vec![t], u.clone())],
-            Slice(Box::new(ty(u))),
+            List(Box::new(ty(u))),
         )],
         // fn filter(self, f: fn(T) -> bool) -> List<T>
         "filter" => vec![fn_ty(
             vec![fn_ty(vec![t.clone()], Primitive(Bool))],
-            Slice(Box::new(ty(t))),
+            List(Box::new(ty(t))),
         )],
         // fn foldl<U>(self, init: U, f: fn(U, T) -> U) -> U
         "foldl" => vec![fn_ty(
@@ -245,13 +245,13 @@ fn lookup_string(method: &str) -> Vec<TyKind> {
         }
         "split" => vec![fn_ty(
             vec![Primitive(String)],
-            Slice(Box::new(ty(Primitive(String)))),
+            List(Box::new(ty(Primitive(String)))),
         )],
         "replace" => vec![fn_ty(
             vec![Primitive(String), Primitive(String)],
             Primitive(String),
         )],
-        "chars" => vec![fn_ty(vec![], Slice(Box::new(ty(Primitive(String)))))],
+        "chars" => vec![fn_ty(vec![], List(Box::new(ty(Primitive(String)))))],
         "char_at" => vec![fn_ty(vec![Primitive(I64)], Primitive(String))],
         "slice" => vec![
             fn_ty(vec![Primitive(I64)], Primitive(String)),
@@ -278,7 +278,7 @@ pub fn type_name_from_kind(kind: &TyKind) -> Option<&str> {
             let name = path.segments.last().map(|s| s.ident.as_str())?;
             Some(name)
         }
-        TyKind::Slice(_) => Some("List"),
+        TyKind::List(_) | TyKind::Slice(_) => Some("List"),
         _ => None,
     }
 }
@@ -415,8 +415,8 @@ pub fn substitute_receiver_type_vars(receiver_ty: &TyKind, method_ty: &TyKind) -
     let mut bindings: HashMap<TypeVarId, TyKind> = HashMap::new();
 
     match receiver_ty {
-        // List<T> = Slice(inner) → bind T to the inner element type
-        TyKind::Slice(inner) if !matches!(inner.kind, TyKind::Unknown) => {
+        // List<T> / Slice<T> → bind T to the inner element type
+        TyKind::List(inner) | TyKind::Slice(inner) if !matches!(inner.kind, TyKind::Unknown) => {
             bindings.insert(VAR_T, inner.kind.clone());
         }
         _ => {}
@@ -432,6 +432,10 @@ pub fn substitute_receiver_type_vars(receiver_ty: &TyKind, method_ty: &TyKind) -
 fn substitute_ty(ty: &TyKind, bindings: &std::collections::HashMap<TypeVarId, TyKind>) -> TyKind {
     match ty {
         TyKind::Var(id) => bindings.get(id).cloned().unwrap_or_else(|| ty.clone()),
+        TyKind::List(inner) => TyKind::List(Box::new(Ty {
+            kind: substitute_ty(&inner.kind, bindings),
+            ..Ty::default()
+        })),
         TyKind::Slice(inner) => TyKind::Slice(Box::new(Ty {
             kind: substitute_ty(&inner.kind, bindings),
             ..Ty::default()

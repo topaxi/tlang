@@ -812,7 +812,8 @@ impl LoweringContext {
     /// Lower a type path together with its type parameters, recognising
     /// built-in generic collection types:
     ///
-    /// - `List<T>` / `Slice<T>` → `TyKind::Slice(T)`
+    /// - `List<T>` → `TyKind::List(T)`
+    /// - `Slice<T>` → `TyKind::Slice(T)`
     /// - `Dict<K, V>` → `TyKind::Dict(K, V)`
     fn lower_ty_path_with_params(
         &mut self,
@@ -822,8 +823,14 @@ impl LoweringContext {
         if path.segments.len() == 1 {
             let name = path.segments[0].as_str();
 
-            // List<T> / Slice<T> → TyKind::Slice(T)
-            if (name == "List" || name == "Slice") && params.len() == 1 {
+            // List<T> → TyKind::List(T)
+            if name == "List" && params.len() == 1 {
+                let elem_ty = self.lower_ty(Some(&params[0]));
+                return hir::TyKind::List(Box::new(elem_ty));
+            }
+
+            // Slice<T> → TyKind::Slice(T)
+            if name == "Slice" && params.len() == 1 {
                 let elem_ty = self.lower_ty(Some(&params[0]));
                 return hir::TyKind::Slice(Box::new(elem_ty));
             }

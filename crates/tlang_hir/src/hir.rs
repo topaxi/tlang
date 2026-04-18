@@ -901,7 +901,12 @@ pub enum TyKind {
     Primitive(PrimTy),
     /// Function type: parameter types → return type.
     Fn(Vec<Ty>, Box<Ty>),
-    /// List type with element type (user-facing `List<T>`).
+    /// Owned list type produced by list literals `[1, 2, 3]` and `List<T>`
+    /// annotations.  At runtime this is a `TlangStruct` with a list shape.
+    List(Box<Ty>),
+    /// Slice (view) type produced by rest patterns (`...xs` in `[x, ...xs]`)
+    /// and `Slice<T>` annotations.  At runtime this is a `TlangSlice` — a
+    /// `(base, start, len)` view into an existing list.
     Slice(Box<Ty>),
     /// Dictionary type: key type → value type.
     Dict(Box<Ty>, Box<Ty>),
@@ -931,7 +936,8 @@ impl Display for TyKind {
                 }
                 write!(f, ") -> {}", ret.kind)
             }
-            TyKind::Slice(inner) => write!(f, "List<{}>", inner.kind),
+            TyKind::List(inner) => write!(f, "List<{}>", inner.kind),
+            TyKind::Slice(inner) => write!(f, "Slice<{}>", inner.kind),
             TyKind::Dict(k, v) => write!(f, "Dict<{}, {}>", k.kind, v.kind),
             TyKind::Never => write!(f, "never"),
             TyKind::Var(id) => write!(f, "?{id}"),

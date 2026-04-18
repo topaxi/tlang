@@ -150,7 +150,10 @@ impl UnificationTable {
                     Err(UnificationError::conflict(left, right))
                 }
             }
-            (TyKind::Slice(inner_left), TyKind::Slice(inner_right)) => {
+            (TyKind::List(inner_left), TyKind::List(inner_right))
+            | (TyKind::Slice(inner_left), TyKind::Slice(inner_right))
+            | (TyKind::List(inner_left), TyKind::Slice(inner_right))
+            | (TyKind::Slice(inner_left), TyKind::List(inner_right)) => {
                 self.unify_types(&inner_left.kind, &inner_right.kind)
             }
             (TyKind::Dict(key_left, value_left), TyKind::Dict(key_right, value_right)) => {
@@ -261,6 +264,10 @@ impl UnificationTable {
                     None => TyKind::Var(root),
                 }
             }
+            TyKind::List(inner) => TyKind::List(Box::new(Ty {
+                kind: self.zonk(&inner.kind),
+                ..Ty::default()
+            })),
             TyKind::Slice(inner) => TyKind::Slice(Box::new(Ty {
                 kind: self.zonk(&inner.kind),
                 ..Ty::default()
@@ -317,7 +324,7 @@ fn occurs_in(var: TypeVarId, ty: &TyKind, table: &mut UnificationTable) -> bool 
             }
             false
         }
-        TyKind::Slice(inner) => occurs_in(var, &inner.kind, table),
+        TyKind::List(inner) | TyKind::Slice(inner) => occurs_in(var, &inner.kind, table),
         TyKind::Dict(k, v) => occurs_in(var, &k.kind, table) || occurs_in(var, &v.kind, table),
         TyKind::Fn(params, ret) => {
             params.iter().any(|p| occurs_in(var, &p.kind, table))

@@ -27,7 +27,7 @@ pub use crate::typed_hir::{TypedHir, lower_and_typecheck};
 fn ty_contains_var(ty: &TyKind) -> bool {
     match ty {
         TyKind::Var(_) => true,
-        TyKind::Slice(inner) => ty_contains_var(&inner.kind),
+        TyKind::List(inner) | TyKind::Slice(inner) => ty_contains_var(&inner.kind),
         TyKind::Dict(k, v) => ty_contains_var(&k.kind) || ty_contains_var(&v.kind),
         TyKind::Fn(params, ret) => {
             params.iter().any(|p| ty_contains_var(&p.kind)) || ty_contains_var(&ret.kind)
@@ -519,7 +519,7 @@ fn preferred_pattern_hint_ty<'a>(pat_ty: &'a TyKind, table_ty: Option<&'a TyKind
         Some(table_ty)
             if matches!(
                 pat_ty,
-                TyKind::Slice(_) | TyKind::Dict(_, _) | TyKind::Fn(_, _)
+                TyKind::List(_) | TyKind::Slice(_) | TyKind::Dict(_, _) | TyKind::Fn(_, _)
             ) && matches!(table_ty, TyKind::Path(..)) =>
         {
             pat_ty
@@ -561,7 +561,8 @@ fn format_ty_kind(ty: &TyKind, type_var_names: &TypeVarNames) -> String {
                 format_ty_kind(&ret.kind, type_var_names)
             )
         }
-        TyKind::Slice(inner) => format!("List<{}>", format_ty_kind(&inner.kind, type_var_names)),
+        TyKind::List(inner) => format!("List<{}>", format_ty_kind(&inner.kind, type_var_names)),
+        TyKind::Slice(inner) => format!("Slice<{}>", format_ty_kind(&inner.kind, type_var_names)),
         TyKind::Dict(key, value) => format!(
             "Dict<{}, {}>",
             format_ty_kind(&key.kind, type_var_names),
@@ -1226,6 +1227,31 @@ fn Expense.date(Expense::Food(_, d)) { d }
         assert!(
             hints.iter().any(|h| h.label == ": Temporal::PlainDate"),
             "expected `: Temporal::PlainDate` hint for enum payload binding, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn rest_pattern_in_function_param_shows_slice_hint() {
+        let source = r#"
+fn head([x, ...xs]) { x }
+"#;
+        let hints = hints_for(source);
+        assert!(
+            hints.iter().any(|h| h.label.starts_with(": Slice")),
+            "expected `: Slice` hint for rest pattern binding `xs`, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn rest_pattern_in_typed_list_destructuring_shows_slice() {
+        let source = r#"
+let list: List<i64> = [1, 2, 3];
+let [x, ...xs] = list;
+"#;
+        let hints = hints_for(source);
+        assert!(
+            hints.iter().any(|h| h.label == ": Slice<i64>"),
+            "expected `: Slice<i64>` hint for rest pattern binding `xs`, got: {hints:?}"
         );
     }
 

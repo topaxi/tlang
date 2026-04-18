@@ -598,7 +598,8 @@ fn format_ty_kind(ty: &TyKind, type_var_names: &TypeVarNames) -> String {
                 .join(", "),
             format_ty_kind(&ret.kind, type_var_names)
         ),
-        TyKind::Slice(inner) => format!("List<{}>", format_ty_kind(&inner.kind, type_var_names)),
+        TyKind::List(inner) => format!("List<{}>", format_ty_kind(&inner.kind, type_var_names)),
+        TyKind::Slice(inner) => format!("Slice<{}>", format_ty_kind(&inner.kind, type_var_names)),
         TyKind::Dict(key, value) => format!(
             "Dict<{}, {}>",
             format_ty_kind(&key.kind, type_var_names),
