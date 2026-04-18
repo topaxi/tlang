@@ -19,7 +19,7 @@ fn has_concrete_type(ty: &hir::Ty) -> bool {
             hir::TyKind::Union(types) => types.iter().any(|ty| contains_var(&ty.kind)),
             hir::TyKind::Unknown | hir::TyKind::Primitive(_) | hir::TyKind::Never => false,
             hir::TyKind::Path(path, type_args) => {
-                is_unspecialized_generic_builtin_path(path)
+                (type_args.is_empty() && is_unspecialized_generic_builtin_path(path))
                     || type_args.iter().any(|ty| contains_var(&ty.kind))
             }
         }
@@ -29,7 +29,7 @@ fn has_concrete_type(ty: &hir::Ty) -> bool {
         && !contains_var(&ty.kind)
         && !matches!(
             &ty.kind,
-            hir::TyKind::Path(path, _type_args) if is_unspecialized_generic_builtin_path(path)
+            hir::TyKind::Path(path, type_args) if type_args.is_empty() && is_unspecialized_generic_builtin_path(path)
         )
 }
 
