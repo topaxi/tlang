@@ -305,11 +305,18 @@ impl<'a> InnerCodegen<'a> {
     /// Generate a cast expression (`as`).
     ///
     /// Dispatches through the `Into` protocol: `Into::into(value, "targetType")`.
-    /// For builtin numeric types in JavaScript this is effectively
-    /// a no-op since JS has a single number type, but user-defined
-    /// `Into` implementations will be called.
+    /// For builtin numeric types JavaScript has a single `number` type, so all
+    /// numeric-to-numeric casts are identity operations at runtime.  User-defined
+    /// `Into` implementations for non-numeric types will still be called.
     fn generate_cast_expr(&mut self, inner: &hir::Expr, target_ty: &hir::Ty) -> Expression<'a> {
         let value = self.generate_expr(inner);
+        if let (hir::TyKind::Primitive(source), hir::TyKind::Primitive(target)) =
+            (&inner.ty.kind, &target_ty.kind)
+            && source.is_numeric()
+            && target.is_numeric()
+        {
+            return value;
+        }
         let into_fn = self.static_member_expr(
             self.ident_expr(&crate::generator::CodegenJS::protocol_js_name("Into")),
             "into",

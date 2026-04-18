@@ -29,5 +29,5 @@ pub fn lookup(name: &str) -> Option<TyKind> {
     let segment = hir::PathSegment::new(ident);
     let mut path = hir::Path::new(vec![segment], Span::default());
     path.set_res(Res::new_prim_ty());
-    Some(TyKind::Path(path))
+    Some(TyKind::Path(path, Vec::new()))
 }

@@ -404,16 +404,6 @@ impl<'src> Parser<'src> {
         path
     }
 
-    fn parse_path_expression(&mut self) -> Expr {
-        // How do we generalize this span handling?
-        // Callbacks come to mind, but I'd rather not.
-        // Adding another stack is also not ideal.
-        let path = self.parse_path();
-        let span = path.span;
-
-        node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span)
-    }
-
     /// Check if the current position is at a `const` or `pub const` item.
     /// Returns `Some(visibility)` if so, `None` otherwise.
     fn try_parse_const_item_visibility(&mut self) -> Option<Visibility> {
@@ -1338,27 +1328,56 @@ impl<'src> Parser<'src> {
         .with_span(span)
     }
 
-    /// Can be a Identifier, `NestedIdentifier` or `FieldExpression` with a single field name.
-    fn parse_function_name(&mut self) -> Expr {
-        let path = self.parse_path_expression();
-        let mut span = path.span;
+    fn try_parse_owner_type_params_before_member(&mut self) -> Vec<TypeParam> {
+        if !matches!(self.current_token_kind(), TokenKind::LessThan) {
+            return Vec::new();
+        }
+
+        let saved_state = self.save_state();
+        let type_params = self.parse_type_params();
+        if matches!(
+            self.current_token_kind(),
+            TokenKind::Dot | TokenKind::PathSeparator
+        ) {
+            type_params
+        } else {
+            self.restore_state(saved_state);
+            Vec::new()
+        }
+    }
+
+    /// Can be an identifier, `NestedIdentifier`, `FieldExpression`, or the
+    /// method-head owner-generic forms `Type<T>.method` / `Type<T>::func`.
+    fn parse_function_name(&mut self) -> (Expr, Vec<TypeParam>) {
+        let path = self.parse_path();
+        let path_span = path.span;
+        let mut span = path_span;
+        let base_expr =
+            node::expr!(self.unique_id(), Path(Box::new(path.clone()))).with_span(path_span);
+
+        let owner_type_params = self.try_parse_owner_type_params_before_member();
 
         let mut expr = if matches!(self.current_token_kind(), TokenKind::Dot) {
             self.advance();
             node::expr!(
                 self.unique_id(),
                 FieldExpression(Box::new(FieldAccessExpression {
-                    base: path,
+                    base: base_expr,
                     field: self.parse_identifier(),
                 }))
             )
+        } else if matches!(self.current_token_kind(), TokenKind::PathSeparator) {
+            self.advance();
+            let mut full_path = path;
+            full_path.push(self.parse_identifier());
+            node::expr!(self.unique_id(), Path(Box::new(full_path)))
         } else {
-            path
+            base_expr
         };
 
         self.end_span_from_previous_token(&mut span);
         expr.span = span;
-        expr
+        (expr, owner_type_params)
     }
 
     fn parse_if_condition(&mut self) -> Expr {
@@ -1858,9 +1877,13 @@ impl<'src> Parser<'src> {
                 let parameters = self.parse_type_annotation_parameters();
                 self.end_span_from_previous_token(&mut span);
 
-                Ty::new(self.unique_id(), identifier)
-                    .with_parameters(parameters)
-                    .with_span(span)
+                if parameters.is_empty() && identifier.to_string() == "unknown" {
+                    Ty::new_unknown(self.unique_id()).with_span(span)
+                } else {
+                    Ty::new(self.unique_id(), identifier)
+                        .with_parameters(parameters)
+                        .with_span(span)
+                }
             }
             _ => Ty::new_unknown(self.unique_id()),
         }
@@ -2036,6 +2059,7 @@ impl<'src> Parser<'src> {
                 id: self.unique_id(),
                 visibility: Visibility::Private,
                 name,
+                owner_type_params: vec![],
                 type_params: vec![],
                 parameters,
                 params_span,
@@ -2113,6 +2137,7 @@ impl<'src> Parser<'src> {
         let mut name: Option<Expr> = None;
         let mut declarations: Vec<FunctionDeclaration> = Vec::new();
         let mut clause_visibility = visibility;
+        let mut owner_type_params: Vec<TypeParam> = Vec::new();
         let mut type_params: Vec<TypeParam> = Vec::new();
 
         while matches!(
@@ -2155,7 +2180,7 @@ impl<'src> Parser<'src> {
             }
 
             if Self::is_contextual_identifier_token(self.current_token_kind()) {
-                let node = self.parse_function_name();
+                let (node, clause_owner_type_params) = self.parse_function_name();
 
                 if name.is_some()
                     && self.fn_name_identifier_to_string(name.as_ref().unwrap())
@@ -2183,6 +2208,9 @@ impl<'src> Parser<'src> {
                         self.push_unexpected_token_error("identifier", self.current_token);
                         break;
                     }
+                }
+                if declarations.is_empty() {
+                    owner_type_params = clause_owner_type_params;
                 }
             } else if name.is_none() {
                 // No identifier after `fn` keyword and no prior clause name to reuse.
@@ -2217,6 +2245,7 @@ impl<'src> Parser<'src> {
                 id: self.unique_id(),
                 visibility: clause_visibility,
                 name: fn_name,
+                owner_type_params: owner_type_params.clone(),
                 type_params: type_params.clone(),
                 parameters,
                 params_span,

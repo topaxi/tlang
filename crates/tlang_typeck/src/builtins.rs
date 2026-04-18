@@ -74,14 +74,13 @@ fn lookup_generic(name: &str) -> Option<TyKind> {
     let u = TyKind::Var(VAR_U);
 
     match name {
-        // map<T, U>(iterable: Slice<T>, f: fn(T) -> U) -> Slice<U>
-        // Also available as Functor::map
-        "map" | "Functor::map" => Some(mk_fn_ty(
+        // map<T, U>(iterable: List<T>, f: fn(T) -> U) -> List<U>
+        "map" => Some(mk_fn_ty(
             vec![
-                TyKind::Slice(Box::new(mk_ty(t.clone()))),
+                TyKind::List(Box::new(mk_ty(t.clone()))),
                 mk_fn_ty(vec![t], u.clone()),
             ],
-            TyKind::Slice(Box::new(mk_ty(u))),
+            TyKind::List(Box::new(mk_ty(u))),
         )),
         _ => None,
     }

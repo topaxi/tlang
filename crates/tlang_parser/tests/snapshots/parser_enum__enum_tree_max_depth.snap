@@ -301,6 +301,7 @@ Module(
               ),
             ),
           ),
+          owner_type_params: [],
           type_params: [],
           parameters: [
             FunctionParameter(
@@ -534,6 +535,7 @@ Module(
               ),
             ),
           ),
+          owner_type_params: [],
           type_params: [],
           parameters: [
             FunctionParameter(
@@ -1173,6 +1175,7 @@ Module(
             ),
           ),
         ),
+        owner_type_params: [],
         type_params: [],
         parameters: [],
         params_span: Span(

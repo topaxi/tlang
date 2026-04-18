@@ -17,7 +17,7 @@ get_sum(p) |> log();
 
 // Multi-dispatch: struct pattern clause + wildcard fallback
 fn describe(SafeHtml { value }) { "html: " + value }
-fn describe(_) { "unknown" }
+fn describe(_: unknown) { "unknown" }
 
 describe(sh) |> log();
 describe(42) |> log();

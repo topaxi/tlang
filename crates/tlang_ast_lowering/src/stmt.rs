@@ -8,6 +8,47 @@ use tlang_hir as hir;
 
 use crate::{LoweringContext, ProtocolDispatchContext};
 
+fn same_ast_ty_shape(lhs: &ast::node::Ty, rhs: &ast::node::Ty) -> bool {
+    if lhs.parameters.len() != rhs.parameters.len() {
+        return false;
+    }
+
+    if !lhs
+        .parameters
+        .iter()
+        .zip(rhs.parameters.iter())
+        .all(|(lhs, rhs)| same_ast_ty_shape(lhs, rhs))
+    {
+        return false;
+    }
+
+    match (&lhs.kind, &rhs.kind) {
+        (ast::node::TyKind::Unknown, ast::node::TyKind::Unknown) => true,
+        (ast::node::TyKind::Path(lhs_path), ast::node::TyKind::Path(rhs_path)) => {
+            lhs_path.segments == rhs_path.segments
+        }
+        (ast::node::TyKind::Union(lhs_paths), ast::node::TyKind::Union(rhs_paths)) => {
+            lhs_paths.len() == rhs_paths.len()
+                && lhs_paths
+                    .iter()
+                    .zip(rhs_paths.iter())
+                    .all(|(lhs_path, rhs_path)| lhs_path.segments == rhs_path.segments)
+        }
+        (
+            ast::node::TyKind::Fn(lhs_params, lhs_ret),
+            ast::node::TyKind::Fn(rhs_params, rhs_ret),
+        ) => {
+            lhs_params.len() == rhs_params.len()
+                && lhs_params
+                    .iter()
+                    .zip(rhs_params.iter())
+                    .all(|(lhs_param, rhs_param)| same_ast_ty_shape(&lhs_param.ty, &rhs_param.ty))
+                && same_ast_ty_shape(lhs_ret, rhs_ret)
+        }
+        _ => false,
+    }
+}
+
 impl LoweringContext {
     pub(crate) fn lower_stmt(&mut self, node: &ast::node::Stmt) -> Vec<hir::Stmt> {
         debug!("Lowering statement {:?}", node.kind);
@@ -407,6 +448,7 @@ impl LoweringContext {
         method: &ast::node::ProtocolMethodSignature,
         method_dispatch_map: &HashMap<String, Ident>,
     ) -> hir::ProtocolMethodSignature {
+        let type_params = self.lower_type_params(&method.type_params);
         let has_body = method.body.is_some();
         let params: Vec<hir::FunctionParameter> = method
             .parameters
@@ -440,14 +482,17 @@ impl LoweringContext {
             method.body.as_ref().map(|b| self.lower_block(b))
         };
 
-        hir::ProtocolMethodSignature {
+        let signature = hir::ProtocolMethodSignature {
             hir_id: method_hir_id,
             name: method.name,
+            type_params,
             parameters: params,
             return_type: self.lower_ty(method.return_type_annotation.as_ref()),
             body,
             span: method.span,
-        }
+        };
+        self.pop_type_param_scope();
+        signature
     }
 
     fn lower_protocol_method_param(
@@ -713,19 +758,26 @@ impl LoweringContext {
             .iter()
             .enumerate()
             .map(|(i, ident)| {
-                let has_type_annotation = decls.iter().any(|d| {
-                    d.parameters
-                        .get(i)
-                        .and_then(|p| p.type_annotation.as_ref())
-                        .is_some()
-                });
-
-                // Pick up any type annotation inferred by the semantic analysis phase.
-                let type_annotation = decls
+                // Preserve a concrete synthesized parameter type only when every
+                // clause agrees on the same annotation/inferred type. Mixed
+                // typed/untyped clauses must stay permissive so catch-all arms
+                // (e.g. `fn render(v)`) continue to participate in dispatch.
+                let type_annotations = decls
                     .iter()
-                    .find_map(|d| d.parameters.get(i).and_then(|p| p.type_annotation.as_ref()))
-                    .map(|ty| self.lower_ty(Some(ty)))
-                    .unwrap_or_default();
+                    .map(|d| d.parameters.get(i).and_then(|p| p.type_annotation.as_ref()))
+                    .collect::<Vec<_>>();
+                let type_annotation = if type_annotations.len() == decls.len()
+                    && let Some(first_annotation) = type_annotations.first().copied().flatten()
+                    && type_annotations.iter().all(|annotation| {
+                        annotation.is_some_and(|annotation| {
+                            same_ast_ty_shape(annotation, first_annotation)
+                        })
+                    }) {
+                    self.lower_ty(Some(first_annotation))
+                } else {
+                    hir::Ty::default()
+                };
+                let has_type_annotation = !matches!(type_annotation.kind, hir::TyKind::Unknown);
 
                 hir::FunctionParameter {
                     hir_id: self.unique_id(),
@@ -848,15 +900,20 @@ impl LoweringContext {
         );
 
         self.with_new_scope(|this, _scope| {
-            // Push method-level type parameter scope (e.g. `<U>` from `fn map<U>`)
+            // Push owner type parameter scope first (e.g. `<A>` from
+            // `fn Pair<A>.swap(...)`), then method-level type parameters
+            // (e.g. `<U>` from `fn map<U>`)
             // before lowering any type annotations so that references like
             // `fn(T) -> U` in parameter types resolve `U` to `TyKind::Var`.
             // Type params are taken from the first clause — subsequent clauses
             // must use identical params (enforced by convention, not yet validated).
+            let owner_type_params = this.lower_type_params(&decls[0].owner_type_params);
             let type_params = this.lower_type_params(&decls[0].type_params);
 
             let (hir_id, fn_name, params, span) =
                 this.setup_function_declaration_metadata(decls, all_param_names);
+            let mut params = params;
+            this.seed_dot_method_receiver_type(&fn_name, &owner_type_params, &mut params);
 
             let fn_name_str = this.fn_name_or_error(&decls[0]);
             this.define_function_symbols(hir_id, &fn_name_str, &decls[0], &params);
@@ -893,9 +950,11 @@ impl LoweringContext {
             );
 
             this.pop_type_param_scope();
+            this.pop_type_param_scope();
 
             (hir_id, {
                 let mut decl = hir::FunctionDeclaration::new(hir_id, fn_name, params, body);
+                decl.owner_type_params = owner_type_params;
                 decl.type_params = type_params;
                 decl.return_type = return_type;
                 decl.has_return_type = decls.iter().any(|d| d.return_type_annotation.is_some());

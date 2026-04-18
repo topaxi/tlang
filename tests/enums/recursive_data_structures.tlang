@@ -1,12 +1,12 @@
 enum LinkedList {
     Empty,
-    Node(i32, LinkedList),
+    Node(i64, LinkedList),
 }
 
 enum BinaryTree {
     Empty,
-    Leaf(i32),
-    Node(i32, BinaryTree, BinaryTree),
+    Leaf(i64),
+    Node(i64, BinaryTree, BinaryTree),
 }
 
 // Create a linked list recursively

@@ -1,5 +1,57 @@
 use tlang_hir as hir;
 
+fn is_unspecialized_generic_builtin_path(path: &hir::Path) -> bool {
+    matches!(
+        path.first_ident().as_str(),
+        "List" | "Dict" | "Option" | "Result"
+    )
+}
+
+fn has_concrete_type(ty: &hir::Ty) -> bool {
+    fn contains_var(kind: &hir::TyKind) -> bool {
+        match kind {
+            hir::TyKind::Var(_) => true,
+            hir::TyKind::Fn(params, ret) => {
+                params.iter().any(|param| contains_var(&param.kind)) || contains_var(&ret.kind)
+            }
+            hir::TyKind::List(inner) | hir::TyKind::Slice(inner) => contains_var(&inner.kind),
+            hir::TyKind::Dict(key, value) => contains_var(&key.kind) || contains_var(&value.kind),
+            hir::TyKind::Union(types) => types.iter().any(|ty| contains_var(&ty.kind)),
+            hir::TyKind::Unknown | hir::TyKind::Primitive(_) | hir::TyKind::Never => false,
+            hir::TyKind::Path(path, type_args) => {
+                (type_args.is_empty() && is_unspecialized_generic_builtin_path(path))
+                    || type_args.iter().any(|ty| contains_var(&ty.kind))
+            }
+        }
+    }
+
+    fn contains_unknown(kind: &hir::TyKind) -> bool {
+        match kind {
+            hir::TyKind::Unknown => true,
+            hir::TyKind::Fn(params, ret) => {
+                params.iter().any(|p| contains_unknown(&p.kind)) || contains_unknown(&ret.kind)
+            }
+            hir::TyKind::List(inner) | hir::TyKind::Slice(inner) => contains_unknown(&inner.kind),
+            hir::TyKind::Dict(key, value) => {
+                contains_unknown(&key.kind) || contains_unknown(&value.kind)
+            }
+            hir::TyKind::Union(types) => types.iter().any(|ty| contains_unknown(&ty.kind)),
+            hir::TyKind::Path(_, type_args) => {
+                type_args.iter().any(|ty| contains_unknown(&ty.kind))
+            }
+            hir::TyKind::Var(_) | hir::TyKind::Primitive(_) | hir::TyKind::Never => false,
+        }
+    }
+
+    !matches!(ty.kind, hir::TyKind::Unknown)
+        && !contains_var(&ty.kind)
+        && !contains_unknown(&ty.kind)
+        && !matches!(
+            &ty.kind,
+            hir::TyKind::Path(path, type_args) if type_args.is_empty() && is_unspecialized_generic_builtin_path(path)
+        )
+}
+
 /// Whether `unknown` operands produce errors or propagate silently.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TypingContext {
@@ -19,14 +71,14 @@ impl TypingContext {
 
     /// Determine the typing context for a function declaration.
     ///
-    /// A function is strict if **all** parameters have non-`unknown` type
-    /// annotations **and** the return type is non-`unknown`.
+    /// A function is strict only when every parameter and the return type are
+    /// fully concrete. Unresolved generic vars still belong to permissive mode.
     pub fn for_function(decl: &hir::FunctionDeclaration) -> Self {
         let all_params_typed = decl
             .parameters
             .iter()
-            .all(|p| !matches!(p.type_annotation.kind, hir::TyKind::Unknown));
-        let return_typed = !matches!(decl.return_type.kind, hir::TyKind::Unknown);
+            .all(|p| has_concrete_type(&p.type_annotation));
+        let return_typed = has_concrete_type(&decl.return_type);
 
         if all_params_typed && return_typed {
             TypingContext::Strict

@@ -12,11 +12,11 @@
 //!   `|>` operator and after wrapped member-access / method-call receivers when
 //!   the chain spans multiple lines.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use tlang_hir as hir;
 use tlang_hir::TyKind;
-use tlang_span::{HirId, LineColumn, Span};
+use tlang_span::{HirId, LineColumn, Span, TypeVarId};
 use tlang_typeck::TypeTable;
 
 // Re-export from the dedicated typed_hir module so existing consumers
@@ -27,11 +27,12 @@ pub use crate::typed_hir::{TypedHir, lower_and_typecheck};
 fn ty_contains_var(ty: &TyKind) -> bool {
     match ty {
         TyKind::Var(_) => true,
-        TyKind::Slice(inner) => ty_contains_var(&inner.kind),
+        TyKind::List(inner) | TyKind::Slice(inner) => ty_contains_var(&inner.kind),
         TyKind::Dict(k, v) => ty_contains_var(&k.kind) || ty_contains_var(&v.kind),
         TyKind::Fn(params, ret) => {
             params.iter().any(|p| ty_contains_var(&p.kind)) || ty_contains_var(&ret.kind)
         }
+        TyKind::Path(_, type_args) => type_args.iter().any(|arg| ty_contains_var(&arg.kind)),
         TyKind::Union(tys) => tys.iter().any(|t| ty_contains_var(&t.kind)),
         _ => false,
     }
@@ -71,6 +72,7 @@ pub fn collect_inlay_hints(typed_hir: &TypedHir, range: Option<(u32, u32)>) -> V
     let ctx = HintCtx {
         type_table: &typed_hir.type_table,
         pipeline_call_ids: &typed_hir.pipeline_call_ids,
+        type_var_names: HashMap::new(),
         range,
     };
     collect_block_hints(&typed_hir.module.block, &ctx, &mut hints);
@@ -83,8 +85,11 @@ pub fn collect_inlay_hints(typed_hir: &TypedHir, range: Option<(u32, u32)>) -> V
 struct HintCtx<'a> {
     type_table: &'a TypeTable,
     pipeline_call_ids: &'a HashSet<HirId>,
+    type_var_names: TypeVarNames,
     range: Option<(u32, u32)>,
 }
+
+type TypeVarNames = HashMap<TypeVarId, String>;
 
 // ── Block / statement traversal ────────────────────────────────────────
 
@@ -105,14 +110,14 @@ fn collect_stmt_hints(stmt: &hir::Stmt, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
 
             // Show a type hint when no explicit annotation was written.
             if matches!(ty.kind, TyKind::Unknown) && !matches!(pat.ty.kind, TyKind::Unknown) {
-                collect_pat_type_hints(pat, ctx.type_table, ctx.range, hints);
+                collect_pat_type_hints(pat, ctx.type_table, &ctx.type_var_names, ctx.range, hints);
             }
         }
         hir::StmtKind::Const(_, pat, expr, ty) => {
             collect_expr_hints(expr, ctx, hints);
 
             if matches!(ty.kind, TyKind::Unknown) && !matches!(pat.ty.kind, TyKind::Unknown) {
-                collect_pat_type_hints(pat, ctx.type_table, ctx.range, hints);
+                collect_pat_type_hints(pat, ctx.type_table, &ctx.type_var_names, ctx.range, hints);
             }
         }
         hir::StmtKind::FunctionDeclaration(decl) => {
@@ -150,16 +155,26 @@ fn collect_fn_decl_hints(
     ctx: &HintCtx<'_>,
     hints: &mut Vec<InlayHint>,
 ) {
+    let fn_ctx = HintCtx {
+        type_table: ctx.type_table,
+        pipeline_call_ids: ctx.pipeline_call_ids,
+        type_var_names: extend_type_var_names(
+            &ctx.type_var_names,
+            &decl.all_type_params().cloned().collect::<Vec<_>>(),
+        ),
+        range: ctx.range,
+    };
+
     // Parameter type hints — show when the user didn't annotate a type.
     for param in &decl.parameters {
         if !param.has_type_annotation {
-            // Look up the inferred type from the type table first,
-            // falling back to the (possibly mutated) type_annotation.
-            let inferred_ty = ctx
-                .type_table
-                .get(&param.hir_id)
-                .map(|info| &info.ty.kind)
-                .unwrap_or(&param.type_annotation.kind);
+            let inferred_ty = preferred_decl_hint_ty(
+                &param.type_annotation.kind,
+                fn_ctx
+                    .type_table
+                    .get(&param.hir_id)
+                    .map(|info| &info.ty.kind),
+            );
 
             if matches!(inferred_ty, TyKind::Unknown) {
                 continue;
@@ -168,9 +183,9 @@ fn collect_fn_decl_hints(
             let pos = param.name.span.end_lc;
             push_hint(
                 hints,
-                ctx.range,
+                fn_ctx.range,
                 pos,
-                format!(": {inferred_ty}"),
+                format!(": {}", format_ty_kind(inferred_ty, &fn_ctx.type_var_names)),
                 InlayHintKind::Type,
             );
         }
@@ -207,7 +222,7 @@ fn collect_fn_decl_hints(
             && decl.return_hint_spans.len() == decl.return_hint_arm_indices.len()
         {
             if !has_informative_clause_completion(arms) {
-                collect_block_hints(&decl.body, ctx, hints);
+                collect_block_hints(&decl.body, &fn_ctx, hints);
                 return;
             }
 
@@ -229,13 +244,13 @@ fn collect_fn_decl_hints(
                 for (span, ret_kind) in clause_returns {
                     push_hint(
                         hints,
-                        ctx.range,
+                        fn_ctx.range,
                         return_type_hint_position(span),
-                        format!(" -> {ret_kind}"),
+                        format!(" -> {}", format_ty_kind(ret_kind, &fn_ctx.type_var_names)),
                         InlayHintKind::ReturnType,
                     );
                 }
-                collect_block_hints(&decl.body, ctx, hints);
+                collect_block_hints(&decl.body, &fn_ctx, hints);
                 return;
             }
         }
@@ -266,9 +281,9 @@ fn collect_fn_decl_hints(
             for span in return_hint_spans {
                 push_hint(
                     hints,
-                    ctx.range,
+                    fn_ctx.range,
                     return_type_hint_position(span),
-                    format!(" -> {ret_kind}"),
+                    format!(" -> {}", format_ty_kind(ret_kind, &fn_ctx.type_var_names)),
                     InlayHintKind::ReturnType,
                 );
             }
@@ -276,7 +291,7 @@ fn collect_fn_decl_hints(
     }
 
     // Recurse into the function body.
-    collect_block_hints(&decl.body, ctx, hints);
+    collect_block_hints(&decl.body, &fn_ctx, hints);
 }
 
 /// Check whether a type consists entirely of unresolved type variables.
@@ -313,7 +328,10 @@ fn push_multiline_chain_hint(
             hints,
             ctx.range,
             inner_expr.span.end_lc,
-            format!(": {}", inner_expr.ty.kind),
+            format!(
+                ": {}",
+                format_ty_kind(&inner_expr.ty.kind, &ctx.type_var_names)
+            ),
             InlayHintKind::ChainedPipeline,
         );
     }
@@ -354,7 +372,7 @@ fn collect_expr_hints(expr: &hir::Expr, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
                     hints,
                     ctx.range,
                     lhs.span.end_lc,
-                    format!(": {}", lhs.ty.kind),
+                    format!(": {}", format_ty_kind(&lhs.ty.kind, &ctx.type_var_names)),
                     InlayHintKind::ChainedPipeline,
                 );
             }
@@ -400,7 +418,13 @@ fn collect_expr_hints(expr: &hir::Expr, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
             for arm in arms {
                 // Emit type hints for each binding introduced by the arm pattern
                 // (e.g. `title: string` for `Page { title, alerts, posts }`).
-                collect_pat_type_hints(&arm.pat, ctx.type_table, ctx.range, hints);
+                collect_pat_type_hints(
+                    &arm.pat,
+                    ctx.type_table,
+                    &ctx.type_var_names,
+                    ctx.range,
+                    hints,
+                );
                 if let Some(guard) = &arm.guard {
                     collect_expr_hints(guard, ctx, hints);
                 }
@@ -439,6 +463,7 @@ fn collect_expr_hints(expr: &hir::Expr, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
 fn collect_pat_type_hints(
     pat: &hir::Pat,
     type_table: &TypeTable,
+    type_var_names: &TypeVarNames,
     range: Option<(u32, u32)>,
     hints: &mut Vec<InlayHint>,
 ) {
@@ -462,22 +487,22 @@ fn collect_pat_type_hints(
                 hints,
                 range,
                 pos,
-                format!(": {inferred_ty}"),
+                format!(": {}", format_ty_kind(inferred_ty, type_var_names)),
                 InlayHintKind::Type,
             );
         }
         hir::PatKind::List(pats) => {
             // For list destructuring, emit hints for each sub-pattern.
             for sub_pat in pats {
-                collect_pat_type_hints(sub_pat, type_table, range, hints);
+                collect_pat_type_hints(sub_pat, type_table, type_var_names, range, hints);
             }
         }
         hir::PatKind::Rest(inner) => {
-            collect_pat_type_hints(inner, type_table, range, hints);
+            collect_pat_type_hints(inner, type_table, type_var_names, range, hints);
         }
         hir::PatKind::Enum(_, fields) => {
             for (_, field_pat) in fields {
-                collect_pat_type_hints(field_pat, type_table, range, hints);
+                collect_pat_type_hints(field_pat, type_table, type_var_names, range, hints);
             }
         }
         // Wildcards and literal patterns don't need hints.
@@ -490,15 +515,83 @@ fn preferred_pattern_hint_ty<'a>(pat_ty: &'a TyKind, table_ty: Option<&'a TyKind
         None => pat_ty,
         Some(TyKind::Unknown) => pat_ty,
         Some(table_ty) if matches!(pat_ty, TyKind::Unknown) => table_ty,
+        Some(table_ty) if ty_contains_var(pat_ty) && ty_contains_var(table_ty) => pat_ty,
         Some(table_ty)
             if matches!(
                 pat_ty,
-                TyKind::Slice(_) | TyKind::Dict(_, _) | TyKind::Fn(_, _)
-            ) && matches!(table_ty, TyKind::Path(_)) =>
+                TyKind::List(_) | TyKind::Slice(_) | TyKind::Dict(_, _) | TyKind::Fn(_, _)
+            ) && matches!(table_ty, TyKind::Path(..)) =>
         {
             pat_ty
         }
         Some(table_ty) => table_ty,
+    }
+}
+
+fn preferred_decl_hint_ty<'a>(decl_ty: &'a TyKind, table_ty: Option<&'a TyKind>) -> &'a TyKind {
+    match table_ty {
+        None => decl_ty,
+        Some(TyKind::Unknown) => decl_ty,
+        Some(table_ty) if matches!(decl_ty, TyKind::Unknown) => table_ty,
+        Some(table_ty) if ty_contains_var(decl_ty) && ty_contains_var(table_ty) => decl_ty,
+        Some(table_ty) => table_ty,
+    }
+}
+
+fn extend_type_var_names(parent: &TypeVarNames, type_params: &[hir::TypeParam]) -> TypeVarNames {
+    let mut names = parent.clone();
+    for type_param in type_params {
+        names.insert(type_param.type_var_id, type_param.name.to_string());
+    }
+    names
+}
+
+fn format_ty_kind(ty: &TyKind, type_var_names: &TypeVarNames) -> String {
+    match ty {
+        TyKind::Unknown => "unknown".to_string(),
+        TyKind::Primitive(p) => p.to_string(),
+        TyKind::Fn(params, ret) => {
+            let params = params
+                .iter()
+                .map(|param| format_ty_kind(&param.kind, type_var_names))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(
+                "fn({params}) -> {}",
+                format_ty_kind(&ret.kind, type_var_names)
+            )
+        }
+        TyKind::List(inner) => format!("List<{}>", format_ty_kind(&inner.kind, type_var_names)),
+        TyKind::Slice(inner) => format!("Slice<{}>", format_ty_kind(&inner.kind, type_var_names)),
+        TyKind::Dict(key, value) => format!(
+            "Dict<{}, {}>",
+            format_ty_kind(&key.kind, type_var_names),
+            format_ty_kind(&value.kind, type_var_names)
+        ),
+        TyKind::Never => "never".to_string(),
+        TyKind::Var(id) => type_var_names
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| format!("?{id}")),
+        TyKind::Path(path, type_args) => {
+            if type_args.is_empty() {
+                path.to_string()
+            } else {
+                format!(
+                    "{path}<{}>",
+                    type_args
+                        .iter()
+                        .map(|ty| format_ty_kind(&ty.kind, type_var_names))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+        }
+        TyKind::Union(tys) => tys
+            .iter()
+            .map(|ty| format_ty_kind(&ty.kind, type_var_names))
+            .collect::<Vec<_>>()
+            .join(" | "),
     }
 }
 
@@ -557,6 +650,7 @@ pub fn type_at_definition(typed_hir: &TypedHir, def_line: u32, def_col: u32) -> 
     walk_block_for_type(
         &typed_hir.module.block,
         &typed_hir.type_table,
+        &HashMap::new(),
         def_line,
         lexer_col,
         &mut result,
@@ -567,6 +661,7 @@ pub fn type_at_definition(typed_hir: &TypedHir, def_line: u32, def_col: u32) -> 
 fn walk_block_for_type(
     block: &hir::Block,
     type_table: &TypeTable,
+    type_var_names: &TypeVarNames,
     line: u32,
     col: u32,
     out: &mut Option<String>,
@@ -575,32 +670,33 @@ fn walk_block_for_type(
         if out.is_some() {
             return;
         }
-        walk_stmt_for_type(stmt, type_table, line, col, out);
+        walk_stmt_for_type(stmt, type_table, type_var_names, line, col, out);
     }
     if out.is_none()
         && let Some(expr) = &block.expr
     {
-        walk_expr_for_type(expr, type_table, line, col, out);
+        walk_expr_for_type(expr, type_table, type_var_names, line, col, out);
     }
 }
 
 fn walk_stmt_for_type(
     stmt: &hir::Stmt,
     type_table: &TypeTable,
+    type_var_names: &TypeVarNames,
     line: u32,
     col: u32,
     out: &mut Option<String>,
 ) {
     match &stmt.kind {
-        hir::StmtKind::Expr(e) => walk_expr_for_type(e, type_table, line, col, out),
+        hir::StmtKind::Expr(e) => walk_expr_for_type(e, type_table, type_var_names, line, col, out),
         hir::StmtKind::Let(pat, init, _ty) | hir::StmtKind::Const(_, pat, init, _ty) => {
-            check_pat_for_type(pat, line, col, out);
+            check_pat_for_type(pat, type_var_names, line, col, out);
             if out.is_none() {
-                walk_expr_for_type(init, type_table, line, col, out);
+                walk_expr_for_type(init, type_table, type_var_names, line, col, out);
             }
         }
         hir::StmtKind::FunctionDeclaration(decl) => {
-            walk_fn_decl_for_type(decl, type_table, line, col, out);
+            walk_fn_decl_for_type(decl, type_table, type_var_names, line, col, out);
         }
         hir::StmtKind::StructDeclaration(decl) => {
             let name_span = &decl.name.span;
@@ -610,7 +706,7 @@ fn walk_stmt_for_type(
         }
         hir::StmtKind::ImplBlock(impl_block) => {
             for decl in &impl_block.methods {
-                walk_fn_decl_for_type(decl, type_table, line, col, out);
+                walk_fn_decl_for_type(decl, type_table, type_var_names, line, col, out);
             }
         }
         hir::StmtKind::EnumDeclaration(decl) => {
@@ -619,7 +715,9 @@ fn walk_stmt_for_type(
                 *out = Some(decl.name.to_string());
             }
         }
-        hir::StmtKind::Return(Some(e)) => walk_expr_for_type(e, type_table, line, col, out),
+        hir::StmtKind::Return(Some(e)) => {
+            walk_expr_for_type(e, type_table, type_var_names, line, col, out);
+        }
         _ => {}
     }
 }
@@ -627,6 +725,7 @@ fn walk_stmt_for_type(
 fn walk_fn_decl_for_type(
     decl: &hir::FunctionDeclaration,
     type_table: &TypeTable,
+    parent_type_var_names: &TypeVarNames,
     line: u32,
     col: u32,
     out: &mut Option<String>,
@@ -635,22 +734,63 @@ fn walk_fn_decl_for_type(
         return;
     }
 
+    let type_var_names = extend_type_var_names(
+        parent_type_var_names,
+        &decl.all_type_params().cloned().collect::<Vec<_>>(),
+    );
+
     // Build the function signature string, preferring the fully-inferred
     // types from the type table over the (possibly stale) AST annotations.
     let fn_sig = || -> String {
-        if let Some(info) = type_table.get(&decl.hir_id)
-            && let TyKind::Fn(ref param_tys, ref ret_ty) = info.ty.kind
-        {
-            let params: Vec<String> = param_tys.iter().map(|p| format!("{}", p.kind)).collect();
-            format!("fn({}) -> {}", params.join(", "), ret_ty.kind)
-        } else {
+        let decl_sig = || {
             let params: Vec<String> = decl
                 .parameters
                 .iter()
-                .map(|p| format!("{}", p.type_annotation.kind))
+                .map(|param| {
+                    let param_ty = preferred_decl_hint_ty(
+                        &param.type_annotation.kind,
+                        type_table.get(&param.hir_id).map(|info| &info.ty.kind),
+                    );
+                    format_ty_kind(param_ty, &type_var_names)
+                })
                 .collect();
-            let ret = &decl.return_type.kind;
-            format!("fn({}) -> {ret}", params.join(", "))
+            let ret = preferred_decl_hint_ty(
+                &decl.return_type.kind,
+                type_table
+                    .get(&decl.hir_id)
+                    .and_then(|info| match &info.ty.kind {
+                        TyKind::Fn(_, ret) => Some(&ret.kind),
+                        _ => None,
+                    }),
+            );
+            format!(
+                "fn({}) -> {}",
+                params.join(", "),
+                format_ty_kind(ret, &type_var_names)
+            )
+        };
+
+        if let Some(info) = type_table.get(&decl.hir_id)
+            && let TyKind::Fn(ref param_tys, ref ret_ty) = info.ty.kind
+            && (!(decl.owner_type_params.is_empty() && decl.type_params.is_empty())
+                && (param_tys.iter().any(|param| ty_contains_var(&param.kind))
+                    || ty_contains_var(&ret_ty.kind)))
+        {
+            decl_sig()
+        } else if let Some(info) = type_table.get(&decl.hir_id)
+            && let TyKind::Fn(ref param_tys, ref ret_ty) = info.ty.kind
+        {
+            let params: Vec<String> = param_tys
+                .iter()
+                .map(|p| format_ty_kind(&p.kind, &type_var_names))
+                .collect();
+            format!(
+                "fn({}) -> {}",
+                params.join(", "),
+                format_ty_kind(&ret_ty.kind, &type_var_names)
+            )
+        } else {
+            decl_sig()
         }
     };
 
@@ -671,43 +811,47 @@ fn walk_fn_decl_for_type(
     // Check each parameter.
     for param in &decl.parameters {
         if param.name.span.start_lc.line == line && param.name.span.start_lc.column == col {
-            let ty = type_table
-                .get(&param.hir_id)
-                .map(|info| &info.ty.kind)
-                .unwrap_or(&param.type_annotation.kind);
+            let ty = type_table.get(&param.hir_id).map(|info| &info.ty.kind);
+            let ty = preferred_decl_hint_ty(&param.type_annotation.kind, ty);
             if !matches!(ty, TyKind::Unknown) {
-                *out = Some(format!("{ty}"));
+                *out = Some(format_ty_kind(ty, &type_var_names));
             }
             return;
         }
     }
 
     // Recurse into the body.
-    walk_block_for_type(&decl.body, type_table, line, col, out);
+    walk_block_for_type(&decl.body, type_table, &type_var_names, line, col, out);
 }
 
-fn check_pat_for_type(pat: &hir::Pat, line: u32, col: u32, out: &mut Option<String>) {
+fn check_pat_for_type(
+    pat: &hir::Pat,
+    type_var_names: &TypeVarNames,
+    line: u32,
+    col: u32,
+    out: &mut Option<String>,
+) {
     match &pat.kind {
         hir::PatKind::Identifier(_, ident)
             if ident.span.start_lc.line == line && ident.span.start_lc.column == col =>
         {
             let ty = &pat.ty.kind;
             if !matches!(ty, TyKind::Unknown) {
-                *out = Some(format!("{ty}"));
+                *out = Some(format_ty_kind(ty, type_var_names));
             }
         }
         hir::PatKind::List(pats) => {
             for p in pats {
-                check_pat_for_type(p, line, col, out);
+                check_pat_for_type(p, type_var_names, line, col, out);
                 if out.is_some() {
                     return;
                 }
             }
         }
-        hir::PatKind::Rest(inner) => check_pat_for_type(inner, line, col, out),
+        hir::PatKind::Rest(inner) => check_pat_for_type(inner, type_var_names, line, col, out),
         hir::PatKind::Enum(_, fields) => {
             for (_, p) in fields {
-                check_pat_for_type(p, line, col, out);
+                check_pat_for_type(p, type_var_names, line, col, out);
                 if out.is_some() {
                     return;
                 }
@@ -718,18 +862,27 @@ fn check_pat_for_type(pat: &hir::Pat, line: u32, col: u32, out: &mut Option<Stri
 }
 
 /// Report the type of `expr` into `out` when the cursor is exactly on `span`.
-fn report_ty_at(expr: &hir::Expr, span: &Span, line: u32, col: u32, out: &mut Option<String>) {
+fn report_ty_at(
+    expr: &hir::Expr,
+    span: &Span,
+    type_var_names: &TypeVarNames,
+    line: u32,
+    col: u32,
+    out: &mut Option<String>,
+) {
     if span.start_lc.line == line && span.start_lc.column == col {
         let ty = &expr.ty.kind;
         if !matches!(ty, TyKind::Unknown) {
-            *out = Some(format!("{ty}"));
+            *out = Some(format_ty_kind(ty, type_var_names));
         }
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn walk_expr_for_type(
     expr: &hir::Expr,
     type_table: &TypeTable,
+    type_var_names: &TypeVarNames,
     line: u32,
     col: u32,
     out: &mut Option<String>,
@@ -740,98 +893,105 @@ fn walk_expr_for_type(
 
     match &expr.kind {
         hir::ExprKind::Let(pat, init) => {
-            check_pat_for_type(pat, line, col, out);
+            check_pat_for_type(pat, type_var_names, line, col, out);
             if out.is_none() {
-                walk_expr_for_type(init, type_table, line, col, out);
+                walk_expr_for_type(init, type_table, type_var_names, line, col, out);
             }
         }
         hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
-            walk_block_for_type(block, type_table, line, col, out);
+            walk_block_for_type(block, type_table, type_var_names, line, col, out);
         }
         hir::ExprKind::FunctionExpression(decl) => {
-            walk_fn_decl_for_type(decl, type_table, line, col, out);
+            walk_fn_decl_for_type(decl, type_table, type_var_names, line, col, out);
         }
         hir::ExprKind::IfElse(cond, then_block, else_clauses) => {
-            walk_expr_for_type(cond, type_table, line, col, out);
-            walk_block_for_type(then_block, type_table, line, col, out);
+            walk_expr_for_type(cond, type_table, type_var_names, line, col, out);
+            walk_block_for_type(then_block, type_table, type_var_names, line, col, out);
             for clause in else_clauses {
                 if let Some(cond) = &clause.condition {
-                    walk_expr_for_type(cond, type_table, line, col, out);
+                    walk_expr_for_type(cond, type_table, type_var_names, line, col, out);
                 }
-                walk_block_for_type(&clause.consequence, type_table, line, col, out);
+                walk_block_for_type(
+                    &clause.consequence,
+                    type_table,
+                    type_var_names,
+                    line,
+                    col,
+                    out,
+                );
             }
         }
         hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
-            walk_expr_for_type(&call.callee, type_table, line, col, out);
+            walk_expr_for_type(&call.callee, type_table, type_var_names, line, col, out);
             for arg in &call.arguments {
-                walk_expr_for_type(arg, type_table, line, col, out);
+                walk_expr_for_type(arg, type_table, type_var_names, line, col, out);
             }
         }
         hir::ExprKind::Binary(_, lhs, rhs) => {
-            walk_expr_for_type(lhs, type_table, line, col, out);
-            walk_expr_for_type(rhs, type_table, line, col, out);
+            walk_expr_for_type(lhs, type_table, type_var_names, line, col, out);
+            walk_expr_for_type(rhs, type_table, type_var_names, line, col, out);
         }
         hir::ExprKind::Unary(_, operand) => {
-            walk_expr_for_type(operand, type_table, line, col, out);
+            walk_expr_for_type(operand, type_table, type_var_names, line, col, out);
         }
         hir::ExprKind::Match(scrutinee, arms) => {
-            walk_expr_for_type(scrutinee, type_table, line, col, out);
+            walk_expr_for_type(scrutinee, type_table, type_var_names, line, col, out);
             for arm in arms {
-                check_pat_for_type(&arm.pat, line, col, out);
+                check_pat_for_type(&arm.pat, type_var_names, line, col, out);
                 if out.is_some() {
                     return;
                 }
                 if let Some(guard) = &arm.guard {
-                    walk_expr_for_type(guard, type_table, line, col, out);
+                    walk_expr_for_type(guard, type_table, type_var_names, line, col, out);
                 }
-                walk_block_for_type(&arm.block, type_table, line, col, out);
+                walk_block_for_type(&arm.block, type_table, type_var_names, line, col, out);
             }
         }
         hir::ExprKind::Path(path) => {
-            report_ty_at(expr, &expr.span, line, col, out);
+            report_ty_at(expr, &expr.span, type_var_names, line, col, out);
             for seg in &path.segments {
-                report_ty_at(expr, &seg.ident.span, line, col, out);
+                report_ty_at(expr, &seg.ident.span, type_var_names, line, col, out);
             }
         }
         hir::ExprKind::FieldAccess(base, ident) => {
-            walk_expr_for_type(base, type_table, line, col, out);
-            report_ty_at(expr, &ident.span, line, col, out);
+            walk_expr_for_type(base, type_table, type_var_names, line, col, out);
+            report_ty_at(expr, &ident.span, type_var_names, line, col, out);
         }
         hir::ExprKind::IndexAccess(base, index) => {
-            walk_expr_for_type(base, type_table, line, col, out);
-            walk_expr_for_type(index, type_table, line, col, out);
+            walk_expr_for_type(base, type_table, type_var_names, line, col, out);
+            walk_expr_for_type(index, type_table, type_var_names, line, col, out);
         }
         hir::ExprKind::Cast(inner, _) | hir::ExprKind::TryCast(inner, _) => {
-            walk_expr_for_type(inner, type_table, line, col, out);
+            walk_expr_for_type(inner, type_table, type_var_names, line, col, out);
         }
         hir::ExprKind::List(items) => {
             for item in items {
-                walk_expr_for_type(item, type_table, line, col, out);
+                walk_expr_for_type(item, type_table, type_var_names, line, col, out);
             }
         }
         hir::ExprKind::Dict(entries) => {
             for (k, v) in entries {
-                walk_expr_for_type(k, type_table, line, col, out);
-                walk_expr_for_type(v, type_table, line, col, out);
+                walk_expr_for_type(k, type_table, type_var_names, line, col, out);
+                walk_expr_for_type(v, type_table, type_var_names, line, col, out);
             }
         }
         hir::ExprKind::Break(e) => {
             if let Some(e) = e {
-                walk_expr_for_type(e, type_table, line, col, out);
+                walk_expr_for_type(e, type_table, type_var_names, line, col, out);
             }
         }
         hir::ExprKind::Range(r) => {
-            walk_expr_for_type(&r.start, type_table, line, col, out);
-            walk_expr_for_type(&r.end, type_table, line, col, out);
+            walk_expr_for_type(&r.start, type_table, type_var_names, line, col, out);
+            walk_expr_for_type(&r.end, type_table, type_var_names, line, col, out);
         }
         hir::ExprKind::TaggedString { tag, exprs, .. } => {
-            walk_expr_for_type(tag, type_table, line, col, out);
+            walk_expr_for_type(tag, type_table, type_var_names, line, col, out);
             for e in exprs {
-                walk_expr_for_type(e, type_table, line, col, out);
+                walk_expr_for_type(e, type_table, type_var_names, line, col, out);
             }
         }
         hir::ExprKind::Implements(inner, _) => {
-            walk_expr_for_type(inner, type_table, line, col, out);
+            walk_expr_for_type(inner, type_table, type_var_names, line, col, out);
         }
         hir::ExprKind::Literal(_) | hir::ExprKind::Continue | hir::ExprKind::Wildcard => {}
     }
@@ -1071,6 +1231,31 @@ fn Expense.date(Expense::Food(_, d)) { d }
     }
 
     #[test]
+    fn rest_pattern_in_function_param_shows_slice_hint() {
+        let source = r#"
+fn head([x, ...xs]) { x }
+"#;
+        let hints = hints_for(source);
+        assert!(
+            hints.iter().any(|h| h.label.starts_with(": Slice")),
+            "expected `: Slice` hint for rest pattern binding `xs`, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn rest_pattern_in_typed_list_destructuring_shows_slice() {
+        let source = r#"
+let list: List<i64> = [1, 2, 3];
+let [x, ...xs] = list;
+"#;
+        let hints = hints_for(source);
+        assert!(
+            hints.iter().any(|h| h.label == ": Slice<i64>"),
+            "expected `: Slice<i64>` hint for rest pattern binding `xs`, got: {hints:?}"
+        );
+    }
+
+    #[test]
     fn function_parameter_with_annotation_no_hint() {
         let hints = hints_for("fn double(x: i64) { x * 2 }");
         // Only check that no Type hint exists for the parameter position.
@@ -1141,6 +1326,13 @@ fn Expense.date(Expense::Food(_, d)) { d }
     }
 
     #[test]
+    fn type_at_definition_generic_function_name_uses_type_param_names() {
+        let typed_hir = typed_hir_for("fn identity<T>(x: T) -> T { x }");
+        let ty = type_at_definition(&typed_hir, 0, 3);
+        assert_eq!(ty.as_deref(), Some("fn(T) -> T"));
+    }
+
+    #[test]
     fn type_at_definition_returns_none_for_whitespace() {
         let typed_hir = typed_hir_for("let x = 42;");
         let ty = type_at_definition(&typed_hir, 0, 0);
@@ -1185,6 +1377,29 @@ let result = [1,2,3] |> map(fn (x) { x ** 2 });
             label, ": List<i64>",
             "map should return List<i64> after generic instantiation"
         );
+    }
+
+    #[test]
+    fn generic_nominal_binding_hints_preserve_type_arguments() {
+        let source = r#"
+struct Pair<A, B> { first: A, second: B }
+fn Pair::new<A, B>(first: A, second: B) -> Pair<A, B> { Pair { first: first, second: second } }
+let p = Pair::new(1, "one");
+"#;
+        let hints = hints_for(source);
+        assert!(
+            hints
+                .iter()
+                .any(|h| h.line == 3 && h.label == ": Pair<i64, String>"),
+            "expected `p` to keep instantiated nominal type arguments, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn type_at_definition_generic_function_parameter_uses_type_param_names() {
+        let typed_hir = typed_hir_for("fn identity<T>(x: T) -> T { x }");
+        let ty = type_at_definition(&typed_hir, 0, 15);
+        assert_eq!(ty.as_deref(), Some("T"));
     }
 
     #[test]

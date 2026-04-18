@@ -134,6 +134,9 @@ pub struct FunctionDeclaration {
     pub id: NodeId,
     pub visibility: Visibility,
     pub name: Expr,
+    /// Type parameters declared on the owning type in a method head, e.g.
+    /// `<A>` in `fn Pair<A>.swap(...)`.
+    pub owner_type_params: Vec<TypeParam>,
     /// Type parameters for generic functions, e.g. `<T, U>` in `fn map<T, U>(...)`.
     pub type_params: Vec<TypeParam>,
     pub parameters: Vec<FunctionParameter>,
@@ -149,6 +152,10 @@ pub struct FunctionDeclaration {
 }
 
 impl FunctionDeclaration {
+    pub fn all_type_params(&self) -> impl Iterator<Item = &TypeParam> {
+        self.owner_type_params.iter().chain(self.type_params.iter())
+    }
+
     pub fn name(&self) -> Option<String> {
         match &self.name.kind {
             ExprKind::Path(path) => Some(path.to_string()),

@@ -47,8 +47,8 @@ fn text(v) { SafeHtml::Html(escape_html(Display::to_string(v))) }
 // SafeHtml values are trusted — they embed without re-escaping.
 // All other values are auto-escaped through Display.
 
-fn render(SafeHtml::Html(v)) { v }
-fn render(v) { escape_html(Display::to_string(v)) }
+fn render(SafeHtml::Html(v)) -> String { v }
+fn render<T: Display>(v: T) -> String { escape_html(Display::to_string(v)) }
 
 // ── html tag function ───────────────────────────────────────────────────────
 
@@ -69,15 +69,17 @@ fn join_html([x, ...xs]) { SafeHtml::Html(render(x) + render(join_html(xs))) }
 // Strips the leading and trailing whitespace that triple-quoted strings
 // produce when formatted with surrounding line breaks.
 fn trim(SafeHtml::Html(v)) { SafeHtml::Html(trim(v)) }
-fn trim(s) {
+fn trim<T: Display>(s: T) {
     s
+    |> Display::to_string()
     |> re"^\s+".replace_first("")
     |> re"\s+$".replace_first("")
 }
 
 fn dedent(SafeHtml::Html(v)) { SafeHtml::Html(dedent(v)) }
-fn dedent(s) {
+fn dedent<T: Display>(s: T) {
     let trimmed = s
+        |> Display::to_string()
         |> re"^\n".replace_first("")
         |> re"\n[ \t]*$".replace_first("");
     match re"^([ \t]+)".exec(trimmed) {

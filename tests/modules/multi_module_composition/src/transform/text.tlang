@@ -1,4 +1,4 @@
-pub fn repeat(s, 0) { "" }
-pub fn repeat(s, n) { s + repeat(s, n - 1) }
+pub fn repeat(s: String, 0) -> String { "" }
+pub fn repeat(s: String, n: i64) -> String { s + repeat(s, n - 1) }
 
-pub fn upper_first(s) { s }
+pub fn upper_first(s: String) -> String { s }

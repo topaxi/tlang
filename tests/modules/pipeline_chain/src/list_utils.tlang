@@ -1,2 +1,2 @@
-pub fn sum([], acc) { acc }
-pub fn sum([x, ...xs], acc) { rec sum(xs, acc + x) }
+pub fn sum([], acc: i64) -> i64 { acc }
+pub fn sum([x, ...xs]: List<i64>, acc: i64) -> i64 { rec sum(xs, acc + x) }

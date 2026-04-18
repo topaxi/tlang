@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use tlang_ast::node::Ident;
 use tlang_hir::Ty;
 use tlang_span::HirId;
+use tlang_span::TypeVarId;
 
 /// Supplementary type metadata for a given HIR node.
 ///
@@ -19,6 +20,7 @@ pub struct TypeInfo {
 #[derive(Debug, Clone)]
 pub struct StructInfo {
     pub name: Ident,
+    pub type_param_var_ids: Vec<TypeVarId>,
     pub fields: Vec<(Ident, Ty)>,
 }
 
@@ -33,6 +35,7 @@ pub struct VariantInfo {
 #[derive(Debug, Clone)]
 pub struct EnumInfo {
     pub name: Ident,
+    pub type_param_var_ids: Vec<TypeVarId>,
     pub variants: Vec<VariantInfo>,
 }
 
@@ -57,6 +60,7 @@ pub struct AssociatedTypeInfo {
 #[derive(Debug, Clone)]
 pub struct ProtocolInfo {
     pub name: Ident,
+    pub type_param_var_ids: Vec<TypeVarId>,
     pub methods: Vec<ProtocolMethodInfo>,
     pub constraints: Vec<String>,
     /// Associated types declared in this protocol.
@@ -68,6 +72,10 @@ pub struct ProtocolInfo {
 pub struct ImplInfo {
     pub protocol_name: String,
     pub target_type_name: String,
+    pub target_type_arguments: Vec<Ty>,
+    /// Whether the impl target is a bare impl-level type parameter, e.g. the
+    /// `T` in `impl<T> Foo for T`.
+    pub target_type_is_param: bool,
     /// Protocol type-argument keys (e.g. `["i64"]` for `impl Into<i64> for String`).
     pub protocol_type_args: Vec<String>,
     /// Protocol type arguments preserved as types for inference.
@@ -174,6 +182,19 @@ impl TypeTable {
         &self.impl_info
     }
 
+    /// Find the most specific impl for `Protocol` on `Type`, preferring
+    /// concrete impls over blanket impls.
+    pub fn find_impl_for(&self, protocol_name: &str, target_type_name: &str) -> Option<&ImplInfo> {
+        self.impl_info
+            .iter()
+            .find(|i| {
+                i.protocol_name == protocol_name
+                    && i.target_type_name == target_type_name
+                    && !i.is_blanket
+            })
+            .or_else(|| self.find_blanket_impl_for(protocol_name, target_type_name))
+    }
+
     /// Check whether `impl Protocol for Type` has been registered.
     pub fn has_impl(&self, protocol_name: &str, target_type_name: &str) -> bool {
         self.impl_info
@@ -241,6 +262,7 @@ impl TypeTable {
         self.impl_info.iter().find(|i| {
             i.protocol_name == protocol_name
                 && i.is_blanket
+                && (i.target_type_name == target_type_name || i.target_type_is_param)
                 && self.blanket_impl_matches(i, target_type_name)
         })
     }
@@ -256,5 +278,46 @@ impl TypeTable {
             }
         }
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn impl_info(
+        protocol_name: &str,
+        target_type_name: &str,
+        target_type_is_param: bool,
+        is_blanket: bool,
+    ) -> ImplInfo {
+        ImplInfo {
+            protocol_name: protocol_name.to_string(),
+            target_type_name: target_type_name.to_string(),
+            target_type_arguments: Vec::new(),
+            target_type_is_param,
+            protocol_type_args: Vec::new(),
+            protocol_type_arg_tys: Vec::new(),
+            is_blanket,
+            where_predicates: Vec::new(),
+            associated_type_bindings: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn find_blanket_impl_for_respects_concrete_target_shape() {
+        let mut table = TypeTable::new();
+        table.insert_impl_info(impl_info("Functor", "Option", false, true));
+
+        assert!(table.find_blanket_impl_for("Functor", "Result").is_none());
+        assert!(table.find_blanket_impl_for("Functor", "Option").is_some());
+    }
+
+    #[test]
+    fn find_blanket_impl_for_allows_target_type_params() {
+        let mut table = TypeTable::new();
+        table.insert_impl_info(impl_info("Functor", "T", true, true));
+
+        assert!(table.find_blanket_impl_for("Functor", "Result").is_some());
     }
 }

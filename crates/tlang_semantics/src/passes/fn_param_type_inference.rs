@@ -133,7 +133,7 @@ fn annotate_self_param(decl: &mut FunctionDeclaration) {
 #[derive(Debug, Clone, PartialEq)]
 enum PatternType {
     /// A named type (enum name or builtin type name).
-    Named(String),
+    Named { name: String },
 }
 
 /// Returns the `PatternType` contributed by a single pattern, or `None` if the
@@ -147,20 +147,26 @@ fn pattern_type(pat: &PatKind) -> Option<Result<PatternType, ()>> {
                 1 => {
                     // Struct pattern: `Page { title }` — the type is the struct
                     // name itself (the single path segment).
-                    Some(Ok(PatternType::Named(segs[0].to_string())))
+                    Some(Ok(PatternType::Named {
+                        name: segs[0].to_string(),
+                    }))
                 }
                 _ => {
                     // Enum variant pattern: `Option::Some(x)` — the type is the
                     // second-to-last segment (e.g. "Option" from "Option::Some").
                     let name = segs[segs.len() - 2].to_string();
-                    Some(Ok(PatternType::Named(name)))
+                    Some(Ok(PatternType::Named { name }))
                 }
             }
         }
-        PatKind::Literal(lit) => {
-            builtin_type_for_literal(lit).map(|name| Ok(PatternType::Named(name.to_string())))
-        }
-        PatKind::List(_) => Some(Ok(PatternType::Named(builtin_types::LIST.to_string()))),
+        PatKind::Literal(lit) => builtin_type_for_literal(lit).map(|name| {
+            Ok(PatternType::Named {
+                name: name.to_string(),
+            })
+        }),
+        PatKind::List(_) => Some(Ok(PatternType::Named {
+            name: builtin_types::LIST.to_string(),
+        })),
         // Unconstrained — don't block or contribute to inference.
         PatKind::Identifier(_) | PatKind::Wildcard | PatKind::_Self => None,
         // Rest patterns at the top level, None patterns — block inference.
@@ -220,12 +226,16 @@ fn infer_param_type(
     for decl in decls {
         if let Some(param) = decl.parameters.get(param_idx) {
             match pattern_type(&param.pattern.kind) {
-                None => {}                    // unconstrained, skip
+                // Unconstrained (identifier, wildcard, self) — the catch-all
+                // inherits its type from the constrained clauses.  If the
+                // catch-all must accept a wider type, the user annotates it
+                // explicitly with `unknown` or a union type.
+                None => {}
                 Some(Err(())) => return None, // blocks inference
-                Some(Ok(PatternType::Named(name))) if !type_names.contains(&name) => {
+                Some(Ok(PatternType::Named { name })) if !type_names.contains(&name) => {
                     type_names.push(name);
                 }
-                Some(Ok(PatternType::Named(_))) => {}
+                Some(Ok(_)) => {}
             }
         }
     }

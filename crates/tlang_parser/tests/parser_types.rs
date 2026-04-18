@@ -1,5 +1,8 @@
 mod common;
 
+use tlang_ast::node::TyKind;
+use tlang_parser::Parser;
+
 #[test]
 fn test_variable_declaration_type_annotation() {
     assert_parser_snapshot!("let x: i64 = 1;");
@@ -35,4 +38,24 @@ fn test_function_type_annotation() {
     assert_parser_snapshot!("let f: fn(fn(i64) -> i64) -> i64 = fn(g: fn(i64) -> i64) { g(1) };");
     // Function type with no return type
     assert_parser_snapshot!("let f: fn(i64) = fn(x: i64) { log(x) };");
+}
+
+#[test]
+fn test_unknown_type_annotation_parses_as_unknown() {
+    let (module, _) = Parser::from_source("enum LinkedList { Cons(unknown, LinkedList), Nil }")
+        .parse()
+        .unwrap();
+
+    let stmt = module
+        .statements
+        .first()
+        .expect("expected enum declaration");
+    let tlang_ast::node::StmtKind::EnumDeclaration(decl) = &stmt.kind else {
+        panic!("expected enum declaration");
+    };
+
+    assert!(matches!(
+        decl.variants[0].parameters[0].ty.kind,
+        TyKind::Unknown
+    ));
 }

@@ -901,7 +901,12 @@ pub enum TyKind {
     Primitive(PrimTy),
     /// Function type: parameter types → return type.
     Fn(Vec<Ty>, Box<Ty>),
-    /// List type with element type (user-facing `List<T>`).
+    /// Owned list type produced by list literals `[1, 2, 3]` and `List<T>`
+    /// annotations.  At runtime this is a `TlangStruct` with a list shape.
+    List(Box<Ty>),
+    /// Slice (view) type produced by rest patterns (`...xs` in `[x, ...xs]`)
+    /// and `Slice<T>` annotations.  At runtime this is a `TlangSlice` — a
+    /// `(base, start, len)` view into an existing list.
     Slice(Box<Ty>),
     /// Dictionary type: key type → value type.
     Dict(Box<Ty>, Box<Ty>),
@@ -909,8 +914,9 @@ pub enum TyKind {
     Never,
     /// Placeholder for future generic type variables (Phase 8: Generics).
     Var(TypeVarId),
-    /// User-defined types (structs, enums).
-    Path(Path),
+    /// User-defined nominal types (structs, enums), optionally specialised with
+    /// type arguments such as `Pair<i64, String>`.
+    Path(Path, Vec<Ty>),
     /// Union of multiple types.
     Union(Vec<Ty>),
 }
@@ -930,11 +936,25 @@ impl Display for TyKind {
                 }
                 write!(f, ") -> {}", ret.kind)
             }
-            TyKind::Slice(inner) => write!(f, "List<{}>", inner.kind),
+            TyKind::List(inner) => write!(f, "List<{}>", inner.kind),
+            TyKind::Slice(inner) => write!(f, "Slice<{}>", inner.kind),
             TyKind::Dict(k, v) => write!(f, "Dict<{}, {}>", k.kind, v.kind),
             TyKind::Never => write!(f, "never"),
             TyKind::Var(id) => write!(f, "?{id}"),
-            TyKind::Path(path) => write!(f, "{path}"),
+            TyKind::Path(path, type_args) => {
+                write!(f, "{path}")?;
+                if !type_args.is_empty() {
+                    write!(f, "<")?;
+                    for (i, ty) in type_args.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(f, "{}", ty.kind)?;
+                    }
+                    write!(f, ">")?;
+                }
+                Ok(())
+            }
             TyKind::Union(tys) => {
                 for (i, ty) in tys.iter().enumerate() {
                     if i > 0 {
@@ -981,6 +1001,9 @@ pub struct FunctionDeclaration {
     pub hir_id: HirId,
     pub visibility: Visibility,
     pub name: Expr,
+    /// Type parameters declared on the owning type in a method head, e.g.
+    /// `<A>` in `fn Pair<A>.swap(...)`.
+    pub owner_type_params: Vec<TypeParam>,
     /// Type parameters for generic functions, e.g. `<T, U>` in `fn map<T, U>(...)`.
     pub type_params: Vec<TypeParam>,
     pub parameters: Vec<FunctionParameter>,
@@ -1008,6 +1031,7 @@ impl FunctionDeclaration {
             hir_id,
             visibility: Visibility::Private,
             name,
+            owner_type_params: Vec::new(),
             type_params: Vec::new(),
             parameters: params,
             params_span: Span::default(),
@@ -1029,6 +1053,10 @@ impl FunctionDeclaration {
             }
             _ => unreachable!(),
         }
+    }
+
+    pub fn all_type_params(&self) -> impl Iterator<Item = &TypeParam> {
+        self.owner_type_params.iter().chain(self.type_params.iter())
     }
 }
 
@@ -1203,6 +1231,7 @@ pub struct WhereClause {
 pub struct ProtocolMethodSignature {
     pub hir_id: HirId,
     pub name: Ident,
+    pub type_params: Vec<TypeParam>,
     pub parameters: Vec<FunctionParameter>,
     pub return_type: Ty,
     pub body: Option<Block>,

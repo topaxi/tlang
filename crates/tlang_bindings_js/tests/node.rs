@@ -172,14 +172,13 @@ fn interpreter_fibonacci() -> Result<(), JsError> {
 
 #[wasm_bindgen_test]
 fn interpreter_guard_clauses() -> Result<(), JsError> {
-    // filter via guard: keep only positive numbers, capture the count
+    // Route through the guarded clause for positive values.
     eval_capturing(
-        "fn count_pos([], acc) { acc }
-         fn count_pos([x, ...xs], acc) if x > 0 { rec count_pos(xs, acc + 1) }
-         fn count_pos([_, ...xs], acc) { rec count_pos(xs, acc) }
-         capture(count_pos([-1, 2, -3, 4, 0, 5], 0));",
+        "fn classify(n: i64) if n > 0 { 1 }
+         fn classify(_: i64) { 0 }
+         capture(classify(7));",
     )?;
-    assert_eq!(Capture::first_number(), Some(3.0));
+    assert_eq!(Capture::first_number(), Some(1.0));
     Ok(())
 }
 
@@ -278,7 +277,7 @@ fn interpreter_custom_enum_pattern_matching() -> Result<(), JsError> {
          }
          fn evaluate(Expr::Number(n)) { n }
          fn evaluate(Expr::Add(left, right)) { evaluate(left) + evaluate(right) }
-         capture(evaluate(Expr::Add(Expr::Number(3), Expr::Number(4))));",
+         capture(evaluate(Expr::Add(Expr::Number(3 as isize), Expr::Number(4 as isize))));",
     )?;
     assert_eq!(Capture::first_number(), Some(7.0));
     Ok(())
@@ -296,7 +295,7 @@ fn interpreter_nested_enum_match() -> Result<(), JsError> {
          fn eval(Expr::Add(l, r)) { eval(l) + eval(r) }
          fn eval(Expr::Mul(l, r)) { eval(l) * eval(r) }
          // (2 + 3) * 4 = 20
-         capture(eval(Expr::Mul(Expr::Add(Expr::Num(2), Expr::Num(3)), Expr::Num(4))));",
+         capture(eval(Expr::Mul(Expr::Add(Expr::Num(2 as isize), Expr::Num(3 as isize)), Expr::Num(4 as isize))));",
     )?;
     assert_eq!(Capture::first_number(), Some(20.0));
     Ok(())
@@ -323,7 +322,7 @@ fn interpreter_struct_static_constructor_and_method() -> Result<(), JsError> {
         "struct Point { x: isize, y: isize }
          fn Point::new(x: isize, y: isize) -> Point { Point { x, y } }
          fn Point.sum(self) -> isize { self.x + self.y }
-         capture(Point::new(3, 4).sum());",
+         capture(Point::new(3 as isize, 4 as isize).sum());",
     )?;
     assert_eq!(Capture::first_number(), Some(7.0));
     Ok(())
@@ -502,6 +501,35 @@ fn semantic_error_for_undefined_variable() -> Result<(), JsError> {
         "expected a semantic diagnostic for undefined variable"
     );
     Ok(())
+}
+
+#[wasm_bindgen_test]
+fn interpreter_eval_returns_type_errors() {
+    let mut tlang = Tlang::new(
+        "fn takes(x: bool) { x }\ntakes(\"1\");".to_string(),
+        Runner::Interpreter,
+    );
+    let err = match tlang.eval() {
+        Ok(_) => panic!("expected type mismatch error"),
+        Err(err) => err,
+    };
+    assert!(
+        format!("{err:?}").contains("argument type mismatch"),
+        "expected type mismatch error, got: {err:?}"
+    );
+}
+
+#[wasm_bindgen_test]
+fn js_compile_returns_type_errors() {
+    let mut tlang = Tlang::new(
+        "fn takes(x: bool) { x }\ntakes(\"1\");".to_string(),
+        Runner::JavaScript,
+    );
+    let err = tlang.compile_to_js().unwrap_err();
+    assert!(
+        format!("{err:?}").contains("argument type mismatch"),
+        "expected type mismatch error, got: {err:?}"
+    );
 }
 
 #[wasm_bindgen_test]

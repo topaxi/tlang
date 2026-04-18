@@ -7,8 +7,13 @@ use tlang_core::{memory::TlangValue, vm::VM};
 use tlang_diagnostics::{render_ice, render_parse_issues, render_semantic_diagnostics};
 use tlang_hir as hir;
 use tlang_hir_opt::HirOptimizer;
-use tlang_modules::{ModulePath, compile_project_with_slots};
+use tlang_modules::{
+    CompiledModule, ModulePath, MultiModuleCompileResult, compile_project_with_slots,
+};
 use tlang_semantics::SemanticAnalyzer;
+use tlang_typeck::typecheck_module;
+
+use crate::commands::{print_source_diagnostics, run_hir_passes};
 
 pub fn handle_run(input_file: &str) {
     let path = Path::new(input_file);
@@ -75,13 +80,7 @@ fn handle_run_project(project_dir: &Path) {
             continue;
         }
 
-        let mut hir_module = compiled.hir.clone();
-        let mut optimizer = HirOptimizer::default();
-        let mut ctx = compiled.lower_meta.clone().into();
-        if let Err(err) = optimizer.optimize_hir(&mut hir_module, &mut ctx) {
-            eprint!("{}", render_ice(&err));
-            std::process::exit(1);
-        }
+        let hir_module = prepare_module_for_execution(path, compiled, &result);
 
         vm.eval_module(&hir_module);
 
@@ -91,13 +90,7 @@ fn handle_run_project(project_dir: &Path) {
 
     // Execute root module
     if let Some(compiled) = result.modules.get(&ModulePath::root()) {
-        let mut hir_module = compiled.hir.clone();
-        let mut optimizer = HirOptimizer::default();
-        let mut ctx = compiled.lower_meta.clone().into();
-        if let Err(err) = optimizer.optimize_hir(&mut hir_module, &mut ctx) {
-            eprint!("{}", render_ice(&err));
-            std::process::exit(1);
-        }
+        let hir_module = prepare_module_for_execution(&ModulePath::root(), compiled, &result);
 
         // Copy exported function values for root module imports
         populate_import_slots(&mut vm, &ModulePath::root(), &result);
@@ -222,13 +215,57 @@ fn compile(input_file: &str) -> (hir::Module, std::collections::HashSet<tlang_hi
         std::process::exit(1);
     });
 
-    let mut optimizer = HirOptimizer::default();
     let constant_pool_ids = meta.constant_pool_ids.clone();
     let mut ctx = meta.into();
-    if let Err(err) = optimizer.optimize_hir(&mut module, &mut ctx) {
+    let mut optimizer = HirOptimizer::default();
+    if let Err(err) = run_hir_passes(&mut optimizer, &mut module, &mut ctx) {
         eprint!("{}", render_ice(&err));
+        std::process::exit(1);
+    }
+    let diagnostics = match typecheck_module(&mut module, &mut ctx) {
+        Ok(diagnostics) => diagnostics,
+        Err(err) => {
+            eprint!("{}", render_ice(&err));
+            std::process::exit(1);
+        }
+    };
+    let source_name = path.to_string_lossy();
+    print_source_diagnostics(&source_name, &source, &diagnostics.warnings);
+    if diagnostics.has_errors() {
+        print_source_diagnostics(&source_name, &source, &diagnostics.errors);
         std::process::exit(1);
     }
 
     (module, constant_pool_ids)
+}
+
+fn prepare_module_for_execution(
+    path: &ModulePath,
+    compiled: &CompiledModule,
+    result: &MultiModuleCompileResult,
+) -> hir::Module {
+    let mut hir_module = compiled.hir.clone();
+    let mut optimizer = HirOptimizer::default();
+    let mut ctx = compiled.lower_meta.clone().into();
+    if let Err(err) = run_hir_passes(&mut optimizer, &mut hir_module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        std::process::exit(1);
+    }
+    let diagnostics = match typecheck_module(&mut hir_module, &mut ctx) {
+        Ok(diagnostics) => diagnostics,
+        Err(err) => {
+            eprint!("{}", render_ice(&err));
+            std::process::exit(1);
+        }
+    };
+
+    let parsed_module = &result.graph.modules[path];
+    let source_name = parsed_module.file_path.to_string_lossy();
+    print_source_diagnostics(&source_name, &parsed_module.source, &diagnostics.warnings);
+    if diagnostics.has_errors() {
+        print_source_diagnostics(&source_name, &parsed_module.source, &diagnostics.errors);
+        std::process::exit(1);
+    }
+
+    hir_module
 }

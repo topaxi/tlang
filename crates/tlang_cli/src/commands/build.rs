@@ -3,10 +3,11 @@ use std::path::Path;
 use tlang_codegen_js::CodegenError;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_diagnostics::render_ice;
-use tlang_hir_opt::HirPass;
-use tlang_modules::{ModulePath, compile_project};
+use tlang_modules::{CompiledModule, ModulePath, MultiModuleCompileResult, compile_project};
+use tlang_typeck::typecheck_module;
 
 use crate::commands::compile::CompileTargetHirOptimizer;
+use crate::commands::{print_source_diagnostics, run_hir_passes};
 
 #[derive(Debug)]
 pub struct BuildOptions {
@@ -69,27 +70,10 @@ pub fn handle_build(options: &BuildOptions) -> bool {
             continue;
         }
 
-        let mut hir_module = compiled.hir.clone();
-        let mut optimizer = CompileTargetHirOptimizer::JavaScript(
-            tlang_codegen_js::js_hir_opt::JsHirOptimizer::default(),
-        );
-        let mut ctx = compiled.lower_meta.clone().into();
-        if let Err(err) = optimizer.optimize_hir(&mut hir_module, &mut ctx) {
-            eprint!("{}", render_ice(&err));
-            return false;
-        }
-
-        let mut codegen = CodegenJS::default();
-        codegen.set_bundle_mode(true);
-        for name in &protocol_names {
-            codegen.register_protocol(name);
-        }
-        if let Err(errors) = codegen.generate_code(&hir_module) {
-            eprint!("{}", render_codegen_errors(path, &errors));
-            return false;
-        }
-        let module_code = codegen.get_output().to_string();
-
+        let module_code = match generate_module_code(path, compiled, &result, &protocol_names) {
+            Some(module_code) => module_code,
+            None => return false,
+        };
         if !module_code.trim().is_empty() {
             output_parts.push(format!("// module: {path}\n{module_code}"));
         }
@@ -115,26 +99,11 @@ pub fn handle_build(options: &BuildOptions) -> bool {
 
     // Generate code for root module last
     if let Some(compiled) = result.modules.get(&ModulePath::root()) {
-        let mut hir_module = compiled.hir.clone();
-        let mut optimizer = CompileTargetHirOptimizer::JavaScript(
-            tlang_codegen_js::js_hir_opt::JsHirOptimizer::default(),
-        );
-        let mut ctx = compiled.lower_meta.clone().into();
-        if let Err(err) = optimizer.optimize_hir(&mut hir_module, &mut ctx) {
-            eprint!("{}", render_ice(&err));
-            return false;
-        }
-
-        let mut codegen = CodegenJS::default();
-        codegen.set_bundle_mode(true);
-        for name in &protocol_names {
-            codegen.register_protocol(name);
-        }
-        if let Err(errors) = codegen.generate_code(&hir_module) {
-            eprint!("{}", render_codegen_errors(&ModulePath::root(), &errors));
-            return false;
-        }
-        let root_code = codegen.get_output().to_string();
+        let root_code =
+            match generate_module_code(&ModulePath::root(), compiled, &result, &protocol_names) {
+                Some(root_code) => root_code,
+                None => return false,
+            };
 
         if !root_code.trim().is_empty() {
             output_parts.push(root_code);
@@ -153,4 +122,50 @@ pub fn handle_build(options: &BuildOptions) -> bool {
     }
 
     true
+}
+
+fn generate_module_code(
+    path: &ModulePath,
+    compiled: &CompiledModule,
+    result: &MultiModuleCompileResult,
+    protocol_names: &[String],
+) -> Option<String> {
+    let mut hir_module = compiled.hir.clone();
+    let mut optimizer = CompileTargetHirOptimizer::JavaScript(
+        tlang_codegen_js::js_hir_opt::JsHirOptimizer::default(),
+    );
+    let mut ctx = compiled.lower_meta.clone().into();
+    if let Err(err) = run_hir_passes(&mut optimizer, &mut hir_module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        return None;
+    }
+
+    let diagnostics = match typecheck_module(&mut hir_module, &mut ctx) {
+        Ok(diagnostics) => diagnostics,
+        Err(err) => {
+            eprint!("{}", render_ice(&err));
+            return None;
+        }
+    };
+
+    if let Some(parsed_module) = result.graph.modules.get(path) {
+        let source_name = parsed_module.file_path.to_string_lossy();
+        print_source_diagnostics(&source_name, &parsed_module.source, &diagnostics.warnings);
+        if diagnostics.has_errors() {
+            print_source_diagnostics(&source_name, &parsed_module.source, &diagnostics.errors);
+            return None;
+        }
+    }
+
+    let mut codegen = CodegenJS::default();
+    codegen.set_bundle_mode(true);
+    for name in protocol_names {
+        codegen.register_protocol(name);
+    }
+    if let Err(errors) = codegen.generate_code(&hir_module) {
+        eprint!("{}", render_codegen_errors(path, &errors));
+        return None;
+    }
+
+    Some(codegen.get_output().to_string())
 }

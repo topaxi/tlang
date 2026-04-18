@@ -47,6 +47,8 @@ pub struct TypeChecker {
 }
 
 impl TypeChecker {
+    const MIN_PROTOCOL_PATH_SEGMENTS: usize = 2;
+
     pub fn new() -> Self {
         Self::default()
     }
@@ -60,9 +62,9 @@ impl TypeChecker {
 
     fn iterable_item_type(&self, ty: &TyKind) -> Option<TyKind> {
         match ty {
-            TyKind::Slice(inner) => Some(inner.kind.clone()),
-            TyKind::Primitive(PrimTy::String) => Some(TyKind::Primitive(PrimTy::Char)),
-            TyKind::Path(path) => self
+            TyKind::List(inner) | TyKind::Slice(inner) => Some(inner.kind.clone()),
+            TyKind::Primitive(PrimTy::String) => Some(TyKind::Primitive(PrimTy::String)),
+            TyKind::Path(path, _) => self
                 .type_table
                 .impls()
                 .iter()
@@ -114,6 +116,53 @@ impl TypeChecker {
         self.iterator_item_types.get(&hir_id).cloned()
     }
 
+    /// Seed the implicit receiver parameter of a dot-method declaration from
+    /// the owning type when lowering left it unknown.
+    ///
+    /// This only applies to `fn Type.method(...)` declarations whose method
+    /// name lowers to `ExprKind::FieldAccess`, have at least one parameter,
+    /// and whose first parameter still has an unknown type annotation.
+    fn seed_dot_method_receiver_type(&self, decl: &mut hir::FunctionDeclaration) {
+        let hir::ExprKind::FieldAccess(base, _) = &decl.name.kind else {
+            return;
+        };
+        let Some(receiver_path) = base.path() else {
+            return;
+        };
+        let Some(receiver_param) = decl.parameters.first_mut() else {
+            return;
+        };
+        if !matches!(receiver_param.type_annotation.kind, TyKind::Unknown) {
+            return;
+        }
+
+        receiver_param.type_annotation = Ty {
+            kind: TyKind::Path(
+                receiver_path.clone(),
+                decl.owner_type_params
+                    .iter()
+                    .map(|type_param| Ty {
+                        kind: TyKind::Var(type_param.type_var_id),
+                        ..Ty::default()
+                    })
+                    .collect(),
+            ),
+            ..Ty::default()
+        };
+    }
+
+    /// Resolve the result type of `base[index]`.
+    ///
+    /// Only slice indexing currently has aligned type-checker and runtime
+    /// semantics, so other receivers remain unknown until additional indexing
+    /// behavior is defined and implemented.
+    fn index_access_result_type(&self, base_ty: &TyKind) -> TyKind {
+        match base_ty {
+            TyKind::List(inner) | TyKind::Slice(inner) => inner.kind.clone(),
+            _ => TyKind::Unknown,
+        }
+    }
+
     fn register_iterator_next_pattern_bindings(&mut self, pat: &mut hir::Pat, item_ty: &TyKind) {
         let hir::PatKind::Enum(path, fields) = &mut pat.kind else {
             return;
@@ -144,10 +193,10 @@ impl TypeChecker {
             .unwrap_or_else(|| panic!("unknown builtin collection type: {name}"))
     }
 
-    /// Infer `Slice(elem_ty)` from a list literal's elements.
+    /// Infer `List(elem_ty)` from a list literal's elements.
     ///
     /// When all elements agree on a single known type, the list is typed as
-    /// `Slice(that_type)`.  Otherwise (empty list, mixed types, or unknown
+    /// `List(that_type)`.  Otherwise (empty list, mixed types, or unknown
     /// elements) falls back to the bare `List` path.
     fn infer_list_element_type(&self, expr: &hir::Expr) -> TyKind {
         if let hir::ExprKind::Unary(UnaryOp::Spread, inner) = &expr.kind {
@@ -166,7 +215,7 @@ impl TypeChecker {
             .collect();
         let common = Self::common_element_type(element_tys.iter());
         match common {
-            Some(elem_kind) => TyKind::Slice(Box::new(Ty {
+            Some(elem_kind) => TyKind::List(Box::new(Ty {
                 kind: elem_kind,
                 ..Ty::default()
             })),
@@ -270,8 +319,8 @@ impl TypeChecker {
         let ctx = self.current_context();
 
         // Handle `unknown` operands.
-        let lhs_unknown = matches!(lhs_ty, TyKind::Unknown);
-        let rhs_unknown = matches!(rhs_ty, TyKind::Unknown);
+        let lhs_unknown = matches!(lhs_ty, TyKind::Unknown | TyKind::Var(_));
+        let rhs_unknown = matches!(rhs_ty, TyKind::Unknown | TyKind::Var(_));
 
         if lhs_unknown || rhs_unknown {
             if ctx.is_strict() {
@@ -313,9 +362,13 @@ impl TypeChecker {
             | BinaryOpKind::RightShift => self.check_bitwise(op, lhs_ty, rhs_ty, span),
 
             // Assignment expressions evaluate to the assigned value.
-            // Only preserve a concrete type when the assignment is type-compatible.
+            // When the LHS is nil or unknown (e.g. ANF temporaries initialised
+            // as `let $anf = nil;`), adopt the RHS type so information flows
+            // from match arms back to the consuming binding.
             BinaryOpKind::Assign => {
-                if ty_kinds_compatible(lhs_ty, rhs_ty) {
+                if matches!(lhs_ty, TyKind::Unknown | TyKind::Primitive(PrimTy::Nil))
+                    || ty_kinds_compatible(lhs_ty, rhs_ty)
+                {
                     rhs_ty.clone()
                 } else {
                     TyKind::Unknown
@@ -366,6 +419,24 @@ impl TypeChecker {
         rhs_ty: &TyKind,
         span: tlang_span::Span,
     ) -> TyKind {
+        if matches!(self.current_context(), TypingContext::Permissive)
+            && (matches!(lhs_ty, TyKind::Var(_)) || matches!(rhs_ty, TyKind::Var(_)))
+        {
+            return match (lhs_ty, rhs_ty) {
+                (TyKind::Primitive(l), TyKind::Primitive(r)) => {
+                    Self::coerced_numeric_result(*l, *r)
+                        .map(TyKind::Primitive)
+                        .unwrap_or(TyKind::Unknown)
+                }
+                (TyKind::Var(_), TyKind::Primitive(r)) | (TyKind::Primitive(r), TyKind::Var(_))
+                    if r.is_numeric() =>
+                {
+                    TyKind::Primitive(*r)
+                }
+                _ => TyKind::Unknown,
+            };
+        }
+
         match (lhs_ty, rhs_ty) {
             (TyKind::Primitive(l), TyKind::Primitive(r)) => {
                 if let Some(result) = Self::coerced_numeric_result(*l, *r) {
@@ -399,7 +470,25 @@ impl TypeChecker {
         rhs_ty: &TyKind,
         span: tlang_span::Span,
     ) -> TyKind {
-        if lhs_ty == rhs_ty {
+        if matches!(self.current_context(), TypingContext::Permissive)
+            && (matches!(lhs_ty, TyKind::Var(_)) || matches!(rhs_ty, TyKind::Var(_)))
+        {
+            return match (lhs_ty, rhs_ty) {
+                (TyKind::Primitive(l), TyKind::Primitive(r))
+                    if l.is_numeric() && r.is_numeric() =>
+                {
+                    TyKind::Primitive(PrimTy::Bool)
+                }
+                (TyKind::Var(_), TyKind::Primitive(r)) | (TyKind::Primitive(r), TyKind::Var(_))
+                    if r.is_numeric() =>
+                {
+                    TyKind::Primitive(PrimTy::Bool)
+                }
+                _ => TyKind::Unknown,
+            };
+        }
+
+        if ty_kinds_compatible(lhs_ty, rhs_ty) {
             TyKind::Primitive(PrimTy::Bool)
         } else {
             self.errors.push(TypeError::InvalidBinaryOp {
@@ -540,7 +629,7 @@ impl TypeChecker {
             return;
         }
 
-        if !ty_kinds_compatible(&declared_ty.kind, expr_ty) {
+        if !ty_kinds_assignable(&declared_ty.kind, expr_ty) {
             self.errors.push(TypeError::BindingTypeMismatch {
                 declared: declared_ty.kind.to_string(),
                 actual: expr_ty.to_string(),
@@ -602,7 +691,7 @@ impl TypeChecker {
             return;
         }
 
-        if !ty_kinds_compatible(declared_ret, body_ty) {
+        if !ty_kinds_assignable(declared_ret, body_ty) {
             self.errors.push(TypeError::ReturnTypeMismatch {
                 expected: declared_ret.to_string(),
                 actual: body_ty.to_string(),
@@ -634,20 +723,18 @@ impl TypeChecker {
                 // enum variants, use the registered constructor signature's
                 // return type instead of rebuilding a path with `as_init()`,
                 // which drops `Path.res`.
+                if let Some(hir_id) = path.res.hir_id()
+                    && let Some(info) = self.type_table.get(&hir_id)
+                    && let TyKind::Fn(_, ret) = &info.ty.kind
+                {
+                    return ret.kind.clone();
+                }
+
                 return match binding_kind {
-                    hir::BindingKind::Struct => TyKind::Path((**path).clone()),
-                    hir::BindingKind::Variant => {
-                        if let Some(hir_id) = path.res.hir_id()
-                            && let Some(info) = self.type_table.get(&hir_id)
-                            && let TyKind::Fn(_, ret) = &info.ty.kind
-                        {
-                            ret.kind.clone()
-                        } else {
-                            unreachable!(
-                                "enum variant constructors must have a registered function signature"
-                            )
-                        }
-                    }
+                    hir::BindingKind::Struct => TyKind::Path((**path).clone(), Vec::new()),
+                    hir::BindingKind::Variant => unreachable!(
+                        "enum variant constructors must have a registered function signature"
+                    ),
                     _ => unreachable!(),
                 };
             }
@@ -663,12 +750,16 @@ impl TypeChecker {
         }
 
         // Try to resolve the callee to a function signature.
-        let fn_ty = self.resolve_callee_type(&call.callee);
+        let fn_ty = self.resolve_call_callee_type(call);
 
         match fn_ty {
             Some(TyKind::Fn(ref param_tys, ref ret_ty)) => {
                 let callee_name = callee_name_str(&call.callee);
                 let is_variadic = callee_name.as_deref().is_some_and(builtins::is_variadic);
+                let is_protocol_dispatch = matches!(
+                    &call.callee.kind,
+                    hir::ExprKind::Path(path) if self.protocol_dispatch_parts(path).is_some()
+                );
 
                 // Check argument count (skip for variadic builtins).
                 if !is_variadic && param_tys.len() != call.arguments.len() {
@@ -680,7 +771,13 @@ impl TypeChecker {
                     return ret_ty.kind.clone();
                 }
 
-                self.check_argument_types(call, param_tys, &callee_name, is_variadic);
+                self.check_argument_types(
+                    call,
+                    param_tys,
+                    &callee_name,
+                    is_variadic,
+                    is_protocol_dispatch,
+                );
 
                 // Instantiate generic return type: if the return type
                 // contains type variables, match argument types against
@@ -711,16 +808,17 @@ impl TypeChecker {
         param_tys: &[Ty],
         callee_name: &Option<String>,
         is_variadic: bool,
+        is_protocol_dispatch: bool,
     ) {
         if is_variadic {
             if let Some(param_ty) = param_tys.first() {
                 for (i, arg) in call.arguments.iter().enumerate() {
-                    self.check_single_arg(arg, param_ty, i, callee_name);
+                    self.check_single_arg(arg, param_ty, i, callee_name, is_protocol_dispatch);
                 }
             }
         } else {
             for (i, (arg, param_ty)) in call.arguments.iter().zip(param_tys.iter()).enumerate() {
-                self.check_single_arg(arg, param_ty, i, callee_name);
+                self.check_single_arg(arg, param_ty, i, callee_name, is_protocol_dispatch);
             }
         }
     }
@@ -731,11 +829,15 @@ impl TypeChecker {
         param_ty: &Ty,
         index: usize,
         callee_name: &Option<String>,
+        is_protocol_dispatch: bool,
     ) {
-        if matches!(param_ty.kind, TyKind::Unknown) || matches!(arg.ty.kind, TyKind::Unknown) {
+        if matches!(param_ty.kind, TyKind::Unknown)
+            || matches!(arg.ty.kind, TyKind::Unknown)
+            || is_protocol_dispatch && Self::is_protocol_generic_placeholder(&param_ty.kind)
+        {
             return;
         }
-        if !ty_kinds_compatible(&arg.ty.kind, &param_ty.kind) {
+        if !ty_kinds_assignable(&param_ty.kind, &arg.ty.kind) {
             let param_name = callee_name
                 .as_deref()
                 .map(|n| format!("arg{index} of `{n}`"))
@@ -747,6 +849,21 @@ impl TypeChecker {
                 span: arg.span,
             });
         }
+    }
+
+    fn is_protocol_generic_placeholder(kind: &TyKind) -> bool {
+        let TyKind::Path(path, _) = kind else {
+            return false;
+        };
+        if !path.res.is_unresolved() || path.segments.len() != 1 {
+            return false;
+        }
+        let name = path.first_ident().as_str();
+        name.len() == 1
+            && name
+                .chars()
+                .next()
+                .is_some_and(|ch| ch.is_ascii_uppercase())
     }
 
     /// Try to resolve the callee expression to a `TyKind::Fn`.
@@ -787,6 +904,277 @@ impl TypeChecker {
         }
     }
 
+    fn resolve_call_callee_type(&self, call: &hir::CallExpression) -> Option<TyKind> {
+        self.resolve_protocol_dispatch_callee_type(call)
+            .or_else(|| self.resolve_builtin_method_call_callee_type(call))
+            .or_else(|| self.resolve_callee_type(&call.callee))
+    }
+
+    fn resolve_builtin_method_call_callee_type(
+        &self,
+        call: &hir::CallExpression,
+    ) -> Option<TyKind> {
+        let hir::ExprKind::FieldAccess(base, method) = &call.callee.kind else {
+            return None;
+        };
+
+        let type_name = builtin_methods::type_name_from_kind(&base.ty.kind)?;
+        let candidates = builtin_methods::lookup_all(type_name, method.as_str());
+        let selected = candidates
+            .iter()
+            .find(|candidate| {
+                matches!(candidate, TyKind::Fn(params, _) if params.len() == call.arguments.len())
+            })
+            .or_else(|| candidates.first())?;
+
+        Some(builtin_methods::substitute_receiver_type_vars(
+            &base.ty.kind,
+            selected,
+        ))
+    }
+
+    fn resolve_protocol_dispatch_callee_type(&self, call: &hir::CallExpression) -> Option<TyKind> {
+        let hir::ExprKind::Path(path) = &call.callee.kind else {
+            return None;
+        };
+        if call.arguments.is_empty() {
+            return None;
+        }
+
+        let (protocol_name, method_name) = self.protocol_dispatch_parts(path)?;
+        let receiver_ty = &call.arguments[0].ty.kind;
+        let receiver_type_name = Self::receiver_dispatch_type_name(receiver_ty)?;
+
+        self.resolve_impl_protocol_dispatch_callee_type(
+            &protocol_name,
+            &method_name,
+            receiver_ty,
+            &receiver_type_name,
+        )
+        .or_else(|| {
+            self.resolve_builtin_protocol_dispatch_callee_type(
+                &protocol_name,
+                &method_name,
+                receiver_ty,
+                &receiver_type_name,
+            )
+        })
+    }
+
+    fn resolve_impl_protocol_dispatch_callee_type(
+        &self,
+        protocol_name: &str,
+        method_name: &str,
+        receiver_ty: &TyKind,
+        receiver_type_name: &str,
+    ) -> Option<TyKind> {
+        let proto_info = self.type_table.get_protocol_info(protocol_name)?;
+        let method = proto_info
+            .methods
+            .iter()
+            .find(|candidate| candidate.name.as_str() == method_name)?;
+        let impl_info = self
+            .type_table
+            .find_impl_for(protocol_name, receiver_type_name)?;
+        let protocol_bindings =
+            self.resolve_protocol_dispatch_type_bindings(proto_info, impl_info, receiver_ty);
+
+        let mut type_bindings = protocol_bindings.clone();
+        if let Some(self_param) = method.param_tys.first() {
+            let receiver_pattern = substitute_type_vars(&self_param.kind, &protocol_bindings);
+            collect_type_var_bindings(receiver_ty, &receiver_pattern, &mut type_bindings);
+        }
+
+        let mut param_tys: Vec<Ty> = method
+            .param_tys
+            .iter()
+            .map(|ty| Ty {
+                kind: substitute_type_vars(&ty.kind, &type_bindings),
+                ..ty.clone()
+            })
+            .collect();
+        if let Some(self_param) = param_tys.first_mut() {
+            self_param.kind = receiver_ty.clone();
+        } else {
+            param_tys.push(Ty {
+                kind: receiver_ty.clone(),
+                ..Ty::default()
+            });
+        }
+
+        let substituted_return_ty = Ty {
+            kind: substitute_type_vars(&method.return_ty.kind, &type_bindings),
+            ..method.return_ty.clone()
+        };
+        let return_ty = self.resolve_protocol_dispatch_return_type(
+            protocol_name,
+            receiver_type_name,
+            &substituted_return_ty,
+        );
+
+        Some(TyKind::Fn(param_tys, Box::new(return_ty)))
+    }
+
+    fn resolve_protocol_dispatch_type_bindings(
+        &self,
+        proto_info: &ProtocolInfo,
+        impl_info: &ImplInfo,
+        receiver_ty: &TyKind,
+    ) -> HashMap<TypeVarId, TyKind> {
+        let mut receiver_bindings = HashMap::new();
+        self.collect_receiver_type_arg_bindings(receiver_ty, impl_info, &mut receiver_bindings);
+
+        let mut protocol_bindings = HashMap::new();
+        for (proto_type_param, impl_protocol_arg) in proto_info
+            .type_param_var_ids
+            .iter()
+            .zip(impl_info.protocol_type_arg_tys.iter())
+        {
+            protocol_bindings.insert(
+                *proto_type_param,
+                substitute_type_vars(&impl_protocol_arg.kind, &receiver_bindings),
+            );
+        }
+
+        protocol_bindings
+    }
+
+    fn collect_receiver_type_arg_bindings(
+        &self,
+        receiver_ty: &TyKind,
+        impl_info: &ImplInfo,
+        bindings: &mut HashMap<TypeVarId, TyKind>,
+    ) {
+        match receiver_ty {
+            TyKind::List(inner) | TyKind::Slice(inner) if impl_info.target_type_name == "List" => {
+                if let Some(pattern) = impl_info.target_type_arguments.first() {
+                    collect_type_var_bindings(&inner.kind, &pattern.kind, bindings);
+                }
+            }
+            TyKind::Dict(key, value) if impl_info.target_type_name == "Dict" => {
+                if let Some(pattern) = impl_info.target_type_arguments.first() {
+                    collect_type_var_bindings(&key.kind, &pattern.kind, bindings);
+                }
+                if let Some(pattern) = impl_info.target_type_arguments.get(1) {
+                    collect_type_var_bindings(&value.kind, &pattern.kind, bindings);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn resolve_builtin_protocol_dispatch_callee_type(
+        &self,
+        _protocol_name: &str,
+        method_name: &str,
+        receiver_ty: &TyKind,
+        receiver_type_name: &str,
+    ) -> Option<TyKind> {
+        let method_ty = builtin_methods::lookup(receiver_type_name, method_name)?;
+        let TyKind::Fn(method_params, method_ret) =
+            builtin_methods::substitute_receiver_type_vars(receiver_ty, &method_ty)
+        else {
+            return None;
+        };
+
+        let mut param_tys = Vec::with_capacity(method_params.len() + 1);
+        param_tys.push(Ty {
+            kind: receiver_ty.clone(),
+            ..Ty::default()
+        });
+        param_tys.extend(method_params);
+
+        Some(TyKind::Fn(param_tys, method_ret))
+    }
+
+    fn resolve_protocol_dispatch_return_type(
+        &self,
+        protocol_name: &str,
+        receiver_type_name: &str,
+        return_ty: &Ty,
+    ) -> Ty {
+        let TyKind::Path(path, _) = &return_ty.kind else {
+            return return_ty.clone();
+        };
+        if path.segments.len() != 1 {
+            return return_ty.clone();
+        }
+
+        let assoc_type_name = path.first_ident().as_str();
+        let Some(binding) = self.type_table.resolve_associated_type(
+            protocol_name,
+            receiver_type_name,
+            assoc_type_name,
+        ) else {
+            return return_ty.clone();
+        };
+
+        Ty {
+            kind: builtin_types::lookup(&binding).unwrap_or_else(|| {
+                TyKind::Path(
+                    hir::Path::new(
+                        vec![hir::PathSegment::from_str(
+                            &binding,
+                            tlang_span::Span::default(),
+                        )],
+                        tlang_span::Span::default(),
+                    ),
+                    Vec::new(),
+                )
+            }),
+            ..Ty::default()
+        }
+    }
+
+    fn receiver_dispatch_type_name(receiver_ty: &TyKind) -> Option<String> {
+        match receiver_ty {
+            TyKind::List(_) | TyKind::Slice(_) => Some("List".to_string()),
+            TyKind::Primitive(PrimTy::String) => Some("String".to_string()),
+            TyKind::Path(path, _) => Some(path.join("::")),
+            _ => None,
+        }
+    }
+
+    fn protocol_dispatch_parts(&self, path: &hir::Path) -> Option<(String, String)> {
+        if !Self::is_protocol_path(path) {
+            return None;
+        }
+
+        let method_name = path.last_ident().as_str().to_string();
+        let protocol_name = path.segments[..path.segments.len() - 1]
+            .iter()
+            .map(|segment| segment.ident.as_str())
+            .collect::<Vec<_>>()
+            .join("::");
+        let proto_info = self.type_table.get_protocol_info(&protocol_name)?;
+        proto_info
+            .methods
+            .iter()
+            .any(|method| method.name.as_str() == method_name)
+            .then_some((protocol_name, method_name))
+    }
+
+    fn is_protocol_path(path: &hir::Path) -> bool {
+        path.segments.len() >= Self::MIN_PROTOCOL_PATH_SEGMENTS
+    }
+
+    fn visit_dispatch_receiver_arg(&mut self, call: &mut hir::CallExpression) -> bool {
+        let Some(receiver) = call.arguments.first_mut() else {
+            return false;
+        };
+        let hir::ExprKind::Path(path) = &call.callee.kind else {
+            return false;
+        };
+        if self.protocol_dispatch_parts(path).is_none()
+            || matches!(receiver.kind, hir::ExprKind::FunctionExpression(_))
+        {
+            return false;
+        }
+
+        self.visit_expr(receiver, &mut ());
+        true
+    }
+
     // ── Return statement checking ────────────────────────────────────
 
     fn check_return_type(&mut self, return_expr: Option<&hir::Expr>, span: tlang_span::Span) {
@@ -812,7 +1200,7 @@ impl TypeChecker {
             return; // Unknown value — skip.
         }
 
-        if !ty_kinds_compatible(expected, actual) {
+        if !ty_kinds_assignable(expected, actual) {
             self.errors.push(TypeError::ReturnTypeMismatch {
                 expected: expected.to_string(),
                 actual: actual.to_string(),
@@ -879,12 +1267,13 @@ impl TypeChecker {
 
     fn is_provisional_return_seed_candidate(ty: &TyKind) -> bool {
         match ty {
-            TyKind::Primitive(_) | TyKind::Path(_) => true,
+            TyKind::Primitive(_) | TyKind::Path(..) => true,
             TyKind::Union(tys) => tys
                 .iter()
                 .all(|ty| Self::is_provisional_return_seed_candidate(&ty.kind)),
             TyKind::Unknown
             | TyKind::Fn(..)
+            | TyKind::List(..)
             | TyKind::Slice(..)
             | TyKind::Dict(..)
             | TyKind::Never
@@ -1027,20 +1416,33 @@ impl TypeChecker {
             }
             hir::PatKind::List(pats) => {
                 // When the binding type is a list/slice, decompose it so that
-                // element patterns get the element type and rest patterns keep
-                // the full list type.
-                let elem_ty = match binding_ty {
-                    TyKind::Slice(inner) => Some(inner.kind.clone()),
-                    _ => None,
+                // element patterns get the element type and rest patterns get
+                // a Slice type (the view into remaining elements).
+                let elem_ty = self.iterable_item_type(binding_ty);
+
+                // Rest patterns produce a Slice<T> regardless of whether the
+                // original collection is List<T> or Slice<T>.
+                let rest_ty = match binding_ty {
+                    TyKind::List(inner) | TyKind::Slice(inner) => {
+                        TyKind::Slice(Box::new(inner.as_ref().clone()))
+                    }
+                    _ => {
+                        // Non-list binding (e.g. Iterable impl or unknown) —
+                        // build Slice from the iterable element type if known.
+                        let inner_kind = elem_ty.clone().unwrap_or(TyKind::Unknown);
+                        TyKind::Slice(Box::new(Ty {
+                            kind: inner_kind,
+                            ..Ty::default()
+                        }))
+                    }
                 };
 
                 for p in pats {
                     let is_rest = matches!(p.kind, hir::PatKind::Rest(_));
                     if is_rest {
-                        // Rest patterns (`...xs`) keep the full list type.
-                        self.register_pat_bindings(p, binding_ty);
+                        self.register_pat_bindings(p, &rest_ty);
                     } else {
-                        let ty = elem_ty.as_ref().unwrap_or(binding_ty);
+                        let ty = elem_ty.as_ref().unwrap_or(&TyKind::Unknown);
                         self.register_pat_bindings(p, ty);
                     }
                 }
@@ -1095,7 +1497,9 @@ impl TypeChecker {
                     } else {
                         // Struct pattern: look up struct field type.
                         struct_hir_id
-                            .and_then(|id| self.resolve_field_type(&id, field_key.as_str()))
+                            .and_then(|id| {
+                                self.resolve_field_type(binding_ty, &id, field_key.as_str())
+                            })
                             .or_else(|| {
                                 self.type_table
                                     .get_struct_info_by_name(&last_ident)
@@ -1121,6 +1525,32 @@ impl TypeChecker {
         }
     }
 
+    /// Register pattern bindings against the scrutinee expression itself.
+    ///
+    /// This preserves heterogeneous element types for synthetic match
+    /// scrutinees like `[arg0, arg1]` used by multi-clause function lowering.
+    /// Falling back to the aggregate list type would smear every element into a
+    /// homogeneous `List`, which breaks typed multi-parameter dispatch.
+    fn register_match_pat_bindings(&mut self, pat: &mut hir::Pat, scrutinee: &hir::Expr) {
+        match (&mut pat.kind, &scrutinee.kind) {
+            (hir::PatKind::List(pats), hir::ExprKind::List(items))
+                if pats.len() == items.len()
+                    && !pats
+                        .iter()
+                        .any(|pat| matches!(pat.kind, hir::PatKind::Rest(_))) =>
+            {
+                pat.ty.kind = scrutinee.ty.kind.clone();
+                for (item_pat, item_expr) in pats.iter_mut().zip(items.iter()) {
+                    self.register_match_pat_bindings(item_pat, item_expr);
+                }
+            }
+            _ => {
+                pat.ty.kind = scrutinee.ty.kind.clone();
+                self.register_pat_bindings(pat, &scrutinee.ty.kind);
+            }
+        }
+    }
+
     /// Field types declared in structs/enums are safe to propagate to
     /// destructuring bindings when they are explicit types. Tuple-enum
     /// payloads like `Dog(name)` use a lowercase placeholder that parses as
@@ -1128,7 +1558,7 @@ impl TypeChecker {
     fn should_propagate_field_ty(kind: &TyKind) -> bool {
         match kind {
             TyKind::Unknown | TyKind::Var(_) => false,
-            TyKind::Path(path) => {
+            TyKind::Path(path, _) => {
                 if !path.res.is_unresolved() {
                     return true;
                 }
@@ -1149,6 +1579,14 @@ impl TypeChecker {
         }
     }
 
+    fn constructor_param_ty(ty: &Ty) -> Ty {
+        if Self::should_propagate_field_ty(&ty.kind) {
+            ty.clone()
+        } else {
+            Ty::unknown()
+        }
+    }
+
     // ── Struct and enum declaration registration ──────────────────────
 
     /// Register a struct declaration in the type table: store field metadata
@@ -1161,7 +1599,16 @@ impl TypeChecker {
         // Set the resolution so that field access can find the struct info.
         struct_path.res.set_hir_id(decl.hir_id);
         struct_path.res.set_binding_kind(hir::BindingKind::Struct);
-        let struct_ty_kind = TyKind::Path(struct_path);
+        let struct_ty_kind = TyKind::Path(
+            struct_path,
+            decl.type_params
+                .iter()
+                .map(|type_param| Ty {
+                    kind: TyKind::Var(type_param.type_var_id),
+                    ..Ty::default()
+                })
+                .collect(),
+        );
 
         // Store struct field metadata.
         let fields: Vec<(tlang_ast::node::Ident, Ty)> =
@@ -1170,6 +1617,7 @@ impl TypeChecker {
             decl.hir_id,
             StructInfo {
                 name: decl.name,
+                type_param_var_ids: decl.type_params.iter().map(|tp| tp.type_var_id).collect(),
                 fields: fields.clone(),
             },
         );
@@ -1198,7 +1646,16 @@ impl TypeChecker {
         // Set the resolution so that variant access can find the enum info.
         enum_path.res.set_hir_id(decl.hir_id);
         enum_path.res.set_binding_kind(hir::BindingKind::Enum);
-        let enum_ty_kind = TyKind::Path(enum_path);
+        let enum_ty_kind = TyKind::Path(
+            enum_path,
+            decl.type_params
+                .iter()
+                .map(|type_param| Ty {
+                    kind: TyKind::Var(type_param.type_var_id),
+                    ..Ty::default()
+                })
+                .collect(),
+        );
 
         // Collect variant info.
         let variants: Vec<VariantInfo> = decl
@@ -1218,6 +1675,7 @@ impl TypeChecker {
             decl.hir_id,
             EnumInfo {
                 name: decl.name,
+                type_param_var_ids: decl.type_params.iter().map(|tp| tp.type_var_id).collect(),
                 variants,
             },
         );
@@ -1237,7 +1695,11 @@ impl TypeChecker {
                 );
             } else {
                 // Constructor variant: Fn(param_types…) → EnumPath
-                let param_tys: Vec<Ty> = variant.parameters.iter().map(|p| p.ty.clone()).collect();
+                let param_tys: Vec<Ty> = variant
+                    .parameters
+                    .iter()
+                    .map(|p| Self::constructor_param_ty(&p.ty))
+                    .collect();
                 let fn_ty = Self::make_fn_ty(param_tys, enum_ty_kind.clone());
                 self.type_table.insert(
                     variant.hir_id,
@@ -1282,6 +1744,11 @@ impl TypeChecker {
             .collect();
         self.type_table.insert_protocol_info(ProtocolInfo {
             name: decl.name,
+            type_param_var_ids: decl
+                .type_params
+                .iter()
+                .map(|param| param.type_var_id)
+                .collect(),
             methods,
             constraints,
             associated_types,
@@ -1444,13 +1911,34 @@ impl TypeChecker {
     }
     fn resolve_field_type(
         &self,
+        base_ty_kind: &TyKind,
         struct_hir_id: &tlang_span::HirId,
         field_name: &str,
     ) -> Option<TyKind> {
         if let Some(info) = self.type_table.get_struct_info(struct_hir_id) {
+            let mut bindings = HashMap::new();
+            if !info.type_param_var_ids.is_empty() {
+                let mut struct_path = hir::Path::new(
+                    vec![hir::PathSegment { ident: info.name }],
+                    tlang_span::Span::default(),
+                );
+                struct_path.res.set_hir_id(*struct_hir_id);
+                struct_path.res.set_binding_kind(hir::BindingKind::Struct);
+                let struct_pattern = TyKind::Path(
+                    struct_path,
+                    info.type_param_var_ids
+                        .iter()
+                        .map(|id| Ty {
+                            kind: TyKind::Var(*id),
+                            ..Ty::default()
+                        })
+                        .collect(),
+                );
+                collect_type_var_bindings(base_ty_kind, &struct_pattern, &mut bindings);
+            }
             for (name, ty) in &info.fields {
                 if name.as_str() == field_name {
-                    return Some(ty.kind.clone());
+                    return Some(substitute_type_vars(&ty.kind, &bindings));
                 }
             }
         }
@@ -1458,9 +1946,18 @@ impl TypeChecker {
     }
 
     fn resolve_dot_method_type(&self, base_ty_kind: &TyKind, field_name: &str) -> Option<TyKind> {
-        let type_name = builtin_methods::type_name_from_kind(base_ty_kind)?;
-        let method_name = format!("{type_name}.{field_name}");
-        let method_hir_id = *self.dot_methods.get(&method_name)?;
+        let mut method_names = Vec::new();
+        if let Some(type_name) = builtin_methods::type_name_from_kind(base_ty_kind) {
+            method_names.push(format!("{type_name}.{field_name}"));
+        }
+        if let TyKind::Path(path, _) = base_ty_kind {
+            method_names.push(format!("{}.{}", path.join("::"), field_name));
+            method_names.push(format!("{}.{}", path.last_ident(), field_name));
+        }
+
+        let method_hir_id = method_names
+            .into_iter()
+            .find_map(|method_name| self.dot_methods.get(&method_name).copied())?;
         let method_info = self.type_table.get(&method_hir_id)?;
 
         let TyKind::Fn(param_tys, ret_ty) = &method_info.ty.kind else {
@@ -1468,13 +1965,16 @@ impl TypeChecker {
         };
 
         let mut bindings = HashMap::new();
-        if let Some(receiver_ty) = param_tys.first() {
+        let has_receiver = param_tys.first().is_some_and(|receiver_ty| {
+            Self::dot_method_has_receiver(base_ty_kind, &receiver_ty.kind)
+        });
+        if has_receiver && let Some(receiver_ty) = param_tys.first() {
             collect_type_var_bindings(base_ty_kind, &receiver_ty.kind, &mut bindings);
         }
 
         let remaining_params = param_tys
             .iter()
-            .skip(1)
+            .skip(usize::from(has_receiver))
             .map(|param_ty| Ty {
                 kind: substitute_type_vars(&param_ty.kind, &bindings),
                 ..Ty::default()
@@ -1491,10 +1991,42 @@ impl TypeChecker {
         ))
     }
 
+    fn dot_method_has_receiver(base_ty_kind: &TyKind, candidate_receiver_ty: &TyKind) -> bool {
+        match (base_ty_kind, candidate_receiver_ty) {
+            (TyKind::Path(base_path, _), TyKind::Path(receiver_path, _)) => {
+                base_path == receiver_path
+            }
+            (TyKind::List(_), TyKind::List(_))
+            | (TyKind::Slice(_), TyKind::Slice(_))
+            | (TyKind::List(_), TyKind::Slice(_))
+            | (TyKind::Slice(_), TyKind::List(_)) => true,
+            (TyKind::Dict(..), TyKind::Dict(..)) => true,
+            (TyKind::Primitive(lhs), TyKind::Primitive(rhs)) => lhs == rhs,
+            _ => false,
+        }
+    }
+
+    fn has_dot_method_variant(&self, base_ty_kind: &TyKind, field_name: &str) -> bool {
+        let mut prefixes = Vec::new();
+        if let Some(type_name) = builtin_methods::type_name_from_kind(base_ty_kind) {
+            prefixes.push(format!("{type_name}.{field_name}/"));
+        }
+        if let TyKind::Path(path, _) = base_ty_kind {
+            prefixes.push(format!("{}.{}/", path.join("::"), field_name));
+            prefixes.push(format!("{}.{}/", path.last_ident(), field_name));
+        }
+
+        prefixes.into_iter().any(|prefix| {
+            self.dot_methods
+                .keys()
+                .any(|name| name.starts_with(&prefix))
+        })
+    }
+
     /// Resolve the HirId of a struct/enum type from a TyKind::Path.
     fn resolve_type_hir_id(ty_kind: &TyKind) -> Option<tlang_span::HirId> {
         match ty_kind {
-            TyKind::Path(path) => path.res.hir_id(),
+            TyKind::Path(path, _) => path.res.hir_id(),
             _ => None,
         }
     }
@@ -1512,7 +2044,7 @@ impl TypeChecker {
         span: tlang_span::Span,
     ) -> TyKind {
         if let Some(hir_id) = Self::resolve_type_hir_id(base_ty_kind) {
-            if let Some(field_ty) = self.resolve_field_type(&hir_id, field_name) {
+            if let Some(field_ty) = self.resolve_field_type(base_ty_kind, &hir_id, field_name) {
                 self.type_table.insert(
                     expr_hir_id,
                     TypeInfo {
@@ -1536,6 +2068,12 @@ impl TypeChecker {
                     },
                 );
                 return method_ty;
+            }
+
+            if self.has_dot_method_variant(base_ty_kind, field_name) {
+                self.type_table
+                    .insert(expr_hir_id, TypeInfo { ty: Ty::unknown() });
+                return TyKind::Unknown;
             }
 
             // Base is a known struct but the field does not exist.
@@ -1598,6 +2136,8 @@ impl TypeChecker {
                 }
                 hir::StmtKind::ImplBlock(impl_block) => {
                     let is_blanket = !impl_block.type_params.is_empty();
+                    let target_type_name = impl_block.target_type.join("::");
+                    let target_type_name_str = target_type_name.as_str();
                     let where_predicates: Vec<(String, Vec<String>)> = impl_block
                         .where_clause
                         .as_ref()
@@ -1620,7 +2160,12 @@ impl TypeChecker {
                         .collect();
                     self.type_table.insert_impl_info(ImplInfo {
                         protocol_name: impl_block.protocol_name.join("::"),
-                        target_type_name: impl_block.target_type.join("::"),
+                        target_type_name: target_type_name.clone(),
+                        target_type_arguments: impl_block.target_type_arguments.clone(),
+                        target_type_is_param: impl_block
+                            .type_params
+                            .iter()
+                            .any(|param| param.name.as_str() == target_type_name_str),
                         protocol_type_args: impl_block
                             .type_arguments
                             .iter()
@@ -1659,6 +2204,33 @@ impl TypeChecker {
         self.visit_expr(lhs, &mut ());
         self.visit_expr(rhs, &mut ());
         let result_ty = self.check_binary_op(op, &lhs.ty.kind, &rhs.ty.kind, expr_span);
+
+        // For assignments to ANF temporaries (or any variable whose current
+        // type is nil/unknown), propagate the RHS type back to the LHS
+        // binding so that subsequent reads see the concrete type.
+        if op == BinaryOpKind::Assign
+            && !matches!(result_ty, TyKind::Unknown)
+            && matches!(
+                lhs.ty.kind,
+                TyKind::Unknown | TyKind::Primitive(PrimTy::Nil)
+            )
+        {
+            lhs.ty.kind = result_ty.clone();
+            if let hir::ExprKind::Path(path) = &lhs.kind
+                && let Some(hir_id) = path.res.hir_id()
+            {
+                self.type_table.insert(
+                    hir_id,
+                    TypeInfo {
+                        ty: Ty {
+                            kind: result_ty.clone(),
+                            ..Ty::default()
+                        },
+                    },
+                );
+            }
+        }
+
         expr_ty.kind = result_ty.clone();
         self.type_table.insert(
             expr_hir_id,
@@ -1745,7 +2317,7 @@ impl TypeChecker {
                 self.assign_expr_type(expr, target_kind.clone());
             }
             // Same type → identity cast, always fine.
-            _ if ty_kinds_compatible(source_kind, target_kind) => {
+            _ if ty_kinds_assignable(target_kind, source_kind) => {
                 self.assign_expr_type(expr, target_kind.clone());
             }
             _ => {
@@ -1807,7 +2379,8 @@ impl TypeChecker {
         // Visit callee first so its type is available for bidirectional
         // inference into closure arguments.
         self.visit_expr(&mut call.callee, &mut ());
-        let callee_fn_ty = self.resolve_callee_type(&call.callee);
+        let receiver_visited = self.visit_dispatch_receiver_arg(call);
+        let callee_fn_ty = self.resolve_call_callee_type(call);
 
         // When the callee is a generic function, we need to infer type
         // variable bindings from non-closure arguments first, then
@@ -1827,7 +2400,16 @@ impl TypeChecker {
             if let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty {
                 // Pass 1: visit non-closure args and collect bindings.
                 for (i, arg) in call.arguments.iter_mut().enumerate() {
+                    if receiver_visited && i == 0 {
+                        if let Some(param_ty) = param_tys.get(i) {
+                            collect_type_var_bindings(&arg.ty.kind, &param_ty.kind, &mut bindings);
+                        }
+                        continue;
+                    }
                     if !matches!(arg.kind, hir::ExprKind::FunctionExpression(_)) {
+                        if let Some(param_ty) = param_tys.get(i) {
+                            self.apply_expected_expr_type(arg, &param_ty.kind);
+                        }
                         self.visit_expr(arg, &mut ());
                         if let Some(param_ty) = param_tys.get(i) {
                             collect_type_var_bindings(&arg.ty.kind, &param_ty.kind, &mut bindings);
@@ -1837,25 +2419,31 @@ impl TypeChecker {
 
                 // Pass 2: visit closure args with substituted expected types.
                 for (i, arg) in call.arguments.iter_mut().enumerate() {
-                    if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind {
-                        if let Some(expected_arg_ty) = param_tys.get(i) {
-                            let substituted =
-                                substitute_type_vars(&expected_arg_ty.kind, &bindings);
-                            Self::apply_expected_closure_types(decl, &substituted);
-                        }
+                    if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind
+                        && let Some(expected_arg_ty) = param_tys.get(i)
+                    {
+                        let substituted = substitute_type_vars(&expected_arg_ty.kind, &bindings);
+                        Self::apply_expected_closure_types(decl, &substituted);
                         self.visit_expr(arg, &mut ());
+                        continue;
                     }
+                    self.visit_expr(arg, &mut ());
                 }
             }
         } else {
             // Simple path: visit all arguments in order with optional
             // bidirectional inference for closures.
             for (i, arg) in call.arguments.iter_mut().enumerate() {
-                if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind
-                    && let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty
+                if receiver_visited && i == 0 {
+                    continue;
+                }
+                if let Some(TyKind::Fn(ref param_tys, _)) = callee_fn_ty
                     && let Some(expected_arg_ty) = param_tys.get(i)
                 {
-                    Self::apply_expected_closure_types(decl, &expected_arg_ty.kind);
+                    self.apply_expected_expr_type(arg, &expected_arg_ty.kind);
+                    if let hir::ExprKind::FunctionExpression(decl) = &mut arg.kind {
+                        Self::apply_expected_closure_types(decl, &expected_arg_ty.kind);
+                    }
                 }
                 self.visit_expr(arg, &mut ());
             }
@@ -1900,6 +2488,21 @@ impl TypeChecker {
     }
 
     fn apply_expected_loop_accumulator_type(&mut self, block: &mut hir::Block, expected: &TyKind) {
+        fn can_refine_from_expected(kind: &TyKind) -> bool {
+            match kind {
+                TyKind::Unknown => true,
+                TyKind::List(inner) | TyKind::Slice(inner) => matches!(inner.kind, TyKind::Unknown),
+                TyKind::Dict(key, value) => {
+                    matches!(key.kind, TyKind::Unknown) && matches!(value.kind, TyKind::Unknown)
+                }
+                TyKind::Path(path, type_args) => {
+                    type_args.is_empty()
+                        && matches!(path.to_string().as_str(), "List" | "Slice" | "Dict")
+                }
+                _ => false,
+            }
+        }
+
         for stmt in &mut block.stmts {
             let hir::StmtKind::Let(pat, _, ty) = &mut stmt.kind else {
                 continue;
@@ -1907,7 +2510,7 @@ impl TypeChecker {
             let hir::PatKind::Identifier(hir_id, ident) = &pat.kind else {
                 continue;
             };
-            if ident.as_str() != "accumulator$$" || !matches!(ty.kind, TyKind::Unknown) {
+            if ident.as_str() != "accumulator$$" || !can_refine_from_expected(&ty.kind) {
                 continue;
             }
 
@@ -1933,6 +2536,16 @@ impl TypeChecker {
         }
 
         match &mut expr.kind {
+            hir::ExprKind::Literal(lit) => {
+                if matches!(
+                    lit.as_ref(),
+                    Literal::Integer(_) | Literal::UnsignedInteger(_) | Literal::Float(_)
+                ) && let TyKind::Primitive(prim) = expected
+                    && prim.is_numeric()
+                {
+                    expr.ty.kind = expected.clone();
+                }
+            }
             hir::ExprKind::FunctionExpression(decl) => {
                 Self::apply_expected_closure_types(decl, expected);
             }
@@ -1958,7 +2571,10 @@ impl TypeChecker {
                 self.apply_expected_expr_type(value, expected);
             }
             hir::ExprKind::List(elements) => {
-                if let TyKind::Slice(inner) = expected {
+                if let TyKind::List(inner) | TyKind::Slice(inner) = expected {
+                    if elements.is_empty() {
+                        expr.ty.kind = expected.clone();
+                    }
                     for element in elements {
                         self.apply_expected_expr_type(element, &inner.kind);
                     }
@@ -1966,6 +2582,9 @@ impl TypeChecker {
             }
             hir::ExprKind::Dict(entries) => {
                 if let TyKind::Dict(key_ty, value_ty) = expected {
+                    if entries.is_empty() {
+                        expr.ty.kind = expected.clone();
+                    }
                     for (key, value) in entries {
                         self.apply_expected_expr_type(key, &key_ty.kind);
                         self.apply_expected_expr_type(value, &value_ty.kind);
@@ -2065,6 +2684,7 @@ impl TypeChecker {
     /// and infer return types.  Used by both top-level function declarations
     /// and impl block methods.
     fn typecheck_function_decl(&mut self, decl: &mut hir::FunctionDeclaration) {
+        self.seed_dot_method_receiver_type(decl);
         let fn_ctx = TypingContext::for_function(decl);
         self.push_context(fn_ctx);
         self.register_function_signature(decl);
@@ -2104,12 +2724,18 @@ impl TypeChecker {
                 decl.return_type.kind = body_ty.clone();
             }
 
+            let signature_ret_ty = if decl.has_return_type {
+                decl.return_type.kind.clone()
+            } else {
+                body_ty.clone()
+            };
+
             let param_tys: Vec<Ty> = decl
                 .parameters
                 .iter()
                 .map(|p| p.type_annotation.clone())
                 .collect();
-            let fn_ty = Self::make_fn_ty(param_tys, body_ty);
+            let fn_ty = Self::make_fn_ty(param_tys, signature_ret_ty);
             self.type_table.insert(
                 decl.hir_id,
                 TypeInfo {
@@ -2271,7 +2897,17 @@ impl<'hir> Visitor<'hir> for TypeChecker {
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
         match &mut expr.kind {
             hir::ExprKind::Literal(lit) => {
-                let ty_kind = Self::type_of_literal(lit);
+                let ty_kind = match lit.as_ref() {
+                    Literal::Integer(_) | Literal::UnsignedInteger(_) | Literal::Float(_)
+                        if matches!(
+                            expr.ty.kind,
+                            TyKind::Primitive(prim) if prim.is_numeric()
+                        ) =>
+                    {
+                        expr.ty.kind.clone()
+                    }
+                    _ => Self::type_of_literal(lit),
+                };
                 expr.ty.kind = ty_kind.clone();
                 self.type_table.insert(
                     expr.hir_id,
@@ -2372,12 +3008,10 @@ impl<'hir> Visitor<'hir> for TypeChecker {
             }
             hir::ExprKind::Match(scrutinee, arms) => {
                 self.visit_expr(scrutinee, ctx);
-                let scrutinee_ty = scrutinee.ty.kind.clone();
                 let iterator_item_ty = self.iterator_next_item_type(scrutinee);
                 let mut arm_tys = Vec::with_capacity(arms.len());
                 for arm in arms.iter_mut() {
-                    arm.pat.ty.kind = scrutinee_ty.clone();
-                    self.register_pat_bindings(&mut arm.pat, &scrutinee_ty);
+                    self.register_match_pat_bindings(&mut arm.pat, scrutinee);
                     if let Some(item_ty) = &iterator_item_ty {
                         self.register_iterator_next_pattern_bindings(&mut arm.pat, item_ty);
                     }
@@ -2429,6 +3063,12 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 expr.ty.kind =
                     self.check_field_access(&base_ty, field_name, expr.hir_id, expr.span);
             }
+            hir::ExprKind::IndexAccess(base, index) => {
+                self.visit_expr(base, ctx);
+                self.visit_expr(index, ctx);
+                let result_ty = self.index_access_result_type(&base.ty.kind);
+                self.assign_expr_type(expr, result_ty);
+            }
             hir::ExprKind::Implements(inner_expr, _path) => {
                 let hir_id = expr.hir_id;
                 self.visit_implements_expr(inner_expr, hir_id, &mut expr.ty);
@@ -2463,7 +3103,13 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 for elem in elements.iter_mut() {
                     self.visit_expr(elem, ctx);
                 }
-                let ty_kind = self.infer_list_type(elements);
+                let ty_kind = if elements.is_empty()
+                    && matches!(expr.ty.kind, TyKind::List(_) | TyKind::Slice(_))
+                {
+                    expr.ty.kind.clone()
+                } else {
+                    self.infer_list_type(elements)
+                };
                 self.assign_expr_type(expr, ty_kind);
             }
             hir::ExprKind::Dict(entries) => {
@@ -2471,7 +3117,11 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     self.visit_expr(key, ctx);
                     self.visit_expr(val, ctx);
                 }
-                let ty_kind = Self::infer_dict_type(entries);
+                let ty_kind = if entries.is_empty() && matches!(expr.ty.kind, TyKind::Dict(..)) {
+                    expr.ty.kind.clone()
+                } else {
+                    Self::infer_dict_type(entries)
+                };
                 self.assign_expr_type(expr, ty_kind);
             }
             hir::ExprKind::TaggedString {
@@ -2513,47 +3163,88 @@ fn callee_name_str(callee: &hir::Expr) -> Option<String> {
 /// from different source locations (e.g. an annotation vs an inferred
 /// expression type) need to be compared purely by shape.
 fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
-    match (a, b) {
-        (TyKind::Unknown, TyKind::Unknown) | (TyKind::Never, TyKind::Never) => true,
-        (TyKind::Primitive(pa), TyKind::Primitive(pb)) => pa == pb,
-        (TyKind::Fn(pa, ra), TyKind::Fn(pb, rb)) => {
-            pa.len() == pb.len()
-                && pa
-                    .iter()
-                    .zip(pb.iter())
-                    .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
-                && ty_kinds_compatible(&ra.kind, &rb.kind)
-        }
-        (TyKind::Slice(a), TyKind::Slice(b)) => ty_kinds_compatible(&a.kind, &b.kind),
-        (TyKind::Dict(ka, va), TyKind::Dict(kb, vb)) => {
-            ty_kinds_compatible(&ka.kind, &kb.kind) && ty_kinds_compatible(&va.kind, &vb.kind)
-        }
-        (TyKind::Path(pa), TyKind::Path(pb)) => pa == pb,
-        // A bare `List`/`Dict` path annotation is compatible with any
-        // parameterised `Slice(_)`/`Dict(_, _)` — the annotation just doesn't
-        // constrain the element type.
-        (TyKind::Path(p), TyKind::Slice(_)) | (TyKind::Slice(_), TyKind::Path(p))
-            if p.to_string() == "List" =>
-        {
-            true
-        }
-        (TyKind::Path(p), TyKind::Dict(..)) | (TyKind::Dict(..), TyKind::Path(p))
-            if p.to_string() == "Dict" =>
-        {
-            true
-        }
-        (TyKind::Union(ua), TyKind::Union(ub)) => {
-            ua.len() == ub.len()
-                && ua
-                    .iter()
-                    .zip(ub.iter())
-                    .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
-        }
-        (TyKind::Var(a), TyKind::Var(b)) => a == b,
-        // A type variable in either position is compatible with anything —
-        // this is needed so that generic signatures do not spuriously trigger
-        // type-mismatch errors during argument checking.
+    ty_kinds_assignable(a, b) || ty_kinds_assignable(b, a)
+}
+
+/// Check whether `actual` can be used where `expected` is required.
+///
+/// This is directional:
+/// - `List<unknown>` accepts `List<i64>`
+/// - `List<i64>` does *not* accept `List<unknown>`
+fn ty_kinds_assignable(expected: &TyKind, actual: &TyKind) -> bool {
+    match (expected, actual) {
+        // Type variables are placeholders during generic checking and should
+        // not force mismatches.
         (TyKind::Var(_), _) | (_, TyKind::Var(_)) => true,
+        (TyKind::Unknown, _) => true,
+        (_, TyKind::Unknown) => false,
+        (TyKind::Never, TyKind::Never) => true,
+        (TyKind::Primitive(expected), TyKind::Primitive(actual)) => expected == actual,
+        (TyKind::Fn(expected_params, expected_ret), TyKind::Fn(actual_params, actual_ret)) => {
+            expected_params.len() == actual_params.len()
+                && expected_params
+                    .iter()
+                    .zip(actual_params.iter())
+                    .all(|(expected, actual)| ty_kinds_assignable(&expected.kind, &actual.kind))
+                && ty_kinds_assignable(&expected_ret.kind, &actual_ret.kind)
+        }
+        (TyKind::List(expected), TyKind::List(actual))
+        | (TyKind::Slice(expected), TyKind::Slice(actual))
+        | (TyKind::List(expected), TyKind::Slice(actual))
+        | (TyKind::Slice(expected), TyKind::List(actual)) => {
+            ty_kinds_assignable(&expected.kind, &actual.kind)
+        }
+        (TyKind::Dict(expected_key, expected_val), TyKind::Dict(actual_key, actual_val)) => {
+            ty_kinds_assignable(&expected_key.kind, &actual_key.kind)
+                && ty_kinds_assignable(&expected_val.kind, &actual_val.kind)
+        }
+        (TyKind::Path(expected_path, expected_args), TyKind::Path(actual_path, actual_args)) => {
+            expected_path == actual_path
+                && expected_args.len() == actual_args.len()
+                && expected_args
+                    .iter()
+                    .zip(actual_args.iter())
+                    .all(|(expected, actual)| ty_kinds_assignable(&expected.kind, &actual.kind))
+        }
+        // Remaining bare builtin-generic paths act like unconstrained
+        // annotations on the expected side only.
+        (TyKind::Path(path, _), TyKind::List(_) | TyKind::Slice(_))
+            if path.to_string() == "List" =>
+        {
+            true
+        }
+        (TyKind::Path(path, _), TyKind::Dict(..)) if path.to_string() == "Dict" => true,
+        // If a builtin collection is still represented as a bare path on the
+        // actual side, treat it as carrying unknown inner types.
+        (TyKind::List(expected), TyKind::Path(path, type_args))
+        | (TyKind::Slice(expected), TyKind::Path(path, type_args))
+            if type_args.is_empty() && path.to_string() == "List" =>
+        {
+            ty_kinds_assignable(&expected.kind, &TyKind::Unknown)
+        }
+        (TyKind::Dict(expected_key, expected_val), TyKind::Path(path, type_args))
+            if type_args.is_empty() && path.to_string() == "Dict" =>
+        {
+            ty_kinds_assignable(&expected_key.kind, &TyKind::Unknown)
+                && ty_kinds_assignable(&expected_val.kind, &TyKind::Unknown)
+        }
+        (TyKind::Union(expected_members), TyKind::Union(actual_members)) => {
+            actual_members.iter().all(|actual_member| {
+                expected_members.iter().any(|expected_member| {
+                    ty_kinds_assignable(&expected_member.kind, &actual_member.kind)
+                })
+            })
+        }
+        // A concrete type is assignable to a union when at least one member
+        // accepts it.
+        (TyKind::Union(members), actual) => members
+            .iter()
+            .any(|member| ty_kinds_assignable(&member.kind, actual)),
+        // A union value is assignable to a concrete type only if every member
+        // is assignable to that target.
+        (expected, TyKind::Union(members)) => members
+            .iter()
+            .all(|member| ty_kinds_assignable(expected, &member.kind)),
         _ => false,
     }
 }
@@ -2565,11 +3256,12 @@ fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
 fn ty_contains_var(ty: &TyKind) -> bool {
     match ty {
         TyKind::Var(_) => true,
-        TyKind::Slice(inner) => ty_contains_var(&inner.kind),
+        TyKind::List(inner) | TyKind::Slice(inner) => ty_contains_var(&inner.kind),
         TyKind::Dict(k, v) => ty_contains_var(&k.kind) || ty_contains_var(&v.kind),
         TyKind::Fn(params, ret) => {
             params.iter().any(|p| ty_contains_var(&p.kind)) || ty_contains_var(&ret.kind)
         }
+        TyKind::Path(_, type_args) => type_args.iter().any(|arg| ty_contains_var(&arg.kind)),
         TyKind::Union(tys) => tys.iter().any(|t| ty_contains_var(&t.kind)),
         _ => false,
     }
@@ -2578,7 +3270,7 @@ fn ty_contains_var(ty: &TyKind) -> bool {
 /// Structurally match a concrete type against a pattern that may contain
 /// `Var` placeholders, and collect the bindings into `bindings`.
 ///
-/// For example, matching `Slice(i64)` against `Slice(Var(T))` adds
+/// For example, matching `List(i64)` against `List(Var(T))` adds
 /// `T → i64`.  Conflicting bindings (the same `Var` mapped to different
 /// concrete types) are silently ignored (first-wins).
 fn collect_type_var_bindings(
@@ -2594,7 +3286,10 @@ fn collect_type_var_bindings(
         (_, TyKind::Var(id)) => {
             bindings.entry(*id).or_insert_with(|| concrete.clone());
         }
-        (TyKind::Slice(c), TyKind::Slice(p)) => {
+        (TyKind::List(c), TyKind::List(p))
+        | (TyKind::Slice(c), TyKind::Slice(p))
+        | (TyKind::List(c), TyKind::Slice(p))
+        | (TyKind::Slice(c), TyKind::List(p)) => {
             collect_type_var_bindings(&c.kind, &p.kind, bindings);
         }
         (TyKind::Dict(ck, cv), TyKind::Dict(pk, pv)) => {
@@ -2607,7 +3302,14 @@ fn collect_type_var_bindings(
             }
             collect_type_var_bindings(&c_ret.kind, &p_ret.kind, bindings);
         }
-        // Bare `List` path (unparameterised) vs Slice(Var(T)): no binding.
+        (TyKind::Path(concrete_path, concrete_args), TyKind::Path(pattern_path, pattern_args))
+            if concrete_path == pattern_path && concrete_args.len() == pattern_args.len() =>
+        {
+            for (concrete_arg, pattern_arg) in concrete_args.iter().zip(pattern_args.iter()) {
+                collect_type_var_bindings(&concrete_arg.kind, &pattern_arg.kind, bindings);
+            }
+        }
+        // Bare `List` path (unparameterised) vs List/Slice(Var(T)): no binding.
         // Bare `Dict` path vs Dict(Var, Var): no binding.
         _ => {}
     }
@@ -2619,6 +3321,10 @@ fn collect_type_var_bindings(
 fn substitute_type_vars(ty: &TyKind, bindings: &HashMap<TypeVarId, TyKind>) -> TyKind {
     match ty {
         TyKind::Var(id) => bindings.get(id).cloned().unwrap_or_else(|| ty.clone()),
+        TyKind::List(inner) => TyKind::List(Box::new(Ty {
+            kind: substitute_type_vars(&inner.kind, bindings),
+            ..Ty::default()
+        })),
         TyKind::Slice(inner) => TyKind::Slice(Box::new(Ty {
             kind: substitute_type_vars(&inner.kind, bindings),
             ..Ty::default()
@@ -2651,6 +3357,16 @@ fn substitute_type_vars(ty: &TyKind, bindings: &HashMap<TypeVarId, TyKind>) -> T
             tys.iter()
                 .map(|t| Ty {
                     kind: substitute_type_vars(&t.kind, bindings),
+                    ..Ty::default()
+                })
+                .collect(),
+        ),
+        TyKind::Path(path, type_args) => TyKind::Path(
+            path.clone(),
+            type_args
+                .iter()
+                .map(|arg| Ty {
+                    kind: substitute_type_vars(&arg.kind, bindings),
                     ..Ty::default()
                 })
                 .collect(),
@@ -2692,6 +3408,7 @@ mod tests {
             hir_id: dummy_hir_id(),
             visibility: tlang_ast::node::Visibility::Private,
             name: dummy_name,
+            owner_type_params: Vec::new(),
             type_params: Vec::new(),
             parameters: params,
             params_span: tlang_span::Span::default(),
@@ -2905,5 +3622,87 @@ mod tests {
         let ty = TyKind::Var(u);
         let result = substitute_type_vars(&ty, &bindings);
         assert_eq!(result, TyKind::Var(u));
+    }
+
+    fn make_path_expr(segments: &[&str]) -> hir::Expr {
+        hir::Expr {
+            hir_id: dummy_hir_id(),
+            kind: hir::ExprKind::Path(Box::new(hir::Path::new(
+                segments
+                    .iter()
+                    .map(|segment| hir::PathSegment::from_str(segment, tlang_span::Span::default()))
+                    .collect(),
+                tlang_span::Span::default(),
+            ))),
+            ty: Ty::default(),
+            span: tlang_span::Span::default(),
+        }
+    }
+
+    #[test]
+    fn protocol_dispatch_parts_requires_known_protocol_method() {
+        let mut checker = TypeChecker::new();
+        checker.type_table.insert_protocol_info(ProtocolInfo {
+            name: Ident::new("Functor", tlang_span::Span::default()),
+            type_param_var_ids: Vec::new(),
+            methods: vec![ProtocolMethodInfo {
+                name: Ident::new("map", tlang_span::Span::default()),
+                param_tys: Vec::new(),
+                return_ty: Ty::unknown(),
+                has_default_body: false,
+            }],
+            constraints: Vec::new(),
+            associated_types: Vec::new(),
+        });
+
+        let functor_map = make_path_expr(&["Functor", "map"]);
+        let option_map = make_path_expr(&["Option", "map"]);
+        let functor_missing = make_path_expr(&["Functor", "missing"]);
+
+        assert_eq!(
+            checker.protocol_dispatch_parts(functor_map.path().unwrap()),
+            Some(("Functor".to_string(), "map".to_string()))
+        );
+        assert!(
+            checker
+                .protocol_dispatch_parts(option_map.path().unwrap())
+                .is_none()
+        );
+        assert!(
+            checker
+                .protocol_dispatch_parts(functor_missing.path().unwrap())
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn visit_dispatch_receiver_arg_requires_known_protocol_dispatch_site() {
+        let mut checker = TypeChecker::new();
+        checker.type_table.insert_protocol_info(ProtocolInfo {
+            name: Ident::new("Functor", tlang_span::Span::default()),
+            type_param_var_ids: Vec::new(),
+            methods: vec![ProtocolMethodInfo {
+                name: Ident::new("map", tlang_span::Span::default()),
+                param_tys: Vec::new(),
+                return_ty: Ty::unknown(),
+                has_default_body: false,
+            }],
+            constraints: Vec::new(),
+            associated_types: Vec::new(),
+        });
+
+        let mut protocol_call = hir::CallExpression {
+            hir_id: dummy_hir_id(),
+            callee: make_path_expr(&["Functor", "map"]),
+            arguments: vec![make_path_expr(&["value"])],
+        };
+        let mut non_protocol_call = hir::CallExpression {
+            hir_id: dummy_hir_id(),
+            callee: make_path_expr(&["Option", "map"]),
+            arguments: vec![make_path_expr(&["value"])],
+        };
+
+        assert!(checker.visit_dispatch_receiver_arg(&mut protocol_call));
+        assert!(!checker.visit_dispatch_receiver_arg(&mut non_protocol_call));
     }
 }

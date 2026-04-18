@@ -1,9 +1,8 @@
 ---
 source: crates/tlang_hir_opt/tests/anf_transform.rs
-assertion_line: 288
 expression: "common::pretty_print(&hir)"
 ---
-fn filter(arg0: List, f: unknown) -> unknown {
+fn filter(arg0: List<unknown>, f: unknown) -> unknown {
     let $anf$0: unknown = [arg0, f];
     let $anf$1: unknown = nil;
     match $anf$0 {

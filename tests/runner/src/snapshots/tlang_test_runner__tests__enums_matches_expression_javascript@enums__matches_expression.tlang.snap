@@ -14,7 +14,7 @@ true
 false
 not a circle
 
-warning: Unused enum variant `Shape::Triangle`, if this is intentional, prefix the name with an underscore: `_Shape::Triangle`
+warning: Unused enum variant `Shape::Triangle`
   ┌─ [WORKSPACE_ROOT]/tests/enums/matches_expression.tlang:4:5
   │
 4 │     Triangle(base, height),

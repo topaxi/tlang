@@ -9,7 +9,7 @@ protocol Foldable {
 
 enum List {
   Nil,
-  Cons(unknown, List),
+  Cons(i64, List),
 }
 
 impl Foldable for List {
@@ -23,4 +23,3 @@ let xs = List::Cons(1, List::Cons(2, List::Cons(3, List::Nil)));
 Foldable::sum(xs) |> log();
 Foldable::length(xs) |> log();
 Foldable::foldl(xs, 0, fn (acc, x) { acc + x }) |> log();
-

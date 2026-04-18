@@ -18,9 +18,9 @@ fn Vector.scale(self, scalar: isize) -> Vector {
     Vector::new(self.x * scalar, self.y * scalar)
 }
 
-// Vector.magnitude(self) -> float
-fn Vector.magnitude(self) -> float {
-    math::sqrt(self.x ** 2 + self.y ** 2)
+// Vector.magnitude(self) -> f64
+fn Vector.magnitude(self) -> f64 {
+    math::sqrt((self.x ** 2 + self.y ** 2) as f64)
 }
 
 // Example usage

@@ -8,6 +8,21 @@ fn integer_literal_ok() {
 }
 
 #[test]
+fn integer_literal_uses_typed_binding_context() {
+    common::typecheck_ok("let x: i32 = 42;");
+}
+
+#[test]
+fn integer_literal_uses_call_argument_context() {
+    common::typecheck_ok(
+        r#"
+        enum Expr { Number(i32) }
+        let _ = Expr::Number(42);
+        "#,
+    );
+}
+
+#[test]
 fn float_literal_ok() {
     common::typecheck_ok("let x = 3.14;");
 }
@@ -183,6 +198,61 @@ fn unknown_in_permissive_mode_ok() {
     common::typecheck_ok(
         r#"
         fn add(a, b) { a + b }
+        "#,
+    );
+}
+
+#[test]
+fn unresolved_generic_closure_param_in_permissive_mode_ok() {
+    common::typecheck_ok(
+        r#"
+        fn use_fn<T>(f: fn(T) -> i64) { 0 }
+        use_fn(fn(x) { x * 2 });
+        "#,
+    );
+}
+
+#[test]
+fn unresolved_generic_closure_param_comparison_in_permissive_mode_ok() {
+    common::typecheck_ok(
+        r#"
+        fn use_pred<T>(f: fn(T) -> bool) { true }
+        use_pred(fn(x) { x > 5 });
+        "#,
+    );
+}
+
+#[test]
+fn generic_call_accepts_distinct_type_var_ids() {
+    common::typecheck_ok(
+        r#"
+        fn max_of<T: Ord>(a: T, b: T) -> T {
+            if a >= b { a } else { b }
+        }
+
+        fn clamp<T: Ord>(value: T, lo: T, hi: T) -> T {
+            value |> max_of(lo) |> max_of(hi)
+        }
+        "#,
+    );
+}
+
+#[test]
+fn float_literal_adopts_expected_numeric_type_in_call_context() {
+    common::typecheck_ok(
+        r#"
+        enum Expense { Food(f32) }
+        let x = Expense::Food(45.50);
+        "#,
+    );
+}
+
+#[test]
+fn list_slice_allows_single_start_argument() {
+    common::typecheck_ok(
+        r#"
+        let xs = [1, 2, 3, 4];
+        let tail = xs.slice(1);
         "#,
     );
 }
@@ -768,6 +838,31 @@ fn function_calls_another_function_ok() {
     );
 }
 
+#[test]
+fn typed_recursive_higher_order_function_infers_closure_types() {
+    common::typecheck_ok(
+        r#"
+        fn map<T, U>([]: List<T>, _: fn(T) -> U) -> List<U> { [] }
+        fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, f)] }
+
+        let ys = map([1, 2, 3], fn(x) { x + 1 });
+        "#,
+    );
+}
+
+#[test]
+fn closure_with_generic_expected_return_stays_permissive() {
+    common::typecheck_ok(
+        r#"
+        fn map<T, U>([]: List<T>, _: fn(T) -> U) -> List<U> { [] }
+        fn map<T, U>([x, ...xs]: List<T>, f: fn(T) -> U) -> List<U> { [f(x), ...map(xs, f)] }
+        fn identity(x) { x }
+
+        let ys = map([1, 2, 3], fn(n) { identity(n) == identity(n) });
+        "#,
+    );
+}
+
 // ── Closure type checking ───────────────────────────────────────────────
 
 #[test]
@@ -894,6 +989,41 @@ fn struct_method_call_ok() {
         fn Point.get_x(self) -> isize { self.x }
         let p = Point { x: 3, y: 4 };
         let x = Point::get_x(p);
+        "#,
+    );
+}
+
+#[test]
+fn index_access_type_flows_in_strict_context() {
+    common::typecheck_ok(
+        r#"
+        fn head_plus_one(xs: List<i64>) -> i64 {
+            xs[0] + 1
+        }
+        "#,
+    );
+}
+
+#[test]
+fn dot_method_reference_matches_expected_fn_type() {
+    common::typecheck_ok(
+        r#"
+        struct Point { x: i64 }
+        fn Point.get_x(self) -> i64 { self.x }
+        fn apply_getter(getter: fn(Point) -> i64, point: Point) -> i64 { getter(point) }
+        let point = Point { x: 3 };
+        let value: i64 = apply_getter(Point::get_x, point);
+        "#,
+    );
+}
+
+#[test]
+fn dot_method_call_return_type_flows_in_strict_context() {
+    common::typecheck_ok(
+        r#"
+        struct Point { x: i64 }
+        fn Point.get_x(self) -> i64 { self.x }
+        fn increment(point: Point) -> i64 { point.get_x() + 1 }
         "#,
     );
 }
@@ -1478,6 +1608,23 @@ fn list_literal_annotation_matches_ok() {
 }
 
 #[test]
+fn bare_list_annotation_is_not_assignable_to_typed_list() {
+    let errs = common::typecheck_errors(
+        r#"
+        fn id(xs: List) -> List { xs }
+
+        fn typed(xs: List<i64>) -> List<i64> {
+            id(xs)
+        }
+        "#,
+    );
+    assert!(
+        errs.iter().any(|e| e.contains("return type mismatch")),
+        "expected return type mismatch, got: {errs:?}"
+    );
+}
+
+#[test]
 fn list_literal_annotation_mismatch_error() {
     let errs = common::typecheck_errors("let a: i64 = [1, 2];");
     assert!(
@@ -1521,7 +1668,8 @@ fn builtin_types_list_lookup_returns_prim_ty_res() {
 
     let ty = builtin_types::lookup("List").expect("List should be a known builtin type");
     match ty {
-        TyKind::Path(path) => {
+        TyKind::Path(path, type_args) => {
+            assert!(type_args.is_empty());
             assert!(path.res.is_prim_ty(), "List path should carry Res::PrimTy");
             assert_eq!(path.join("::"), "List");
         }
@@ -1536,7 +1684,8 @@ fn builtin_types_dict_lookup_returns_prim_ty_res() {
 
     let ty = builtin_types::lookup("Dict").expect("Dict should be a known builtin type");
     match ty {
-        TyKind::Path(path) => {
+        TyKind::Path(path, type_args) => {
+            assert!(type_args.is_empty());
             assert!(path.res.is_prim_ty(), "Dict path should carry Res::PrimTy");
             assert_eq!(path.join("::"), "Dict");
         }
@@ -2113,6 +2262,15 @@ fn builtin_re_returns_regex() {
 }
 
 #[test]
+fn regex_flags_allows_zero_argument_getter() {
+    common::typecheck_ok(
+        r#"
+        let flags: String = re"hello".flags();
+        "#,
+    );
+}
+
+#[test]
 fn builtin_f_returns_string() {
     common::typecheck_ok(
         r#"
@@ -2291,6 +2449,17 @@ fn string_split_returns_list() {
 }
 
 #[test]
+fn typed_list_return_accepts_bare_list_on_expected_side_only() {
+    common::typecheck_ok(
+        r#"
+        fn erase(xs: List<i64>) -> List {
+            xs
+        }
+        "#,
+    );
+}
+
+#[test]
 fn string_contains_returns_bool() {
     common::typecheck_ok(
         r#"
@@ -2363,6 +2532,74 @@ fn functor_map_closure_ok() {
         r#"
         let xs: List<i64> = [1, 2, 3];
         let ys = Functor::map(xs, fn(x) { x + 1 });
+        "#,
+    );
+}
+
+#[test]
+fn builtin_functor_map_accepts_option_receiver() {
+    common::typecheck_ok(
+        r#"
+        let some = Option::Some(5);
+        Functor::map(some, fn(_) { "mapped" });
+
+        let none = Option::None;
+        Functor::map(none, fn(_) { "mapped" });
+        "#,
+    );
+}
+
+#[test]
+fn builtin_functor_map_accepts_result_receiver() {
+    common::typecheck_ok(
+        r#"
+        let ok = Result::Ok(10);
+        Functor::map(ok, fn(_) { "mapped" });
+
+        let err = Result::Err("error");
+        Functor::map(err, fn(_) { "mapped" });
+        "#,
+    );
+}
+
+#[test]
+fn user_protocol_dispatch_infers_receiver_type_for_closure() {
+    common::typecheck_ok(
+        r#"
+        protocol MyFunctor<T> {
+          type Wrapped<U>
+          fn map<U>(self, f: fn(T) -> U) -> Wrapped<U>
+        }
+
+        impl<T> MyFunctor<T> for Option<T> {
+          type Wrapped<U> = Option<U>
+          fn map<U>(Option::Some(x), f) { Option::Some(f(x)) }
+          fn map<U>(Option::None, _) { Option::None }
+        }
+
+        let mapped = MyFunctor::map(Option::Some(5), fn (x) { x * 2 });
+        "#,
+    );
+}
+
+#[test]
+fn spread_string_is_compatible_with_list_string_param() {
+    common::typecheck_ok(
+        r#"
+        fn reverse_chars([]: List<String>) -> String { "" }
+        fn reverse_chars([x, ...xs]: List<String>) -> String { reverse_chars(xs) + x }
+
+        fn reverse_string(str: String) -> String { reverse_chars([...str]) }
+        "#,
+    );
+}
+
+#[test]
+fn list_pattern_without_element_annotation_stays_permissive() {
+    common::typecheck_ok(
+        r#"
+        fn sum([], acc: i64) -> i64 { acc }
+        fn sum([x, ...xs], acc: i64) -> i64 { rec sum(xs, acc + x) }
         "#,
     );
 }

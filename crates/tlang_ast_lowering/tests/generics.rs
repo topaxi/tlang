@@ -178,6 +178,66 @@ fn test_protocol_associated_type_with_type_params_lowered() {
 }
 
 #[test]
+fn test_protocol_method_type_params_lowered() {
+    let module = common::hir_from_str(
+        "protocol Functor<T> {
+            type Wrapped<U>
+            fn map<U>(self, f: fn(T) -> U) -> Wrapped<U>
+        }",
+    );
+
+    let stmt = &module.block.stmts[0];
+    let decl = match &stmt.kind {
+        hir::StmtKind::ProtocolDeclaration(decl) => decl,
+        other => panic!("expected ProtocolDeclaration, got {other:?}"),
+    };
+
+    assert_eq!(decl.methods.len(), 1);
+    let method = &decl.methods[0];
+    assert_eq!(method.type_params.len(), 1);
+    assert_eq!(method.type_params[0].name.as_str(), "U");
+    let tv_t = decl.type_params[0].type_var_id;
+    let tv_u = method.type_params[0].type_var_id;
+    assert_eq!(
+        method.parameters[1].type_annotation.kind.to_string(),
+        format!("fn(?{tv_t}) -> ?{tv_u}")
+    );
+    assert_eq!(
+        method.return_type.kind.to_string(),
+        format!("Wrapped<?{tv_u}>")
+    );
+}
+
+#[test]
+fn test_method_head_owner_and_method_type_params_lowered() {
+    let module = common::hir_from_str("fn Pair<A, B>.swap<T>(self, value: T) -> A { self }");
+
+    let stmt = &module.block.stmts[0];
+    let decl = match &stmt.kind {
+        hir::StmtKind::FunctionDeclaration(decl) => decl,
+        other => panic!("expected FunctionDeclaration, got {other:?}"),
+    };
+
+    assert_eq!(decl.owner_type_params.len(), 2);
+    assert_eq!(decl.type_params.len(), 1);
+
+    let tv_a = decl.owner_type_params[0].type_var_id;
+    let tv_b = decl.owner_type_params[1].type_var_id;
+    let tv_t = decl.type_params[0].type_var_id;
+
+    assert_ne!(tv_a, tv_b);
+    assert_ne!(tv_a, tv_t);
+    assert_ne!(tv_b, tv_t);
+
+    assert_eq!(
+        decl.parameters[0].type_annotation.kind.to_string(),
+        format!("Pair<?{tv_a}, ?{tv_b}>")
+    );
+    assert_eq!(decl.parameters[1].type_annotation.kind, TyKind::Var(tv_t));
+    assert_eq!(decl.return_type.kind, TyKind::Var(tv_a));
+}
+
+#[test]
 fn test_impl_block_type_params_lowered() {
     let module = common::hir_from_str(
         "protocol Functor {
@@ -252,10 +312,10 @@ fn test_impl_block_associated_type_binding_lowered() {
 
     assert_eq!(impl_block.associated_types.len(), 1);
     assert_eq!(impl_block.associated_types[0].name.as_str(), "Wrapped");
-    // The type should be a Path pointing to "List"
+    // Bare `List` is canonicalized to TyKind::List(Unknown)
     assert!(
-        matches!(&impl_block.associated_types[0].ty.kind, TyKind::Path(p) if p.to_string() == "List"),
-        "expected Path(List), got {:?}",
+        matches!(&impl_block.associated_types[0].ty.kind, TyKind::List(inner) if matches!(inner.kind, TyKind::Unknown)),
+        "expected List(Unknown), got {:?}",
         impl_block.associated_types[0].ty.kind
     );
 }
@@ -277,7 +337,7 @@ fn test_generic_fn_single_bound_lowered() {
     assert_eq!(tp.name.as_str(), "T");
     assert_eq!(tp.bounds.len(), 1);
     assert!(
-        matches!(&tp.bounds[0].kind, TyKind::Path(p) if p.to_string() == "Ord"),
+        matches!(&tp.bounds[0].kind, TyKind::Path(p, _) if p.to_string() == "Ord"),
         "expected bound Path(Ord), got {:?}",
         tp.bounds[0].kind,
     );
@@ -299,12 +359,12 @@ fn test_generic_fn_multiple_bounds_lowered() {
     assert_eq!(tp.name.as_str(), "T");
     assert_eq!(tp.bounds.len(), 2);
     assert!(
-        matches!(&tp.bounds[0].kind, TyKind::Path(p) if p.to_string() == "Display"),
+        matches!(&tp.bounds[0].kind, TyKind::Path(p, _) if p.to_string() == "Display"),
         "expected bound Path(Display), got {:?}",
         tp.bounds[0].kind,
     );
     assert!(
-        matches!(&tp.bounds[1].kind, TyKind::Path(p) if p.to_string() == "Serialize"),
+        matches!(&tp.bounds[1].kind, TyKind::Path(p, _) if p.to_string() == "Serialize"),
         "expected bound Path(Serialize), got {:?}",
         tp.bounds[1].kind,
     );

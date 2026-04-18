@@ -2,11 +2,10 @@
 // Demonstrates that enum-variant patterns correctly fall through
 // to subsequent overloads when the value is not of the expected type.
 
-enum SafeHtml { Html(string) }
+enum SafeHtml { Html(String) }
 
-// Mixed dispatch: enum variant + catch-all
-fn render(SafeHtml::Html(v)) { v }
-fn render(v) { Display::to_string(v) }
+fn render(SafeHtml::Html(value)) { value }
+fn render(v: unknown) { Display::to_string(v) }
 
 log("=== Multi-dispatch enum fallthrough ===");
 

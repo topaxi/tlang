@@ -4,13 +4,13 @@
 
 enum Tree {
     Empty,
-    Node { value: isize, left: Tree, right: Tree },
+    Node { value: i64, left: Tree, right: Tree },
 }
 
-fn Tree.insert(Tree::Empty, value) {
+fn Tree.insert(Tree::Empty, value: i64) {
     Tree::Node { value: value, left: Tree::Empty, right: Tree::Empty }
 }
-fn Tree.insert(Tree::Node { value: node_val, left, right }, value) {
+fn Tree.insert(Tree::Node { value: node_val, left, right }, value: i64) {
     if value < node_val {
         Tree::Node { value: node_val, left: left.insert(value), right }
     } else if value > node_val {

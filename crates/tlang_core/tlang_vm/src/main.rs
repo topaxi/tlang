@@ -4,12 +4,16 @@ use std::io::IsTerminal;
 use std::process;
 
 use tlang_ast_lowering::lower_to_hir;
-use tlang_diagnostics::{render_ice, render_parse_issues, render_semantic_diagnostics};
+use tlang_diagnostics::{
+    render_diagnostics, render_ice, render_parse_issues, render_semantic_diagnostics,
+};
 use tlang_hir_opt::HirOptimizer;
 use tlang_semantics::SemanticAnalyzer;
-use tlang_semantics::diagnostic::Diagnostic;
+use tlang_semantics::diagnostic::Diagnostic as SemanticDiagnostic;
+use tlang_typeck::typecheck_module;
 use tlang_vm::VM;
 
+#[allow(clippy::too_many_lines)]
 fn main() {
     let stress_gc = env::var("TLANG_STRESS_GC").is_ok();
 
@@ -71,7 +75,7 @@ fn main() {
                 )
             );
 
-            if diagnostics.iter().any(Diagnostic::is_error) {
+            if diagnostics.iter().any(SemanticDiagnostic::is_error) {
                 process::exit(1);
             }
         }
@@ -95,6 +99,38 @@ fn main() {
     let mut ctx = meta.into();
     if let Err(err) = optimizer.optimize_hir(&mut module, &mut ctx) {
         eprint!("{}", render_ice(&err));
+        process::exit(1);
+    }
+
+    let diagnostics = match typecheck_module(&mut module, &mut ctx) {
+        Ok(diagnostics) => diagnostics,
+        Err(err) => {
+            eprint!("{}", render_ice(&err));
+            process::exit(1);
+        }
+    };
+
+    if !diagnostics.warnings.is_empty() {
+        eprint!(
+            "{}",
+            render_diagnostics(
+                filename,
+                &code,
+                &diagnostics.warnings,
+                std::io::stderr().is_terminal()
+            )
+        );
+    }
+    if diagnostics.has_errors() {
+        eprint!(
+            "{}",
+            render_diagnostics(
+                filename,
+                &code,
+                &diagnostics.errors,
+                std::io::stderr().is_terminal()
+            )
+        );
         process::exit(1);
     }
 

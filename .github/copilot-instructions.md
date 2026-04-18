@@ -293,6 +293,15 @@ tsconfig.json
 - Use CI results as authoritative - if tests pass on CI, local failures are likely environment issues
 - Focus on ensuring your changes don't break existing interpreter functionality
 
+### Collection Types: List vs Slice
+
+The type system has two dedicated `TyKind` variants for collections:
+
+- **`TyKind::List(Box<Ty>)`** — An owned list. Created by list literals (`[1, 2, 3]`), `map`/`filter` results, and user `List<T>` annotations. At runtime this is a `TlangObjectKind::Struct` with list shape.
+- **`TyKind::Slice(Box<Ty>)`** — A view into an existing list. Created by rest patterns in destructuring (`[x, ...xs]` — the `xs` binding), the `.slice()` method, and user `Slice<T>` annotations. At runtime this is a `TlangObjectKind::Slice`.
+
+Both types are **mutually compatible** in type checking: a `Slice<T>` can be used where `List<T>` is expected and vice versa. They share the same builtin methods (`map`, `filter`, `foldl`, etc.) via `receiver_dispatch_type_name` mapping both to `"List"`. The bare unparameterised `List` path annotation is compatible with both `TyKind::List(_)` and `TyKind::Slice(_)`.
+
 ### Semantic Analysis Architecture
 
 The semantic analysis pipeline (in `tlang_semantics`) runs in two phases before HIR lowering:
