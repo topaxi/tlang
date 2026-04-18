@@ -1422,35 +1422,25 @@ impl TypeChecker {
 
                 // Rest patterns produce a Slice<T> regardless of whether the
                 // original collection is List<T> or Slice<T>.
-                // For bare `List` paths (no type args), produce `Slice<Unknown>`.
-                let rest_ty: Option<TyKind> = match binding_ty {
+                let rest_ty = match binding_ty {
                     TyKind::List(inner) | TyKind::Slice(inner) => {
-                        Some(TyKind::Slice(Box::new(inner.as_ref().clone())))
+                        TyKind::Slice(Box::new(inner.as_ref().clone()))
                     }
-                    TyKind::Path(p, _)
-                        if p.segments.last().is_some_and(|s| {
-                            s.ident.as_str() == "List" || s.ident.as_str() == "Slice"
-                        }) =>
-                    {
-                        // Bare `List`/`Slice` path without type args — element
-                        // type is unknown but the rest is still a Slice.
-                        Some(TyKind::Slice(Box::new(Ty {
-                            kind: elem_ty.clone().unwrap_or(TyKind::Unknown),
+                    _ => {
+                        // Non-list binding (e.g. Iterable impl or unknown) —
+                        // build Slice from the iterable element type if known.
+                        let inner_kind = elem_ty.clone().unwrap_or(TyKind::Unknown);
+                        TyKind::Slice(Box::new(Ty {
+                            kind: inner_kind,
                             ..Ty::default()
-                        })))
+                        }))
                     }
-                    _ if elem_ty.is_some() => Some(TyKind::Slice(Box::new(Ty {
-                        kind: elem_ty.clone().unwrap(),
-                        ..Ty::default()
-                    }))),
-                    _ => None,
                 };
 
                 for p in pats {
                     let is_rest = matches!(p.kind, hir::PatKind::Rest(_));
                     if is_rest {
-                        let ty = rest_ty.as_ref().unwrap_or(binding_ty);
-                        self.register_pat_bindings(p, ty);
+                        self.register_pat_bindings(p, &rest_ty);
                     } else {
                         let ty = elem_ty.as_ref().unwrap_or(&TyKind::Unknown);
                         self.register_pat_bindings(p, ty);
@@ -3143,7 +3133,10 @@ fn callee_name_str(callee: &hir::Expr) -> Option<String> {
 /// expression type) need to be compared purely by shape.
 fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
     match (a, b) {
-        (TyKind::Unknown, TyKind::Unknown) | (TyKind::Never, TyKind::Never) => true,
+        // Unknown is a wildcard: it represents an undetermined type and is
+        // compatible with any other type.
+        (TyKind::Unknown, _) | (_, TyKind::Unknown) => true,
+        (TyKind::Never, TyKind::Never) => true,
         (TyKind::Primitive(pa), TyKind::Primitive(pb)) => pa == pb,
         (TyKind::Fn(pa, ra), TyKind::Fn(pb, rb)) => {
             pa.len() == pb.len()

@@ -312,10 +312,10 @@ fn test_impl_block_associated_type_binding_lowered() {
 
     assert_eq!(impl_block.associated_types.len(), 1);
     assert_eq!(impl_block.associated_types[0].name.as_str(), "Wrapped");
-    // The type should be a Path pointing to "List"
+    // Bare `List` is canonicalized to TyKind::List(Unknown)
     assert!(
-        matches!(&impl_block.associated_types[0].ty.kind, TyKind::Path(p, _) if p.to_string() == "List"),
-        "expected Path(List), got {:?}",
+        matches!(&impl_block.associated_types[0].ty.kind, TyKind::List(inner) if matches!(inner.kind, TyKind::Unknown)),
+        "expected List(Unknown), got {:?}",
         impl_block.associated_types[0].ty.kind
     );
 }

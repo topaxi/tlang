@@ -25,8 +25,20 @@ fn has_concrete_type(ty: &hir::Ty) -> bool {
         }
     }
 
+    fn contains_unknown(kind: &hir::TyKind) -> bool {
+        match kind {
+            hir::TyKind::Unknown => true,
+            hir::TyKind::List(inner) | hir::TyKind::Slice(inner) => contains_unknown(&inner.kind),
+            hir::TyKind::Dict(key, value) => {
+                contains_unknown(&key.kind) || contains_unknown(&value.kind)
+            }
+            _ => false,
+        }
+    }
+
     !matches!(ty.kind, hir::TyKind::Unknown)
         && !contains_var(&ty.kind)
+        && !contains_unknown(&ty.kind)
         && !matches!(
             &ty.kind,
             hir::TyKind::Path(path, type_args) if type_args.is_empty() && is_unspecialized_generic_builtin_path(path)

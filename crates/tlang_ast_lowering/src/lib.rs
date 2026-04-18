@@ -812,9 +812,9 @@ impl LoweringContext {
     /// Lower a type path together with its type parameters, recognising
     /// built-in generic collection types:
     ///
-    /// - `List<T>` → `TyKind::List(T)`
-    /// - `Slice<T>` → `TyKind::Slice(T)`
-    /// - `Dict<K, V>` → `TyKind::Dict(K, V)`
+    /// - `List<T>` → `TyKind::List(T)`, bare `List` → `TyKind::List(Unknown)`
+    /// - `Slice<T>` → `TyKind::Slice(T)`, bare `Slice` → `TyKind::Slice(Unknown)`
+    /// - `Dict<K, V>` → `TyKind::Dict(K, V)`, bare `Dict` → `TyKind::Dict(Unknown, Unknown)`
     fn lower_ty_path_with_params(
         &mut self,
         path: &ast::node::Path,
@@ -823,22 +823,34 @@ impl LoweringContext {
         if path.segments.len() == 1 {
             let name = path.segments[0].as_str();
 
-            // List<T> → TyKind::List(T)
-            if name == "List" && params.len() == 1 {
-                let elem_ty = self.lower_ty(Some(&params[0]));
+            // List / List<T> → TyKind::List(T | Unknown)
+            if name == "List" && params.len() <= 1 {
+                let elem_ty = params
+                    .first()
+                    .map(|p| self.lower_ty(Some(p)))
+                    .unwrap_or_default();
                 return hir::TyKind::List(Box::new(elem_ty));
             }
 
-            // Slice<T> → TyKind::Slice(T)
-            if name == "Slice" && params.len() == 1 {
-                let elem_ty = self.lower_ty(Some(&params[0]));
+            // Slice / Slice<T> → TyKind::Slice(T | Unknown)
+            if name == "Slice" && params.len() <= 1 {
+                let elem_ty = params
+                    .first()
+                    .map(|p| self.lower_ty(Some(p)))
+                    .unwrap_or_default();
                 return hir::TyKind::Slice(Box::new(elem_ty));
             }
 
-            // Dict<K, V> → TyKind::Dict(K, V)
-            if name == "Dict" && params.len() == 2 {
-                let key_ty = self.lower_ty(Some(&params[0]));
-                let val_ty = self.lower_ty(Some(&params[1]));
+            // Dict / Dict<K, V> → TyKind::Dict(K | Unknown, V | Unknown)
+            if name == "Dict" && params.len() <= 2 {
+                let key_ty = params
+                    .first()
+                    .map(|p| self.lower_ty(Some(p)))
+                    .unwrap_or_default();
+                let val_ty = params
+                    .get(1)
+                    .map(|p| self.lower_ty(Some(p)))
+                    .unwrap_or_default();
                 return hir::TyKind::Dict(Box::new(key_ty), Box::new(val_ty));
             }
 
