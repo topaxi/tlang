@@ -1,4 +1,4 @@
-struct SafeHtml { value: string }
+struct SafeHtml { value: String }
 
 fn render(v) {
     match v {
@@ -23,8 +23,8 @@ fn classify(p) {
 let p = Point { x: 3, y: 4 };
 classify(p) |> log();
 
-struct Cat { name: string }
-struct Dog { name: string }
+struct Cat { name: String }
+struct Dog { name: String }
 
 fn describe(animal) {
     match animal {

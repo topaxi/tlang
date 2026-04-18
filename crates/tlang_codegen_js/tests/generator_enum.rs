@@ -7,7 +7,7 @@ mod common;
 fn test_enums() {
     let output = compile!(indoc! {"
         enum Option {
-            Some(x),
+            Some(unknown),
             None,
         }
 
@@ -19,9 +19,9 @@ fn test_enums() {
         class Option {
             tag = this;
             [0];
-            static Some = (x) => Object.assign(new this(), {
+            static Some = (arg) => Object.assign(new this(), {
                 tag: this.Some,
-                0: x
+                0: arg
             });
             static None = new this();
         }
@@ -79,7 +79,7 @@ fn test_enums_with_fields() {
 fn test_enums_tree_implementation() {
     let output = compile!(indoc! {"
         enum Tree {
-            Leaf(x),
+            Leaf(unknown),
             Node {
                 left,
                 right,
@@ -99,9 +99,9 @@ fn test_enums_tree_implementation() {
             [0];
             left;
             right;
-            static Leaf = (x) => Object.assign(new this(), {
+            static Leaf = (arg) => Object.assign(new this(), {
                 tag: this.Leaf,
-                0: x
+                0: arg
             });
             static Node = ({ left, right }) => Object.assign(new this(), {
                 tag: this.Node,
@@ -123,7 +123,7 @@ fn test_enums_tree_implementation() {
 fn test_maximum_depth_tree() {
     let output = compile!(indoc! {"
         enum Tree {
-            Leaf(x),
+            Leaf(unknown),
             Node {
                 left,
                 right,
@@ -149,9 +149,9 @@ fn test_maximum_depth_tree() {
             [0];
             left;
             right;
-            static Leaf = (x) => Object.assign(new this(), {
+            static Leaf = (arg) => Object.assign(new this(), {
                 tag: this.Leaf,
-                0: x
+                0: arg
             });
             static Node = ({ left, right }) => Object.assign(new this(), {
                 tag: this.Node,
@@ -184,8 +184,8 @@ fn test_maximum_depth_tree() {
 fn test_maximum_depth_tree_positional() {
     let output = compile!(indoc! {"
         enum Tree {
-            Leaf(x),
-            Node(left, right),
+            Leaf(unknown),
+            Node(unknown, unknown),
         }
 
         fn maximum_depth(Tree::Leaf(_)) { 1 }
@@ -196,14 +196,14 @@ fn test_maximum_depth_tree_positional() {
             tag = this;
             [0];
             [1];
-            static Leaf = (x) => Object.assign(new this(), {
+            static Leaf = (arg) => Object.assign(new this(), {
                 tag: this.Leaf,
-                0: x
+                0: arg
             });
-            static Node = (left, right) => Object.assign(new this(), {
+            static Node = (arg, arg$0) => Object.assign(new this(), {
                 tag: this.Node,
-                0: left,
-                1: right
+                0: arg,
+                1: arg$0
             });
         }
         function maximum_depth(tree) {
@@ -263,7 +263,7 @@ fn test_enum_is_variant_negated_boolean_return_simplification() {
 #[test]
 fn test_enum_is_variant_with_positional_fields() {
     let output = compile!(indoc! {"
-        enum Shape { Circle(r), Rectangle(w, h) }
+        enum Shape { Circle(unknown), Rectangle(unknown, unknown) }
         fn Shape.is_circle(Shape::Circle(_)) { true }
         fn Shape.is_circle(_) { false }
     "});
@@ -272,14 +272,14 @@ fn test_enum_is_variant_with_positional_fields() {
             tag = this;
             [0];
             [1];
-            static Circle = (r) => Object.assign(new this(), {
+            static Circle = (arg) => Object.assign(new this(), {
                 tag: this.Circle,
-                0: r
+                0: arg
             });
-            static Rectangle = (w, h) => Object.assign(new this(), {
+            static Rectangle = (arg, arg$0) => Object.assign(new this(), {
                 tag: this.Rectangle,
-                0: w,
-                1: h
+                0: arg,
+                1: arg$0
             });
         }
         Shape.prototype.is_circle = function is_circle() {

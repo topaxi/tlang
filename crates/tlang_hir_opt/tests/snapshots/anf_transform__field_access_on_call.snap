@@ -3,8 +3,8 @@ source: crates/tlang_hir_opt/tests/anf_transform.rs
 expression: "common::pretty_print(&hir)"
 ---
 struct Point {
-    x: int,
-    y: int,
+    x: isize,
+    y: isize,
 }
 
 fn make_point() -> unknown {

@@ -20,7 +20,7 @@ protocol Ord : Eq {
   }
 }
 
-struct Value { n: int }
+struct Value { n: isize }
 
 impl PartialEq for Value {
   fn eq(a, b) { a.n == b.n }

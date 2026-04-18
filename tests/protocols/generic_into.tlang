@@ -1,6 +1,6 @@
 // Test generic Into<T> protocol
-struct Celsius { value: int }
-struct Fahrenheit { value: int }
+struct Celsius { value: isize }
+struct Fahrenheit { value: isize }
 
 impl Into<Fahrenheit> for Celsius {
   fn into(c) { Fahrenheit { value: c.value * 9 / 5 + 32 } }

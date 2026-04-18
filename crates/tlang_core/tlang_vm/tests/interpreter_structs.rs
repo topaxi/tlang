@@ -55,7 +55,7 @@ fn test_struct_nested() {
 #[test]
 fn test_struct_destructure_match_single_field() {
     let s = common::eval_to_string(
-        r#"struct SafeHtml { value: string }
+        r#"struct SafeHtml { value: String }
          let sh = SafeHtml { value: "hello" };
          match sh {
              SafeHtml { value } => value,
@@ -79,8 +79,8 @@ fn test_struct_destructure_match_multiple_fields() {
 #[test]
 fn test_struct_destructure_match_with_wildcard_fallback() {
     let value = common::eval(
-        "struct Cat { name: string }
-         struct Dog { name: string }
+        "struct Cat { name: String }
+         struct Dog { name: String }
          let d = Dog { name: \"Rex\" };
          match d {
              Cat { name } => 1,
@@ -94,8 +94,8 @@ fn test_struct_destructure_match_with_wildcard_fallback() {
 #[test]
 fn test_struct_destructure_match_no_match_falls_to_wildcard() {
     let value = common::eval(
-        "struct Cat { name: string }
-         struct Dog { name: string }
+        "struct Cat { name: String }
+         struct Dog { name: String }
          let d = Dog { name: \"Rex\" };
          match d {
              Cat { name } => 1,

@@ -1,4 +1,4 @@
-struct SafeHtml { value: string }
+struct SafeHtml { value: String }
 
 // Single-dispatch with struct destructuring in function parameter
 fn get_value(SafeHtml { value }) { value }

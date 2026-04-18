@@ -1467,7 +1467,7 @@ impl TypeChecker {
                 let struct_hir_id = Self::resolve_type_hir_id(binding_ty);
                 let is_enum_variant = path.segments.len() >= 2;
 
-                for (field_key, p) in fields {
+                for (field_idx, (field_key, p)) in fields.iter_mut().enumerate() {
                     let field_ty = if is_enum_variant {
                         // Enum variant pattern: look up variant parameter type.
                         let enum_name = path.segments[path.segments.len() - 2]
@@ -1483,6 +1483,7 @@ impl TypeChecker {
                                     v.parameters
                                         .iter()
                                         .find(|(n, _)| n.as_str() == field_key.as_str())
+                                        .or_else(|| v.parameters.get(field_idx))
                                         .map(|(_, ty)| ty.kind.clone())
                                 })
                         };
@@ -1552,29 +1553,11 @@ impl TypeChecker {
     }
 
     /// Field types declared in structs/enums are safe to propagate to
-    /// destructuring bindings when they are explicit types. Tuple-enum
-    /// payloads like `Dog(name)` use a lowercase placeholder that parses as
-    /// an unresolved single-segment path; keep those permissive.
+    /// destructuring bindings only when they resolved to a concrete type.
     fn should_propagate_field_ty(kind: &TyKind) -> bool {
         match kind {
             TyKind::Unknown | TyKind::Var(_) => false,
-            TyKind::Path(path, _) => {
-                if !path.res.is_unresolved() {
-                    return true;
-                }
-
-                let Some(first) = path.segments.first() else {
-                    return false;
-                };
-
-                path.segments.len() > 1
-                    || first
-                        .ident
-                        .as_str()
-                        .chars()
-                        .next()
-                        .is_some_and(char::is_uppercase)
-            }
+            TyKind::Path(path, _) => !path.res.is_unresolved(),
             _ => true,
         }
     }
@@ -1805,6 +1788,7 @@ impl TypeChecker {
                     let bound_name = bound.kind.to_string();
                     // Validate that the bound refers to a known protocol path.
                     match &bound.kind {
+                        hir::TyKind::Unknown => {}
                         hir::TyKind::Path(..)
                             if self.type_table.get_protocol_info(&bound_name).is_some() => {}
                         _ => {

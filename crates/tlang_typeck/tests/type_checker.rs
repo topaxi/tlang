@@ -189,6 +189,28 @@ fn let_binding_mismatched_annotation_error() {
     );
 }
 
+#[test]
+fn let_binding_undeclared_type_annotation_error() {
+    let errs = common::typecheck_errors("let x: int = 42;");
+    assert_eq!(errs.len(), 1);
+    assert!(
+        errs[0].contains("Use of undeclared type `int`"),
+        "unexpected: {}",
+        errs[0]
+    );
+}
+
+#[test]
+fn struct_field_undeclared_type_annotation_error() {
+    let errs = common::typecheck_errors("struct Circle { radius: int }");
+    assert_eq!(errs.len(), 1);
+    assert!(
+        errs[0].contains("Use of undeclared type `int`"),
+        "unexpected: {}",
+        errs[0]
+    );
+}
+
 // ── Permissive mode (top-level / untyped functions) ─────────────────────
 
 #[test]
@@ -226,6 +248,8 @@ fn unresolved_generic_closure_param_comparison_in_permissive_mode_ok() {
 fn generic_call_accepts_distinct_type_var_ids() {
     common::typecheck_ok(
         r#"
+        protocol Ord {}
+
         fn max_of<T: Ord>(a: T, b: T) -> T {
             if a >= b { a } else { b }
         }
@@ -1221,8 +1245,8 @@ fn impl_block_all_methods_present_ok() {
             fn greet(self)
         }
         enum Animal {
-            Dog(name),
-            Cat(name),
+            Dog(String),
+            Cat(String),
         }
         impl Greet for Animal {
             fn greet(Animal::Dog(name)) { "Woof! I'm " + name }
@@ -1243,7 +1267,7 @@ fn impl_block_missing_method_error() {
             fn to_string(self)
         }
         enum Animal {
-            Dog(name),
+            Dog(String),
         }
         impl Greet for Animal {
             fn greet(Animal::Dog(name)) { "Woof! " + name }
@@ -1302,8 +1326,8 @@ fn impl_block_with_apply_method_ok() {
             fn greet(self)
         }
         enum Animal {
-            Dog(name),
-            Cat(name),
+            Dog(String),
+            Cat(String),
         }
         impl Greet for Animal {
             apply greet;
@@ -1322,8 +1346,8 @@ fn impl_block_apply_conflicts_with_existing_method_error() {
             fn greet(self)
         }
         enum Animal {
-            Dog(name),
-            Cat(name),
+            Dog(String),
+            Cat(String),
         }
         fn Animal.greet(self) {
             Greet::greet(self)
@@ -1567,8 +1591,8 @@ fn blanket_impl_where_clause_unknown_bound_error() {
     );
     assert!(
         errs.iter()
-            .any(|e| e.contains("unknown bound `NonExistentProtocol`")),
-        "expected unknown bound error, got: {errs:?}"
+            .any(|e| e.contains("Use of undeclared type `NonExistentProtocol`")),
+        "expected undeclared type error, got: {errs:?}"
     );
 }
 

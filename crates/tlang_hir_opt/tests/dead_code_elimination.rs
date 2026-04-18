@@ -191,7 +191,7 @@ fn keeps_used_enum() {
 #[test]
 fn removes_unused_struct() {
     let source = r#"
-        struct Point { x: int, y: int }
+        struct Point { x: isize, y: isize }
     "#;
     let hir = common::compile_and_optimize(source, &mut optimizer());
     assert_snapshot!(common::pretty_print(&hir), @"");
@@ -200,15 +200,15 @@ fn removes_unused_struct() {
 #[test]
 fn keeps_used_struct() {
     let source = r#"
-        struct Point { x: int, y: int }
+        struct Point { x: isize, y: isize }
         let p = Point { x: 1, y: 2 };
         println(p);
     "#;
     let hir = common::compile_and_optimize(source, &mut optimizer());
     assert_snapshot!(common::pretty_print(&hir), @r###"
     struct Point {
-        x: int,
-        y: int,
+        x: isize,
+        y: isize,
     }
 
     let p: unknown = Point({x: 1, y: 2});

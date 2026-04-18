@@ -2,7 +2,7 @@ protocol Area {
   fn area(self)
 }
 
-struct Rect { width: int, height: int }
+struct Rect { width: isize, height: isize }
 
 impl Area for Rect {
   fn area(r) { r.width * r.height }

@@ -1,6 +1,6 @@
 pub enum Shape {
-  Circle(r),
-  Rectangle(w, h),
+  Circle(isize),
+  Rectangle(isize, isize),
 }
 
 pub fn area(Shape::Circle(r)) { r * r * 3 }

@@ -20,6 +20,8 @@ identity(true)    |> log(); // true
 
 // ── Generic functions with constraint bounds ──────────────────────────────────
 
+protocol Ord {}
+
 // <T: Ord> documents that T must implement the Ord protocol.
 fn max_of<T: Ord>(a: T, b: T) -> T {
     if a >= b { a } else { b }

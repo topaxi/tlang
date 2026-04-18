@@ -17,5 +17,5 @@ not a circle
 warning: Unused enum variant `Shape::Triangle`
   ┌─ [WORKSPACE_ROOT]/tests/enums/matches_expression.tlang:4:5
   │
-4 │     Triangle(base, height),
-  │     ^^^^^^^^^^^^^^^^^^^^^^
+4 │     Triangle(f64, f64),
+  │     ^^^^^^^^^^^^^^^^^^

@@ -185,8 +185,8 @@ fn test_codegen_pattern_match_enum_bindings() {
 fn test_codegen_pattern_match_positional_enum() {
     let output = compile!(indoc! {"
         enum Expr {
-            Value(int),
-            Add(lhs, rhs),
+            Value(isize),
+            Add(unknown, unknown),
         }
 
         let expr = Expr::Value(42);
@@ -202,14 +202,14 @@ fn test_codegen_pattern_match_positional_enum() {
             tag = this;
             [0];
             [1];
-            static Value = (int) => Object.assign(new this(), {
+            static Value = (arg) => Object.assign(new this(), {
                 tag: this.Value,
-                0: int
+                0: arg
             });
-            static Add = (lhs, rhs) => Object.assign(new this(), {
+            static Add = (arg, arg$0) => Object.assign(new this(), {
                 tag: this.Add,
-                0: lhs,
-                1: rhs
+                0: arg,
+                1: arg$0
             });
         }
         let expr = Expr.Value(42);

@@ -350,7 +350,7 @@ mod tests {
     #[test]
     fn resolve_enum_method_call_on_variable() {
         // `opt.map(f)` should resolve to the method `Option::map`
-        let source = "enum Option {\n  Some(x),\n  None,\n}\nfn Option.map(Option::Some(x), f) { Option::Some(f(x)) }\nfn Option.map(Option::None, _) { Option::None }\nlet opt = Option::Some(1);\nopt.map(fn (x) { x + 1 });";
+        let source = "enum Option<T> {\n  Some(T),\n  None,\n}\nfn Option.map(Option::Some(x), f) { Option::Some(f(x)) }\nfn Option.map(Option::None, _) { Option::None }\nlet opt = Option::Some(1);\nopt.map(fn (x) { x + 1 });";
         // `map` in `opt.map` on line 7 — 0-based col 4
         let resolved = setup_and_resolve(source, 7, 4);
         assert!(
@@ -367,7 +367,7 @@ mod tests {
     #[test]
     fn resolve_enum_method_call_on_self() {
         // `self.is_some()` inside an enum method should resolve
-        let source = "enum Option {\n  Some(x),\n  None,\n}\nfn Option.is_some(Option::Some(_)) { true }\nfn Option.is_some(Option::None) { false }\nfn Option.check(self) {\n  self.is_some()\n}";
+        let source = "enum Option<T> {\n  Some(T),\n  None,\n}\nfn Option.is_some(Option::Some(_)) { true }\nfn Option.is_some(Option::None) { false }\nfn Option.check(self) {\n  self.is_some()\n}";
         // `is_some` in `self.is_some` on line 7 — 0-based col 7
         let resolved = setup_and_resolve(source, 7, 7);
         assert!(

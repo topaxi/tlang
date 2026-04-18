@@ -55,7 +55,7 @@ fn param_ty_res(decls: &[FunctionDeclaration], decl_idx: usize, param_idx: usize
 #[test]
 fn test_enum_pattern_inference() {
     let decls = analyze_fn_decls(
-        "enum Option { Some(x), None }
+        "enum Option<T> { Some(T), None }
          fn f(Option::Some(x)) { x }
          fn f(Option::None) { 0 }",
     );
@@ -298,10 +298,10 @@ fn analyze_impl_methods(source: &str, method_name: &str) -> Vec<FunctionDeclarat
 fn test_impl_block_enum_pattern_inference() {
     let decls = analyze_impl_methods(
         "protocol Greet { fn greet(self) }
-         enum Animal { Dog(name), Cat(name) }
+         enum Animal { Dog(String), Cat(String) }
          impl Greet for Animal {
-           fn greet(Animal::Dog(name)) { name }
-           fn greet(Animal::Cat(name)) { name }
+            fn greet(Animal::Dog(name)) { name }
+            fn greet(Animal::Cat(name)) { name }
          }",
         "greet",
     );
@@ -324,10 +324,10 @@ fn test_impl_block_enum_pattern_inference() {
 fn test_impl_block_multi_method_inference_independent() {
     let greet_decls = analyze_impl_methods(
         "protocol Greet { fn greet(self) fn shout(self) }
-         enum Animal { Dog(name), Cat(name) }
+         enum Animal { Dog(String), Cat(String) }
          impl Greet for Animal {
-           fn greet(Animal::Dog(name)) { name }
-           fn greet(Animal::Cat(name)) { name }
+            fn greet(Animal::Dog(name)) { name }
+            fn greet(Animal::Cat(name)) { name }
            fn shout(Animal::Dog(name)) { name }
            fn shout(Animal::Cat(name)) { name }
          }",

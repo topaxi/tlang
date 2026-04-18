@@ -20,7 +20,7 @@ fn test_enum_construction() {
 fn test_enum_with_payload() {
     // Positional fields are named by index ("0", "1", ...)
     let s = common::eval_to_string(
-        "enum Shape { Circle(r), Rect(w, h) }
+        "enum Shape { Circle(unknown), Rect(unknown, unknown) }
          Shape::Circle(5)",
     );
     assert_eq!(s, "Shape::Circle(0: 5)");
@@ -44,7 +44,7 @@ fn test_match_enum_variant() {
 #[test]
 fn test_match_with_binding() {
     let value = common::eval(
-        "enum Wrap { Value(x) }
+        "enum Wrap { Value(unknown) }
          let w = Wrap::Value(99);
          match w {
              Wrap::Value(n) => n * 2,

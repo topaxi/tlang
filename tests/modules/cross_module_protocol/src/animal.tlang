@@ -1,6 +1,6 @@
 enum Animal {
-  Dog(name),
-  Cat(name),
+  Dog(String),
+  Cat(String),
 }
 
 pub protocol Greet {

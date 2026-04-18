@@ -49,11 +49,11 @@ protocol Rankable : Comparable {
 // ── Domain model ──────────────────────────────────────────────────────────────
 
 struct Article {
-  id:     int,
-  title:  string,
-  author: string,
-  views:  int,
-  score:  int,
+  id:     isize,
+  title:  String,
+  author: String,
+  views:  isize,
+  score:  isize,
 }
 
 impl Eq for Article {
@@ -139,8 +139,8 @@ fn find_article_by_id(id) {
 
 enum ArticlesFilter {
   All,
-  ByAuthor(string),
-  ScoreRange(int, int),
+  ByAuthor(String),
+  ScoreRange(isize, isize),
 }
 
 fn articles_controller(ArticlesFilter::All) {

@@ -479,7 +479,7 @@ mod tests {
 
     #[test]
     fn method_completions_for_enum() {
-        let source = "enum Option {\n  Some(x),\n  None,\n}\nfn Option.map(Option::Some(x), f) { Option::Some(f(x)) }\nfn Option.map(Option::None, _) { Option::None }\nfn Option.is_some(Option::Some(_)) { true }\nfn Option.is_some(Option::None) { false }";
+        let source = "enum Option<T> {\n  Some(T),\n  None,\n}\nfn Option.map(Option::Some(x), f) { Option::Some(f(x)) }\nfn Option.map(Option::None, _) { Option::None }\nfn Option.is_some(Option::Some(_)) { true }\nfn Option.is_some(Option::None) { false }";
         let result = crate::analyze(source, |_| {});
         assert!(result.parse_issues.is_empty());
         let index = SymbolIndex::from_analyzer(&result.analyzer);

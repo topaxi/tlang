@@ -1,6 +1,6 @@
 enum Shape {
-  Circle(r),
-  Rectangle(w, h),
+  Circle(isize),
+  Rectangle(isize, isize),
 }
 
 pub fn circle(r) { Shape::Circle(r) }

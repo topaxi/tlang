@@ -8,7 +8,7 @@ protocol MyDebug {
 
 protocol Printable : MyDisplay + MyDebug {}
 
-struct Message { text: string }
+struct Message { text: String }
 
 impl MyDisplay for Message {
   fn display(Message { text }) { "Display: " + text }

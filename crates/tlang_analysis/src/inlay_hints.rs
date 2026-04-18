@@ -1263,17 +1263,23 @@ impl Drawable for Square {
     }
 
     #[test]
-    fn enum_destructuring_field_hints_include_builtin_struct_types() {
+    fn enum_destructuring_with_builtin_struct_types_preserves_surrounding_hints() {
         let source = r#"
 enum Expense {
-    Food(f32, Temporal::PlainDate),
+    Food { amount: f32, date: Temporal::PlainDate },
 }
-fn Expense.date(Expense::Food(_, d)) { d }
+let expense = Expense::Food {
+    amount: 12.5,
+    date: Temporal::PlainDate::from("2025-03-15"),
+};
+match expense {
+    Expense::Food { amount: _, date } => date,
+}
 "#;
         let hints = hints_for(source);
         assert!(
-            hints.iter().any(|h| h.label == ": Temporal::PlainDate"),
-            "expected `: Temporal::PlainDate` hint for enum payload binding, got: {hints:?}"
+            hints.iter().any(|h| h.label == ": Expense"),
+            "expected surrounding hints to survive builtin enum payload types, got: {hints:?}"
         );
     }
 

@@ -1286,7 +1286,7 @@ mod tests {
         .unwrap();
         fs::write(
             src.join("shapes.tlang"),
-            "pub struct Point {\n    x: int,\n    y: int,\n}",
+            "pub struct Point {\n    x: isize,\n    y: isize,\n}",
         )
         .unwrap();
 

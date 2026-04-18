@@ -204,7 +204,7 @@ fn list_with_compound_elements() {
 #[test]
 fn field_access_on_call() {
     let source = r#"
-        struct Point { x: int, y: int }
+        struct Point { x: isize, y: isize }
         fn make_point() { Point { x: 1, y: 2 } }
         let x = make_point().x;
     "#;

@@ -8,7 +8,7 @@ protocol Ord : Eq {
   fn cmp(self, other)
 }
 
-struct Point { x: int, y: int }
+struct Point { x: isize, y: isize }
 
 impl PartialEq for Point {
   fn eq(a, b) {

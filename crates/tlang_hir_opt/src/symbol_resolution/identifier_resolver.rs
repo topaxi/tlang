@@ -1,8 +1,9 @@
 use log::{debug, warn};
 use tlang_defs::DefKind;
+use tlang_diagnostics::Diagnostic;
 use tlang_hir::visit::walk_expr;
 use tlang_hir::{self as hir, Visitor};
-use tlang_span::HirId;
+use tlang_span::{HirId, Span};
 
 use crate::HirPass;
 use crate::hir_opt::{HirOptContext, HirOptError};
@@ -24,6 +25,17 @@ pub struct IdentifierResolver {
 }
 
 impl IdentifierResolver {
+    fn is_synthetic_generic_placeholder(path: &hir::Path) -> bool {
+        path.span == Span::default()
+            && path.segments.len() == 1
+            && path
+                .segments
+                .first()
+                .and_then(|segment| segment.ident.as_str().chars().next())
+                .map(|c| c.is_lowercase())
+                .unwrap_or(false)
+    }
+
     fn resolve_ty_path(&mut self, path: &mut hir::Path, ctx: &mut HirOptContext) {
         if path.res.hir_id().is_some() || path.res.is_prim_ty() {
             return;
@@ -48,13 +60,18 @@ impl IdentifierResolver {
             )
         });
 
-        let symbol_info = symbol_table
-            .read()
-            .unwrap()
-            .get_by_name(&name)
-            .into_iter()
-            .filter(|s| s.declared)
-            .find(|s| matches!(s.kind, DefKind::Enum | DefKind::Struct));
+        let symbol_info = {
+            let table = symbol_table.read().unwrap();
+            table
+                .get_by_name(&name)
+                .into_iter()
+                .find(|s| matches!(s.kind, DefKind::Enum | DefKind::Struct | DefKind::Protocol))
+                .or_else(|| {
+                    table.get_closest_by_name(&name, path.span).filter(|s| {
+                        matches!(s.kind, DefKind::Enum | DefKind::Struct | DefKind::Protocol)
+                    })
+                })
+        };
 
         if let Some(symbol_info) = symbol_info {
             debug!("Type path '{}' resolved to {:?}", name, symbol_info);
@@ -63,20 +80,18 @@ impl IdentifierResolver {
                 path.res.set_hir_id(hir_id);
             }
         } else {
-            // Lowercase single-segment names are used as generic type parameter
-            // placeholders (e.g. `value` in `Option::Some(value)`) and have no
-            // explicit declaration. Treat them silently like `unknown`.
-            let is_generic_placeholder = name
-                .chars()
-                .next()
-                .map(|c| c.is_lowercase())
-                .unwrap_or(false);
-            if !is_generic_placeholder {
-                warn!(
-                    "No type declaration found for type path '{}' on line {}.",
-                    name, path.span.start
-                );
+            if Self::is_synthetic_generic_placeholder(path) {
+                return;
             }
+
+            ctx.diagnostics.push(Diagnostic::error(
+                &format!("Use of undeclared type `{name}`"),
+                path.span,
+            ));
+            warn!(
+                "No type declaration found for type path '{}' on line {}.",
+                name, path.span.start
+            );
         }
     }
 
@@ -216,12 +231,14 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
     }
 
     fn visit_ty(&mut self, ty: &'hir mut hir::Ty, ctx: &mut Self::Context) {
+        let mut unresolved_path = false;
         match &mut ty.kind {
             hir::TyKind::Path(path, type_args) => {
                 self.resolve_ty_path(path, ctx);
                 for ty_arg in type_args {
                     self.visit_ty(ty_arg, ctx);
                 }
+                unresolved_path = path.res.is_unresolved();
             }
             hir::TyKind::Union(tys) => {
                 for inner_ty in tys {
@@ -243,6 +260,10 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
             | hir::TyKind::Primitive(_)
             | hir::TyKind::Never
             | hir::TyKind::Var(_) => {}
+        }
+        if unresolved_path {
+            ty.kind = hir::TyKind::Unknown;
+            ty.res = None;
         }
     }
 }
