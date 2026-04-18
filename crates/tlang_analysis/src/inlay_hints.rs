@@ -877,6 +877,7 @@ fn report_ty_at(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn walk_expr_for_type(
     expr: &hir::Expr,
     type_table: &TypeTable,
