@@ -49,8 +49,8 @@
 //! }
 //!
 //! impl List<T> {
-//!     fn slice(self, start: i64) -> List<T> { ... }
-//!     fn slice(self, start: i64, end: i64) -> List<T> { ... }
+//!     fn slice(self, start: i64) -> Slice<T> { ... }
+//!     fn slice(self, start: i64, end: i64) -> Slice<T> { ... }
 //!     fn map<U>(self, f: fn(T) -> U) -> List<U> { ... }
 //!     fn filter(self, f: fn(T) -> bool) -> List<T> { ... }
 //!     fn foldl<U>(self, init: U, f: fn(U, T) -> U) -> U { ... }

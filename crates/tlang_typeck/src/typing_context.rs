@@ -28,11 +28,18 @@ fn has_concrete_type(ty: &hir::Ty) -> bool {
     fn contains_unknown(kind: &hir::TyKind) -> bool {
         match kind {
             hir::TyKind::Unknown => true,
+            hir::TyKind::Fn(params, ret) => {
+                params.iter().any(|p| contains_unknown(&p.kind)) || contains_unknown(&ret.kind)
+            }
             hir::TyKind::List(inner) | hir::TyKind::Slice(inner) => contains_unknown(&inner.kind),
             hir::TyKind::Dict(key, value) => {
                 contains_unknown(&key.kind) || contains_unknown(&value.kind)
             }
-            _ => false,
+            hir::TyKind::Union(types) => types.iter().any(|ty| contains_unknown(&ty.kind)),
+            hir::TyKind::Path(_, type_args) => {
+                type_args.iter().any(|ty| contains_unknown(&ty.kind))
+            }
+            hir::TyKind::Var(_) | hir::TyKind::Primitive(_) | hir::TyKind::Never => false,
         }
     }
 
