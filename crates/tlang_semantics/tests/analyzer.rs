@@ -363,6 +363,18 @@ fn should_not_warn_about_used_function_and_parameters() {
 }
 
 #[test]
+fn should_not_warn_about_unused_self_parameter() {
+    let diagnostics = analyze_diag!(indoc! {"
+        struct Point { x: i64 }
+        fn Point.describe(self) { \"point\" }
+
+        let p = Point { x: 1 };
+        p.describe();
+    "});
+    assert_eq!(diagnostics, vec![]);
+}
+
+#[test]
 fn should_not_warn_about_unused_variables_prefixed_with_underscore() {
     let diagnostics = analyze_diag!(indoc! {"
         let _a = 1;

@@ -61,6 +61,9 @@ impl VariableUsageValidator {
             // themselves.
             .filter(|symbol| !symbol.is_fn_self_binding())
             .filter(|symbol| !symbol.name.starts_with('_'))
+            // `self` is a fixed receiver name, so the usual underscore advice
+            // is not actionable. Leave receiver-specific cleanup to linting.
+            .filter(|symbol| symbol.name.as_ref() != "self")
             // TODO(#580): We currently do not track member methods, as we do not have any type
             //       information yet.
             .filter(|symbol| !symbol.name.contains('.'))
