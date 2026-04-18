@@ -5,7 +5,7 @@
 enum SafeHtml { Html(String) }
 
 fn render(SafeHtml::Html(value)) { value }
-fn render(v) { Display::to_string(v) }
+fn render(v: unknown) { Display::to_string(v) }
 
 log("=== Multi-dispatch enum fallthrough ===");
 

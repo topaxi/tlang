@@ -3155,6 +3155,11 @@ fn ty_kinds_compatible(a: &TyKind, b: &TyKind) -> bool {
                     .zip(ub.iter())
                     .all(|(a, b)| ty_kinds_compatible(&a.kind, &b.kind))
         }
+        // A concrete type is compatible with a union that contains it:
+        // e.g. String is compatible with String | List.
+        (arg, TyKind::Union(members)) | (TyKind::Union(members), arg) => {
+            members.iter().any(|m| ty_kinds_compatible(arg, &m.kind))
+        }
         // A type variable in either position is compatible with anything —
         // this is needed so that generic signatures do not spuriously trigger
         // type-mismatch errors during argument checking.

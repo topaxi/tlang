@@ -202,17 +202,19 @@ fn test_mixed_enum_types_produce_union() {
 // ── No-inference cases ────────────────────────────────────────────────────────
 
 #[test]
-fn test_enum_pattern_with_catch_all_stays_untyped() {
-    // When a catch-all clause exists alongside constrained patterns,
-    // inference is suppressed because the catch-all can accept any type
-    // at runtime via multi-dispatch fallthrough.
+fn test_enum_pattern_with_catch_all_infers_type() {
+    // When a catch-all clause exists alongside constrained enum patterns,
+    // the catch-all inherits the inferred type from the constrained clauses.
+    // If widening is needed, the user must annotate with `unknown` explicitly.
     let decls = analyze_fn_decls(
         "enum SafeHtml { Html(String) }
          fn render(SafeHtml::Html(v)) { v }
          fn render(v) { v }",
     );
-    assert!(decls[0].parameters[0].type_annotation.is_none());
-    assert!(decls[1].parameters[0].type_annotation.is_none());
+    let ann0 = decls[0].parameters[0].type_annotation.as_ref().unwrap();
+    let ann1 = decls[1].parameters[0].type_annotation.as_ref().unwrap();
+    assert!(matches!(ann0.kind, TyKind::Path(_)));
+    assert!(matches!(ann1.kind, TyKind::Path(_)));
 }
 
 #[test]
