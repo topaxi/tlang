@@ -6,8 +6,8 @@ protocol Resizable {
   fn resize(self, factor)
 }
 
-struct Circle { radius: int }
-struct Square { side: int }
+struct Circle { radius: isize }
+struct Square { side: isize }
 
 impl Drawable for Circle {
   fn draw(self) {

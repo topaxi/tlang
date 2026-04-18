@@ -15,7 +15,7 @@
 use std::collections::{HashMap, HashSet};
 
 use tlang_hir as hir;
-use tlang_hir::TyKind;
+use tlang_hir::{PrimTy, TyKind};
 use tlang_span::{HirId, LineColumn, Span, TypeVarId};
 use tlang_typeck::TypeTable;
 
@@ -233,7 +233,10 @@ fn collect_fn_decl_hints(
                     let ret_kind = arms
                         .get(*arm_idx)
                         .and_then(|arm| arm.block.expr.as_ref().map(|e| &e.ty.kind))?;
-                    if matches!(ret_kind, TyKind::Unknown) || ty_contains_var(ret_kind) {
+                    if matches!(ret_kind, TyKind::Unknown)
+                        || ty_contains_var(ret_kind)
+                        || is_void_return_ty(ret_kind)
+                    {
                         return None;
                     }
                     Some((*span, ret_kind))
@@ -277,6 +280,7 @@ fn collect_fn_decl_hints(
         if let Some(ret_kind) = inferred_ret
             && !matches!(ret_kind, TyKind::Unknown)
             && !ty_contains_var(ret_kind)
+            && !is_void_return_ty(ret_kind)
         {
             for span in return_hint_spans {
                 push_hint(
@@ -299,6 +303,10 @@ fn collect_fn_decl_hints(
 /// but not yet resolved to concrete types — these should still get hints.
 fn ty_contains_only_vars(ty: &TyKind) -> bool {
     matches!(ty, TyKind::Var(_))
+}
+
+fn is_void_return_ty(ty: &TyKind) -> bool {
+    matches!(ty, TyKind::Primitive(PrimTy::Nil))
 }
 
 /// Determine the position for a return type hint.
@@ -1155,6 +1163,45 @@ fn evaluate(Expr::Divide(left, right)) { evaluate(left) / evaluate(right) }
         assert!(
             !hints.iter().any(|h| h.kind == InlayHintKind::ReturnType),
             "should not show return type hint when explicitly annotated, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn function_with_implicit_nil_return_has_no_hint() {
+        let hints = hints_for(r#"fn draw() { log("Drawing circle") }"#);
+        assert!(
+            !hints.iter().any(|h| h.kind == InlayHintKind::ReturnType),
+            "should not show return type hint for implicit nil returns, got: {hints:?}"
+        );
+    }
+
+    #[test]
+    fn impl_method_with_implicit_nil_return_has_no_hint() {
+        let hints = hints_for(
+            r#"
+protocol Drawable {
+    fn draw(self)
+}
+
+struct Circle {}
+struct Square {}
+
+impl Drawable for Circle {
+    fn draw(self) {
+        log("Drawing circle")
+    }
+}
+
+impl Drawable for Square {
+    fn draw(self) {
+        log("Drawing square")
+    }
+}
+"#,
+        );
+        assert!(
+            !hints.iter().any(|h| h.kind == InlayHintKind::ReturnType),
+            "should not show return type hints for implicit nil impl methods, got: {hints:?}"
         );
     }
 
