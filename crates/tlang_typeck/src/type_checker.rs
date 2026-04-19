@@ -2532,6 +2532,13 @@ impl TypeChecker {
 
         match &mut expr.kind {
             hir::ExprKind::Literal(lit) => {
+                // Don't refine a literal that was inlined from an explicitly-typed
+                // binding by constant propagation — its type is already concrete
+                // and must be respected (e.g. `let x: i64 = 5; let y: isize = x`
+                // should remain a type mismatch, not silently coerce `5` to `isize`).
+                if !matches!(expr.ty.kind, TyKind::Unknown) {
+                    return;
+                }
                 if matches!(
                     lit.as_ref(),
                     Literal::Integer(_) | Literal::UnsignedInteger(_) | Literal::Float(_)

@@ -2718,7 +2718,7 @@ fn loop_accumulator_unannotated_infers_type_from_iterator_item() {
 }
 
 #[test]
-fn branch_result_literal_infers_from_annotated_binding() {
+fn branch_literal_infers_from_function_return_type() {
     common::typecheck_ok(
         r#"
         fn foo(b: bool) -> isize {
@@ -2764,8 +2764,9 @@ fn loop_accumulator_infers_from_function_return_type_numeric() {
 }
 
 #[test]
-fn accumulator_literal_zero_infers_from_isize_return_type() {
-    // A simple if/else where both branches return isize literals
+fn branch_if_else_literal_infers_from_function_return_type() {
+    // A simple if/else where both branches return isize literals — this
+    // is a return-type context test, not related to loop accumulators.
     common::typecheck_ok(
         r#"
         fn foo(b: bool) -> isize {
@@ -2809,14 +2810,19 @@ fn explicit_cast_prevents_literal_inference() {
 }
 
 #[test]
-fn constant_propagated_variable_adopts_binding_type() {
-    // A variable initialized with a literal is constant-propagated to the
-    // literal, which then adopts the annotation of the enclosing binding.
-    common::typecheck_ok(
+fn constant_propagated_variable_preserves_annotated_type() {
+    // Constant propagation must not erase the explicit `i64` annotation on
+    // `x`. Assigning that binding to `isize` should still be a type mismatch
+    // unless an explicit cast is present.
+    let errs = common::typecheck_errors(
         r#"
         let x: i64 = 5;
         let y: isize = x;
         "#,
+    );
+    assert!(
+        !errs.is_empty(),
+        "Expected type mismatch: constant propagation must not coerce annotated i64 to isize"
     );
 }
 
