@@ -101,14 +101,18 @@ impl TypeChecker {
         let Some(hir_id) = Self::local_binding_hir_id(pat) else {
             return;
         };
-        let Some(seed_ty) = self
+        // Guard: if there is no active seed for this binding, do nothing.
+        // The annotation field must stay Unknown when the user wrote no
+        // explicit type so that inlay hints can detect unannotated bindings.
+        // The seed type is propagated to the binding via
+        // `seed_local_inference_literal_expr` (for literal initialisers) and
+        // through the `expr_ty_kind` path in `binding_ty` computation.
+        let Some(_seed_ty) = self
             .current_local_inference_scope()
             .and_then(|scope| scope.seed_type_for_binding(hir_id))
         else {
             return;
         };
-
-        ty.kind = seed_ty;
     }
 
     fn seed_local_inference_literal_expr(&self, pat: &hir::Pat, expr: &mut hir::Expr) {
@@ -166,17 +170,17 @@ impl TypeChecker {
     fn typecheck_executable_block(
         &mut self,
         block: &mut hir::Block,
-        expected_return: Option<TyKind>,
+        expected_return: Option<&TyKind>,
         error_checkpoint: usize,
     ) {
         let scope = LocalInferenceScope::collect(block, &mut self.local_type_var_id_allocator);
         let has_candidates = !scope.is_empty();
         self.local_inference_scopes.push(scope);
 
-        if let Some(expected_return) = expected_return.as_ref()
+        if let Some(ret_ty) = expected_return
             && let Some(expr) = &mut block.expr
         {
-            self.apply_expected_expr_type(expr, expected_return);
+            self.apply_expected_expr_type(expr, ret_ty);
         }
         self.visit_block(block, &mut ());
 
@@ -189,8 +193,7 @@ impl TypeChecker {
             return;
         }
 
-        let local_inference_error = if let Err(error) = scope.solve(block, expected_return.as_ref())
-        {
+        let local_inference_error = if let Err(error) = scope.solve(block, expected_return) {
             scope.fallback_to_defaults();
             Some(error)
         } else {
@@ -204,10 +207,10 @@ impl TypeChecker {
 
         Self::reset_block_expr_types(block);
         self.local_inference_scopes.push(scope);
-        if let Some(expected_return) = expected_return.as_ref()
+        if let Some(ret_ty) = expected_return
             && let Some(expr) = &mut block.expr
         {
-            self.apply_expected_expr_type(expr, expected_return);
+            self.apply_expected_expr_type(expr, ret_ty);
         }
         self.visit_block(block, &mut ());
         self.local_inference_scopes
@@ -2888,8 +2891,8 @@ impl TypeChecker {
         self.return_type_stack.push(decl.return_type.kind.clone());
         self.observed_return_types.push(Vec::new());
         let error_checkpoint = self.errors.len();
-        let expected_return = (!matches!(decl.return_type.kind, TyKind::Unknown))
-            .then_some(decl.return_type.kind.clone());
+        let expected_return =
+            (!matches!(decl.return_type.kind, TyKind::Unknown)).then_some(&decl.return_type.kind);
         self.typecheck_executable_block(&mut decl.body, expected_return, error_checkpoint);
         self.recheck_body_with_provisional_return(decl, error_checkpoint);
         self.flush_local_inference_errors();
@@ -2971,8 +2974,8 @@ impl TypeChecker {
         self.return_type_stack.push(decl.return_type.kind.clone());
         self.observed_return_types.push(Vec::new());
         let error_checkpoint = self.errors.len();
-        let expected_return = (!matches!(decl.return_type.kind, TyKind::Unknown))
-            .then_some(decl.return_type.kind.clone());
+        let expected_return =
+            (!matches!(decl.return_type.kind, TyKind::Unknown)).then_some(&decl.return_type.kind);
         self.typecheck_executable_block(&mut decl.body, expected_return, error_checkpoint);
         self.recheck_body_with_provisional_return(decl, error_checkpoint);
         self.flush_local_inference_errors();

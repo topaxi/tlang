@@ -45,13 +45,13 @@ pub(crate) struct LocalInferenceScope {
 #[derive(Debug, Clone)]
 pub(crate) enum LocalInferenceError {
     Conflict {
-        expected: TyKind,
-        actual: TyKind,
+        expected: Box<TyKind>,
+        actual: Box<TyKind>,
         span: Span,
     },
     InfiniteType {
         type_var: TypeVarId,
-        ty: TyKind,
+        ty: Box<TyKind>,
         span: Span,
     },
 }
@@ -463,6 +463,7 @@ impl LocalInferenceScope {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn collect_expr_widening_hints(
         &self,
         expr: &hir::Expr,
@@ -757,8 +758,8 @@ impl LocalInferenceScope {
     fn map_unification_error(&self, err: UnificationError, span: Span) -> LocalInferenceError {
         match err {
             UnificationError::Conflict { left, right } => LocalInferenceError::Conflict {
-                expected: *left,
-                actual: *right,
+                expected: left,
+                actual: right,
                 span,
             },
             UnificationError::OccursCheck(occurs) => {
@@ -770,7 +771,7 @@ impl LocalInferenceScope {
                     .unwrap_or(span);
                 LocalInferenceError::InfiniteType {
                     type_var: occurs.var,
-                    ty: occurs.ty,
+                    ty: Box::new(occurs.ty),
                     span,
                 }
             }
