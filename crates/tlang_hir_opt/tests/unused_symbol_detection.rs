@@ -5,9 +5,9 @@ use tlang_hir_opt::unused_symbol_detection::UnusedSymbolDetector;
 
 mod common;
 
-/// Compile source, run optimizer + type checker + UnusedSymbolDetector, and
-/// return the diagnostics produced by the detection pass (previous pass
-/// diagnostics are cleared before running the detector).
+/// Compile source, optimize HIR, run the type checker, then run
+/// `UnusedSymbolDetector`, returning the detector diagnostics after clearing
+/// diagnostics from earlier phases.
 fn run_detection(source: &str) -> Vec<tlang_diagnostics::Diagnostic> {
     let (mut module, meta) = common::compile(source);
     let mut ctx: HirOptContext = meta.into();

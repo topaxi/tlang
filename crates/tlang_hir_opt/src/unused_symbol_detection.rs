@@ -63,7 +63,7 @@ impl UnusedSymbolDetector {
     /// struct/enum path.
     fn type_name_from_ty(ty: &hir::TyKind) -> Option<String> {
         match ty {
-            hir::TyKind::Path(path) => Some(path.to_string()),
+            hir::TyKind::Path(path, _) => Some(path.to_string()),
             _ => None,
         }
     }
@@ -227,10 +227,11 @@ fn is_type_dependent_symbol(symbol: &tlang_defs::Def) -> bool {
         || symbol.name.contains('.')
 }
 
-/// Returns `true` if the symbol's "local" name part starts with `_`.
+/// Returns `true` if the symbol's effective local/member name starts with `_`.
 ///
-/// For qualified names like `Point::_internal`, we check the part after the
-/// last `::`. For dot-method names like `Vector._debug`, we check after `.`.
+/// For qualified names like `Point::_internal`, this checks the segment after
+/// the last `::`. For dot-member names like `Vector._debug`, it checks the
+/// segment after the final `.`.
 fn has_underscore_prefix(name: &str) -> bool {
     let local_name = name
         .rsplit_once("::")
