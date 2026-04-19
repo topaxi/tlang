@@ -6,6 +6,28 @@ use tlang_span::{HirId, Span, TypeVarId, TypeVarIdAllocator};
 
 use crate::unification::{UnificationError, UnificationTable};
 
+/// Compute the coerced (widened) result type for an arithmetic operation between two
+/// numeric primitive types, matching the main type-checker's `coerced_numeric_result`
+/// semantics.
+fn coerced_numeric_result(lhs: PrimTy, rhs: PrimTy) -> Option<PrimTy> {
+    if !lhs.is_numeric() || !rhs.is_numeric() {
+        return None;
+    }
+    if lhs == rhs {
+        return Some(lhs);
+    }
+    if lhs.is_float() || rhs.is_float() {
+        return Some(PrimTy::F64);
+    }
+    if lhs.is_signed_integer() && rhs.is_signed_integer() {
+        return Some(PrimTy::I64);
+    }
+    if lhs.is_unsigned_integer() && rhs.is_unsigned_integer() {
+        return Some(PrimTy::U64);
+    }
+    Some(PrimTy::F64)
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct LocalBindingSeed {
     pub(crate) type_var_id: TypeVarId,
@@ -69,7 +91,20 @@ impl LocalInferenceScope {
             table.register(seed.type_var_id);
         }
 
+        // Collect arithmetic widening hints in a separate pass to avoid spurious
+        // conflicts from equality-style unification of mixed numeric operands.
+        // These are applied *after* equality constraints so explicit annotations
+        // and assignment constraints take priority.
+        let widening_hints = self.collect_block_widening_hints(block);
+
         self.collect_block_constraints(block, expected_return, &mut table)?;
+
+        // Apply widening hints collected from arithmetic operations. Suppress
+        // conflicts: if a var is already bound by an explicit annotation or
+        // assignment, the annotation wins.
+        for (&var_id, &prim) in &widening_hints {
+            let _ = table.unify_var_ty(var_id, &TyKind::Primitive(prim));
+        }
 
         self.solved_by_binding.clear();
         for (&binding_hir_id, seed) in &self.seeds_by_binding {
@@ -228,7 +263,7 @@ impl LocalInferenceScope {
         table: &mut UnificationTable,
     ) -> Result<(), LocalInferenceError> {
         for stmt in &block.stmts {
-            self.collect_stmt_constraints(stmt, table)?;
+            self.collect_stmt_constraints(stmt, expected_return, table)?;
         }
 
         if let Some(expr) = &block.expr {
@@ -244,6 +279,7 @@ impl LocalInferenceScope {
     fn collect_stmt_constraints(
         &self,
         stmt: &hir::Stmt,
+        expected_return: Option<&TyKind>,
         table: &mut UnificationTable,
     ) -> Result<(), LocalInferenceError> {
         match &stmt.kind {
@@ -260,7 +296,12 @@ impl LocalInferenceScope {
                 self.constrain_expr_to_type(expr, &ty.kind, stmt.span, table)?;
             }
             hir::StmtKind::Expr(expr) => self.collect_expr_constraints(expr, table)?,
-            hir::StmtKind::Return(Some(expr)) => self.collect_expr_constraints(expr, table)?,
+            hir::StmtKind::Return(Some(expr)) => {
+                self.collect_expr_constraints(expr, table)?;
+                if let Some(ret_ty) = expected_return {
+                    self.constrain_expr_to_type(expr, ret_ty, expr.span, table)?;
+                }
+            }
             hir::StmtKind::FunctionDeclaration(_)
             | hir::StmtKind::DynFunctionDeclaration(_)
             | hir::StmtKind::EnumDeclaration(_)
@@ -323,14 +364,16 @@ impl LocalInferenceScope {
                             self.constrain_local_from_completions(var, rhs, expr.span, table)?;
                         }
                     }
+                    // Arithmetic ops are handled via widening hints (see
+                    // collect_block_widening_hints), not direct equality unification,
+                    // to avoid spurious conflicts when mixed numeric types appear in
+                    // the same expression (e.g. i64 + f64 → f64).
                     BinaryOpKind::Add
                     | BinaryOpKind::Sub
                     | BinaryOpKind::Mul
                     | BinaryOpKind::Div
                     | BinaryOpKind::Mod
-                    | BinaryOpKind::Exp => {
-                        self.constrain_numeric_pair(lhs, rhs, expr.span, table)?;
-                    }
+                    | BinaryOpKind::Exp => {}
                     _ => {}
                 }
             }
@@ -377,28 +420,227 @@ impl LocalInferenceScope {
         Ok(())
     }
 
-    fn constrain_numeric_pair(
+    /// Collect widening hints for arithmetic binary operations in a block.
+    ///
+    /// For each seeded local var that appears as an operand in an arithmetic op
+    /// (`+`, `-`, `*`, `/`, `%`, `**`), we record the coerced (widened) numeric
+    /// result type based on the var's default type and the other operand's
+    /// concrete type.  Widening is monotone: if the same var appears in multiple
+    /// arithmetic ops, we keep the widest seen type.
+    ///
+    /// These hints are applied *after* equality constraints so that explicit
+    /// annotations always take priority.
+    fn collect_block_widening_hints(&self, block: &hir::Block) -> HashMap<TypeVarId, PrimTy> {
+        let mut hints = HashMap::new();
+        for stmt in &block.stmts {
+            self.collect_stmt_widening_hints(stmt, &mut hints);
+        }
+        if let Some(expr) = &block.expr {
+            self.collect_expr_widening_hints(expr, &mut hints);
+        }
+        hints
+    }
+
+    fn collect_stmt_widening_hints(
+        &self,
+        stmt: &hir::Stmt,
+        hints: &mut HashMap<TypeVarId, PrimTy>,
+    ) {
+        match &stmt.kind {
+            hir::StmtKind::Let(_, expr, _) | hir::StmtKind::Const(_, _, expr, _) => {
+                self.collect_expr_widening_hints(expr, hints);
+            }
+            hir::StmtKind::Expr(expr) | hir::StmtKind::Return(Some(expr)) => {
+                self.collect_expr_widening_hints(expr, hints);
+            }
+            hir::StmtKind::FunctionDeclaration(_)
+            | hir::StmtKind::DynFunctionDeclaration(_)
+            | hir::StmtKind::EnumDeclaration(_)
+            | hir::StmtKind::StructDeclaration(_)
+            | hir::StmtKind::ProtocolDeclaration(_)
+            | hir::StmtKind::ImplBlock(_)
+            | hir::StmtKind::Return(None) => {}
+        }
+    }
+
+    fn collect_expr_widening_hints(
+        &self,
+        expr: &hir::Expr,
+        hints: &mut HashMap<TypeVarId, PrimTy>,
+    ) {
+        match &expr.kind {
+            hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
+                for stmt in &block.stmts {
+                    self.collect_stmt_widening_hints(stmt, hints);
+                }
+                if let Some(inner) = &block.expr {
+                    self.collect_expr_widening_hints(inner, hints);
+                }
+            }
+            hir::ExprKind::IfElse(condition, then_block, else_clauses) => {
+                self.collect_expr_widening_hints(condition, hints);
+                for stmt in &then_block.stmts {
+                    self.collect_stmt_widening_hints(stmt, hints);
+                }
+                if let Some(inner) = &then_block.expr {
+                    self.collect_expr_widening_hints(inner, hints);
+                }
+                for clause in else_clauses {
+                    if let Some(cond) = &clause.condition {
+                        self.collect_expr_widening_hints(cond, hints);
+                    }
+                    for stmt in &clause.consequence.stmts {
+                        self.collect_stmt_widening_hints(stmt, hints);
+                    }
+                    if let Some(inner) = &clause.consequence.expr {
+                        self.collect_expr_widening_hints(inner, hints);
+                    }
+                }
+            }
+            hir::ExprKind::Match(scrutinee, arms) => {
+                self.collect_expr_widening_hints(scrutinee, hints);
+                for arm in arms {
+                    if let Some(guard) = &arm.guard {
+                        self.collect_expr_widening_hints(guard, hints);
+                    }
+                    for stmt in &arm.block.stmts {
+                        self.collect_stmt_widening_hints(stmt, hints);
+                    }
+                    if let Some(inner) = &arm.block.expr {
+                        self.collect_expr_widening_hints(inner, hints);
+                    }
+                }
+            }
+            hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
+                self.collect_expr_widening_hints(&call.callee, hints);
+                for arg in &call.arguments {
+                    self.collect_expr_widening_hints(arg, hints);
+                }
+            }
+            hir::ExprKind::Binary(op, lhs, rhs) => {
+                self.collect_expr_widening_hints(lhs, hints);
+                self.collect_expr_widening_hints(rhs, hints);
+
+                if matches!(
+                    op,
+                    BinaryOpKind::Add
+                        | BinaryOpKind::Sub
+                        | BinaryOpKind::Mul
+                        | BinaryOpKind::Div
+                        | BinaryOpKind::Mod
+                        | BinaryOpKind::Exp
+                ) {
+                    self.accumulate_numeric_widening_from_pair(lhs, rhs, hints);
+                }
+            }
+            hir::ExprKind::Unary(_, operand)
+            | hir::ExprKind::Cast(operand, _)
+            | hir::ExprKind::TryCast(operand, _)
+            | hir::ExprKind::Break(Some(operand))
+            | hir::ExprKind::FieldAccess(operand, _)
+            | hir::ExprKind::Implements(operand, _)
+            | hir::ExprKind::Let(_, operand) => self.collect_expr_widening_hints(operand, hints),
+            hir::ExprKind::IndexAccess(base, index) => {
+                self.collect_expr_widening_hints(base, hints);
+                self.collect_expr_widening_hints(index, hints);
+            }
+            hir::ExprKind::Range(range) => {
+                self.collect_expr_widening_hints(&range.start, hints);
+                self.collect_expr_widening_hints(&range.end, hints);
+            }
+            hir::ExprKind::List(elements) => {
+                for element in elements {
+                    self.collect_expr_widening_hints(element, hints);
+                }
+            }
+            hir::ExprKind::Dict(entries) => {
+                for (key, value) in entries {
+                    self.collect_expr_widening_hints(key, hints);
+                    self.collect_expr_widening_hints(value, hints);
+                }
+            }
+            hir::ExprKind::TaggedString { tag, exprs, .. } => {
+                self.collect_expr_widening_hints(tag, hints);
+                for expr in exprs {
+                    self.collect_expr_widening_hints(expr, hints);
+                }
+            }
+            hir::ExprKind::FunctionExpression(_)
+            | hir::ExprKind::Break(None)
+            | hir::ExprKind::Continue
+            | hir::ExprKind::Literal(_)
+            | hir::ExprKind::Path(_)
+            | hir::ExprKind::Wildcard => {}
+        }
+    }
+
+    /// For an arithmetic pair `lhs op rhs`, if one side is a seeded local var and
+    /// the other is a concrete numeric primitive, update the widening hints map to
+    /// reflect the coerced (widened) result type.
+    fn accumulate_numeric_widening_from_pair(
         &self,
         lhs: &hir::Expr,
         rhs: &hir::Expr,
-        span: Span,
-        table: &mut UnificationTable,
-    ) -> Result<(), LocalInferenceError> {
+        hints: &mut HashMap<TypeVarId, PrimTy>,
+    ) {
         let lhs_var = self.local_var_from_expr(lhs);
         let rhs_var = self.local_var_from_expr(rhs);
 
         if let Some(lhs_var) = lhs_var {
-            self.unify_local_with_expr_ty(lhs_var, &rhs.ty.kind, span, table)?;
+            self.accumulate_widening_hint(lhs_var, &rhs.ty.kind, hints);
         }
         if let Some(rhs_var) = rhs_var {
-            self.unify_local_with_expr_ty(rhs_var, &lhs.ty.kind, span, table)?;
+            self.accumulate_widening_hint(rhs_var, &lhs.ty.kind, hints);
         }
 
+        // When both operands are seeded local vars, link them so they share the
+        // same widening class: whichever gets a concrete hint from another use
+        // will propagate the widening to the other.
         if let (Some(lhs_var), Some(rhs_var)) = (lhs_var, rhs_var) {
-            self.unify_local_vars(lhs_var, rhs_var, span, table)?;
+            let lhs_hint = hints.get(&lhs_var).copied();
+            let rhs_hint = hints.get(&rhs_var).copied();
+            match (lhs_hint, rhs_hint) {
+                (Some(lp), Some(rp)) => {
+                    if let Some(widened) = coerced_numeric_result(lp, rp) {
+                        hints.insert(lhs_var, widened);
+                        hints.insert(rhs_var, widened);
+                    }
+                }
+                (Some(lp), None) => {
+                    hints.insert(rhs_var, lp);
+                }
+                (None, Some(rp)) => {
+                    hints.insert(lhs_var, rp);
+                }
+                (None, None) => {}
+            }
+        }
+    }
+
+    /// Compute the coerced numeric type for `local_var op other_ty` using the
+    /// var's seed default type and update the widening hints map monotonically
+    /// (only ever widening, never narrowing).
+    fn accumulate_widening_hint(
+        &self,
+        local_var: TypeVarId,
+        other_ty: &TyKind,
+        hints: &mut HashMap<TypeVarId, PrimTy>,
+    ) {
+        let TyKind::Primitive(other_prim) = other_ty else {
+            return;
+        };
+        if !other_prim.is_numeric() {
+            return;
         }
 
-        Ok(())
+        // Use the other operand's concrete type as the hint, widening
+        // monotonically across multiple arithmetic uses of the same var.
+        // Widening via coerced_numeric_result ensures that if the same var
+        // is used with both i64 and f64, the hint becomes f64 (no conflict).
+        let entry = hints.entry(local_var).or_insert(*other_prim);
+        if let Some(widened) = coerced_numeric_result(*entry, *other_prim) {
+            *entry = widened;
+        }
     }
 
     fn constrain_expr_to_type(

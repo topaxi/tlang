@@ -2897,3 +2897,37 @@ fn binding_type_mismatch_i64_vs_string() {
     );
     assert!(!errs.is_empty(), "Expected error for String into i64");
 }
+
+#[test]
+fn return_stmt_constrains_local_numeric_binding() {
+    // A `return <expr>` statement should inform local inference the same way
+    // as a tail expression — the return type annotation constrains seeded locals.
+    common::typecheck_ok(
+        r#"
+        fn takes_isize(x: isize) -> isize { x }
+
+        fn make_isize() -> isize {
+            let acc = 0;
+            acc = takes_isize(42);
+            return acc;
+        }
+        "#,
+    );
+}
+
+#[test]
+fn mixed_numeric_arithmetic_no_spurious_conflict() {
+    // A seeded local used in arithmetic with both an i64 and an f64 operand
+    // should resolve to f64 (the widened type) without a spurious conflict.
+    common::typecheck_ok(
+        r#"
+        fn get_i64() -> i64 { 1 }
+        fn get_f64() -> f64 { 1.5 }
+
+        let x = 0;
+        let _a = x + get_i64();
+        let _b = x + get_f64();
+        let _: f64 = _b;
+        "#,
+    );
+}
