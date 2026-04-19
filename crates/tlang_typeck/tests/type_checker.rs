@@ -2718,6 +2718,50 @@ fn loop_accumulator_unannotated_infers_type_from_iterator_item() {
 }
 
 #[test]
+fn manual_loop_local_numeric_binding_infers_from_iterator_usage() {
+    common::typecheck_ok(
+        r#"
+        enum Tree {
+            Empty,
+            Node { value: isize, left: Tree, right: Tree },
+        }
+
+        impl Iterable<isize> for Tree {
+            fn iter(self) {
+                Iterable::iter([])
+            }
+        }
+
+        let tree = Tree::Empty;
+        let iterator = Iterable::iter(tree);
+        let total = {
+            let sum = 0;
+            loop {
+                match Iterator::next(iterator) {
+                    Option::Some(x) => sum = sum + x,
+                    Option::None => break sum,
+                }
+            }
+        };
+        let _: isize = total;
+        "#,
+    );
+}
+
+#[test]
+fn local_numeric_binding_infers_from_later_assignment() {
+    common::typecheck_ok(
+        r#"
+        fn takes_isize(x: isize) -> isize { x }
+
+        let value = 0;
+        value = takes_isize(42);
+        let _: isize = value;
+        "#,
+    );
+}
+
+#[test]
 fn branch_literal_infers_from_function_return_type() {
     common::typecheck_ok(
         r#"
@@ -2852,4 +2896,38 @@ fn binding_type_mismatch_i64_vs_string() {
         "#,
     );
     assert!(!errs.is_empty(), "Expected error for String into i64");
+}
+
+#[test]
+fn return_stmt_constrains_local_numeric_binding() {
+    // A `return <expr>` statement should inform local inference the same way
+    // as a tail expression — the return type annotation constrains seeded locals.
+    common::typecheck_ok(
+        r#"
+        fn takes_isize(x: isize) -> isize { x }
+
+        fn make_isize() -> isize {
+            let acc = 0;
+            acc = takes_isize(42);
+            return acc;
+        }
+        "#,
+    );
+}
+
+#[test]
+fn mixed_numeric_arithmetic_no_spurious_conflict() {
+    // A seeded local used in arithmetic with both an i64 and an f64 operand
+    // should resolve to f64 (the widened type) without a spurious conflict.
+    common::typecheck_ok(
+        r#"
+        fn get_i64() -> i64 { 1 }
+        fn get_f64() -> f64 { 1.5 }
+
+        let x = 0;
+        let _a = x + get_i64();
+        let _b = x + get_f64();
+        let _: f64 = _b;
+        "#,
+    );
 }

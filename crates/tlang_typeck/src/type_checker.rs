@@ -3,15 +3,16 @@ use std::collections::HashMap;
 use tlang_ast::node::UnaryOp;
 use tlang_ast::token::Literal;
 use tlang_hir::Visitor;
-use tlang_hir::visit::{walk_block, walk_expr, walk_module, walk_stmt};
+use tlang_hir::visit::{walk_block, walk_expr, walk_stmt};
 use tlang_hir::{self as hir, BinaryOpKind, PrimTy, Ty, TyKind};
 use tlang_hir_opt::hir_opt::{HirOptContext, HirOptError, HirPass};
-use tlang_span::TypeVarId;
+use tlang_span::{TypeVarId, TypeVarIdAllocator};
 
 use crate::builtin_methods;
 use crate::builtin_protocols;
 use crate::builtin_types;
 use crate::builtins;
+use crate::local_inference::{LocalInferenceError, LocalInferenceScope};
 use crate::type_table::{
     AssociatedTypeInfo, EnumInfo, ImplInfo, ProtocolInfo, ProtocolMethodInfo, StructInfo,
     VariantInfo,
@@ -44,21 +45,26 @@ pub struct TypeChecker {
     dot_methods: HashMap<String, tlang_span::HirId>,
     /// Synthetic for-loop iterator bindings keyed by the lowered iterator local.
     iterator_item_types: HashMap<tlang_span::HirId, TyKind>,
-    /// The item type of the most recently visited for-loop iterator binding.
-    ///
-    /// Set by `record_iterator_binding_item_type` when processing a
-    /// `let iterator$$` statement.  Consumed once by the immediately following
-    /// `let accumulator$$` statement to enable contextual numeric literal
-    /// inference for unannotated loop accumulators (e.g. `with sum = 0`
-    /// infers `sum: isize` when the iterator yields `isize` items).
-    pending_accumulator_type: Option<TyKind>,
+    /// Allocator for checker-local type variables used by two-phase local
+    /// binding inference. Starts well above lowering/builtin ids to avoid
+    /// collisions with generic type parameter vars.
+    local_type_var_id_allocator: TypeVarIdAllocator,
+    /// Stack of active local inference scopes. One scope per executable body
+    /// (module body, function body, closure body).
+    local_inference_scopes: Vec<LocalInferenceScope>,
+    /// Local inference errors are deferred until the surrounding body finishes
+    /// any recheck cycle so provisional-return retries do not discard them.
+    pending_local_inference_errors: Vec<LocalInferenceError>,
 }
 
 impl TypeChecker {
     const MIN_PROTOCOL_PATH_SEGMENTS: usize = 2;
 
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            local_type_var_id_allocator: TypeVarIdAllocator::new(1_000_000),
+            ..Self::default()
+        }
     }
 
     fn current_context(&self) -> TypingContext {
@@ -66,6 +72,244 @@ impl TypeChecker {
             .last()
             .copied()
             .unwrap_or(TypingContext::Permissive)
+    }
+
+    fn current_local_inference_scope(&self) -> Option<&LocalInferenceScope> {
+        self.local_inference_scopes.last()
+    }
+
+    fn local_binding_hir_id(pat: &hir::Pat) -> Option<tlang_span::HirId> {
+        match &pat.kind {
+            hir::PatKind::Identifier(hir_id, _) => Some(*hir_id),
+            _ => None,
+        }
+    }
+
+    fn seed_local_inference_binding_type(&self, pat: &hir::Pat, ty: &mut Ty) {
+        if !matches!(ty.kind, TyKind::Unknown | TyKind::Var(_)) {
+            return;
+        }
+
+        let Some(hir_id) = Self::local_binding_hir_id(pat) else {
+            return;
+        };
+        // Guard: if there is no active seed for this binding, do nothing.
+        // The annotation field must stay Unknown when the user wrote no
+        // explicit type so that inlay hints can detect unannotated bindings.
+        // The seed type is propagated to the binding via
+        // `seed_local_inference_literal_expr` (for literal initialisers) and
+        // through the `expr_ty_kind` path in `binding_ty` computation.
+        let Some(_seed_ty) = self
+            .current_local_inference_scope()
+            .and_then(|scope| scope.seed_type_for_binding(hir_id))
+        else {
+            return;
+        };
+    }
+
+    fn seed_local_inference_literal_expr(&self, pat: &hir::Pat, expr: &mut hir::Expr) {
+        let Some(hir_id) = Self::local_binding_hir_id(pat) else {
+            return;
+        };
+        let Some(seed_ty) = self
+            .current_local_inference_scope()
+            .and_then(|scope| scope.seed_type_for_binding(hir_id))
+        else {
+            return;
+        };
+
+        if matches!(
+            expr.kind,
+            hir::ExprKind::Literal(_)
+                if matches!(expr.ty.kind, TyKind::Unknown | TyKind::Var(_))
+                    || matches!(
+                        expr.ty.kind,
+                        TyKind::Primitive(PrimTy::I64) | TyKind::Primitive(PrimTy::F64)
+                    )
+        ) {
+            expr.ty.kind = seed_ty;
+        }
+    }
+
+    fn report_local_inference_error(&mut self, error: LocalInferenceError) {
+        match error {
+            LocalInferenceError::Conflict {
+                expected,
+                actual,
+                span,
+            } => self.errors.push(TypeError::BindingTypeMismatch {
+                declared: expected.to_string(),
+                actual: actual.to_string(),
+                span,
+            }),
+            LocalInferenceError::InfiniteType { type_var, ty, span } => {
+                self.errors.push(TypeError::InfiniteType {
+                    type_param: type_var.to_string(),
+                    ty: ty.to_string(),
+                    span,
+                });
+            }
+        }
+    }
+
+    fn flush_local_inference_errors(&mut self) {
+        let pending = std::mem::take(&mut self.pending_local_inference_errors);
+        for error in pending {
+            self.report_local_inference_error(error);
+        }
+    }
+
+    fn typecheck_executable_block(
+        &mut self,
+        block: &mut hir::Block,
+        expected_return: Option<&TyKind>,
+        error_checkpoint: usize,
+    ) {
+        let scope = LocalInferenceScope::collect(block, &mut self.local_type_var_id_allocator);
+        let has_candidates = !scope.is_empty();
+        self.local_inference_scopes.push(scope);
+
+        if let Some(ret_ty) = expected_return
+            && let Some(expr) = &mut block.expr
+        {
+            self.apply_expected_expr_type(expr, ret_ty);
+        }
+        self.visit_block(block, &mut ());
+
+        let mut scope = self
+            .local_inference_scopes
+            .pop()
+            .expect("local inference scope should be active for executable block");
+
+        if !has_candidates {
+            return;
+        }
+
+        let local_inference_error = if let Err(error) = scope.solve(block, expected_return) {
+            scope.fallback_to_defaults();
+            Some(error)
+        } else {
+            None
+        };
+
+        self.errors.truncate(error_checkpoint);
+        if let Some(observed) = self.observed_return_types.last_mut() {
+            observed.clear();
+        }
+
+        Self::reset_block_expr_types(block);
+        self.local_inference_scopes.push(scope);
+        if let Some(ret_ty) = expected_return
+            && let Some(expr) = &mut block.expr
+        {
+            self.apply_expected_expr_type(expr, ret_ty);
+        }
+        self.visit_block(block, &mut ());
+        self.local_inference_scopes
+            .pop()
+            .expect("local inference scope should still be active on second pass");
+
+        if let Some(error) = local_inference_error {
+            self.pending_local_inference_errors.push(error);
+        }
+    }
+
+    fn reset_block_expr_types(block: &mut hir::Block) {
+        for stmt in &mut block.stmts {
+            Self::reset_stmt_expr_types(stmt);
+        }
+        if let Some(expr) = &mut block.expr {
+            Self::reset_expr_type(expr);
+        }
+    }
+
+    fn reset_stmt_expr_types(stmt: &mut hir::Stmt) {
+        match &mut stmt.kind {
+            hir::StmtKind::Let(_, expr, _)
+            | hir::StmtKind::Const(_, _, expr, _)
+            | hir::StmtKind::Expr(expr)
+            | hir::StmtKind::Return(Some(expr)) => Self::reset_expr_type(expr),
+            hir::StmtKind::FunctionDeclaration(_)
+            | hir::StmtKind::DynFunctionDeclaration(_)
+            | hir::StmtKind::EnumDeclaration(_)
+            | hir::StmtKind::StructDeclaration(_)
+            | hir::StmtKind::ProtocolDeclaration(_)
+            | hir::StmtKind::ImplBlock(_)
+            | hir::StmtKind::Return(None) => {}
+        }
+    }
+
+    fn reset_expr_type(expr: &mut hir::Expr) {
+        expr.ty = Ty::unknown();
+
+        match &mut expr.kind {
+            hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
+                Self::reset_block_expr_types(block);
+            }
+            hir::ExprKind::Break(Some(value))
+            | hir::ExprKind::Unary(_, value)
+            | hir::ExprKind::Cast(value, _)
+            | hir::ExprKind::TryCast(value, _)
+            | hir::ExprKind::FieldAccess(value, _)
+            | hir::ExprKind::Implements(value, _)
+            | hir::ExprKind::Let(_, value) => Self::reset_expr_type(value),
+            hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
+                Self::reset_expr_type(&mut call.callee);
+                for arg in &mut call.arguments {
+                    Self::reset_expr_type(arg);
+                }
+            }
+            hir::ExprKind::Binary(_, lhs, rhs) | hir::ExprKind::IndexAccess(lhs, rhs) => {
+                Self::reset_expr_type(lhs);
+                Self::reset_expr_type(rhs);
+            }
+            hir::ExprKind::IfElse(condition, then_block, else_clauses) => {
+                Self::reset_expr_type(condition);
+                Self::reset_block_expr_types(then_block);
+                for clause in else_clauses {
+                    if let Some(condition) = &mut clause.condition {
+                        Self::reset_expr_type(condition);
+                    }
+                    Self::reset_block_expr_types(&mut clause.consequence);
+                }
+            }
+            hir::ExprKind::List(elements) => {
+                for element in elements {
+                    Self::reset_expr_type(element);
+                }
+            }
+            hir::ExprKind::Dict(entries) => {
+                for (key, value) in entries {
+                    Self::reset_expr_type(key);
+                    Self::reset_expr_type(value);
+                }
+            }
+            hir::ExprKind::Match(scrutinee, arms) => {
+                Self::reset_expr_type(scrutinee);
+                for arm in arms {
+                    if let Some(guard) = &mut arm.guard {
+                        Self::reset_expr_type(guard);
+                    }
+                    Self::reset_block_expr_types(&mut arm.block);
+                }
+            }
+            hir::ExprKind::Range(range) => {
+                Self::reset_expr_type(&mut range.start);
+                Self::reset_expr_type(&mut range.end);
+            }
+            hir::ExprKind::TaggedString { tag, exprs, .. } => {
+                Self::reset_expr_type(tag);
+                for expr in exprs {
+                    Self::reset_expr_type(expr);
+                }
+            }
+            hir::ExprKind::FunctionExpression(_)
+            | hir::ExprKind::Break(None)
+            | hir::ExprKind::Continue
+            | hir::ExprKind::Literal(_)
+            | hir::ExprKind::Path(_)
+            | hir::ExprKind::Wildcard => {}
+        }
     }
 
     fn iterable_item_type(&self, ty: &TyKind) -> Option<TyKind> {
@@ -87,12 +331,9 @@ impl TypeChecker {
     }
 
     fn record_iterator_binding_item_type(&mut self, pat: &hir::Pat, expr: &hir::Expr) {
-        let hir::PatKind::Identifier(hir_id, ident) = &pat.kind else {
+        let hir::PatKind::Identifier(hir_id, _) = &pat.kind else {
             return;
         };
-        if ident.as_str() != "iterator$$" {
-            return;
-        }
         let hir::ExprKind::Call(call) = &expr.kind else {
             return;
         };
@@ -103,10 +344,7 @@ impl TypeChecker {
             return;
         }
         if let Some(item_ty) = self.iterable_item_type(&call.arguments[0].ty.kind) {
-            self.iterator_item_types.insert(*hir_id, item_ty.clone());
-            // Store as pending so the next `let accumulator$$` binding can
-            // adopt this type when the accumulator has no outer annotation.
-            self.pending_accumulator_type = Some(item_ty);
+            self.iterator_item_types.insert(*hir_id, item_ty);
         }
     }
 
@@ -2485,7 +2723,7 @@ impl TypeChecker {
     fn apply_expected_loop_accumulator_type(&mut self, block: &mut hir::Block, expected: &TyKind) {
         fn can_refine_from_expected(kind: &TyKind) -> bool {
             match kind {
-                TyKind::Unknown => true,
+                TyKind::Unknown | TyKind::Var(_) => true,
                 TyKind::List(inner) | TyKind::Slice(inner) => matches!(inner.kind, TyKind::Unknown),
                 TyKind::Dict(key, value) => {
                     matches!(key.kind, TyKind::Unknown) && matches!(value.kind, TyKind::Unknown)
@@ -2536,7 +2774,7 @@ impl TypeChecker {
                 // binding by constant propagation — its type is already concrete
                 // and must be respected (e.g. `let x: i64 = 5; let y: isize = x`
                 // should remain a type mismatch, not silently coerce `5` to `isize`).
-                if !matches!(expr.ty.kind, TyKind::Unknown) {
+                if !matches!(expr.ty.kind, TyKind::Unknown | TyKind::Var(_)) {
                     return;
                 }
                 if matches!(
@@ -2640,13 +2878,11 @@ impl TypeChecker {
         self.return_type_stack.push(decl.return_type.kind.clone());
         self.observed_return_types.push(Vec::new());
         let error_checkpoint = self.errors.len();
-        if !matches!(decl.return_type.kind, TyKind::Unknown)
-            && let Some(expr) = &mut decl.body.expr
-        {
-            self.apply_expected_expr_type(expr, &decl.return_type.kind);
-        }
-        self.visit_block(&mut decl.body, &mut ());
+        let expected_return =
+            (!matches!(decl.return_type.kind, TyKind::Unknown)).then_some(&decl.return_type.kind);
+        self.typecheck_executable_block(&mut decl.body, expected_return, error_checkpoint);
         self.recheck_body_with_provisional_return(decl, error_checkpoint);
+        self.flush_local_inference_errors();
 
         // Check that the closure body type matches the declared return type.
         self.check_function_body_return(decl);
@@ -2725,13 +2961,11 @@ impl TypeChecker {
         self.return_type_stack.push(decl.return_type.kind.clone());
         self.observed_return_types.push(Vec::new());
         let error_checkpoint = self.errors.len();
-        if !matches!(decl.return_type.kind, TyKind::Unknown)
-            && let Some(expr) = &mut decl.body.expr
-        {
-            self.apply_expected_expr_type(expr, &decl.return_type.kind);
-        }
-        self.visit_block(&mut decl.body, &mut ());
+        let expected_return =
+            (!matches!(decl.return_type.kind, TyKind::Unknown)).then_some(&decl.return_type.kind);
+        self.typecheck_executable_block(&mut decl.body, expected_return, error_checkpoint);
         self.recheck_body_with_provisional_return(decl, error_checkpoint);
+        self.flush_local_inference_errors();
         self.check_function_body_return(decl);
 
         if matches!(decl.return_type.kind, TyKind::Unknown) {
@@ -2812,8 +3046,10 @@ impl HirPass for TypeChecker {
 // ── Visitor implementation ──────────────────────────────────────────────
 
 impl<'hir> Visitor<'hir> for TypeChecker {
-    fn visit_module(&mut self, module: &'hir mut hir::Module, ctx: &mut Self::Context) {
-        walk_module(self, module, ctx);
+    fn visit_module(&mut self, module: &'hir mut hir::Module, _ctx: &mut Self::Context) {
+        let error_checkpoint = self.errors.len();
+        self.typecheck_executable_block(&mut module.block, None, error_checkpoint);
+        self.flush_local_inference_errors();
     }
 
     fn visit_block(&mut self, block: &'hir mut hir::Block, ctx: &mut Self::Context) {
@@ -2824,46 +3060,8 @@ impl<'hir> Visitor<'hir> for TypeChecker {
     fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
         match &mut stmt.kind {
             hir::StmtKind::Let(pat, expr, ty) => {
-                // Contextual inference for unannotated loop accumulators:
-                // when a `let accumulator$$` binding has no explicit type
-                // annotation, try to adopt the iterator's item type so that
-                // bare numeric literals like `0` pick up the right numeric
-                // type without requiring an explicit cast (e.g. `with sum = 0`
-                // infers `sum: isize` when the iterator yields `isize` items).
-                let is_accumulator = matches!(
-                    &pat.kind,
-                    hir::PatKind::Identifier(_, ident) if ident.as_str() == "accumulator$$"
-                );
-                let is_iterator = matches!(
-                    &pat.kind,
-                    hir::PatKind::Identifier(_, ident) if ident.as_str() == "iterator$$"
-                );
-
-                if is_accumulator && matches!(ty.kind, TyKind::Unknown) {
-                    // Consume the pending iterator item type (set by the iterator$$
-                    // stmt immediately before this one).  Only apply it when the
-                    // item type is a numeric primitive AND the initial value is a
-                    // bare integer or float literal (not a cast, call, etc.) so
-                    // that explicit initialiser types are always respected.
-                    if let Some(item_ty) = self.pending_accumulator_type.take()
-                        && matches!(&item_ty, TyKind::Primitive(prim) if prim.is_numeric())
-                        && matches!(
-                            &expr.kind,
-                            hir::ExprKind::Literal(lit)
-                                if matches!(lit.as_ref(),
-                                    Literal::Integer(_)
-                                    | Literal::UnsignedInteger(_)
-                                    | Literal::Float(_))
-                        )
-                    {
-                        ty.kind = item_ty;
-                    }
-                } else if !is_iterator {
-                    // Clear pending accumulator type for any stmt that is neither
-                    // the iterator$$ nor the accumulator$$, preventing leakage to
-                    // unrelated bindings.
-                    self.pending_accumulator_type = None;
-                }
+                self.seed_local_inference_binding_type(pat, ty);
+                self.seed_local_inference_literal_expr(pat, expr);
 
                 if !matches!(ty.kind, TyKind::Unknown) {
                     self.apply_expected_expr_type(expr, &ty.kind);
@@ -2872,12 +3070,24 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 self.record_iterator_binding_item_type(pat, expr);
 
                 let expr_ty_kind = expr.ty.kind.clone();
+                // $anf$ temporaries are nil-initialized placeholders emitted by
+                // the ANF transform; skip the annotation type-check for them so
+                // that the nil init does not produce a spurious BindingTypeMismatch.
+                let is_anf_placeholder = matches!(
+                    &pat.kind,
+                    hir::PatKind::Identifier(_, ident)
+                        if ident.as_str().starts_with("$anf$")
+                );
 
                 // If there is an explicit annotation, check compatibility.
-                self.check_binding_type(ty, &expr_ty_kind, stmt.span);
+                if !(is_anf_placeholder && matches!(ty.kind, TyKind::Primitive(PrimTy::Nil))) {
+                    self.check_binding_type(ty, &expr_ty_kind, stmt.span);
+                }
 
                 // The binding's type is the annotation if present, else inferred.
-                let binding_ty = if matches!(ty.kind, TyKind::Unknown) {
+                let binding_ty = if matches!(ty.kind, TyKind::Unknown)
+                    || is_anf_placeholder && matches!(ty.kind, TyKind::Primitive(PrimTy::Nil))
+                {
                     expr_ty_kind
                 } else {
                     ty.kind.clone()
@@ -2887,6 +3097,8 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 pat.ty.kind = binding_ty;
             }
             hir::StmtKind::Const(_, pat, expr, ty) => {
+                self.seed_local_inference_binding_type(pat, ty);
+                self.seed_local_inference_literal_expr(pat, expr);
                 if !matches!(ty.kind, TyKind::Unknown) {
                     self.apply_expected_expr_type(expr, &ty.kind);
                 }
@@ -2969,6 +3181,11 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                             expr.ty.kind,
                             TyKind::Primitive(prim) if prim.is_numeric()
                         ) =>
+                    {
+                        expr.ty.kind.clone()
+                    }
+                    Literal::Integer(_) | Literal::UnsignedInteger(_) | Literal::Float(_)
+                        if matches!(expr.ty.kind, TyKind::Var(_)) =>
                     {
                         expr.ty.kind.clone()
                     }
