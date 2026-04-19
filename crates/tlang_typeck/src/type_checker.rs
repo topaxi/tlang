@@ -45,14 +45,6 @@ pub struct TypeChecker {
     dot_methods: HashMap<String, tlang_span::HirId>,
     /// Synthetic for-loop iterator bindings keyed by the lowered iterator local.
     iterator_item_types: HashMap<tlang_span::HirId, TyKind>,
-    /// The item type of the most recently visited for-loop iterator binding.
-    ///
-    /// Set by `record_iterator_binding_item_type` when processing a
-    /// `let iterator$$` statement.  Consumed once by the immediately following
-    /// `let accumulator$$` statement to enable contextual numeric literal
-    /// inference for unannotated loop accumulators (e.g. `with sum = 0`
-    /// infers `sum: isize` when the iterator yields `isize` items).
-    pending_accumulator_type: Option<TyKind>,
     /// Allocator for checker-local type variables used by two-phase local
     /// binding inference. Starts well above lowering/builtin ids to avoid
     /// collisions with generic type parameter vars.
@@ -339,7 +331,7 @@ impl TypeChecker {
     }
 
     fn record_iterator_binding_item_type(&mut self, pat: &hir::Pat, expr: &hir::Expr) {
-        let hir::PatKind::Identifier(hir_id, ident) = &pat.kind else {
+        let hir::PatKind::Identifier(hir_id, _) = &pat.kind else {
             return;
         };
         let hir::ExprKind::Call(call) = &expr.kind else {
@@ -352,12 +344,7 @@ impl TypeChecker {
             return;
         }
         if let Some(item_ty) = self.iterable_item_type(&call.arguments[0].ty.kind) {
-            self.iterator_item_types.insert(*hir_id, item_ty.clone());
-            if ident.as_str() == "iterator$$" {
-                // Store as pending so the next `let accumulator$$` binding can
-                // adopt this type when the accumulator has no outer annotation.
-                self.pending_accumulator_type = Some(item_ty);
-            }
+            self.iterator_item_types.insert(*hir_id, item_ty);
         }
     }
 
@@ -3075,46 +3062,6 @@ impl<'hir> Visitor<'hir> for TypeChecker {
             hir::StmtKind::Let(pat, expr, ty) => {
                 self.seed_local_inference_binding_type(pat, ty);
                 self.seed_local_inference_literal_expr(pat, expr);
-                // Contextual inference for unannotated loop accumulators:
-                // when a `let accumulator$$` binding has no explicit type
-                // annotation, try to adopt the iterator's item type so that
-                // bare numeric literals like `0` pick up the right numeric
-                // type without requiring an explicit cast (e.g. `with sum = 0`
-                // infers `sum: isize` when the iterator yields `isize` items).
-                let is_accumulator = matches!(
-                    &pat.kind,
-                    hir::PatKind::Identifier(_, ident) if ident.as_str() == "accumulator$$"
-                );
-                let is_iterator = matches!(
-                    &pat.kind,
-                    hir::PatKind::Identifier(_, ident) if ident.as_str() == "iterator$$"
-                );
-
-                if is_accumulator && matches!(ty.kind, TyKind::Unknown | TyKind::Var(_)) {
-                    // Consume the pending iterator item type (set by the iterator$$
-                    // stmt immediately before this one).  Only apply it when the
-                    // item type is a numeric primitive AND the initial value is a
-                    // bare integer or float literal (not a cast, call, etc.) so
-                    // that explicit initialiser types are always respected.
-                    if let Some(item_ty) = self.pending_accumulator_type.take()
-                        && matches!(&item_ty, TyKind::Primitive(prim) if prim.is_numeric())
-                        && matches!(
-                            &expr.kind,
-                            hir::ExprKind::Literal(lit)
-                                if matches!(lit.as_ref(),
-                                    Literal::Integer(_)
-                                    | Literal::UnsignedInteger(_)
-                                    | Literal::Float(_))
-                        )
-                    {
-                        ty.kind = item_ty;
-                    }
-                } else if !is_iterator {
-                    // Clear pending accumulator type for any stmt that is neither
-                    // the iterator$$ nor the accumulator$$, preventing leakage to
-                    // unrelated bindings.
-                    self.pending_accumulator_type = None;
-                }
 
                 if !matches!(ty.kind, TyKind::Unknown) {
                     self.apply_expected_expr_type(expr, &ty.kind);
@@ -3123,22 +3070,23 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 self.record_iterator_binding_item_type(pat, expr);
 
                 let expr_ty_kind = expr.ty.kind.clone();
-                let is_synthetic_placeholder = matches!(
+                // $anf$ temporaries are nil-initialized placeholders emitted by
+                // the ANF transform; skip the annotation type-check for them so
+                // that the nil init does not produce a spurious BindingTypeMismatch.
+                let is_anf_placeholder = matches!(
                     &pat.kind,
                     hir::PatKind::Identifier(_, ident)
                         if ident.as_str().starts_with("$anf$")
-                            || ident.as_str() == "accumulator$$"
                 );
 
                 // If there is an explicit annotation, check compatibility.
-                if !(is_synthetic_placeholder && matches!(ty.kind, TyKind::Primitive(PrimTy::Nil)))
-                {
+                if !(is_anf_placeholder && matches!(ty.kind, TyKind::Primitive(PrimTy::Nil))) {
                     self.check_binding_type(ty, &expr_ty_kind, stmt.span);
                 }
 
                 // The binding's type is the annotation if present, else inferred.
                 let binding_ty = if matches!(ty.kind, TyKind::Unknown)
-                    || is_synthetic_placeholder && matches!(ty.kind, TyKind::Primitive(PrimTy::Nil))
+                    || is_anf_placeholder && matches!(ty.kind, TyKind::Primitive(PrimTy::Nil))
                 {
                     expr_ty_kind
                 } else {
