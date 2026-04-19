@@ -25,6 +25,10 @@ fn coerced_numeric_result(lhs: PrimTy, rhs: PrimTy) -> Option<PrimTy> {
     if lhs.is_unsigned_integer() && rhs.is_unsigned_integer() {
         return Some(PrimTy::U64);
     }
+    // Reach of this fallback: mixed signed/unsigned integer arithmetic (e.g.
+    // i64 + u64).  The language does not have a dedicated "widest integer"
+    // type that covers both, so we conservatively widen to f64, matching the
+    // behaviour of the main type-checker's arithmetic coercion rules.
     Some(PrimTy::F64)
 }
 
@@ -99,9 +103,12 @@ impl LocalInferenceScope {
 
         self.collect_block_constraints(block, expected_return, &mut table)?;
 
-        // Apply widening hints collected from arithmetic operations. Suppress
-        // conflicts: if a var is already bound by an explicit annotation or
-        // assignment, the annotation wins.
+        // Apply widening hints collected from arithmetic operations. These hints
+        // represent the widest concrete numeric type seen as an operand to any
+        // arithmetic op involving the local var. Errors are suppressed: if a var
+        // is already bound by an explicit annotation or assignment constraint
+        // (collected in the earlier collect_block_constraints pass), that binding
+        // wins and the widening hint is simply ignored.
         for (&var_id, &prim) in &widening_hints {
             let _ = table.unify_var_ty(var_id, &TyKind::Primitive(prim));
         }
