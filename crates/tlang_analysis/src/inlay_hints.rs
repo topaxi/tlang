@@ -1830,13 +1830,19 @@ let total = for x in tree; with sum = 0 {
 };
 "#;
         let hints = hints_for(source);
+        // With contextual inference the accumulator `sum` adopts the
+        // iterator item type `isize`, so `sum + x` is `isize + isize =
+        // isize` and `total` inherits that type.
         let total_hint = hints.iter().find(|h| {
-            h.line == 13 && h.character == 9 && h.label == ": i64" && h.kind == InlayHintKind::Type
+            h.line == 13
+                && h.character == 9
+                && h.label == ": isize"
+                && h.kind == InlayHintKind::Type
         });
 
         assert!(
             total_hint.is_some(),
-            "expected the loop result binding `total` to get the coerced numeric type, got: {hints:?}"
+            "expected the loop result binding `total` to get the inferred iterator item type `isize`, got: {hints:?}"
         );
     }
 
