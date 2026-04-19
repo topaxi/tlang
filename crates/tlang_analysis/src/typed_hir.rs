@@ -8,7 +8,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
 use tlang_defs::DefScope;
+use tlang_diagnostics::Diagnostic;
 use tlang_hir as hir;
+use tlang_hir_opt::HirPass;
 use tlang_span::{HirId, NodeId};
 use tlang_typeck::TypeTable;
 use tlang_typeck::typecheck_module;
@@ -22,6 +24,9 @@ pub struct TypedHir {
     pub type_table: TypeTable,
     /// HirIds of `CallExpression` nodes that were desugared from `|>`.
     pub pipeline_call_ids: HashSet<HirId>,
+    /// Diagnostics (errors and warnings) produced by both the type checker
+    /// and post-type-check HIR passes (e.g. unused-symbol detection).
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 /// Run the full pipeline (HIR lowering → optimisation → type checking) on an
@@ -73,9 +78,22 @@ pub fn lower_and_typecheck(result: &AnalysisResult) -> Option<TypedHir> {
     // are present; executable entry points gate on type errors separately.
     let typecheck_result = typecheck_module(&mut module, &mut ctx).ok()?;
 
+    // Preserve typecheck diagnostics alongside post-typecheck HIR-pass diagnostics.
+    let mut diagnostics = typecheck_result.errors;
+    diagnostics.extend(typecheck_result.warnings);
+
+    // Run unused-symbol detection now that type information is available.
+    // This detects unused struct fields, dot-methods, and struct method
+    // aliases that the AST-level VariableUsageValidator cannot resolve.
+    let mut unused_detector = tlang_hir_opt::UnusedSymbolDetector::default();
+    unused_detector.optimize_hir(&mut module, &mut ctx).ok()?;
+
+    diagnostics.append(&mut ctx.diagnostics);
+
     Some(TypedHir {
         module,
         type_table: typecheck_result.type_table,
         pipeline_call_ids,
+        diagnostics,
     })
 }
