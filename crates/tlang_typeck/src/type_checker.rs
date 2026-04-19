@@ -44,6 +44,14 @@ pub struct TypeChecker {
     dot_methods: HashMap<String, tlang_span::HirId>,
     /// Synthetic for-loop iterator bindings keyed by the lowered iterator local.
     iterator_item_types: HashMap<tlang_span::HirId, TyKind>,
+    /// The item type of the most recently visited for-loop iterator binding.
+    ///
+    /// Set by `record_iterator_binding_item_type` when processing a
+    /// `let iterator$$` statement.  Consumed once by the immediately following
+    /// `let accumulator$$` statement to enable contextual numeric literal
+    /// inference for unannotated loop accumulators (e.g. `with sum = 0`
+    /// infers `sum: isize` when the iterator yields `isize` items).
+    pending_accumulator_type: Option<TyKind>,
 }
 
 impl TypeChecker {
@@ -95,7 +103,10 @@ impl TypeChecker {
             return;
         }
         if let Some(item_ty) = self.iterable_item_type(&call.arguments[0].ty.kind) {
-            self.iterator_item_types.insert(*hir_id, item_ty);
+            self.iterator_item_types.insert(*hir_id, item_ty.clone());
+            // Store as pending so the next `let accumulator$$` binding can
+            // adopt this type when the accumulator has no outer annotation.
+            self.pending_accumulator_type = Some(item_ty);
         }
     }
 
@@ -2521,6 +2532,13 @@ impl TypeChecker {
 
         match &mut expr.kind {
             hir::ExprKind::Literal(lit) => {
+                // Don't refine a literal that was inlined from an explicitly-typed
+                // binding by constant propagation — its type is already concrete
+                // and must be respected (e.g. `let x: i64 = 5; let y: isize = x`
+                // should remain a type mismatch, not silently coerce `5` to `isize`).
+                if !matches!(expr.ty.kind, TyKind::Unknown) {
+                    return;
+                }
                 if matches!(
                     lit.as_ref(),
                     Literal::Integer(_) | Literal::UnsignedInteger(_) | Literal::Float(_)
@@ -2534,6 +2552,28 @@ impl TypeChecker {
                 Self::apply_expected_closure_types(decl, expected);
             }
             hir::ExprKind::Binary(BinaryOpKind::Assign, lhs, rhs) => {
+                self.apply_expected_expr_type(lhs, expected);
+                self.apply_expected_expr_type(rhs, expected);
+            }
+            // Propagate a numeric expected type through arithmetic binary
+            // operations so that bare integer / float literals inside
+            // expressions like `5 + 3`, `a * 2`, etc. pick up the contextual
+            // numeric type from an enclosing annotated binding or return type.
+            // Non-literal operands (paths, calls) will silently ignore the
+            // hint because their `apply_expected_expr_type` branch falls to
+            // `_ => {}`, which is correct — we only refine literals here.
+            hir::ExprKind::Binary(op, lhs, rhs)
+                if matches!(
+                    op,
+                    BinaryOpKind::Add
+                        | BinaryOpKind::Sub
+                        | BinaryOpKind::Mul
+                        | BinaryOpKind::Div
+                        | BinaryOpKind::Mod
+                        | BinaryOpKind::Exp
+                ) && let TyKind::Primitive(prim) = expected
+                    && prim.is_numeric() =>
+            {
                 self.apply_expected_expr_type(lhs, expected);
                 self.apply_expected_expr_type(rhs, expected);
             }
@@ -2780,9 +2820,51 @@ impl<'hir> Visitor<'hir> for TypeChecker {
         walk_block(self, block, ctx);
     }
 
+    #[allow(clippy::too_many_lines)]
     fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
         match &mut stmt.kind {
             hir::StmtKind::Let(pat, expr, ty) => {
+                // Contextual inference for unannotated loop accumulators:
+                // when a `let accumulator$$` binding has no explicit type
+                // annotation, try to adopt the iterator's item type so that
+                // bare numeric literals like `0` pick up the right numeric
+                // type without requiring an explicit cast (e.g. `with sum = 0`
+                // infers `sum: isize` when the iterator yields `isize` items).
+                let is_accumulator = matches!(
+                    &pat.kind,
+                    hir::PatKind::Identifier(_, ident) if ident.as_str() == "accumulator$$"
+                );
+                let is_iterator = matches!(
+                    &pat.kind,
+                    hir::PatKind::Identifier(_, ident) if ident.as_str() == "iterator$$"
+                );
+
+                if is_accumulator && matches!(ty.kind, TyKind::Unknown) {
+                    // Consume the pending iterator item type (set by the iterator$$
+                    // stmt immediately before this one).  Only apply it when the
+                    // item type is a numeric primitive AND the initial value is a
+                    // bare integer or float literal (not a cast, call, etc.) so
+                    // that explicit initialiser types are always respected.
+                    if let Some(item_ty) = self.pending_accumulator_type.take()
+                        && matches!(&item_ty, TyKind::Primitive(prim) if prim.is_numeric())
+                        && matches!(
+                            &expr.kind,
+                            hir::ExprKind::Literal(lit)
+                                if matches!(lit.as_ref(),
+                                    Literal::Integer(_)
+                                    | Literal::UnsignedInteger(_)
+                                    | Literal::Float(_))
+                        )
+                    {
+                        ty.kind = item_ty;
+                    }
+                } else if !is_iterator {
+                    // Clear pending accumulator type for any stmt that is neither
+                    // the iterator$$ nor the accumulator$$, preventing leakage to
+                    // unrelated bindings.
+                    self.pending_accumulator_type = None;
+                }
+
                 if !matches!(ty.kind, TyKind::Unknown) {
                     self.apply_expected_expr_type(expr, &ty.kind);
                 }

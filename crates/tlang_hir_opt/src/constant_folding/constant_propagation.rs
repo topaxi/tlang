@@ -2,7 +2,7 @@ use log::debug;
 use std::collections::{HashMap, HashSet};
 use tlang_ast::token::Literal;
 use tlang_hir::{
-    self as hir, BinaryOpKind, Expr, ExprKind, Module, Pat, PatKind, Stmt, StmtKind,
+    self as hir, BinaryOpKind, Expr, ExprKind, Module, Pat, PatKind, Stmt, StmtKind, TyKind,
     visit::{self, Visitor},
 };
 use tlang_span::HirId;
@@ -36,7 +36,13 @@ impl<'hir> Visitor<'hir> for AssignmentCollector {
 }
 
 pub struct ConstantPropagator {
-    constants: HashMap<HirId, Literal>,
+    /// Maps each binding HirId to its literal value and the declared type
+    /// annotation.  The type is `Unknown` when the binding has no explicit
+    /// annotation (e.g. `let x = 5`).  Carrying the declared type ensures
+    /// that propagating an explicitly-typed binding (`let x: i64 = 5`) does
+    /// not silently coerce the inlined literal to an unrelated target type
+    /// (e.g. `isize`).
+    constants: HashMap<HirId, (Literal, TyKind)>,
     reassigned_variables: HashSet<HirId>,
     changed: bool,
 }
@@ -66,17 +72,15 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
                     ..
                 },
                 expr,
-                ..,
+                ty,
             ) => {
                 self.visit_expr(expr, ctx);
 
-                if !self.reassigned_variables.contains(hir_id) {
-                    match &expr.kind {
-                        ExprKind::Literal(lit) => {
-                            self.constants.insert(*hir_id, *lit.clone());
-                        }
-                        _ => { /* Not a literal, do nothing */ }
-                    }
+                if !self.reassigned_variables.contains(hir_id)
+                    && let ExprKind::Literal(lit) = &expr.kind
+                {
+                    self.constants
+                        .insert(*hir_id, (*lit.clone(), ty.kind.clone()));
                 }
             }
             // Const declarations are always propagatable since they can never be reassigned.
@@ -87,12 +91,13 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
                     ..
                 },
                 expr,
-                ..,
+                ty,
             ) => {
                 self.visit_expr(expr, ctx);
 
                 if let ExprKind::Literal(lit) = &expr.kind {
-                    self.constants.insert(*hir_id, *lit.clone());
+                    self.constants
+                        .insert(*hir_id, (*lit.clone(), ty.kind.clone()));
                 }
             }
             // Collect const items from struct/enum/protocol declarations so that
@@ -101,7 +106,10 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
                 for const_item in &mut decl.consts {
                     self.visit_expr(&mut const_item.value, ctx);
                     if let ExprKind::Literal(lit) = &const_item.value.kind {
-                        self.constants.insert(const_item.hir_id, *lit.clone());
+                        self.constants.insert(
+                            const_item.hir_id,
+                            (*lit.clone(), const_item.ty.kind.clone()),
+                        );
                     }
                 }
             }
@@ -109,7 +117,10 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
                 for const_item in &mut decl.consts {
                     self.visit_expr(&mut const_item.value, ctx);
                     if let ExprKind::Literal(lit) = &const_item.value.kind {
-                        self.constants.insert(const_item.hir_id, *lit.clone());
+                        self.constants.insert(
+                            const_item.hir_id,
+                            (*lit.clone(), const_item.ty.kind.clone()),
+                        );
                     }
                 }
                 visit::walk_stmt(self, stmt, ctx);
@@ -118,7 +129,10 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
                 for const_item in &mut decl.consts {
                     self.visit_expr(&mut const_item.value, ctx);
                     if let ExprKind::Literal(lit) = &const_item.value.kind {
-                        self.constants.insert(const_item.hir_id, *lit.clone());
+                        self.constants.insert(
+                            const_item.hir_id,
+                            (*lit.clone(), const_item.ty.kind.clone()),
+                        );
                     }
                 }
                 visit::walk_stmt(self, stmt, ctx);
@@ -130,10 +144,15 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
     fn visit_expr(&mut self, expr: &'hir mut Expr, ctx: &mut Self::Context) {
         if let ExprKind::Path(path) = &expr.kind {
             if let Some(resolved_hir_id) = path.res.hir_id()
-                && let Some(lit) = self.constants.get(&resolved_hir_id)
+                && let Some((lit, declared_ty)) = self.constants.get(&resolved_hir_id)
             {
                 debug!("Constant propagating: {resolved_hir_id:?} -> {lit:?}");
                 expr.kind = ExprKind::Literal(Box::new(*lit));
+                // Preserve the declared type of the binding so that
+                // downstream type-checking can enforce it.  When the binding
+                // had no annotation the declared type is `Unknown` and the
+                // type checker will apply contextual inference as usual.
+                expr.ty.kind = declared_ty.clone();
                 self.changed = true;
                 return;
             }

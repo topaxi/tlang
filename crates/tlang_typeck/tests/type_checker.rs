@@ -2666,3 +2666,190 @@ fn pipeline_map_chain_infers_types() {
         "expected type error: List<i64> assigned to String"
     );
 }
+
+#[test]
+fn loop_accumulator_literal_infers_from_isize_annotation() {
+    common::typecheck_ok(
+        r#"
+        enum Tree {
+            Empty,
+            Node { value: isize, left: Tree, right: Tree },
+        }
+
+        impl Iterable<isize> for Tree {
+            fn iter(self) {
+                Iterable::iter([])
+            }
+        }
+
+        let tree = Tree::Empty;
+        let total: isize = for x in tree; with sum = 0 {
+            sum + x
+        };
+        "#,
+    );
+}
+
+#[test]
+fn loop_accumulator_unannotated_infers_type_from_iterator_item() {
+    // Without an outer annotation, a bare numeric literal accumulator (`0`)
+    // should adopt the iterator's item type so that `sum + x` resolves to
+    // the right numeric type instead of defaulting to `i64`.
+    common::typecheck_ok(
+        r#"
+        enum Tree {
+            Empty,
+            Node { value: isize, left: Tree, right: Tree },
+        }
+
+        impl Iterable<isize> for Tree {
+            fn iter(self) {
+                Iterable::iter([])
+            }
+        }
+
+        let tree = Tree::Empty;
+        let total = for x in tree; with sum = 0 {
+            sum + x
+        };
+        let _: isize = total;
+        "#,
+    );
+}
+
+#[test]
+fn branch_literal_infers_from_function_return_type() {
+    common::typecheck_ok(
+        r#"
+        fn foo(b: bool) -> isize {
+            if b { 1 } else { 0 }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn literal_in_function_argument_infers_from_parameter_type() {
+    common::typecheck_ok(
+        r#"
+        fn takes_isize(x: isize) -> isize { x }
+        let _: isize = takes_isize(42);
+        "#,
+    );
+}
+
+#[test]
+fn loop_accumulator_infers_from_function_return_type_numeric() {
+    // The for-loop body returns isize from a function return type annotation
+    common::typecheck_ok(
+        r#"
+        enum Tree {
+            Empty,
+            Node { value: isize, left: Tree, right: Tree },
+        }
+
+        impl Iterable<isize> for Tree {
+            fn iter(self) {
+                Iterable::iter([])
+            }
+        }
+
+        fn sum_tree(tree: Tree) -> isize {
+            for x in tree; with acc = 0 {
+                acc + x
+            }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn branch_if_else_literal_infers_from_function_return_type() {
+    // A simple if/else where both branches return isize literals — this
+    // is a return-type context test, not related to loop accumulators.
+    common::typecheck_ok(
+        r#"
+        fn foo(b: bool) -> isize {
+            if b { 42 } else { 0 }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn binary_expr_result_literal_infers_from_annotated_binding() {
+    common::typecheck_ok(
+        r#"
+        let x: isize = 5 + 3;
+        "#,
+    );
+}
+
+#[test]
+fn nested_binary_literal_infers_from_annotated_binding() {
+    common::typecheck_ok(
+        r#"
+        let x: u32 = (5 + 3) * 2;
+        "#,
+    );
+}
+
+#[test]
+fn explicit_cast_prevents_literal_inference() {
+    // When the operands have explicit casts, the binding annotation
+    // should NOT override them — a type mismatch error is correct.
+    let errs = common::typecheck_errors(
+        r#"
+        let x: isize = (5 as i64) + (3 as i64);
+        "#,
+    );
+    assert!(
+        !errs.is_empty(),
+        "Expected type mismatch: explicit i64 cast should not coerce to isize"
+    );
+}
+
+#[test]
+fn constant_propagated_variable_preserves_annotated_type() {
+    // Constant propagation must not erase the explicit `i64` annotation on
+    // `x`. Assigning that binding to `isize` should still be a type mismatch
+    // unless an explicit cast is present.
+    let errs = common::typecheck_errors(
+        r#"
+        let x: i64 = 5;
+        let y: isize = x;
+        "#,
+    );
+    assert!(
+        !errs.is_empty(),
+        "Expected type mismatch: constant propagation must not coerce annotated i64 to isize"
+    );
+}
+
+#[test]
+fn explicit_typed_function_call_requires_cast() {
+    // A function call that returns a concrete numeric type should produce
+    // a binding type mismatch when assigned to a differently-typed binding.
+    let errs = common::typecheck_errors(
+        r#"
+        fn get_i64() -> i64 { 42 }
+        let y: isize = get_i64();
+        "#,
+    );
+    assert!(
+        !errs.is_empty(),
+        "Expected type mismatch: get_i64() returns i64, cannot assign to isize without cast"
+    );
+}
+
+#[test]
+fn binding_type_mismatch_i64_vs_string() {
+    // This should definitely fail
+    let errs = common::typecheck_errors(
+        r#"
+        fn get_str() -> String { "hello" }
+        let y: i64 = get_str();
+        "#,
+    );
+    assert!(!errs.is_empty(), "Expected error for String into i64");
+}
