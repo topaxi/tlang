@@ -2816,12 +2816,12 @@ impl<'hir> Visitor<'hir> for TypeChecker {
     fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
         match &mut stmt.kind {
             hir::StmtKind::Let(pat, expr, ty) => {
-                // ── Contextual inference for unannotated loop accumulators ──────
-                // When a `let accumulator$$` binding has no explicit type
-                // annotation, try to adopt the iterator's item type so that bare
-                // numeric literals like `0` pick up the right numeric type without
-                // requiring an explicit cast (e.g. `with sum = 0` infers
-                // `sum: isize` when the iterator yields `isize` items).
+                // Contextual inference for unannotated loop accumulators:
+                // when a `let accumulator$$` binding has no explicit type
+                // annotation, try to adopt the iterator's item type so that
+                // bare numeric literals like `0` pick up the right numeric
+                // type without requiring an explicit cast (e.g. `with sum = 0`
+                // infers `sum: isize` when the iterator yields `isize` items).
                 let is_accumulator = matches!(
                     &pat.kind,
                     hir::PatKind::Identifier(_, ident) if ident.as_str() == "accumulator$$"
