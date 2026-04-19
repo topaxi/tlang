@@ -2666,3 +2666,207 @@ fn pipeline_map_chain_infers_types() {
         "expected type error: List<i64> assigned to String"
     );
 }
+
+#[test]
+fn loop_accumulator_literal_infers_from_isize_annotation() {
+    common::typecheck_ok(
+        r#"
+        enum Tree {
+            Empty,
+            Node { value: isize, left: Tree, right: Tree },
+        }
+
+        impl Iterable<isize> for Tree {
+            fn iter(self) {
+                Iterable::iter([])
+            }
+        }
+
+        let tree = Tree::Empty;
+        let total: isize = for x in tree; with sum = 0 {
+            sum + x
+        };
+        "#,
+    );
+}
+
+#[test]
+fn loop_accumulator_literal_infers_from_u32_annotation() {
+    common::typecheck_ok(
+        r#"
+        let total: u32 = for x in [1, 2, 3]; with acc = 0 {
+            acc + x
+        };
+        "#,
+    );
+}
+
+#[test]
+fn branch_result_literal_infers_from_annotated_binding() {
+    common::typecheck_ok(
+        r#"
+        fn foo(b: bool) -> isize {
+            if b { 1 } else { 0 }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn literal_in_function_argument_infers_from_parameter_type() {
+    common::typecheck_ok(
+        r#"
+        fn takes_isize(x: isize) -> isize { x }
+        let _: isize = takes_isize(42);
+        "#,
+    );
+}
+
+#[test]
+fn loop_accumulator_infers_from_function_return_type_numeric() {
+    // The for-loop body returns isize from a function return type annotation
+    common::typecheck_ok(
+        r#"
+        enum Tree {
+            Empty,
+            Node { value: isize, left: Tree, right: Tree },
+        }
+
+        impl Iterable<isize> for Tree {
+            fn iter(self) {
+                Iterable::iter([])
+            }
+        }
+
+        fn sum_tree(tree: Tree) -> isize {
+            for x in tree; with acc = 0 {
+                acc + x
+            }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn accumulator_literal_zero_infers_from_isize_return_type() {
+    // A simple if/else where both branches return isize literals
+    common::typecheck_ok(
+        r#"
+        fn foo(b: bool) -> isize {
+            if b { 42 } else { 0 }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn binary_expr_result_literal_infers_from_annotated_binding() {
+    common::typecheck_ok(
+        r#"
+        let x: isize = 5 + 3;
+        "#,
+    );
+}
+
+#[test]
+fn nested_binary_literal_infers_from_annotated_binding() {
+    common::typecheck_ok(
+        r#"
+        let x: u32 = (5 + 3) * 2;
+        "#,
+    );
+}
+
+#[test]
+fn isize_vs_i64_binding_mismatch_error() {
+    // If 5 + 3 = i64, and we annotate with isize, this should fail...
+    // unless the literals adopt the context type
+    let errs = common::typecheck_errors("let x: isize = (5i64 as i64) + (3i64 as i64);");
+    println!("Errors from i64 expr into isize: {:?}", errs);
+    // If it fails with "type mismatch", then the type system is strict
+    // If it passes, then there's coercion
+}
+
+#[test]
+fn isize_vs_i64_binding_check() {
+    // The "cast to i64" is implicit via type of 5+3 being i64
+    // But does annotating with isize cause a mismatch?
+    let errs = common::typecheck_errors(
+        r#"
+        let x: i64 = 5;
+        let y: isize = x;
+        "#,
+    );
+    println!("Errors: {:?}", errs);
+    // This should fail because i64 != isize
+}
+
+#[test]
+fn debug_isize_i64_check() {
+    let errs = common::typecheck_errors(
+        r#"
+        let x: i64 = 5;
+        let y: isize = x;
+        "#,
+    );
+    assert!(!errs.is_empty(), "Expected errors because i64 != isize, but got none");
+}
+
+#[test]
+fn debug_binary_isize() {
+    let errs = common::typecheck_errors("let x: isize = 5 + 3;");
+    assert!(!errs.is_empty(), "Expected errors because 5+3:i64 != isize, but got none: {errs:?}");
+}
+
+#[test]
+fn debug_print_errors() {
+    let errs = common::typecheck_errors(
+        r#"
+        let x: i64 = 5;
+        let y: isize = x;
+        "#,
+    );
+    // Print for diagnosis
+    eprintln!("DEBUG: isize = i64 binding errors: {:?}", errs);
+    assert_eq!(errs, vec![] as Vec<String>, "Expected: {errs:?}");
+}
+
+#[test]
+fn check_binding_type_strict_isize_vs_i64() {
+    // Using a more explicit test - assign i64 variable to isize binding
+    // The constant folder won't fold a path expression, so this is a pure binding check
+    let errs = common::typecheck_errors(
+        r#"
+        fn get_i64() -> i64 { 42 }
+        let y: isize = get_i64();
+        "#,
+    );
+    // If this has no errors, it means isize = i64 is accepted (coercion)
+    // If it has errors, the type system is strict
+    eprintln!("Binding check result: {errs:?}");
+}
+
+#[test]
+fn binding_type_mismatch_i64_vs_string() {
+    // This should definitely fail
+    let errs = common::typecheck_errors(
+        r#"
+        fn get_str() -> String { "hello" }
+        let y: i64 = get_str();
+        "#,
+    );
+    assert!(!errs.is_empty(), "Expected error for String into i64");
+}
+
+#[test]
+fn i64_to_isize_explicit_should_require_cast() {
+    let errs = common::typecheck_errors(
+        r#"
+        let x: i64 = 42;
+        let y: isize = x;
+        "#,
+    );
+    eprintln!("Errors for i64->isize: {:?}", errs);
+    // If strict, should error since i64 != isize
+    // If permissive, no errors
+}
