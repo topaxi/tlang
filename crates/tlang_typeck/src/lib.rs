@@ -2,6 +2,7 @@ pub mod builtin_methods;
 pub mod builtin_protocols;
 pub mod builtin_types;
 pub mod builtins;
+mod local_inference;
 mod type_checker;
 mod type_error;
 mod type_table;

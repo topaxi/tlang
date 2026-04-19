@@ -2718,6 +2718,50 @@ fn loop_accumulator_unannotated_infers_type_from_iterator_item() {
 }
 
 #[test]
+fn manual_loop_local_numeric_binding_infers_from_iterator_usage() {
+    common::typecheck_ok(
+        r#"
+        enum Tree {
+            Empty,
+            Node { value: isize, left: Tree, right: Tree },
+        }
+
+        impl Iterable<isize> for Tree {
+            fn iter(self) {
+                Iterable::iter([])
+            }
+        }
+
+        let tree = Tree::Empty;
+        let iterator = Iterable::iter(tree);
+        let total = {
+            let sum = 0;
+            loop {
+                match Iterator::next(iterator) {
+                    Option::Some(x) => sum = sum + x,
+                    Option::None => break sum,
+                }
+            }
+        };
+        let _: isize = total;
+        "#,
+    );
+}
+
+#[test]
+fn local_numeric_binding_infers_from_later_assignment() {
+    common::typecheck_ok(
+        r#"
+        fn takes_isize(x: isize) -> isize { x }
+
+        let value = 0;
+        value = takes_isize(42);
+        let _: isize = value;
+        "#,
+    );
+}
+
+#[test]
 fn branch_literal_infers_from_function_return_type() {
     common::typecheck_ok(
         r#"
