@@ -76,11 +76,11 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
             ) => {
                 self.visit_expr(expr, ctx);
 
-                if !self.reassigned_variables.contains(hir_id) {
-                    if let ExprKind::Literal(lit) = &expr.kind {
-                        self.constants
-                            .insert(*hir_id, (*lit.clone(), ty.kind.clone()));
-                    }
+                if !self.reassigned_variables.contains(hir_id)
+                    && let ExprKind::Literal(lit) = &expr.kind
+                {
+                    self.constants
+                        .insert(*hir_id, (*lit.clone(), ty.kind.clone()));
                 }
             }
             // Const declarations are always propagatable since they can never be reassigned.

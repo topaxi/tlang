@@ -2820,6 +2820,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
         walk_block(self, block, ctx);
     }
 
+    #[allow(clippy::too_many_lines)]
     fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
         match &mut stmt.kind {
             hir::StmtKind::Let(pat, expr, ty) => {
@@ -2844,19 +2845,18 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     // item type is a numeric primitive AND the initial value is a
                     // bare integer or float literal (not a cast, call, etc.) so
                     // that explicit initialiser types are always respected.
-                    if let Some(item_ty) = self.pending_accumulator_type.take() {
-                        if matches!(&item_ty, TyKind::Primitive(prim) if prim.is_numeric())
-                            && matches!(
-                                &expr.kind,
-                                hir::ExprKind::Literal(lit)
-                                    if matches!(lit.as_ref(),
-                                        Literal::Integer(_)
-                                        | Literal::UnsignedInteger(_)
-                                        | Literal::Float(_))
-                            )
-                        {
-                            ty.kind = item_ty;
-                        }
+                    if let Some(item_ty) = self.pending_accumulator_type.take()
+                        && matches!(&item_ty, TyKind::Primitive(prim) if prim.is_numeric())
+                        && matches!(
+                            &expr.kind,
+                            hir::ExprKind::Literal(lit)
+                                if matches!(lit.as_ref(),
+                                    Literal::Integer(_)
+                                    | Literal::UnsignedInteger(_)
+                                    | Literal::Float(_))
+                        )
+                    {
+                        ty.kind = item_ty;
                     }
                 } else if !is_iterator {
                     // Clear pending accumulator type for any stmt that is neither
