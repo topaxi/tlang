@@ -5,9 +5,9 @@ use tlang_hir_opt::unused_symbol_detection::UnusedSymbolDetector;
 
 mod common;
 
-/// Compile source, run optimizer + type checker + UnusedSymbolDetector, and
-/// return the diagnostics produced by the detection pass (previous pass
-/// diagnostics are cleared before running the detector).
+/// Compile source, optimize HIR, run the type checker, then run
+/// `UnusedSymbolDetector`, returning the detector diagnostics after clearing
+/// diagnostics from earlier phases.
 fn run_detection(source: &str) -> Vec<tlang_diagnostics::Diagnostic> {
     let (mut module, meta) = common::compile(source);
     let mut ctx: HirOptContext = meta.into();
@@ -115,8 +115,12 @@ fn warning_for_unused_dot_method() {
         "#,
     );
     assert!(
-        warnings.iter().any(|w| w.contains("Vector.unused_method")),
-        "expected warning for unused dot-method, got: {warnings:?}"
+        warnings.iter().any(|w| w.contains("Vector::unused_method")),
+        "expected warning for unused canonical method alias, got: {warnings:?}"
+    );
+    assert!(
+        !warnings.iter().any(|w| w.contains("Vector.unused_method")),
+        "dot-method alias should not be reported independently, got: {warnings:?}"
     );
 }
 
@@ -200,6 +204,51 @@ fn mixed_used_unused_fields() {
     );
 }
 
+#[test]
+fn no_warning_for_struct_fields_used_in_fn_param_pattern() {
+    let warnings = warning_messages(
+        r#"
+        struct Point { x: i64, y: i64 }
+        fn get_x(Point { x, y: _ }) { x }
+        let p = Point { x: 3, y: 4 };
+        let _ = get_x(p);
+        "#,
+    );
+    let field_warnings: Vec<_> = warnings
+        .iter()
+        .filter(|w| w.contains("Point::x") || w.contains("Point::y"))
+        .collect();
+    assert!(
+        field_warnings.is_empty(),
+        "expected no warnings for destructured parameter fields, got: {field_warnings:?}"
+    );
+}
+
+#[test]
+fn no_warning_for_struct_fields_used_in_match_pattern() {
+    let warnings = warning_messages(
+        r#"
+        struct Point { x: i64, y: i64 }
+        fn classify(p) {
+            match p {
+                Point { x: 0, y: 0 } => "origin",
+                Point { x, y } => x + y,
+            }
+        }
+        let p = Point { x: 3, y: 4 };
+        let _ = classify(p);
+        "#,
+    );
+    let field_warnings: Vec<_> = warnings
+        .iter()
+        .filter(|w| w.contains("Point::x") || w.contains("Point::y"))
+        .collect();
+    assert!(
+        field_warnings.is_empty(),
+        "expected no warnings for destructured match fields, got: {field_warnings:?}"
+    );
+}
+
 // ── Underscore-prefixed fields suppressed ──────────────────────────────
 
 #[test]
@@ -239,5 +288,29 @@ fn no_warning_for_used_method_with_args() {
     assert!(
         method_warnings.is_empty(),
         "expected no warnings for used method, got: {method_warnings:?}"
+    );
+}
+
+#[test]
+fn no_warning_for_method_used_via_qualified_alias_reference() {
+    let warnings = warning_messages(
+        r#"
+        struct Vector { x: i64 }
+        fn Vector.get_x(self) -> i64 { self.x }
+
+        fn map([], _) { [] }
+        fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+
+        let vectors = [Vector { x: 1 }, Vector { x: 2 }];
+        let _ = map(vectors, Vector::get_x);
+        "#,
+    );
+    let method_warnings: Vec<_> = warnings
+        .iter()
+        .filter(|w| w.contains("Vector.get_x") || w.contains("Vector::get_x"))
+        .collect();
+    assert!(
+        method_warnings.is_empty(),
+        "expected no warnings for method alias reference, got: {method_warnings:?}"
     );
 }

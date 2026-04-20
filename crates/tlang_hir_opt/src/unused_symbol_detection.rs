@@ -222,9 +222,7 @@ impl UnusedSymbolDetector {
 /// Returns `true` if the symbol is one of the type-dependent categories that
 /// the AST-level `VariableUsageValidator` suppresses.
 fn is_type_dependent_symbol(symbol: &tlang_defs::Def) -> bool {
-    matches!(symbol.kind, DefKind::StructField)
-        || matches!(symbol.kind, DefKind::StructMethod(_))
-        || symbol.name.contains('.')
+    matches!(symbol.kind, DefKind::StructField | DefKind::StructMethod(_))
 }
 
 /// Returns `true` if the symbol's effective local/member name starts with `_`.
@@ -290,5 +288,21 @@ impl<'hir> hir::Visitor<'hir> for UnusedSymbolDetector {
             }
             _ => hir::visit::walk_expr(self, expr, ctx),
         }
+    }
+
+    fn visit_pat(&mut self, pat: &'hir mut hir::Pat, ctx: &mut Self::Context) {
+        if let hir::PatKind::Enum(path, fields) = &mut pat.kind
+            && matches!(path.res.binding_kind(), hir::BindingKind::Struct)
+        {
+            let type_name = path.to_string();
+            for (field, nested_pat) in fields {
+                self.mark_field_as_used(&type_name, field.as_str(), ctx);
+                self.visit_pat(nested_pat, ctx);
+            }
+            self.visit_path(path, ctx);
+            return;
+        }
+
+        hir::visit::walk_pat(self, pat, ctx);
     }
 }
