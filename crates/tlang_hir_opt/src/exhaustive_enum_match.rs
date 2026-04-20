@@ -93,8 +93,10 @@ impl ExhaustiveEnumMatch {
     ///    the variant declaration whose `HirId` is in `variant_to_enum`.
     fn resolve_enum_hir_id(&self, pat: &hir::Pat) -> Option<HirId> {
         if let PatKind::Enum(path, _) = &pat.kind {
-            // Strategy 1: explicit type annotations may resolve directly to the
-            // enum declaration; inferred annotations typically do not.
+            // Strategy 1: populated by lowering for patterns with explicit
+            // `EnumName` type annotations; inferred annotations from
+            // FnParamTypeInference use a synthetic NodeId and typically do not
+            // resolve to the enum declaration.
             if let Some(enum_hir_id) = pat.ty.res
                 && self.enum_variant_counts.contains_key(&enum_hir_id)
             {
@@ -201,12 +203,11 @@ impl ExhaustiveEnumMatch {
         // The catch-all's type must resolve to the same enum as the explicit
         // arms. After type checking, the type checker populates `pat.ty.kind`
         // with the scrutinee's type, so this check is reliable.
-        let catchall_enum = match self.resolve_catchall_enum_hir_id(&arms.last().unwrap().pat) {
-            Some(id) if id == enum_hir_id => id,
-            _ => return false,
-        };
+        if self.resolve_catchall_enum_hir_id(&arms.last().unwrap().pat) != Some(enum_hir_id) {
+            return false;
+        }
 
-        let total_variants = match self.enum_variant_counts.get(&catchall_enum) {
+        let total_variants = match self.enum_variant_counts.get(&enum_hir_id) {
             Some(&count) => count,
             None => return false,
         };
