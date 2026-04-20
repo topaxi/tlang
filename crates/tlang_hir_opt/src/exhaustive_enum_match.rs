@@ -14,6 +14,9 @@ type EnumVariantCounts = HashMap<HirId, usize>;
 /// Maps a variant's `HirId` back to its parent enum `HirId`.
 type VariantToEnum = HashMap<HirId, HirId>;
 
+/// Maps an enum's name (string) to its `HirId`.
+type EnumNameToHirId = HashMap<String, HirId>;
+
 /// HIR optimisation pass that removes an unreachable trailing wildcard (or
 /// catch-all identifier) arm from a `match` expression when every variant of
 /// the matched enum is already covered by explicit `PatKind::Enum` arms.
@@ -35,6 +38,7 @@ type VariantToEnum = HashMap<HirId, HirId>;
 pub struct ExhaustiveEnumMatch {
     enum_variant_counts: EnumVariantCounts,
     variant_to_enum: VariantToEnum,
+    enum_name_to_hir_id: EnumNameToHirId,
     changed: bool,
 }
 
@@ -43,6 +47,7 @@ impl ExhaustiveEnumMatch {
         Self {
             enum_variant_counts: HashMap::new(),
             variant_to_enum: HashMap::new(),
+            enum_name_to_hir_id: HashMap::new(),
             changed: false,
         }
     }
@@ -51,11 +56,13 @@ impl ExhaustiveEnumMatch {
     fn build_enum_maps(&mut self, module: &hir::Module) {
         self.enum_variant_counts.clear();
         self.variant_to_enum.clear();
+        self.enum_name_to_hir_id.clear();
 
         Self::collect_enum_declarations(
             &module.block,
             &mut self.enum_variant_counts,
             &mut self.variant_to_enum,
+            &mut self.enum_name_to_hir_id,
         );
     }
 
@@ -63,10 +70,12 @@ impl ExhaustiveEnumMatch {
         block: &hir::Block,
         counts: &mut EnumVariantCounts,
         variant_map: &mut VariantToEnum,
+        name_map: &mut EnumNameToHirId,
     ) {
         for stmt in &block.stmts {
             if let StmtKind::EnumDeclaration(decl) = &stmt.kind {
                 counts.insert(decl.hir_id, decl.variants.len());
+                name_map.insert(decl.name.to_string(), decl.hir_id);
                 for variant in &decl.variants {
                     variant_map.insert(variant.hir_id, decl.hir_id);
                 }
@@ -79,15 +88,19 @@ impl ExhaustiveEnumMatch {
     ///
     /// Two resolution strategies (tried in order):
     ///
-    /// 1. **Pattern type annotation** (`pat.ty.res`) — populated by
-    ///    `FnParamTypeInference` for multi-clause function lowerings.
-    /// 2. **Variant path resolution** (`path.res.hir_id()`) — after
-    ///    `IdentifierResolver`, the path points to the variant declaration whose
-    ///    `HirId` is in `variant_to_enum`.
+    /// 1. **Pattern type annotation** (`pat.ty.res`) — reliable when the
+    ///    pattern has an explicit type annotation that resolved to the enum
+    ///    declaration. Inferred parameter annotations from multi-clause
+    ///    function lowering are not expected to point at the enum declaration
+    ///    `HirId`.
+    /// 2. **Variant path resolution** (`path.res.hir_id()`) — the primary
+    ///    strategy for inferred patterns. After `IdentifierResolver`, the path
+    ///    points to the variant declaration whose `HirId` is in
+    ///    `variant_to_enum`.
     fn resolve_enum_hir_id(&self, pat: &hir::Pat) -> Option<HirId> {
         if let PatKind::Enum(path, _) = &pat.kind {
-            // Strategy 1: pattern carries inferred type with res pointing to the
-            // enum declaration directly.
+            // Strategy 1: explicit type annotations may resolve directly to the
+            // enum declaration; inferred annotations typically do not.
             if let Some(enum_hir_id) = pat.ty.res
                 && self.enum_variant_counts.contains_key(&enum_hir_id)
             {
@@ -105,11 +118,39 @@ impl ExhaustiveEnumMatch {
         None
     }
 
-    /// Returns `true` when the catch-all's type annotation indicates it was
-    /// typed for a specific type (not `Unknown`). An `Unknown` (or untyped)
-    /// catch-all may accept values of any type and must be preserved.
-    fn is_typed_catchall(pat: &hir::Pat) -> bool {
-        !matches!(pat.ty.kind, TyKind::Unknown)
+    /// Check whether the catch-all arm's type annotation corresponds to the
+    /// given `enum_hir_id`. Returns `true` only when the catch-all is provably
+    /// typed for this specific enum (not `Unknown`, not a primitive, not a
+    /// different named type).
+    ///
+    /// Resolution strategies (tried in order):
+    /// 1. `pat.ty.res` — reliable for explicit type annotations.
+    /// 2. `TyKind::Path` segment name — for inferred annotations from
+    ///    `FnParamTypeInference`, whose synthetic `NodeId` does not map to a
+    ///    declaration `HirId`.
+    fn catchall_type_matches_enum(&self, pat: &hir::Pat, enum_hir_id: HirId) -> bool {
+        // Unknown-typed catch-all may handle values of any type.
+        if matches!(pat.ty.kind, TyKind::Unknown) {
+            return false;
+        }
+
+        // Strategy 1: pat.ty.res directly identifies the enum declaration.
+        if let Some(res_hir_id) = pat.ty.res {
+            if res_hir_id == enum_hir_id {
+                return true;
+            }
+        }
+
+        // Strategy 2: TyKind::Path — resolve the path name to an enum HirId.
+        if let TyKind::Path(ref path, _) = pat.ty.kind {
+            if let Some(first_segment) = path.segments.first() {
+                if let Some(&name_hir_id) = self.enum_name_to_hir_id.get(first_segment.ident.as_str()) {
+                    return name_hir_id == enum_hir_id;
+                }
+            }
+        }
+
+        false
     }
 
     /// Returns `true` if the trailing arm was removed.
