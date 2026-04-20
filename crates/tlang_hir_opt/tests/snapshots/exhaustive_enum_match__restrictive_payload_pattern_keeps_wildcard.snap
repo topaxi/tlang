@@ -1,0 +1,23 @@
+---
+source: crates/tlang_hir_opt/tests/exhaustive_enum_match.rs
+expression: pretty
+---
+enum Num {
+    V {
+        0: i64,
+    }
+    W
+}
+fn classify(num: Num) -> unknown {
+    match num {
+        Num::V { 0: 0 } => {
+            "zero"
+        },
+        Num::W => {
+            "w"
+        },
+        _ => {
+            "other"
+        },
+    }
+}

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use tlang_hir::{
-    self as hir, ExprKind, PatKind, StmtKind,
+    self as hir, ExprKind, PatKind, StmtKind, TyKind,
     visit::{self, Visitor},
 };
 use tlang_span::HirId;
@@ -26,6 +26,12 @@ type VariantToEnum = HashMap<HirId, HirId>;
 ///   fail, causing fall-through to the wildcard.
 /// * Only the **last** arm is considered for removal, and only when it is a
 ///   wildcard or a bare identifier (both are catch-all patterns).
+/// * The trailing catch-all must have a **typed** annotation that resolves to
+///   the same enum — an `unknown` (or untyped) catch-all may handle values of
+///   entirely different types and must be preserved.
+/// * Each variant arm must only use catch-all sub-patterns (identifiers or
+///   wildcards) in its payload fields. A restrictive sub-pattern (e.g. a
+///   literal like `Enum::V(0)`) does not fully cover the variant.
 pub struct ExhaustiveEnumMatch {
     enum_variant_counts: EnumVariantCounts,
     variant_to_enum: VariantToEnum,
@@ -99,6 +105,13 @@ impl ExhaustiveEnumMatch {
         None
     }
 
+    /// Returns `true` when the catch-all's type annotation indicates it was
+    /// typed for a specific type (not `Unknown`).  An `Unknown` (or untyped)
+    /// catch-all may accept values of any type and must be preserved.
+    fn is_typed_catchall(pat: &hir::Pat) -> bool {
+        !matches!(pat.ty.kind, TyKind::Unknown)
+    }
+
     /// Returns `true` if the trailing arm was removed.
     fn try_remove_wildcard_arm(&self, arms: &mut Vec<hir::MatchArm>) -> bool {
         // Need at least two arms: one or more explicit + a trailing catch-all.
@@ -110,6 +123,12 @@ impl ExhaustiveEnumMatch {
 
         // Only remove catch-all arms (wildcard `_` or bare identifier).
         if !is_catch_all_pattern(&last.pat) {
+            return false;
+        }
+
+        // The catch-all must carry a non-Unknown type annotation — an `unknown`
+        // or untyped catch-all may handle values of entirely different types.
+        if !Self::is_typed_catchall(&last.pat) {
             return false;
         }
 
@@ -132,9 +151,13 @@ impl ExhaustiveEnumMatch {
                     _ => {}
                 }
 
-                // Record the variant by its HirId (ensures distinctness).
-                if let PatKind::Enum(path, _) = &arm.pat.kind
+                // Only count the variant as covered if all payload sub-patterns
+                // are catch-all (identifier or wildcard). A restrictive
+                // sub-pattern (literal, nested enum, list, etc.) does not fully
+                // cover the variant and might not match all values.
+                if let PatKind::Enum(path, fields) = &arm.pat.kind
                     && let Some(variant_hir_id) = path.res.hir_id()
+                    && fields.iter().all(|(_, p)| is_catch_all_pattern(p))
                 {
                     covered_variants.insert(variant_hir_id);
                 }

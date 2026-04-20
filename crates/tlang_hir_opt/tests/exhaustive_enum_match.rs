@@ -10,8 +10,8 @@ fn optimizer() -> tlang_hir_opt::HirOptimizer {
 }
 
 /// When every variant of a user-defined enum is covered by explicit arms
-/// plus a trailing catch-all clause, the catch-all is unreachable and
-/// should be removed.
+/// plus a trailing catch-all clause (whose inferred type matches the enum),
+/// the catch-all is unreachable and should be removed.
 #[test]
 fn exhaustive_match_removes_wildcard() {
     let source = r#"
@@ -86,7 +86,7 @@ fn guarded_arm_keeps_wildcard() {
 }
 
 /// Enums with data fields should also have their wildcard removed when
-/// exhaustive.
+/// exhaustive, provided all payload sub-patterns are catch-all.
 #[test]
 fn exhaustive_match_with_data_fields() {
     let source = r#"
@@ -174,6 +174,52 @@ fn exhaustive_match_removes_identifier_catchall() {
     assert!(
         !pretty.contains("other =>"),
         "identifier catch-all should be removed:\n{pretty}"
+    );
+    assert_snapshot!(pretty);
+}
+
+/// A data-carrying variant arm with a restrictive payload pattern (e.g. a
+/// constant) should not be treated as covering the entire variant; the
+/// wildcard must be preserved.
+#[test]
+fn restrictive_payload_pattern_keeps_wildcard() {
+    let source = r#"
+        enum Num {
+            V(i64),
+            W,
+        }
+
+        fn classify(Num::V(0)) { "zero" }
+        fn classify(Num::W) { "w" }
+        fn classify(_) { "other" }
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    let pretty = common::pretty_print(&hir);
+
+    assert!(
+        pretty.contains("_ =>"),
+        "wildcard arm should be kept for restrictive payload patterns:\n{pretty}"
+    );
+    assert_snapshot!(pretty);
+}
+
+/// A catch-all explicitly annotated with `unknown` type should never be
+/// removed, even when all enum variants are explicitly covered. The
+/// `unknown` annotation means the function accepts values of any type.
+#[test]
+fn unknown_typed_catchall_keeps_wildcard() {
+    let source = r#"
+        enum SafeHtml { Html(String) }
+
+        fn render(SafeHtml::Html(v)) { v }
+        fn render(v: unknown) { "fallback" }
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    let pretty = common::pretty_print(&hir);
+
+    assert!(
+        pretty.contains("v =>"),
+        "unknown-typed catch-all should be kept:\n{pretty}"
     );
     assert_snapshot!(pretty);
 }

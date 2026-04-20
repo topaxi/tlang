@@ -161,6 +161,7 @@ impl Default for DefaultOptimizations {
             passes: vec![
                 Box::new(crate::tail_call_validation::TailPositionAnalysis::default()),
                 Box::new(crate::symbol_resolution::SymbolResolution::default()),
+                Box::new(crate::exhaustive_enum_match::ExhaustiveEnumMatch::default()),
                 Box::new(crate::constant_folding::ConstantFolding::default()),
                 Box::new(crate::dead_code_elimination::DeadCodeElimination::default()),
                 Box::new(crate::slot_allocation::SlotAllocation::default()),
@@ -313,13 +314,13 @@ mod tests {
     #[test]
     fn test_default_optimizations_without_removes_dce() {
         let defaults = DefaultOptimizations::default();
-        assert_eq!(defaults.passes.len(), 6, "should start with 6 passes");
+        assert_eq!(defaults.passes.len(), 7, "should start with 7 passes");
 
         let without_dce = defaults.without("DeadCodeElimination");
         assert_eq!(
             without_dce.passes.len(),
-            5,
-            "should have 5 passes after removing DCE"
+            6,
+            "should have 6 passes after removing DCE"
         );
 
         let names: Vec<_> = without_dce.passes.iter().map(|p| p.name()).collect();
