@@ -55,7 +55,7 @@ impl ExhaustiveEnumMatch {
 
     /// Pre-populate lookup tables by scanning enum declarations throughout the
     /// whole module, including nested blocks.
-    fn build_enum_maps(&mut self, module: &mut hir::Module) {
+    fn build_enum_maps(&mut self, module: &hir::Module) {
         self.enum_variant_counts.clear();
         self.variant_to_enum.clear();
 
@@ -67,33 +67,170 @@ impl ExhaustiveEnumMatch {
     }
 
     fn collect_enum_declarations(
-        module: &mut hir::Module,
+        module: &hir::Module,
         counts: &mut EnumVariantCounts,
         variant_map: &mut VariantToEnum,
     ) {
-        struct EnumCollector<'a> {
-            counts: &'a mut EnumVariantCounts,
-            variant_map: &'a mut VariantToEnum,
+        Self::collect_enum_declarations_from_block(&module.block, counts, variant_map);
+    }
+
+    fn collect_enum_declarations_from_block(
+        block: &hir::Block,
+        counts: &mut EnumVariantCounts,
+        variant_map: &mut VariantToEnum,
+    ) {
+        for stmt in &block.stmts {
+            Self::collect_enum_declarations_from_stmt(stmt, counts, variant_map);
         }
 
-        impl<'hir> Visitor<'hir> for EnumCollector<'_> {
-            fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
-                if let StmtKind::EnumDeclaration(decl) = &stmt.kind {
-                    self.counts.insert(decl.hir_id, decl.variants.len());
-                    for variant in &decl.variants {
-                        self.variant_map.insert(variant.hir_id, decl.hir_id);
+        if let Some(expr) = &block.expr {
+            Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+        }
+    }
+
+    fn collect_enum_declarations_from_stmt(
+        stmt: &hir::Stmt,
+        counts: &mut EnumVariantCounts,
+        variant_map: &mut VariantToEnum,
+    ) {
+        match &stmt.kind {
+            StmtKind::EnumDeclaration(decl) => {
+                counts.insert(decl.hir_id, decl.variants.len());
+                for variant in &decl.variants {
+                    variant_map.insert(variant.hir_id, decl.hir_id);
+                }
+            }
+            StmtKind::Expr(expr) => {
+                Self::collect_enum_declarations_from_expr(expr, counts, variant_map)
+            }
+            StmtKind::Return(Some(expr)) => {
+                Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+            }
+            StmtKind::Let(_, expr, _) | StmtKind::Const(_, _, expr, _) => {
+                Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+            }
+            StmtKind::FunctionDeclaration(decl) => {
+                Self::collect_enum_declarations_from_block(&decl.body, counts, variant_map);
+            }
+            StmtKind::DynFunctionDeclaration(_) => {}
+            StmtKind::StructDeclaration(decl) => {
+                for const_item in &decl.consts {
+                    Self::collect_enum_declarations_from_expr(
+                        &const_item.value,
+                        counts,
+                        variant_map,
+                    );
+                }
+            }
+            StmtKind::ProtocolDeclaration(decl) => {
+                for method in &decl.methods {
+                    if let Some(body) = &method.body {
+                        Self::collect_enum_declarations_from_block(body, counts, variant_map);
                     }
                 }
-
-                visit::walk_stmt(self, stmt, ctx);
+                for const_item in &decl.consts {
+                    Self::collect_enum_declarations_from_expr(
+                        &const_item.value,
+                        counts,
+                        variant_map,
+                    );
+                }
             }
+            StmtKind::ImplBlock(decl) => {
+                for method in &decl.methods {
+                    Self::collect_enum_declarations_from_block(&method.body, counts, variant_map);
+                }
+            }
+            StmtKind::Return(None) => {}
         }
+    }
 
-        let mut collector = EnumCollector {
-            counts,
-            variant_map,
-        };
-        collector.visit_module(module, &mut ());
+    fn collect_enum_declarations_from_expr(
+        expr: &hir::Expr,
+        counts: &mut EnumVariantCounts,
+        variant_map: &mut VariantToEnum,
+    ) {
+        match &expr.kind {
+            ExprKind::Block(block) | ExprKind::Loop(block) => {
+                Self::collect_enum_declarations_from_block(block, counts, variant_map);
+            }
+            ExprKind::Break(Some(expr))
+            | ExprKind::Unary(_, expr)
+            | ExprKind::FieldAccess(expr, _) => {
+                Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+            }
+            ExprKind::Call(call) | ExprKind::TailCall(call) => {
+                Self::collect_enum_declarations_from_expr(&call.callee, counts, variant_map);
+                for arg in &call.arguments {
+                    Self::collect_enum_declarations_from_expr(arg, counts, variant_map);
+                }
+            }
+            ExprKind::Cast(expr, _)
+            | ExprKind::TryCast(expr, _)
+            | ExprKind::IndexAccess(expr, _)
+            | ExprKind::Implements(expr, _) => {
+                Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+            }
+            ExprKind::Binary(_, left, right) => {
+                Self::collect_enum_declarations_from_expr(left, counts, variant_map);
+                Self::collect_enum_declarations_from_expr(right, counts, variant_map);
+            }
+            ExprKind::Let(_, expr) => {
+                Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+            }
+            ExprKind::IfElse(condition, consequence, else_clauses) => {
+                Self::collect_enum_declarations_from_expr(condition, counts, variant_map);
+                Self::collect_enum_declarations_from_block(consequence, counts, variant_map);
+                for else_clause in else_clauses {
+                    if let Some(condition) = &else_clause.condition {
+                        Self::collect_enum_declarations_from_expr(condition, counts, variant_map);
+                    }
+                    Self::collect_enum_declarations_from_block(
+                        &else_clause.consequence,
+                        counts,
+                        variant_map,
+                    );
+                }
+            }
+            ExprKind::List(items) => {
+                for item in items {
+                    Self::collect_enum_declarations_from_expr(item, counts, variant_map);
+                }
+            }
+            ExprKind::Dict(items) => {
+                for (key, value) in items {
+                    Self::collect_enum_declarations_from_expr(key, counts, variant_map);
+                    Self::collect_enum_declarations_from_expr(value, counts, variant_map);
+                }
+            }
+            ExprKind::Match(scrutinee, arms) => {
+                Self::collect_enum_declarations_from_expr(scrutinee, counts, variant_map);
+                for arm in arms {
+                    if let Some(guard) = &arm.guard {
+                        Self::collect_enum_declarations_from_expr(guard, counts, variant_map);
+                    }
+                    Self::collect_enum_declarations_from_block(&arm.block, counts, variant_map);
+                }
+            }
+            ExprKind::Range(range) => {
+                Self::collect_enum_declarations_from_expr(&range.start, counts, variant_map);
+                Self::collect_enum_declarations_from_expr(&range.end, counts, variant_map);
+            }
+            ExprKind::TaggedString { tag, exprs, .. } => {
+                Self::collect_enum_declarations_from_expr(tag, counts, variant_map);
+                for expr in exprs {
+                    Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+                }
+            }
+            ExprKind::FunctionExpression(decl) => {
+                Self::collect_enum_declarations_from_block(&decl.body, counts, variant_map);
+            }
+            ExprKind::Path(_)
+            | ExprKind::Literal(_)
+            | ExprKind::Wildcard
+            | ExprKind::Continue
+            | ExprKind::Break(None) => {}
+        }
     }
 
     /// Given a match arm's pattern, try to determine the parent enum `HirId`
