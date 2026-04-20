@@ -106,7 +106,7 @@ impl ExhaustiveEnumMatch {
     }
 
     /// Returns `true` when the catch-all's type annotation indicates it was
-    /// typed for a specific type (not `Unknown`).  An `Unknown` (or untyped)
+    /// typed for a specific type (not `Unknown`). An `Unknown` (or untyped)
     /// catch-all may accept values of any type and must be preserved.
     fn is_typed_catchall(pat: &hir::Pat) -> bool {
         !matches!(pat.ty.kind, TyKind::Unknown)
