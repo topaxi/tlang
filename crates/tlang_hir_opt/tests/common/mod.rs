@@ -133,8 +133,9 @@ pub fn compile_typecheck_and_optimize(
     let mut ctx = meta.into();
 
     // Run pre-typecheck passes (SymbolResolution, TailPositionAnalysis, etc.)
-    // but skip DCE/SlotAllocation/FreeVariableAnalysis which would remove
-    // unreferenced declarations and are not needed for this test.
+    // but skip DeadCodeElimination because it can remove unreferenced
+    // declarations, and skip SlotAllocation/FreeVariableAnalysis because
+    // they are not needed for this test.
     let mut optimizer = HirOptimizer::from(
         tlang_hir_opt::DefaultOptimizations::default()
             .without("DeadCodeElimination")

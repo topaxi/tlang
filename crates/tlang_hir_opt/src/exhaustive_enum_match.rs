@@ -53,31 +53,47 @@ impl ExhaustiveEnumMatch {
         }
     }
 
-    /// Pre-populate lookup tables by scanning top-level enum declarations.
-    fn build_enum_maps(&mut self, module: &hir::Module) {
+    /// Pre-populate lookup tables by scanning enum declarations throughout the
+    /// whole module, including nested blocks.
+    fn build_enum_maps(&mut self, module: &mut hir::Module) {
         self.enum_variant_counts.clear();
         self.variant_to_enum.clear();
 
         Self::collect_enum_declarations(
-            &module.block,
+            module,
             &mut self.enum_variant_counts,
             &mut self.variant_to_enum,
         );
     }
 
     fn collect_enum_declarations(
-        block: &hir::Block,
+        module: &mut hir::Module,
         counts: &mut EnumVariantCounts,
         variant_map: &mut VariantToEnum,
     ) {
-        for stmt in &block.stmts {
-            if let StmtKind::EnumDeclaration(decl) = &stmt.kind {
-                counts.insert(decl.hir_id, decl.variants.len());
-                for variant in &decl.variants {
-                    variant_map.insert(variant.hir_id, decl.hir_id);
+        struct EnumCollector<'a> {
+            counts: &'a mut EnumVariantCounts,
+            variant_map: &'a mut VariantToEnum,
+        }
+
+        impl<'hir> Visitor<'hir> for EnumCollector<'_> {
+            fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
+                if let StmtKind::EnumDeclaration(decl) = &stmt.kind {
+                    self.counts.insert(decl.hir_id, decl.variants.len());
+                    for variant in &decl.variants {
+                        self.variant_map.insert(variant.hir_id, decl.hir_id);
+                    }
                 }
+
+                visit::walk_stmt(self, stmt, ctx);
             }
         }
+
+        let mut collector = EnumCollector {
+            counts,
+            variant_map,
+        };
+        collector.visit_module(module, &mut ());
     }
 
     /// Given a match arm's pattern, try to determine the parent enum `HirId`
@@ -266,6 +282,7 @@ fn is_catch_all_pattern(pat: &hir::Pat) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tlang_ast::node::{Ident, Visibility};
 
     #[test]
     fn is_catch_all_wildcard() {
@@ -288,5 +305,60 @@ mod tests {
             span: Default::default(),
         };
         assert!(is_catch_all_pattern(&pat));
+    }
+
+    #[test]
+    fn build_enum_maps_collects_nested_enums() {
+        let enum_hir_id = HirId::new(10);
+        let variant_hir_id = HirId::new(11);
+        let enum_stmt = hir::Stmt::new(
+            HirId::new(12),
+            StmtKind::EnumDeclaration(Box::new(hir::EnumDeclaration {
+                hir_id: enum_hir_id,
+                visibility: Visibility::Private,
+                name: Ident::new("Local", Default::default()),
+                type_params: vec![],
+                variants: vec![hir::EnumVariant {
+                    hir_id: variant_hir_id,
+                    name: Ident::new("Only", Default::default()),
+                    parameters: vec![],
+                    discriminant: None,
+                    span: Default::default(),
+                }],
+                consts: vec![],
+            })),
+            Default::default(),
+        );
+
+        let nested_block =
+            hir::Block::new(HirId::new(13), vec![enum_stmt], None, Default::default());
+        let mut module = hir::Module {
+            hir_id: HirId::new(1),
+            block: hir::Block::new(
+                HirId::new(2),
+                vec![hir::Stmt::new(
+                    HirId::new(3),
+                    StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: HirId::new(4),
+                        kind: ExprKind::Block(Box::new(nested_block)),
+                        ty: hir::Ty::unknown(),
+                        span: Default::default(),
+                    })),
+                    Default::default(),
+                )],
+                None,
+                Default::default(),
+            ),
+            span: Default::default(),
+        };
+
+        let mut pass = ExhaustiveEnumMatch::default();
+        pass.build_enum_maps(&mut module);
+
+        assert_eq!(pass.enum_variant_counts.get(&enum_hir_id), Some(&1));
+        assert_eq!(
+            pass.variant_to_enum.get(&variant_hir_id),
+            Some(&enum_hir_id)
+        );
     }
 }

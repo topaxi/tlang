@@ -139,6 +139,12 @@ fn compile_to_hir(
         return Err(diagnostics.errors);
     }
 
+    let mut exhaustive_enum = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    if let Err(err) = exhaustive_enum.optimize_hir(&mut module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        std::process::exit(1);
+    }
+
     Ok(module)
 }
 
@@ -374,5 +380,29 @@ mod tests {
         assert_eq!(fs::read_to_string(&output_file).unwrap(), "existing output");
 
         fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn compile_to_hir_runs_exhaustive_enum_match_post_typecheck() {
+        let source = r#"
+            enum Color {
+                Red,
+                Green,
+            }
+
+            fn name(Color::Red) { "red" }
+            fn name(Color::Green) { "green" }
+            fn name(_) { "fallback" }
+        "#;
+
+        let mut module =
+            compile_to_hir("inline.tlang", source, &CompileTargetArg::Js, false).unwrap();
+        let (pretty, warnings) = HirTarget.compile(source, &mut module).unwrap();
+
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+        assert!(
+            !pretty.contains("_ =>"),
+            "compile_to_hir should run ExhaustiveEnumMatch post-typecheck:\n{pretty}"
+        );
     }
 }
