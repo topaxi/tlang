@@ -2,15 +2,8 @@ mod common;
 
 use insta::assert_snapshot;
 
-fn optimizer() -> tlang_hir_opt::HirOptimizer {
-    tlang_hir_opt::HirOptimizer::new(vec![
-        Box::new(tlang_hir_opt::symbol_resolution::SymbolResolution::default()),
-        Box::new(tlang_hir_opt::ExhaustiveEnumMatch::default()),
-    ])
-}
-
 /// When every variant of a user-defined enum is covered by explicit arms
-/// plus a trailing catch-all clause (whose inferred type matches the enum),
+/// plus a trailing catch-all clause (whose type-checked type matches the enum),
 /// the catch-all is unreachable and should be removed.
 #[test]
 fn exhaustive_match_removes_wildcard() {
@@ -26,7 +19,8 @@ fn exhaustive_match_removes_wildcard() {
         fn name(Color::Blue) { "blue" }
         fn name(_) { "unknown" }
     "#;
-    let hir = common::compile_and_optimize(source, &mut optimizer());
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
     let pretty = common::pretty_print(&hir);
 
     // The wildcard arm (from the catch-all clause) should be gone.
@@ -51,7 +45,8 @@ fn partial_match_keeps_wildcard() {
         fn name(Color::Green) { "green" }
         fn name(_) { "fallback" }
     "#;
-    let hir = common::compile_and_optimize(source, &mut optimizer());
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
     let pretty = common::pretty_print(&hir);
 
     assert!(
@@ -75,7 +70,8 @@ fn guarded_arm_keeps_wildcard() {
         fn describe(Light::Off) if 1 == 0 { "off (impossible)" }
         fn describe(_) { "fallback" }
     "#;
-    let hir = common::compile_and_optimize(source, &mut optimizer());
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
     let pretty = common::pretty_print(&hir);
 
     assert!(
@@ -99,7 +95,8 @@ fn exhaustive_match_with_data_fields() {
         fn area(Shape::Rect(w, h)) { w * h }
         fn area(_) { 0 }
     "#;
-    let hir = common::compile_and_optimize(source, &mut optimizer());
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
     let pretty = common::pretty_print(&hir);
 
     assert!(
@@ -121,7 +118,8 @@ fn single_variant_enum_removes_wildcard() {
         fn unwrap(Wrapper::Value(v)) { v }
         fn unwrap(_) { 0 }
     "#;
-    let hir = common::compile_and_optimize(source, &mut optimizer());
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
     let pretty = common::pretty_print(&hir);
 
     assert!(
@@ -145,7 +143,8 @@ fn no_wildcard_is_noop() {
         fn name(Color::Green) { "green" }
         fn name(Color::Blue) { "blue" }
     "#;
-    let hir = common::compile_and_optimize(source, &mut optimizer());
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
     let pretty = common::pretty_print(&hir);
 
     // Should have exactly 3 arms, no wildcard.
@@ -167,7 +166,8 @@ fn exhaustive_match_removes_identifier_catchall() {
         fn label(AB::B) { "b" }
         fn label(other) { "?" }
     "#;
-    let hir = common::compile_and_optimize(source, &mut optimizer());
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
     let pretty = common::pretty_print(&hir);
 
     // The `other =>` arm is also a catch-all and should be removed.
@@ -193,7 +193,8 @@ fn restrictive_payload_pattern_keeps_wildcard() {
         fn classify(Num::W) { "w" }
         fn classify(_) { "other" }
     "#;
-    let hir = common::compile_and_optimize(source, &mut optimizer());
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
     let pretty = common::pretty_print(&hir);
 
     assert!(
@@ -214,7 +215,8 @@ fn unknown_typed_catchall_keeps_wildcard() {
         fn render(SafeHtml::Html(v)) { v }
         fn render(v: unknown) { "fallback" }
     "#;
-    let hir = common::compile_and_optimize(source, &mut optimizer());
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
     let pretty = common::pretty_print(&hir);
 
     assert!(

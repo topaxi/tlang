@@ -8,7 +8,7 @@ enum Num {
     }
     W
 }
-fn classify(num: Num) -> unknown {
+fn classify(num: Num) -> String {
     match num {
         Num::V { 0: 0 } => {
             "zero"

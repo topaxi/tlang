@@ -6,7 +6,7 @@ use tlang_ast_lowering::lower_to_hir;
 use tlang_core::{memory::TlangValue, vm::VM};
 use tlang_diagnostics::{render_ice, render_parse_issues, render_semantic_diagnostics};
 use tlang_hir as hir;
-use tlang_hir_opt::HirOptimizer;
+use tlang_hir_opt::{HirOptimizer, HirPass};
 use tlang_modules::{
     CompiledModule, ModulePath, MultiModuleCompileResult, compile_project_with_slots,
 };
@@ -229,6 +229,13 @@ fn compile(input_file: &str) -> (hir::Module, std::collections::HashSet<tlang_hi
             std::process::exit(1);
         }
     };
+    // ExhaustiveEnumMatch must run after type checking — it uses type-checked
+    // pattern types to verify catch-all arms match the same enum.
+    let mut exhaustive_enum = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    if let Err(err) = exhaustive_enum.optimize_hir(&mut module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        std::process::exit(1);
+    }
     let source_name = path.to_string_lossy();
     print_source_diagnostics(&source_name, &source, &diagnostics.warnings);
     if diagnostics.has_errors() {
@@ -258,6 +265,12 @@ fn prepare_module_for_execution(
             std::process::exit(1);
         }
     };
+    // ExhaustiveEnumMatch must run after type checking.
+    let mut exhaustive_enum = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    if let Err(err) = exhaustive_enum.optimize_hir(&mut hir_module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        std::process::exit(1);
+    }
 
     let parsed_module = &result.graph.modules[path];
     let source_name = parsed_module.file_path.to_string_lossy();

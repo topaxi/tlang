@@ -7,7 +7,7 @@ use tlang_ast_lowering::lower_to_hir;
 use tlang_diagnostics::{
     render_diagnostics, render_ice, render_parse_issues, render_semantic_diagnostics,
 };
-use tlang_hir_opt::HirOptimizer;
+use tlang_hir_opt::{HirOptimizer, HirPass};
 use tlang_semantics::SemanticAnalyzer;
 use tlang_semantics::diagnostic::Diagnostic as SemanticDiagnostic;
 use tlang_typeck::typecheck_module;
@@ -109,6 +109,12 @@ fn main() {
             process::exit(1);
         }
     };
+    // ExhaustiveEnumMatch must run after type checking.
+    let mut exhaustive_enum = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    if let Err(err) = exhaustive_enum.optimize_hir(&mut module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        process::exit(1);
+    }
 
     if !diagnostics.warnings.is_empty() {
         eprint!(

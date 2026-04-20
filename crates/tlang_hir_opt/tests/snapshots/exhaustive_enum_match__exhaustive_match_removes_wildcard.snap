@@ -7,7 +7,7 @@ enum Color {
     Green
     Blue
 }
-fn name(color: Color) -> unknown {
+fn name(color: Color) -> String {
     match color {
         Color::Red => {
             "red"

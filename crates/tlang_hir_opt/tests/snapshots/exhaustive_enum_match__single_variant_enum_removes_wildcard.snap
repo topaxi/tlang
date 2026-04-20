@@ -7,7 +7,7 @@ enum Wrapper {
         0: i64,
     }
 }
-fn unwrap(wrapper: Wrapper) -> unknown {
+fn unwrap(wrapper: Wrapper) -> i64 {
     match wrapper {
         Wrapper::Value { 0: v } => {
             v

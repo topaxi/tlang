@@ -6,7 +6,7 @@ enum AB {
     A
     B
 }
-fn label(arg0: AB) -> unknown {
+fn label(arg0: AB) -> String {
     match arg0 {
         AB::A => {
             "a"

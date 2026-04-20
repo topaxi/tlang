@@ -6,12 +6,12 @@ enum Light {
     On
     Off
 }
-fn describe(light: Light) -> unknown {
+fn describe(light: Light) -> String {
     match light {
         Light::On => {
             "on"
         },
-        Light::Off if (1 == 0) => {
+        Light::Off if false => {
             "off (impossible)"
         },
         _ => {

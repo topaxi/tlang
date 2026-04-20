@@ -7,7 +7,7 @@ enum SafeHtml {
         0: String,
     }
 }
-fn render(arg0: unknown) -> unknown {
+fn render(arg0: unknown) -> String {
     match arg0 {
         SafeHtml::Html { 0: v } => {
             v

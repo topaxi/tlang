@@ -121,6 +121,43 @@ pub fn compile_and_optimize(source: &str, optimizer: &mut HirOptimizer) -> hir::
     module
 }
 
+/// Run the default optimizer, then type checking, then a post-typecheck pass.
+///
+/// `ExhaustiveEnumMatch` requires type-checked pattern types on catch-all arms,
+/// so it must run after the type checker.
+pub fn compile_typecheck_and_optimize(
+    source: &str,
+    post_typecheck_pass: &mut dyn tlang_hir_opt::HirPass,
+) -> hir::Module {
+    let (mut module, meta) = compile(source);
+    let mut ctx = meta.into();
+
+    // Run pre-typecheck passes (SymbolResolution, TailPositionAnalysis, etc.)
+    // but skip DCE/SlotAllocation/FreeVariableAnalysis which would remove
+    // unreferenced declarations and are not needed for this test.
+    let mut optimizer = HirOptimizer::from(
+        tlang_hir_opt::DefaultOptimizations::default()
+            .without("DeadCodeElimination")
+            .without("SlotAllocation")
+            .without("FreeVariableAnalysis"),
+    );
+    optimizer
+        .optimize_hir(&mut module, &mut ctx)
+        .expect("HIR optimization failed");
+
+    // Run type checking so that pat.ty.kind is populated.
+    let mut type_checker = tlang_typeck::TypeChecker::new();
+    tlang_hir_opt::HirPass::optimize_hir(&mut type_checker, &mut module, &mut ctx)
+        .expect("type checking failed");
+
+    // Run the post-typecheck pass.
+    post_typecheck_pass
+        .optimize_hir(&mut module, &mut ctx)
+        .expect("post-typecheck pass failed");
+
+    module
+}
+
 pub fn pretty_print(module: &hir::Module) -> String {
     let options = HirPrettyOptions {
         mark_unresolved: false,

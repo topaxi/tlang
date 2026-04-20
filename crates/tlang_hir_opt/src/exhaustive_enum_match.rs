@@ -14,12 +14,15 @@ type EnumVariantCounts = HashMap<HirId, usize>;
 /// Maps a variant's `HirId` back to its parent enum `HirId`.
 type VariantToEnum = HashMap<HirId, HirId>;
 
-/// Maps an enum's name (string) to its `HirId`.
-type EnumNameToHirId = HashMap<String, HirId>;
-
 /// HIR optimisation pass that removes an unreachable trailing wildcard (or
 /// catch-all identifier) arm from a `match` expression when every variant of
 /// the matched enum is already covered by explicit `PatKind::Enum` arms.
+///
+/// **Must run after type checking.** The pass relies on the type checker
+/// having populated `pat.ty.kind` on each match arm (including catch-alls)
+/// with the scrutinee's type. This gives every catch-all pattern a
+/// `TyKind::Path` whose inner `path.res.hir_id()` reliably identifies the
+/// enum declaration — no string-name matching required.
 ///
 /// The pass is intentionally conservative:
 ///
@@ -29,16 +32,15 @@ type EnumNameToHirId = HashMap<String, HirId>;
 ///   fail, causing fall-through to the wildcard.
 /// * Only the **last** arm is considered for removal, and only when it is a
 ///   wildcard or a bare identifier (both are catch-all patterns).
-/// * The trailing catch-all must have a **typed** annotation that resolves to
-///   the same enum — an `unknown` (or untyped) catch-all may handle values of
-///   entirely different types and must be preserved.
+/// * The trailing catch-all's type must resolve to the **same** enum as the
+///   explicit variant arms. An `unknown` (or untyped) catch-all, or one typed
+///   with a different type, is preserved.
 /// * Each variant arm must only use catch-all sub-patterns (identifiers or
 ///   wildcards) in its payload fields. A restrictive sub-pattern (e.g. a
 ///   literal like `Enum::V(0)`) does not fully cover the variant.
 pub struct ExhaustiveEnumMatch {
     enum_variant_counts: EnumVariantCounts,
     variant_to_enum: VariantToEnum,
-    enum_name_to_hir_id: EnumNameToHirId,
     changed: bool,
 }
 
@@ -47,7 +49,6 @@ impl ExhaustiveEnumMatch {
         Self {
             enum_variant_counts: HashMap::new(),
             variant_to_enum: HashMap::new(),
-            enum_name_to_hir_id: HashMap::new(),
             changed: false,
         }
     }
@@ -56,13 +57,11 @@ impl ExhaustiveEnumMatch {
     fn build_enum_maps(&mut self, module: &hir::Module) {
         self.enum_variant_counts.clear();
         self.variant_to_enum.clear();
-        self.enum_name_to_hir_id.clear();
 
         Self::collect_enum_declarations(
             &module.block,
             &mut self.enum_variant_counts,
             &mut self.variant_to_enum,
-            &mut self.enum_name_to_hir_id,
         );
     }
 
@@ -70,12 +69,10 @@ impl ExhaustiveEnumMatch {
         block: &hir::Block,
         counts: &mut EnumVariantCounts,
         variant_map: &mut VariantToEnum,
-        name_map: &mut EnumNameToHirId,
     ) {
         for stmt in &block.stmts {
             if let StmtKind::EnumDeclaration(decl) = &stmt.kind {
                 counts.insert(decl.hir_id, decl.variants.len());
-                name_map.insert(decl.name.to_string(), decl.hir_id);
                 for variant in &decl.variants {
                     variant_map.insert(variant.hir_id, decl.hir_id);
                 }
@@ -90,13 +87,10 @@ impl ExhaustiveEnumMatch {
     ///
     /// 1. **Pattern type annotation** (`pat.ty.res`) — reliable when the
     ///    pattern has an explicit type annotation that resolved to the enum
-    ///    declaration. Inferred parameter annotations from multi-clause
-    ///    function lowering are not expected to point at the enum declaration
-    ///    `HirId`.
+    ///    declaration `HirId`.
     /// 2. **Variant path resolution** (`path.res.hir_id()`) — the primary
-    ///    strategy for inferred patterns. After `IdentifierResolver`, the path
-    ///    points to the variant declaration whose `HirId` is in
-    ///    `variant_to_enum`.
+    ///    strategy. After `IdentifierResolver`, the variant path points to
+    ///    the variant declaration whose `HirId` is in `variant_to_enum`.
     fn resolve_enum_hir_id(&self, pat: &hir::Pat) -> Option<HirId> {
         if let PatKind::Enum(path, _) = &pat.kind {
             // Strategy 1: explicit type annotations may resolve directly to the
@@ -118,39 +112,36 @@ impl ExhaustiveEnumMatch {
         None
     }
 
-    /// Check whether the catch-all arm's type annotation corresponds to the
-    /// given `enum_hir_id`. Returns `true` only when the catch-all is provably
-    /// typed for this specific enum (not `Unknown`, not a primitive, not a
-    /// different named type).
+    /// Resolve the enum `HirId` from the catch-all pattern's type annotation.
     ///
-    /// Resolution strategies (tried in order):
-    /// 1. `pat.ty.res` — reliable for explicit type annotations.
-    /// 2. `TyKind::Path` segment name — for inferred annotations from
-    ///    `FnParamTypeInference`, whose synthetic `NodeId` does not map to a
-    ///    declaration `HirId`.
-    fn catchall_type_matches_enum(&self, pat: &hir::Pat, enum_hir_id: HirId) -> bool {
-        // Unknown-typed catch-all may handle values of any type.
-        if matches!(pat.ty.kind, TyKind::Unknown) {
-            return false;
-        }
-
-        // Strategy 1: pat.ty.res directly identifies the enum declaration.
-        if let Some(res_hir_id) = pat.ty.res {
-            if res_hir_id == enum_hir_id {
-                return true;
-            }
-        }
-
-        // Strategy 2: TyKind::Path — resolve the path name to an enum HirId.
+    /// After type checking, the type checker sets `pat.ty.kind` on every match
+    /// arm to the scrutinee's type. For enum-dispatching matches this is a
+    /// `TyKind::Path(path, _)` whose `path.res.hir_id()` identifies the enum
+    /// declaration.
+    ///
+    /// Returns `None` when:
+    /// - The type is `Unknown` (untyped / explicitly `unknown`-annotated)
+    /// - The type is not a `Path` (e.g. a primitive like `i64`)
+    /// - The path does not resolve to a known enum declaration
+    fn resolve_catchall_enum_hir_id(&self, pat: &hir::Pat) -> Option<HirId> {
         if let TyKind::Path(ref path, _) = pat.ty.kind {
-            if let Some(first_segment) = path.segments.first() {
-                if let Some(&name_hir_id) = self.enum_name_to_hir_id.get(first_segment.ident.as_str()) {
-                    return name_hir_id == enum_hir_id;
-                }
+            // Primary: pat.ty.res set by lowering for explicit annotations.
+            if let Some(res_hir_id) = pat.ty.res
+                && self.enum_variant_counts.contains_key(&res_hir_id)
+            {
+                return Some(res_hir_id);
+            }
+
+            // Fallback: path.res.hir_id() set by the type checker from the
+            // scrutinee's resolved type.
+            if let Some(hir_id) = path.res.hir_id()
+                && self.enum_variant_counts.contains_key(&hir_id)
+            {
+                return Some(hir_id);
             }
         }
 
-        false
+        None
     }
 
     /// Returns `true` if the trailing arm was removed.
@@ -164,12 +155,6 @@ impl ExhaustiveEnumMatch {
 
         // Only remove catch-all arms (wildcard `_` or bare identifier).
         if !is_catch_all_pattern(&last.pat) {
-            return false;
-        }
-
-        // The catch-all must carry a non-Unknown type annotation — an `unknown`
-        // or untyped catch-all may handle values of entirely different types.
-        if !Self::is_typed_catchall(&last.pat) {
             return false;
         }
 
@@ -213,7 +198,15 @@ impl ExhaustiveEnumMatch {
             None => return false,
         };
 
-        let total_variants = match self.enum_variant_counts.get(&enum_hir_id) {
+        // The catch-all's type must resolve to the same enum as the explicit
+        // arms. After type checking, the type checker populates `pat.ty.kind`
+        // with the scrutinee's type, so this check is reliable.
+        let catchall_enum = match self.resolve_catchall_enum_hir_id(&arms.last().unwrap().pat) {
+            Some(id) if id == enum_hir_id => id,
+            _ => return false,
+        };
+
+        let total_variants = match self.enum_variant_counts.get(&catchall_enum) {
             Some(&count) => count,
             None => return false,
         };
