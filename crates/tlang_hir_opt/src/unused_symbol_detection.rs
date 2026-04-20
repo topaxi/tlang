@@ -294,6 +294,8 @@ impl<'hir> hir::Visitor<'hir> for UnusedSymbolDetector {
         if let hir::PatKind::Enum(path, fields) = &mut pat.kind
             && matches!(path.res.binding_kind(), hir::BindingKind::Struct)
         {
+            // HIR reuses `PatKind::Enum` for both enum-variant patterns and
+            // struct destructuring. Limit this path to actual struct patterns.
             let type_name = path.to_string();
             for (field, nested_pat) in fields {
                 self.mark_field_as_used(&type_name, field.as_str(), ctx);
