@@ -7,11 +7,11 @@ use async_lsp::router::Router;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionParams, GotoDefinitionResponse, HoverParams, HoverProviderCapability,
-    InitializeParams, InitializeResult, InlayHint, InlayHintParams, ParameterInformation,
-    ParameterLabel, PublishDiagnosticsParams, ServerCapabilities, SignatureHelpOptions,
-    SignatureHelpParams, SignatureInformation, TextDocumentSyncCapability, TextDocumentSyncKind,
-    Url,
+    DidSaveTextDocumentParams, GotoDefinitionParams, GotoDefinitionResponse, HoverParams,
+    HoverProviderCapability, InitializeParams, InitializeResult, InlayHint, InlayHintParams,
+    ParameterInformation, ParameterLabel, PublishDiagnosticsParams, ServerCapabilities,
+    SignatureHelpOptions, SignatureHelpParams, SignatureInformation, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions, Url,
 };
 use serde::Deserialize;
 use tlang_analysis::CompilationTarget;
@@ -105,6 +105,7 @@ impl ServerState {
             .notification::<lsp_types::notification::Exit>(|_, _| ControlFlow::Break(Ok(())))
             .notification::<lsp_types::notification::DidOpenTextDocument>(Self::on_did_open)
             .notification::<lsp_types::notification::DidChangeTextDocument>(Self::on_did_change)
+            .notification::<lsp_types::notification::DidSaveTextDocument>(Self::on_did_save)
             .notification::<lsp_types::notification::DidCloseTextDocument>(Self::on_did_close);
 
         router
@@ -132,8 +133,13 @@ impl ServerState {
         Box::pin(async move {
             Ok(InitializeResult {
                 capabilities: ServerCapabilities {
-                    text_document_sync: Some(TextDocumentSyncCapability::Kind(
-                        TextDocumentSyncKind::FULL,
+                    text_document_sync: Some(TextDocumentSyncCapability::Options(
+                        TextDocumentSyncOptions {
+                            open_close: Some(true),
+                            change: Some(TextDocumentSyncKind::FULL),
+                            save: Some(TextDocumentSyncSaveOptions::Supported(true)),
+                            ..TextDocumentSyncOptions::default()
+                        },
                     )),
                     hover_provider: Some(HoverProviderCapability::Simple(true)),
                     definition_provider: Some(lsp_types::OneOf::Left(true)),
@@ -209,6 +215,22 @@ impl ServerState {
         // Clear diagnostics for the closed document.
         state.publish_diagnostics(uri.clone(), vec![], None);
         state.store.close(&uri);
+        ControlFlow::Continue(())
+    }
+
+    fn on_did_save(
+        state: &mut Self,
+        params: DidSaveTextDocumentParams,
+    ) -> ControlFlow<async_lsp::Result<()>> {
+        let uri = params.text_document.uri;
+
+        let Some(source) = state.store.get(&uri).map(|doc| doc.source.clone()) else {
+            warn!("ignoring didSave for unopened document: {uri}");
+            return ControlFlow::Continue(());
+        };
+
+        state.run_diagnostics(&uri, &source);
+
         ControlFlow::Continue(())
     }
 
@@ -810,11 +832,13 @@ impl ServerState {
         diagnostics: Vec<lsp_types::Diagnostic>,
         version: Option<i32>,
     ) {
-        let _ = self.client.publish_diagnostics(PublishDiagnosticsParams {
+        if let Err(err) = self.client.publish_diagnostics(PublishDiagnosticsParams {
             uri,
             diagnostics,
             version,
-        });
+        }) {
+            warn!("failed to publish diagnostics: {err}");
+        }
     }
 }
 

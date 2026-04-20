@@ -5,8 +5,8 @@ use async_lsp::router::Router;
 use async_lsp::server::LifecycleLayer;
 use futures::{AsyncReadExt, StreamExt};
 use lsp_types::{
-    DidOpenTextDocumentParams, InitializeParams, InitializedParams, PublishDiagnosticsParams,
-    TextDocumentIdentifier, TextDocumentItem, Url, notification,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, InitializeParams, InitializedParams,
+    PublishDiagnosticsParams, TextDocumentIdentifier, TextDocumentItem, Url, notification,
 };
 use tlang_lsp_server::server::ServerState;
 use tokio_util::compat::TokioAsyncReadCompatExt;
@@ -122,6 +122,29 @@ async fn smoke_test_diagnostics_on_open() {
     assert!(
         errors.is_empty(),
         "expected no error diagnostics for valid code, got: {errors:?}"
+    );
+
+    // Save the valid document — this should not crash the server and should
+    // republish diagnostics for the current document contents.
+    server
+        .notify::<notification::DidSaveTextDocument>(DidSaveTextDocumentParams {
+            text_document: TextDocumentIdentifier {
+                uri: valid_uri.clone(),
+            },
+            text: None,
+        })
+        .unwrap();
+
+    let saved_diag_params = diag_rx.next().await.unwrap();
+    assert_eq!(saved_diag_params.uri, valid_uri);
+    let save_errors: Vec<_> = saved_diag_params
+        .diagnostics
+        .iter()
+        .filter(|d| d.severity == Some(lsp_types::DiagnosticSeverity::ERROR))
+        .collect();
+    assert!(
+        save_errors.is_empty(),
+        "expected no error diagnostics after save, got: {save_errors:?}"
     );
 
     // Close the bad document — should get empty diagnostics to clear.
