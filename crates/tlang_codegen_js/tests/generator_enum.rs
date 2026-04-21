@@ -329,7 +329,7 @@ fn test_discriminant_enum_pattern_matching() {
                 return \"OK\";
             } else if (httpstatus === HttpStatus.NotFound) {
                 return \"Not Found\";
-            }
+            } else $matchError(httpstatus);
         }
     "};
     assert_eq!(output, expected_output);

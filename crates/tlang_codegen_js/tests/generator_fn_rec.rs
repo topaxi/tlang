@@ -187,7 +187,11 @@ fn test_foldl_impl() {
                     acc = $tmp$1;
                     f = $tmp$2;
                     continue rec;
-                } else $matchError();
+                } else $matchError([
+                    arg0,
+                    acc,
+                    f
+                ]);
             }
         }
     "};
@@ -238,7 +242,12 @@ fn test_partition_impl() {
                     satisfies = $tmp$2;
                     doesNotSatisfy = $tmp$3;
                     continue rec;
-                } else $matchError();
+                } else $matchError([
+                    list,
+                    predicate,
+                    satisfies,
+                    doesNotSatisfy
+                ]);
             }
         }
         function partition() {
@@ -284,7 +293,11 @@ fn test_all_impl() {
                     predicate = $tmp$1;
                     acc = $tmp$2;
                     continue rec;
-                } else $matchError();
+                } else $matchError([
+                    list,
+                    predicate,
+                    acc
+                ]);
             }
         }
         function all() {

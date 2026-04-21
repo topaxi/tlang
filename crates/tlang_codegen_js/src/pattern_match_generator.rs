@@ -263,12 +263,23 @@ impl<'a> InnerCodegen<'a> {
         let_guard_var: &str,
     ) -> Option<Statement<'a>> {
         if arms.is_empty() {
-            // Generate a runtime error for non-exhaustive matches. Only pass
-            // the match value when the root maps to a real JS identifier.
+            // Generate a runtime error for non-exhaustive matches. Pass either
+            // the single match subject or the fixed list of subjects used for
+            // lowered multi-clause function parameter matching.
             let callee = self.ident_expr("$matchError");
-            let args = match root {
-                AccessPath::Ident(name) if !name.is_empty() => {
+            let args = match (root, fixed_list_idents.as_ref()) {
+                (AccessPath::Ident(name), _) if !name.is_empty() => {
                     vec![Argument::from(self.access_path_to_expr(root))]
+                }
+                (_, Some(idents)) => {
+                    let elements: Vec<_> = idents
+                        .iter()
+                        .map(|name| ArrayExpressionElement::from(self.ident_expr(name)))
+                        .collect();
+                    let values = self
+                        .ast
+                        .expression_array(SPAN, self.ast.vec_from_iter(elements));
+                    vec![Argument::from(values)]
                 }
                 _ => vec![],
             };
