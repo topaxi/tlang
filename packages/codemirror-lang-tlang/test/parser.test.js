@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { fileTests } from '@lezer/generator/dist/test';
 import { parser } from '../src/parser.js';
 
@@ -24,4 +24,20 @@ describe('triple-quoted strings', () => {
 
 describe('keyword suffix expressions', () => {
   runCorpus('keyword-suffix-operators.txt');
+});
+
+describe('type declaration names', () => {
+  for (const source of ['enum Foo {}', 'struct Foo {}', 'protocol Foo {}']) {
+    it(`accepts uppercase type names in "${source}"`, () => {
+      const tree = parser.parse(source).toString();
+      expect(tree).toContain('TypeName');
+      expect(tree).not.toContain('⚠');
+    });
+  }
+
+  for (const source of ['enum foo {}', 'struct foo {}', 'protocol foo {}']) {
+    it(`rejects lowercase type names in "${source}"`, () => {
+      expect(parser.parse(source).toString()).toContain('⚠');
+    });
+  }
 });
