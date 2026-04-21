@@ -74,7 +74,11 @@ export class $Protocol {
     // type-parameterized lookup first.
     let impl;
     const lastArg = args[args.length - 1];
-    if (lastArg != null && lastArg[$typeArgSymbol] === true && args.length > 0) {
+    if (
+      lastArg != null &&
+      lastArg[$typeArgSymbol] === true &&
+      args.length > 0
+    ) {
       const typeArgKey = `${Type?.name ?? Type}::${lastArg.key}`;
       impl = this.#impls.get(typeArgKey);
       if (impl) {
@@ -91,7 +95,10 @@ export class $Protocol {
     // Blanket impl fallback: use if all constraint protocols are satisfied.
     if (!impl && this.#blanketImpl) {
       const blanket = this.#blanketImpl;
-      if (blanket.constraints.length === 0 || blanket.constraints.every((c) => c.$implements(self))) {
+      if (
+        blanket.constraints.length === 0 ||
+        blanket.constraints.every((c) => c.$implements(self))
+      ) {
         impl = blanket.methods;
       }
     }
@@ -146,6 +153,10 @@ export function $unreachable(msg = 'Reached unreachable code') {
   $assert(false, msg);
 }
 
+/**
+ * @param {unknown} value - The value to get the enum tag name for.
+ * @return {string | null}
+ */
 function $enumTagName(value) {
   if (value == null || typeof value !== 'object') return null;
   const tag = value.tag;
@@ -164,6 +175,7 @@ function $enumTagName(value) {
 /**
  * Throws a descriptive error for a non-exhaustive pattern match.
  * @param {unknown} [value] - The unmatched value.
+ * @return {never}
  */
 export function $matchError(value) {
   const typeName = value?.constructor?.name;
@@ -172,9 +184,7 @@ export function $matchError(value) {
     typeName && tagName
       ? `${typeName}::${tagName}`
       : (tagName ?? typeName ?? $getType(value));
-  throw new $AssertError(
-    `Non-exhaustive pattern match: unmatched value of type ${desc}`,
-  );
+  $unreachable(`Non-exhaustive pattern match: unmatched value of type ${desc}`);
 }
 
 export const $uncurryThis = (() => {
