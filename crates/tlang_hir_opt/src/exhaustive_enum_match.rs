@@ -101,7 +101,7 @@ impl ExhaustiveEnumMatch {
                 }
             }
             StmtKind::Expr(expr) => {
-                Self::collect_enum_declarations_from_expr(expr, counts, variant_map)
+                Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
             }
             StmtKind::Return(Some(expr)) => {
                 Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
