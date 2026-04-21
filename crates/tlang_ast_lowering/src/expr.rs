@@ -173,7 +173,7 @@ impl LoweringContext {
                 })
             })
             .collect();
-        hir::ExprKind::Match(Box::new(expr), arms)
+        hir::ExprKind::Match(Box::new(expr), arms, hir::MatchMetadata::default())
     }
 
     /// Lowers `expr matches pat` into a synthetic `match expr { pat => true, _ => false }`.
@@ -236,7 +236,11 @@ impl LoweringContext {
             trailing_comments: vec![],
         };
 
-        hir::ExprKind::Match(Box::new(lowered_expr), vec![true_arm, false_arm])
+        hir::ExprKind::Match(
+            Box::new(lowered_expr),
+            vec![true_arm, false_arm],
+            hir::MatchMetadata::default(),
+        )
     }
 
     fn lower_if_else(&mut self, if_else_expr: &ast::node::IfElseExpression) -> hir::ExprKind {
@@ -304,7 +308,7 @@ impl LoweringContext {
             });
         }
 
-        hir::ExprKind::Match(Box::new(expr), arms)
+        hir::ExprKind::Match(Box::new(expr), arms, hir::MatchMetadata::default())
     }
 
     fn lower_callee(&mut self, callee: &ast::node::Expr, arg_len: usize) -> hir::Expr {

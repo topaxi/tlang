@@ -278,7 +278,7 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(
             visitor.visit_expr(expr, ctx);
             visitor.visit_expr(base, ctx);
         }
-        hir::ExprKind::Match(expr, arms) => {
+        hir::ExprKind::Match(expr, arms, _) => {
             visitor.visit_expr(expr, ctx);
             for arm in arms {
                 walk_match_arm(visitor, arm, ctx);

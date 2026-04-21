@@ -235,13 +235,13 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                     );
                     block.stmts.push(if_stmt);
                 }
-                hir::ExprKind::Match(scrutinee, mut arms) => {
+                hir::ExprKind::Match(scrutinee, mut arms, metadata) => {
                     self.rewrite_match_completions(temp_name, pat_hir_id, &mut arms);
                     let match_stmt = hir::Stmt::new(
                         self.alloc_hir_id(),
                         hir::StmtKind::Expr(Box::new(hir::Expr {
                             hir_id: completion.hir_id,
-                            kind: hir::ExprKind::Match(scrutinee, arms),
+                            kind: hir::ExprKind::Match(scrutinee, arms, metadata),
                             ty: completion_ty,
                             span: completion.span,
                         })),
@@ -325,7 +325,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                 );
                 self.pending.push(if_stmt);
             }
-            hir::ExprKind::Match(scrutinee, mut arms) => {
+            hir::ExprKind::Match(scrutinee, mut arms, metadata) => {
                 let init = self.make_literal_none_expr();
                 let let_stmt = self.make_let_stmt(&temp_name, pat_hir_id, init);
                 self.pending.push(let_stmt);
@@ -335,7 +335,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                     self.alloc_hir_id(),
                     hir::StmtKind::Expr(Box::new(hir::Expr {
                         hir_id: expr.hir_id,
-                        kind: hir::ExprKind::Match(scrutinee, arms),
+                        kind: hir::ExprKind::Match(scrutinee, arms, metadata),
                         ty: expr_ty,
                         span: expr.span,
                     })),
@@ -450,7 +450,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                     .collect();
                 hir::ExprKind::IfElse(Box::new(cond), Box::new(then_block), else_branches)
             }
-            hir::ExprKind::Match(scrutinee, arms) => {
+            hir::ExprKind::Match(scrutinee, arms, metadata) => {
                 let scrutinee = self.normalize_expr(*scrutinee);
                 let arms = arms
                     .into_iter()
@@ -488,7 +488,7 @@ impl<F: AnfFilter> AnfFolder<'_, F> {
                         trailing_comments: arm.trailing_comments,
                     })
                     .collect();
-                hir::ExprKind::Match(Box::new(scrutinee), arms)
+                hir::ExprKind::Match(Box::new(scrutinee), arms, metadata)
             }
             hir::ExprKind::Block(block) => hir::ExprKind::Block(Box::new(self.fold_block(*block))),
             hir::ExprKind::Loop(block) => hir::ExprKind::Loop(Box::new(self.fold_block(*block))),
@@ -616,7 +616,7 @@ fn rewrite_break_values_in_expr<F: AnfFilter>(
                 );
             }
         }
-        hir::ExprKind::Match(scrutinee, arms) => {
+        hir::ExprKind::Match(scrutinee, arms, _) => {
             rewrite_break_values_in_expr(temp_name, pat_hir_id, scrutinee, folder);
             for arm in arms.iter_mut() {
                 if let Some(ref mut g) = arm.guard {

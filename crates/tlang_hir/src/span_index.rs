@@ -239,7 +239,7 @@ fn collect_expr(entries: &mut Vec<(Span, SpanNode)>, expr: &hir::Expr) {
             collect_expr(entries, base);
             collect_expr(entries, idx);
         }
-        hir::ExprKind::Match(scrutinee, arms) => {
+        hir::ExprKind::Match(scrutinee, arms, _) => {
             collect_expr(entries, scrutinee);
             for arm in arms {
                 collect_pat(entries, &arm.pat);

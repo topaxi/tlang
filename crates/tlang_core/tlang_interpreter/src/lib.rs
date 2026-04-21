@@ -354,7 +354,9 @@ impl Interpreter {
             hir::ExprKind::FunctionExpression(fn_decl) => {
                 EvalResult::Value(state.new_closure(fn_decl))
             }
-            hir::ExprKind::Match(expr, arms) => self.eval_match(state, expr, arms),
+            hir::ExprKind::Match(expr, arms, metadata) => {
+                self.eval_match(state, expr, arms, metadata.exhaustive)
+            }
             hir::ExprKind::Implements(expr, path) => {
                 let value = eval_value!(state, self.eval_expr(state, expr));
                 let protocol_id = path
@@ -2072,6 +2074,7 @@ impl Interpreter {
         state: &mut VMState,
         expr: &hir::Expr,
         arms: &[hir::MatchArm],
+        exhaustive: bool,
     ) -> EvalResult {
         let value = eval_value!(state, self.eval_expr(state, expr));
 
@@ -2083,8 +2086,25 @@ impl Interpreter {
             }
         }
 
-        let s = state.stringify(value);
-        state.panic(format!("No match found for value {:?}", s));
+        let desc = self.describe_match_value(state, value);
+        let prefix = if exhaustive {
+            "Exhaustive pattern match failed"
+        } else {
+            "Non-exhaustive pattern match"
+        };
+        state.panic(format!("{prefix}: unmatched value of type {desc}"));
+    }
+
+    fn describe_match_value(&self, state: &mut VMState, value: TlangValue) -> String {
+        if let Some(tlang_enum) = state.get_enum(value)
+            && let Some(shape) = state.get_shape_by_key(tlang_enum.shape())
+            && let Some(enum_shape) = shape.get_enum_shape()
+            && let Some(variant) = enum_shape.variants.get(tlang_enum.variant)
+        {
+            return format!("{}::{}", enum_shape.name, variant.name);
+        }
+
+        state.stringify(value)
     }
 
     /// Evaluates a match arm and returns the value if it matches, otherwise returns None.
@@ -2800,6 +2820,25 @@ mod tests {
         assert_matches!(interpreter.eval("match_test(1)"), TlangValue::U64(2));
         assert_matches!(interpreter.eval("match_test(2)"), TlangValue::U64(2));
         assert_matches!(interpreter.eval("match_test(3)"), TlangValue::U64(3));
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "Non-exhaustive pattern match: unmatched value of type Expr::Multiply"
+    )]
+    fn test_non_exhaustive_match_reports_enum_variant() {
+        let mut interpreter = interpreter(indoc! {"
+            enum Expr {
+                Number(Int),
+                Add(Int, Int),
+                Multiply(Int, Int),
+            }
+
+            fn eval(Expr::Number(n)) { n }
+            fn eval(Expr::Add(a, b)) { a + b }
+        "});
+
+        interpreter.eval("eval(Expr::Multiply(2, 3))");
     }
 
     #[test]

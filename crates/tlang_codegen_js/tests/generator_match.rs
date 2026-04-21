@@ -219,8 +219,6 @@ fn test_codegen_pattern_match_positional_enum() {
             $anf$0 = x;
         } else if (expr.tag === Expr.Add && (x = expr[0], true) && (y = expr[1], true)) {
             $anf$0 = x + y;
-        } else {
-            $anf$0 = 0;
         }
         let z = $anf$0;
     "};

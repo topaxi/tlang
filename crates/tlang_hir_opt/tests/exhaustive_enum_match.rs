@@ -1,6 +1,7 @@
 mod common;
 
 use insta::assert_snapshot;
+use tlang_hir::{ExprKind, StmtKind};
 
 /// When every variant of a user-defined enum is covered by explicit arms
 /// plus a trailing catch-all clause (whose type-checked type matches the enum),
@@ -224,4 +225,39 @@ fn unknown_typed_catchall_keeps_wildcard() {
         "unknown-typed catch-all should be kept:\n{pretty}"
     );
     assert_snapshot!(pretty);
+}
+
+#[test]
+fn exhaustive_match_without_catchall_is_marked_exhaustive() {
+    let source = r#"
+        enum Color {
+            Red,
+            Blue,
+        }
+
+        let value = match Color::Red {
+            Color::Red => "red",
+            Color::Blue => "blue",
+        };
+    "#;
+
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
+
+    let match_expr = hir
+        .block
+        .stmts
+        .iter()
+        .find_map(|stmt| match &stmt.kind {
+            StmtKind::Let(_, expr, _) => Some(expr.as_ref()),
+            _ => None,
+        })
+        .expect("expected let statement containing match");
+
+    match &match_expr.kind {
+        ExprKind::Match(_, _, metadata) => {
+            assert!(metadata.exhaustive, "match should be marked exhaustive");
+        }
+        other => panic!("expected match expression, got {other:?}"),
+    }
 }

@@ -284,7 +284,7 @@ impl TypeChecker {
                     Self::reset_expr_type(value);
                 }
             }
-            hir::ExprKind::Match(scrutinee, arms) => {
+            hir::ExprKind::Match(scrutinee, arms, _) => {
                 Self::reset_expr_type(scrutinee);
                 for arm in arms {
                     if let Some(guard) = &mut arm.guard {
@@ -1579,7 +1579,7 @@ impl TypeChecker {
                     })),
                 )
             }
-            hir::ExprKind::Match(_, arms) => {
+            hir::ExprKind::Match(_, arms, _) => {
                 Self::partial_completion_type_owned(arms.iter().map(|arm| {
                     arm.block
                         .expr
@@ -2824,7 +2824,7 @@ impl TypeChecker {
                     self.apply_expected_block_type(&mut else_clause.consequence, expected);
                 }
             }
-            hir::ExprKind::Match(_, arms) => {
+            hir::ExprKind::Match(_, arms, _) => {
                 for arm in arms {
                     self.apply_expected_block_type(&mut arm.block, expected);
                 }
@@ -3289,7 +3289,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 };
                 self.assign_expr_type(expr, if_ty);
             }
-            hir::ExprKind::Match(scrutinee, arms) => {
+            hir::ExprKind::Match(scrutinee, arms, _) => {
                 self.visit_expr(scrutinee, ctx);
                 let iterator_item_ty = self.iterator_next_item_type(scrutinee);
                 let mut arm_tys = Vec::with_capacity(arms.len());

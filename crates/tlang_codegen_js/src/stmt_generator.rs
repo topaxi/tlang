@@ -242,7 +242,9 @@ impl<'a> InnerCodegen<'a> {
                 self.generate_if_else_stmts(cond, then_branch, else_branches)
             }
             // Match as statement
-            hir::ExprKind::Match(match_expr, arms) => self.generate_match_stmts(match_expr, arms),
+            hir::ExprKind::Match(match_expr, arms, metadata) => {
+                self.generate_match_stmts(match_expr, arms, metadata.exhaustive)
+            }
             // Loop as statement
             hir::ExprKind::Loop(block) => self.generate_loop_stmts(block),
             // Break

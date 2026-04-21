@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
+use tlang_defs::{DefId, DefKind};
 use tlang_hir::{
-    self as hir, ExprKind, PatKind, StmtKind, TyKind,
+    self as hir, ExprKind, PatKind, Slot, StmtKind, TyKind,
     visit::{self, Visitor},
 };
 use tlang_span::HirId;
@@ -13,6 +14,18 @@ type EnumVariantCounts = HashMap<HirId, usize>;
 
 /// Maps a variant's `HirId` back to its parent enum `HirId`.
 type VariantToEnum = HashMap<HirId, HirId>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum EnumIdentity {
+    Hir(HirId),
+    Symbol(DefId),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum VariantIdentity {
+    Hir(HirId),
+    Global(usize),
+}
 
 /// HIR optimisation pass that removes an unreachable trailing wildcard (or
 /// catch-all identifier) arm from a `match` expression when every variant of
@@ -41,6 +54,9 @@ type VariantToEnum = HashMap<HirId, HirId>;
 pub struct ExhaustiveEnumMatch {
     enum_variant_counts: EnumVariantCounts,
     variant_to_enum: VariantToEnum,
+    enum_paths: HashMap<String, EnumIdentity>,
+    builtin_variant_to_enum: HashMap<usize, EnumIdentity>,
+    builtin_variant_counts: HashMap<EnumIdentity, usize>,
     changed: bool,
 }
 
@@ -49,42 +65,52 @@ impl ExhaustiveEnumMatch {
         Self {
             enum_variant_counts: HashMap::new(),
             variant_to_enum: HashMap::new(),
+            enum_paths: HashMap::new(),
+            builtin_variant_to_enum: HashMap::new(),
+            builtin_variant_counts: HashMap::new(),
             changed: false,
         }
     }
 
     /// Pre-populate lookup tables by scanning enum declarations throughout the
     /// whole module, including nested blocks.
-    fn build_enum_maps(&mut self, module: &hir::Module) {
+    fn build_enum_maps(&mut self, module: &hir::Module, ctx: &HirOptContext) {
         self.enum_variant_counts.clear();
         self.variant_to_enum.clear();
+        self.enum_paths.clear();
+        self.builtin_variant_to_enum.clear();
+        self.builtin_variant_counts.clear();
 
         Self::collect_enum_declarations(
             module,
             &mut self.enum_variant_counts,
             &mut self.variant_to_enum,
+            &mut self.enum_paths,
         );
+        self.collect_symbol_enums(ctx);
     }
 
     fn collect_enum_declarations(
         module: &hir::Module,
         counts: &mut EnumVariantCounts,
         variant_map: &mut VariantToEnum,
+        paths: &mut HashMap<String, EnumIdentity>,
     ) {
-        Self::collect_enum_declarations_from_block(&module.block, counts, variant_map);
+        Self::collect_enum_declarations_from_block(&module.block, counts, variant_map, paths);
     }
 
     fn collect_enum_declarations_from_block(
         block: &hir::Block,
         counts: &mut EnumVariantCounts,
         variant_map: &mut VariantToEnum,
+        paths: &mut HashMap<String, EnumIdentity>,
     ) {
         for stmt in &block.stmts {
-            Self::collect_enum_declarations_from_stmt(stmt, counts, variant_map);
+            Self::collect_enum_declarations_from_stmt(stmt, counts, variant_map, paths);
         }
 
         if let Some(expr) = &block.expr {
-            Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+            Self::collect_enum_declarations_from_expr(expr, counts, variant_map, paths);
         }
     }
 
@@ -92,25 +118,30 @@ impl ExhaustiveEnumMatch {
         stmt: &hir::Stmt,
         counts: &mut EnumVariantCounts,
         variant_map: &mut VariantToEnum,
+        paths: &mut HashMap<String, EnumIdentity>,
     ) {
         match &stmt.kind {
             StmtKind::EnumDeclaration(decl) => {
                 counts.insert(decl.hir_id, decl.variants.len());
+                paths.insert(
+                    decl.name.as_str().to_string(),
+                    EnumIdentity::Hir(decl.hir_id),
+                );
                 for variant in &decl.variants {
                     variant_map.insert(variant.hir_id, decl.hir_id);
                 }
             }
             StmtKind::Expr(expr) => {
-                Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+                Self::collect_enum_declarations_from_expr(expr, counts, variant_map, paths);
             }
             StmtKind::Return(Some(expr)) => {
-                Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+                Self::collect_enum_declarations_from_expr(expr, counts, variant_map, paths);
             }
             StmtKind::Let(_, expr, _) | StmtKind::Const(_, _, expr, _) => {
-                Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+                Self::collect_enum_declarations_from_expr(expr, counts, variant_map, paths);
             }
             StmtKind::FunctionDeclaration(decl) => {
-                Self::collect_enum_declarations_from_block(&decl.body, counts, variant_map);
+                Self::collect_enum_declarations_from_block(&decl.body, counts, variant_map, paths);
             }
             StmtKind::DynFunctionDeclaration(_) => {}
             StmtKind::StructDeclaration(decl) => {
@@ -119,13 +150,19 @@ impl ExhaustiveEnumMatch {
                         &const_item.value,
                         counts,
                         variant_map,
+                        paths,
                     );
                 }
             }
             StmtKind::ProtocolDeclaration(decl) => {
                 for method in &decl.methods {
                     if let Some(body) = &method.body {
-                        Self::collect_enum_declarations_from_block(body, counts, variant_map);
+                        Self::collect_enum_declarations_from_block(
+                            body,
+                            counts,
+                            variant_map,
+                            paths,
+                        );
                     }
                 }
                 for const_item in &decl.consts {
@@ -133,12 +170,18 @@ impl ExhaustiveEnumMatch {
                         &const_item.value,
                         counts,
                         variant_map,
+                        paths,
                     );
                 }
             }
             StmtKind::ImplBlock(decl) => {
                 for method in &decl.methods {
-                    Self::collect_enum_declarations_from_block(&method.body, counts, variant_map);
+                    Self::collect_enum_declarations_from_block(
+                        &method.body,
+                        counts,
+                        variant_map,
+                        paths,
+                    );
                 }
             }
             StmtKind::Return(None) => {}
@@ -149,81 +192,98 @@ impl ExhaustiveEnumMatch {
         expr: &hir::Expr,
         counts: &mut EnumVariantCounts,
         variant_map: &mut VariantToEnum,
+        paths: &mut HashMap<String, EnumIdentity>,
     ) {
         match &expr.kind {
             ExprKind::Block(block) | ExprKind::Loop(block) => {
-                Self::collect_enum_declarations_from_block(block, counts, variant_map);
+                Self::collect_enum_declarations_from_block(block, counts, variant_map, paths);
             }
             ExprKind::Break(Some(expr))
             | ExprKind::Unary(_, expr)
             | ExprKind::FieldAccess(expr, _) => {
-                Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+                Self::collect_enum_declarations_from_expr(expr, counts, variant_map, paths);
             }
             ExprKind::Call(call) | ExprKind::TailCall(call) => {
-                Self::collect_enum_declarations_from_expr(&call.callee, counts, variant_map);
+                Self::collect_enum_declarations_from_expr(&call.callee, counts, variant_map, paths);
                 for arg in &call.arguments {
-                    Self::collect_enum_declarations_from_expr(arg, counts, variant_map);
+                    Self::collect_enum_declarations_from_expr(arg, counts, variant_map, paths);
                 }
             }
             ExprKind::Cast(expr, _)
             | ExprKind::TryCast(expr, _)
             | ExprKind::IndexAccess(expr, _)
             | ExprKind::Implements(expr, _) => {
-                Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+                Self::collect_enum_declarations_from_expr(expr, counts, variant_map, paths);
             }
             ExprKind::Binary(_, left, right) => {
-                Self::collect_enum_declarations_from_expr(left, counts, variant_map);
-                Self::collect_enum_declarations_from_expr(right, counts, variant_map);
+                Self::collect_enum_declarations_from_expr(left, counts, variant_map, paths);
+                Self::collect_enum_declarations_from_expr(right, counts, variant_map, paths);
             }
             ExprKind::Let(_, expr) => {
-                Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+                Self::collect_enum_declarations_from_expr(expr, counts, variant_map, paths);
             }
             ExprKind::IfElse(condition, consequence, else_clauses) => {
-                Self::collect_enum_declarations_from_expr(condition, counts, variant_map);
-                Self::collect_enum_declarations_from_block(consequence, counts, variant_map);
+                Self::collect_enum_declarations_from_expr(condition, counts, variant_map, paths);
+                Self::collect_enum_declarations_from_block(consequence, counts, variant_map, paths);
                 for else_clause in else_clauses {
                     if let Some(condition) = &else_clause.condition {
-                        Self::collect_enum_declarations_from_expr(condition, counts, variant_map);
+                        Self::collect_enum_declarations_from_expr(
+                            condition,
+                            counts,
+                            variant_map,
+                            paths,
+                        );
                     }
                     Self::collect_enum_declarations_from_block(
                         &else_clause.consequence,
                         counts,
                         variant_map,
+                        paths,
                     );
                 }
             }
             ExprKind::List(items) => {
                 for item in items {
-                    Self::collect_enum_declarations_from_expr(item, counts, variant_map);
+                    Self::collect_enum_declarations_from_expr(item, counts, variant_map, paths);
                 }
             }
             ExprKind::Dict(items) => {
                 for (key, value) in items {
-                    Self::collect_enum_declarations_from_expr(key, counts, variant_map);
-                    Self::collect_enum_declarations_from_expr(value, counts, variant_map);
+                    Self::collect_enum_declarations_from_expr(key, counts, variant_map, paths);
+                    Self::collect_enum_declarations_from_expr(value, counts, variant_map, paths);
                 }
             }
-            ExprKind::Match(scrutinee, arms) => {
-                Self::collect_enum_declarations_from_expr(scrutinee, counts, variant_map);
+            ExprKind::Match(scrutinee, arms, _) => {
+                Self::collect_enum_declarations_from_expr(scrutinee, counts, variant_map, paths);
                 for arm in arms {
                     if let Some(guard) = &arm.guard {
-                        Self::collect_enum_declarations_from_expr(guard, counts, variant_map);
+                        Self::collect_enum_declarations_from_expr(
+                            guard,
+                            counts,
+                            variant_map,
+                            paths,
+                        );
                     }
-                    Self::collect_enum_declarations_from_block(&arm.block, counts, variant_map);
+                    Self::collect_enum_declarations_from_block(
+                        &arm.block,
+                        counts,
+                        variant_map,
+                        paths,
+                    );
                 }
             }
             ExprKind::Range(range) => {
-                Self::collect_enum_declarations_from_expr(&range.start, counts, variant_map);
-                Self::collect_enum_declarations_from_expr(&range.end, counts, variant_map);
+                Self::collect_enum_declarations_from_expr(&range.start, counts, variant_map, paths);
+                Self::collect_enum_declarations_from_expr(&range.end, counts, variant_map, paths);
             }
             ExprKind::TaggedString { tag, exprs, .. } => {
-                Self::collect_enum_declarations_from_expr(tag, counts, variant_map);
+                Self::collect_enum_declarations_from_expr(tag, counts, variant_map, paths);
                 for expr in exprs {
-                    Self::collect_enum_declarations_from_expr(expr, counts, variant_map);
+                    Self::collect_enum_declarations_from_expr(expr, counts, variant_map, paths);
                 }
             }
             ExprKind::FunctionExpression(decl) => {
-                Self::collect_enum_declarations_from_block(&decl.body, counts, variant_map);
+                Self::collect_enum_declarations_from_block(&decl.body, counts, variant_map, paths);
             }
             ExprKind::Path(_)
             | ExprKind::Literal(_)
@@ -233,102 +293,146 @@ impl ExhaustiveEnumMatch {
         }
     }
 
-    /// Given a match arm's pattern, try to determine the parent enum `HirId`
-    /// of the variant it matches.
-    ///
-    /// Two resolution strategies (tried in order):
-    ///
-    /// 1. **Pattern type annotation** (`pat.ty.res`) — reliable when the
-    ///    pattern has an explicit type annotation that resolved to the enum
-    ///    declaration `HirId`.
-    /// 2. **Variant path resolution** (`path.res.hir_id()`) — the primary
-    ///    strategy. After `IdentifierResolver`, the variant path points to
-    ///    the variant declaration whose `HirId` is in `variant_to_enum`.
-    fn resolve_enum_hir_id(&self, pat: &hir::Pat) -> Option<HirId> {
+    fn collect_symbol_enums(&mut self, ctx: &HirOptContext) {
+        for scope in ctx.symbols.values() {
+            for symbol in scope.read().unwrap().get_all_declared_local_symbols() {
+                if symbol.kind == DefKind::Enum {
+                    let identity = symbol
+                        .hir_id
+                        .map(EnumIdentity::Hir)
+                        .unwrap_or(EnumIdentity::Symbol(symbol.id));
+                    self.enum_paths
+                        .entry(symbol.name.to_string())
+                        .or_insert(identity);
+                }
+            }
+        }
+
+        for scope in ctx.symbols.values() {
+            for symbol in scope.read().unwrap().get_all_declared_local_symbols() {
+                let DefKind::EnumVariant(_) = symbol.kind else {
+                    continue;
+                };
+
+                let Some((enum_name, _)) = symbol.name.rsplit_once("::") else {
+                    continue;
+                };
+                let Some(identity) = self.enum_paths.get(enum_name).copied() else {
+                    continue;
+                };
+                let Some(global_slot) = symbol.global_slot else {
+                    continue;
+                };
+
+                self.builtin_variant_to_enum.insert(global_slot, identity);
+                *self.builtin_variant_counts.entry(identity).or_insert(0) += 1;
+            }
+        }
+    }
+
+    fn resolve_variant_identity(&self, path: &hir::Path) -> Option<VariantIdentity> {
+        if let Some(variant_hir_id) = path.res.hir_id() {
+            return Some(VariantIdentity::Hir(variant_hir_id));
+        }
+
+        if let Slot::Global(slot) = path.res.slot() {
+            return Some(VariantIdentity::Global(slot));
+        }
+
+        None
+    }
+
+    fn resolve_enum_identity(&self, pat: &hir::Pat) -> Option<EnumIdentity> {
         if let PatKind::Enum(path, _) = &pat.kind {
-            // Strategy 1: populated by lowering for patterns with explicit
-            // `EnumName` type annotations; inferred annotations from
-            // FnParamTypeInference use a synthetic NodeId and typically do not
-            // resolve to the enum declaration.
             if let Some(enum_hir_id) = pat.ty.res
                 && self.enum_variant_counts.contains_key(&enum_hir_id)
             {
-                return Some(enum_hir_id);
+                return Some(EnumIdentity::Hir(enum_hir_id));
             }
 
-            // Strategy 2: variant path resolved to variant HirId → look up parent.
             if let Some(variant_hir_id) = path.res.hir_id()
                 && let Some(&enum_hir_id) = self.variant_to_enum.get(&variant_hir_id)
             {
-                return Some(enum_hir_id);
+                return Some(EnumIdentity::Hir(enum_hir_id));
+            }
+
+            if let Slot::Global(slot) = path.res.slot()
+                && let Some(enum_identity) = self.builtin_variant_to_enum.get(&slot)
+            {
+                return Some(*enum_identity);
             }
         }
 
         None
     }
 
-    /// Resolve the enum `HirId` from the catch-all pattern's type annotation.
-    ///
-    /// After type checking, the type checker sets `pat.ty.kind` on every match
-    /// arm to the scrutinee's type. For enum-dispatching matches this is a
-    /// `TyKind::Path(path, _)` whose `path.res.hir_id()` identifies the enum
-    /// declaration.
-    ///
-    /// Returns `None` when:
-    /// - The type is `Unknown` (untyped / explicitly `unknown`-annotated)
-    /// - The type is not a `Path` (e.g. a primitive like `i64`)
-    /// - The path does not resolve to a known enum declaration
-    fn resolve_catchall_enum_hir_id(&self, pat: &hir::Pat) -> Option<HirId> {
-        if let TyKind::Path(ref path, _) = pat.ty.kind {
-            // Primary: pat.ty.res set by lowering for explicit annotations.
-            if let Some(res_hir_id) = pat.ty.res
+    fn resolve_type_enum_identity(&self, ty: &hir::Ty) -> Option<EnumIdentity> {
+        if let TyKind::Path(ref path, _) = ty.kind {
+            if let Some(res_hir_id) = ty.res
                 && self.enum_variant_counts.contains_key(&res_hir_id)
             {
-                return Some(res_hir_id);
+                return Some(EnumIdentity::Hir(res_hir_id));
             }
 
-            // Fallback: path.res.hir_id() set by the type checker from the
-            // scrutinee's resolved type.
             if let Some(hir_id) = path.res.hir_id()
                 && self.enum_variant_counts.contains_key(&hir_id)
             {
-                return Some(hir_id);
+                return Some(EnumIdentity::Hir(hir_id));
+            }
+
+            if path.res.is_enum_def() {
+                return self.enum_paths.get(&path.to_string()).copied();
             }
         }
 
         None
     }
 
-    /// Returns `true` if the trailing arm was removed.
-    fn try_remove_wildcard_arm(&self, arms: &mut Vec<hir::MatchArm>) -> bool {
-        // Need at least two arms: one or more explicit + a trailing catch-all.
-        if arms.len() < 2 {
-            return false;
+    fn total_variant_count(&self, enum_identity: EnumIdentity) -> Option<usize> {
+        match enum_identity {
+            EnumIdentity::Hir(hir_id) => self.enum_variant_counts.get(&hir_id).copied(),
+            EnumIdentity::Symbol(def_id) => self
+                .builtin_variant_counts
+                .get(&EnumIdentity::Symbol(def_id))
+                .copied(),
+        }
+    }
+
+    fn analyze_exhaustiveness(
+        &self,
+        scrutinee: &hir::Expr,
+        arms: &[hir::MatchArm],
+    ) -> Option<(EnumIdentity, bool)> {
+        if arms.is_empty() {
+            return None;
         }
 
-        let last = arms.last().unwrap();
-
-        // Only remove catch-all arms (wildcard `_` or bare identifier).
-        if !is_catch_all_pattern(&last.pat) {
-            return false;
-        }
-
-        // Bail out if *any* arm (including the catch-all) has a guard.
         if arms.iter().any(|arm| arm.guard.is_some()) {
-            return false;
+            return None;
         }
 
-        // All non-wildcard arms must be Enum patterns resolving to the same enum.
-        let non_catchall_arms = &arms[..arms.len() - 1];
+        let has_trailing_catchall = arms
+            .last()
+            .is_some_and(|arm| is_catch_all_pattern(&arm.pat));
+        let explicit_arms = if has_trailing_catchall {
+            &arms[..arms.len() - 1]
+        } else {
+            arms
+        };
 
-        let mut enum_hir_id: Option<HirId> = None;
-        let mut covered_variants: HashSet<HirId> = HashSet::new();
+        if explicit_arms.is_empty() {
+            return None;
+        }
 
-        for arm in non_catchall_arms {
-            if let Some(eid) = self.resolve_enum_hir_id(&arm.pat) {
-                match enum_hir_id {
-                    None => enum_hir_id = Some(eid),
-                    Some(existing) if existing != eid => return false, // mixed enums
+        let mut enum_identity: Option<EnumIdentity> = None;
+        let mut covered_variants: HashSet<VariantIdentity> = HashSet::new();
+
+        for arm in explicit_arms {
+            {
+                let identity = self.resolve_enum_identity(&arm.pat)?;
+                match enum_identity {
+                    None => enum_identity = Some(identity),
+                    Some(existing) if existing != identity => return None, // mixed enums
                     _ => {}
                 }
 
@@ -337,39 +441,32 @@ impl ExhaustiveEnumMatch {
                 // sub-pattern (literal, nested enum, list, etc.) does not fully
                 // cover the variant and might not match all values.
                 if let PatKind::Enum(path, fields) = &arm.pat.kind
-                    && let Some(variant_hir_id) = path.res.hir_id()
+                    && let Some(variant_identity) = self.resolve_variant_identity(path)
                     && fields.iter().all(|(_, p)| is_catch_all_pattern(p))
                 {
-                    covered_variants.insert(variant_hir_id);
+                    covered_variants.insert(variant_identity);
                 }
-            } else {
-                // Non-enum pattern among the explicit arms → bail.
-                return false;
             }
         }
 
-        let enum_hir_id = match enum_hir_id {
-            Some(id) => id,
-            None => return false,
+        let enum_identity = enum_identity?;
+
+        let scrutinee_enum_identity = if has_trailing_catchall {
+            self.resolve_type_enum_identity(&arms.last().unwrap().pat.ty)
+        } else {
+            self.resolve_type_enum_identity(&scrutinee.ty)
         };
 
-        // The catch-all's type must resolve to the same enum as the explicit
-        // arms. After type checking, the type checker populates `pat.ty.kind`
-        // with the scrutinee's type, so this check is reliable.
-        if self.resolve_catchall_enum_hir_id(&arms.last().unwrap().pat) != Some(enum_hir_id) {
-            return false;
+        if scrutinee_enum_identity != Some(enum_identity) {
+            return None;
         }
 
-        let total_variants = match self.enum_variant_counts.get(&enum_hir_id) {
-            Some(&count) => count,
-            None => return false,
-        };
+        let total_variants = self.total_variant_count(enum_identity)?;
 
         if covered_variants.len() >= total_variants {
-            arms.pop(); // remove trailing catch-all
-            true
+            Some((enum_identity, has_trailing_catchall))
         } else {
-            false
+            None
         }
     }
 }
@@ -385,10 +482,23 @@ impl<'hir> Visitor<'hir> for ExhaustiveEnumMatch {
         // Visit children first (post-order).
         visit::walk_expr(self, expr, ctx);
 
-        if let ExprKind::Match(_, arms) = &mut expr.kind
-            && self.try_remove_wildcard_arm(arms)
-        {
-            self.changed = true;
+        if let ExprKind::Match(scrutinee, arms, metadata) = &mut expr.kind {
+            let was_exhaustive = metadata.exhaustive;
+            metadata.exhaustive = self.analyze_exhaustiveness(scrutinee, arms).is_some();
+
+            if metadata.exhaustive != was_exhaustive {
+                self.changed = true;
+            }
+
+            if metadata.exhaustive
+                && arms.len() >= 2
+                && arms
+                    .last()
+                    .is_some_and(|arm| is_catch_all_pattern(&arm.pat))
+            {
+                arms.pop();
+                self.changed = true;
+            }
         }
     }
 }
@@ -401,10 +511,10 @@ impl HirPass for ExhaustiveEnumMatch {
     fn optimize_hir(
         &mut self,
         module: &mut hir::Module,
-        _ctx: &mut HirOptContext,
+        ctx: &mut HirOptContext,
     ) -> Result<bool, HirOptError> {
         self.changed = false;
-        self.build_enum_maps(module);
+        self.build_enum_maps(module, ctx);
         self.visit_module(module, &mut ());
         Ok(self.changed)
     }
@@ -490,7 +600,13 @@ mod tests {
         };
 
         let mut pass = ExhaustiveEnumMatch::default();
-        pass.build_enum_maps(&mut module);
+        let ctx = HirOptContext {
+            symbols: Default::default(),
+            hir_id_allocator: Default::default(),
+            current_scope: HirId::new(1),
+            diagnostics: Vec::new(),
+        };
+        pass.build_enum_maps(&mut module, &ctx);
 
         assert_eq!(pass.enum_variant_counts.get(&enum_hir_id), Some(&1));
         assert_eq!(

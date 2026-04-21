@@ -50,6 +50,7 @@ impl<'a> InnerCodegen<'a> {
         &mut self,
         expr: &hir::Expr,
         arms: &[hir::MatchArm],
+        exhaustive: bool,
     ) -> Vec<Statement<'a>> {
         let mut result = Vec::new();
         let mut declarators = Vec::new();
@@ -129,9 +130,14 @@ impl<'a> InnerCodegen<'a> {
 
         // 4. Generate if/else chain
         let root = AccessPath::Ident(match_value_name);
-        if let Some(stmt) =
-            self.generate_match_arms_chain(expr, arms, &root, &fixed_list_idents, &let_guard_var)
-        {
+        if let Some(stmt) = self.generate_match_arms_chain(
+            expr,
+            arms,
+            &root,
+            &fixed_list_idents,
+            &let_guard_var,
+            exhaustive,
+        ) {
             result.push(stmt);
         }
 
@@ -261,8 +267,13 @@ impl<'a> InnerCodegen<'a> {
         root: &AccessPath,
         fixed_list_idents: &Option<Vec<String>>,
         let_guard_var: &str,
+        exhaustive: bool,
     ) -> Option<Statement<'a>> {
         if arms.is_empty() {
+            if exhaustive {
+                return None;
+            }
+
             // Generate a runtime error for non-exhaustive matches. Pass either
             // the single match subject or the fixed list of subjects used for
             // lowered multi-clause function parameter matching.
@@ -334,6 +345,7 @@ impl<'a> InnerCodegen<'a> {
                 root,
                 fixed_list_idents,
                 let_guard_var,
+                exhaustive,
             );
 
             Some(self.ast.statement_if(SPAN, test, body, alternate))

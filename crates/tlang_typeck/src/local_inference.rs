@@ -206,7 +206,7 @@ impl LocalInferenceScope {
                     self.collect_block_seeds(&clause.consequence, allocator);
                 }
             }
-            hir::ExprKind::Match(scrutinee, arms) => {
+            hir::ExprKind::Match(scrutinee, arms, _) => {
                 self.collect_expr_seeds(scrutinee, allocator);
                 for arm in arms {
                     if let Some(guard) = &arm.guard {
@@ -340,7 +340,7 @@ impl LocalInferenceScope {
                     self.collect_block_constraints(&clause.consequence, None, table)?;
                 }
             }
-            hir::ExprKind::Match(scrutinee, arms) => {
+            hir::ExprKind::Match(scrutinee, arms, _) => {
                 self.collect_expr_constraints(scrutinee, table)?;
                 for arm in arms {
                     if let Some(guard) = &arm.guard {
@@ -505,7 +505,7 @@ impl LocalInferenceScope {
                     }
                 }
             }
-            hir::ExprKind::Match(scrutinee, arms) => {
+            hir::ExprKind::Match(scrutinee, arms, _) => {
                 self.collect_expr_widening_hints(scrutinee, hints);
                 for arm in arms {
                     if let Some(guard) = &arm.guard {
@@ -688,7 +688,7 @@ impl LocalInferenceScope {
                     }
                 }
             }
-            hir::ExprKind::Match(_, arms) => {
+            hir::ExprKind::Match(_, arms, _) => {
                 for arm in arms {
                     if let Some(expr) = &arm.block.expr {
                         self.constrain_local_from_completions(local_var, expr, span, table)?;

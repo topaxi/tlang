@@ -93,7 +93,7 @@ impl BooleanReturnSimplification {
                     self.visit_block(&mut clause.consequence);
                 }
             }
-            hir::ExprKind::Match(scrutinee, arms) => {
+            hir::ExprKind::Match(scrutinee, arms, _) => {
                 self.visit_expr(scrutinee);
                 for arm in arms {
                     self.visit_block(&mut arm.block);
@@ -191,7 +191,7 @@ fn simplify_stmt_recursive(stmt: &mut hir::Stmt) -> bool {
                     }
                 }
             }
-            hir::ExprKind::Match(_, arms) => {
+            hir::ExprKind::Match(_, arms, _) => {
                 for arm in arms {
                     if simplify_block_recursive(&mut arm.block) {
                         changed = true;

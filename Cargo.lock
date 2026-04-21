@@ -2336,6 +2336,7 @@ dependencies = [
  "tlang_parser",
  "tlang_semantics",
  "tlang_span",
+ "tlang_typeck",
 ]
 
 [[package]]
