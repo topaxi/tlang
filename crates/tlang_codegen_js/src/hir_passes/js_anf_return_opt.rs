@@ -90,7 +90,7 @@ impl JsAnfReturnOpt {
                     self.visit_block(&mut clause.consequence);
                 }
             }
-            hir::ExprKind::Match(scrutinee, arms) => {
+            hir::ExprKind::Match(scrutinee, arms, _) => {
                 self.visit_expr(scrutinee);
                 for arm in arms {
                     self.visit_block(&mut arm.block);
@@ -262,7 +262,7 @@ fn rewrite_assignments_to_returns(anf_name: &str, stmt: &mut hir::Stmt) {
                     rewrite_block_terminal(anf_name, &mut clause.consequence);
                 }
             }
-            hir::ExprKind::Match(_, arms) => {
+            hir::ExprKind::Match(_, arms, _) => {
                 for arm in arms {
                     rewrite_block_terminal(anf_name, &mut arm.block);
                 }
@@ -291,7 +291,7 @@ fn rewrite_block_terminal(anf_name: &str, block: &mut hir::Block) {
                     rewrite_block_terminal(anf_name, &mut clause.consequence);
                 }
             }
-            hir::ExprKind::Match(_, arms) => {
+            hir::ExprKind::Match(_, arms, _) => {
                 for arm in arms {
                     rewrite_block_terminal(anf_name, &mut arm.block);
                 }

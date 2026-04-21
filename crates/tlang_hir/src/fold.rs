@@ -154,6 +154,7 @@ pub fn fold_stmt<F: Folder>(folder: &mut F, stmt: hir::Stmt) -> SmallVec<hir::St
     })
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn fold_expr<F: Folder>(folder: &mut F, expr: hir::Expr) -> hir::Expr {
     let kind = match expr.kind {
         hir::ExprKind::Path(_) => expr.kind,
@@ -221,7 +222,7 @@ pub fn fold_expr<F: Folder>(folder: &mut F, expr: hir::Expr) -> hir::Expr {
                 })
                 .collect(),
         ),
-        hir::ExprKind::Match(scrutinee, arms) => hir::ExprKind::Match(
+        hir::ExprKind::Match(scrutinee, arms, metadata) => hir::ExprKind::Match(
             Box::new(folder.fold_expr(*scrutinee)),
             arms.into_iter()
                 .map(|arm| hir::MatchArm {
@@ -234,6 +235,7 @@ pub fn fold_expr<F: Folder>(folder: &mut F, expr: hir::Expr) -> hir::Expr {
                     trailing_comments: arm.trailing_comments,
                 })
                 .collect(),
+            metadata,
         ),
         hir::ExprKind::Implements(expr, path) => {
             hir::ExprKind::Implements(Box::new(folder.fold_expr(*expr)), path)

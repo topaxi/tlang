@@ -216,7 +216,7 @@ fn collect_fn_decl_hints(
     // Return type hint — show when no explicit return type was written.
     if !return_hint_spans.is_empty() {
         if let Some(hir::Expr {
-            kind: hir::ExprKind::Match(_, arms),
+            kind: hir::ExprKind::Match(_, arms, _),
             ..
         }) = decl.body.expr.as_ref()
             && decl.return_hint_spans.len() == decl.return_hint_arm_indices.len()
@@ -421,7 +421,7 @@ fn collect_expr_hints(expr: &hir::Expr, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
             collect_expr_hints(base, ctx, hints);
             collect_expr_hints(index, ctx, hints);
         }
-        hir::ExprKind::Match(scrutinee, arms) => {
+        hir::ExprKind::Match(scrutinee, arms, _) => {
             collect_expr_hints(scrutinee, ctx, hints);
             for arm in arms {
                 // Emit type hints for each binding introduced by the arm pattern
@@ -942,7 +942,7 @@ fn walk_expr_for_type(
         hir::ExprKind::Unary(_, operand) => {
             walk_expr_for_type(operand, type_table, type_var_names, line, col, out);
         }
-        hir::ExprKind::Match(scrutinee, arms) => {
+        hir::ExprKind::Match(scrutinee, arms, _) => {
             walk_expr_for_type(scrutinee, type_table, type_var_names, line, col, out);
             for arm in arms {
                 check_pat_for_type(&arm.pat, type_var_names, line, col, out);

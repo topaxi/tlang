@@ -1,0 +1,19 @@
+---
+source: crates/tlang_hir_opt/tests/exhaustive_enum_match.rs
+expression: pretty
+---
+enum SafeHtml {
+    Html {
+        0: String,
+    }
+}
+fn render(arg0: unknown) -> String {
+    match arg0 {
+        SafeHtml::Html { 0: v } => {
+            v
+        },
+        v => {
+            "fallback"
+        },
+    }
+}

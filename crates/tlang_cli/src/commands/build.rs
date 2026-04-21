@@ -3,6 +3,7 @@ use std::path::Path;
 use tlang_codegen_js::CodegenError;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_diagnostics::render_ice;
+use tlang_hir_opt::HirPass;
 use tlang_modules::{CompiledModule, ModulePath, MultiModuleCompileResult, compile_project};
 use tlang_typeck::typecheck_module;
 
@@ -147,6 +148,12 @@ fn generate_module_code(
             return None;
         }
     };
+    // ExhaustiveEnumMatch must run after type checking.
+    let mut exhaustive_enum = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    if let Err(err) = exhaustive_enum.optimize_hir(&mut hir_module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        return None;
+    }
 
     if let Some(parsed_module) = result.graph.modules.get(path) {
         let source_name = parsed_module.file_path.to_string_lossy();

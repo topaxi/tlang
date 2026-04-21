@@ -1,4 +1,4 @@
-export const $typeArgSymbol = Symbol('$typeArg');
+const $typeArgSymbol = Symbol('$typeArg');
 
 /**
  * Wraps a string type-argument key in an object tagged with a Symbol so that
@@ -11,23 +11,64 @@ export function $typeArg(key) {
   return { [$typeArgSymbol]: true, key };
 }
 
+/**
+ * Throws an error with the given message.
+ * @param {string} msg
+ */
 export function panic(msg) {
   throw new Error(msg);
 }
 
-export function $getType(value) {
-  return Array.isArray(value)
-    ? 'List'
-    : (value?.constructor?.name ?? typeof value);
+/**
+ * Get the type/constructor of a value
+ * @param {unknown} value
+ * @return {{ new(): any } | null | undefined}
+ */
+function $getType(value) {
+  return value?.constructor;
+}
+
+/**
+ * Returns a string representation of the type of the given value, with special
+ * cases for arrays (returning 'List') and null/undefined (returning
+ * 'null'/'undefined').
+ * @param {unknown} value
+ * @return {string}
+ */
+export function $getTypeName(value) {
+  return $typeName($getType(value));
+}
+
+/**
+ * Returns a string representation of the given type, with special cases for
+ * arrays and null/undefined.
+ * @param {{ new(): any } | null} Type
+ * @return {string}
+ */
+function $typeName(Type) {
+  if (Type == null) return typeof Type;
+  if (Type === Array) return 'List';
+  return Type.name;
 }
 
 export class $Protocol {
+  /** @property {object} */
   #def;
+
+  /** @property {Map<string, object>} */
   #impls = new Map();
+
+  /** @property {$Protocol[]} */
   #constraints;
+
   /** @type {{ methods: object, constraints: $Protocol[] } | null} */
   #blanketImpl = null;
 
+  /**
+   * Creates a new protocol instance.
+   * @param {object} def
+   * @param {$Procotol[]}
+   */
   constructor(def, constraints = []) {
     this.#def = def;
     this.#constraints = constraints;
@@ -37,24 +78,38 @@ export class $Protocol {
     }
   }
 
-  $setImpl(Type, methods, typeArgs = null, constraints = null) {
+  /**
+   * Sets the implementation for a given type or a blanket implementation if Type is null.
+   * @param {Function | null} Type - The constructor function of the type or null for a blanket implementation.
+   * @param {object} methods - The methods to implement for the given type.
+   * @param {string | null} [typeArgs] - Optional type arguments for generic protocol dispatch.
+   * @param {Array<$Protocol>} [constraints] - Optional constraints for the implementation.
+   */
+  $setImpl(Type, methods, typeArgs = null, constraints = []) {
     if (Type === null) {
       // Blanket impl — store separately with its constraint protocols.
-      this.#blanketImpl = { methods, constraints: constraints ?? [] };
+      this.#blanketImpl = { methods, constraints };
       return;
     }
-    const key = typeArgs ? `${Type?.name ?? Type}::${typeArgs}` : Type;
+    const key = typeArgs ? `${$typeName(Type)}::${typeArgs}` : Type;
     this.#impls.set(key, methods);
   }
 
+  /**
+   * @param {unknown} value
+   * @return {boolean}
+   */
   $implements(value) {
-    const Type = value?.constructor;
+    const Type = $getType(value);
+
     if (this.#impls.has(Type)) return true;
+
     // Check blanket impl: if all constraint protocols are satisfied, this
     // protocol is considered implemented.
-    if (this.#blanketImpl) {
+    if (this.#blanketImpl != null) {
       return this.#blanketImpl.constraints.every((c) => c.$implements(value));
     }
+
     return false;
   }
 
@@ -67,7 +122,7 @@ export class $Protocol {
   }
 
   #call(methodName, self, ...args) {
-    const Type = self?.constructor;
+    const Type = $getType(self);
 
     // If the last argument is a type-arg sentinel (tagged with $typeArgSymbol
     // by the compiler for generic protocol dispatch like `Into<i64>`), try a
@@ -79,7 +134,7 @@ export class $Protocol {
       lastArg[$typeArgSymbol] === true &&
       args.length > 0
     ) {
-      const typeArgKey = `${Type?.name ?? Type}::${lastArg.key}`;
+      const typeArgKey = `${$typeName(Type)}::${lastArg.key}`;
       impl = this.#impls.get(typeArgKey);
       if (impl) {
         // Remove the type-arg sentinel from the argument list before calling the method.
@@ -93,12 +148,9 @@ export class $Protocol {
     }
 
     // Blanket impl fallback: use if all constraint protocols are satisfied.
-    if (!impl && this.#blanketImpl) {
+    if (!impl && this.#blanketImpl != null) {
       const blanket = this.#blanketImpl;
-      if (
-        blanket.constraints.length === 0 ||
-        blanket.constraints.every((c) => c.$implements(self))
-      ) {
+      if (blanket.constraints.every((c) => c.$implements(self))) {
         impl = blanket.methods;
       }
     }
@@ -114,20 +166,51 @@ export class $Protocol {
   }
 }
 
+/**
+ * @overload
+ * @param {object} def - THe protocol definition.
+ * @return {$Protocol} The created protocol instance.
+ *
+ * @overload
+ * @param {...$Protocol} constraints - Optional constraints for the protocol.
+ * @param {object} def - The protocol definition.
+ * @return {$Protocol} The created protocol instance.
+ *
+ * Creates a new protocol instance.
+ * @param {...$Protocol} constraints - Constraints for the protocol.
+ * @param {object} def - The protocol definition.
+ * @return {$Protocol} The created protocol instance.
+ */
 export function $protocol(...constraintsAndDef) {
   const def = constraintsAndDef.pop();
   return new $Protocol(def, constraintsAndDef);
 }
 
+/**
+ * @param {$Protocol} protocol - The protocol to implement.
+ * @param {Function | null} Type - The constructor function of the type or null for a blanket implementation.
+ * @param {object} methods - The methods to implement for the given type.
+ * @param {string | null} [typeArgs] - Optional type arguments for generic protocol dispatch.
+ * @param {Array<$Protocol>} [constraints] - Optional constraints for the implementation.
+ */
 export function $impl(protocol, Type, methods, typeArgs, constraints) {
   protocol.$setImpl(Type, methods, typeArgs, constraints);
 }
 
+/**
+ * Installs the given method on the prototype of a type, dispatching to the
+ * appropriate protocol implementation at runtime.
+ *
+ * @param {object} proto - The prototype object to install the method on (e.g. `String.prototype`).
+ * @param {string} methodName - The name of the method to install.
+ * @param {Function} dispatch - The dispatch function to call when the method is invoked.
+ * @return {void}
+ */
 export function $installMethod(proto, methodName, dispatch) {
   $assert(
     !Reflect.has(proto, methodName),
     () =>
-      `Method collision: '${methodName}' already defined on ${$getType(proto)}`,
+      `Method collision: '${methodName}' already defined on ${$getTypeName(proto)}`,
   );
 
   proto[methodName] = function (...args) {
@@ -163,7 +246,7 @@ function $enumTagName(value) {
   if (tag == null) return null;
   if (typeof tag === 'function') return tag.name;
   // For singleton enum variants: find the matching static property on the constructor
-  const ctor = value.constructor;
+  const ctor = $getType(value);
   if (ctor != null) {
     for (const key of Object.keys(ctor)) {
       if (ctor[key] === tag) return key;
@@ -178,12 +261,12 @@ function $enumTagName(value) {
  * @return {never}
  */
 export function $matchError(value) {
-  const typeName = value?.constructor?.name;
+  const typeName = $getTypeName(value);
   const tagName = $enumTagName(value);
   const desc =
     typeName && tagName
       ? `${typeName}::${tagName}`
-      : (tagName ?? typeName ?? $getType(value));
+      : (tagName ?? typeName ?? $getTypeName(value));
   $unreachable(`Non-exhaustive pattern match: unmatched value of type ${desc}`);
 }
 

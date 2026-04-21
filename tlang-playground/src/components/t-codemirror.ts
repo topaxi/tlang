@@ -1,5 +1,5 @@
 import { basicSetup } from 'codemirror';
-import { EditorView, keymap } from '@codemirror/view';
+import { EditorView, EditorViewConfig, keymap } from '@codemirror/view';
 import { Compartment, EditorState, Prec } from '@codemirror/state';
 import { Diagnostic, linter, lintGutter } from '@codemirror/lint';
 import { type Completion, completeFromList } from '@codemirror/autocomplete';
@@ -173,9 +173,10 @@ export class TCodeMirror extends LitElement {
     return extensions;
   }
 
-  private getEditorViewConfig() {
+  private getEditorViewConfig(): EditorViewConfig {
     return {
       extensions: this.getEditorExtensions(),
+      root: this.shadowRoot as ShadowRoot,
       parent: this.shadowRoot as DocumentFragment,
     };
   }

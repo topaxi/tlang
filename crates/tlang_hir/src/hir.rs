@@ -675,6 +675,12 @@ impl MatchArm {
     }
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct MatchMetadata {
+    pub exhaustive: bool,
+}
+
 impl HirScope for MatchArm {
     fn locals(&self) -> usize {
         self.block.locals()
@@ -779,7 +785,7 @@ pub enum ExprKind {
     FieldAccess(Box<Expr>, Ident),
     IndexAccess(Box<Expr>, Box<Expr>),
     Literal(Box<Literal>),
-    Match(Box<Expr>, Vec<MatchArm>),
+    Match(Box<Expr>, Vec<MatchArm>, MatchMetadata),
     Implements(Box<Expr>, Path),
     Range(Box<RangeExpression>),
     TaggedString {

@@ -579,6 +579,13 @@ impl Tlang {
                 .optimize_hir(&mut module, &mut ctx)
                 .unwrap_or_else(|err| panic!("{}", render_ice(&err)));
 
+            // ExhaustiveEnumMatch must run after type checking — it uses
+            // type-checked pattern types to verify catch-all arms.
+            let mut exhaustive_enum = tlang_hir_opt::ExhaustiveEnumMatch::default();
+            exhaustive_enum
+                .optimize_hir(&mut module, &mut ctx)
+                .unwrap_or_else(|err| panic!("{}", render_ice(&err)));
+
             let has_type_errors = ctx
                 .diagnostics
                 .iter()

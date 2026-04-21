@@ -118,7 +118,7 @@ impl<'hir> Visitor<'hir> for CaptureCollector {
                 // Anonymous closure — stop recursion, lift transitive captures.
                 self.lift_from(nested);
             }
-            hir::ExprKind::Match(discriminant, arms) => {
+            hir::ExprKind::Match(discriminant, arms, _) => {
                 self.visit_expr(discriminant, ctx);
                 for arm in arms {
                     let has_pat_scope = arm.hir_id != arm.block.hir_id;
@@ -263,7 +263,7 @@ impl<'hir> Visitor<'hir> for CaptureRemapper {
             hir::ExprKind::FunctionExpression(nested) => {
                 self.update_nested_captures(nested);
             }
-            hir::ExprKind::Match(discriminant, arms) => {
+            hir::ExprKind::Match(discriminant, arms, _) => {
                 self.visit_expr(discriminant, ctx);
                 for arm in arms {
                     let has_pat_scope = arm.hir_id != arm.block.hir_id;

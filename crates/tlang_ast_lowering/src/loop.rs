@@ -323,7 +323,11 @@ impl LoweringContext {
 
         let match_expr = self.expr(
             Default::default(),
-            hir::ExprKind::Match(Box::new(call_next), vec![loop_arm, break_arm]),
+            hir::ExprKind::Match(
+                Box::new(call_next),
+                vec![loop_arm, break_arm],
+                hir::MatchMetadata::default(),
+            ),
         );
 
         let match_expr = if for_loop.acc.is_some() {

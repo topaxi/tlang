@@ -1,0 +1,21 @@
+---
+source: crates/tlang_hir_opt/tests/exhaustive_enum_match.rs
+expression: pretty
+---
+enum Light {
+    On
+    Off
+}
+fn describe(light: Light) -> String {
+    match light {
+        Light::On => {
+            "on"
+        },
+        Light::Off if false => {
+            "off (impossible)"
+        },
+        _ => {
+            "fallback"
+        },
+    }
+}

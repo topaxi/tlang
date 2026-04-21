@@ -291,7 +291,7 @@ fn signature_from_expr_name(
         hir::ExprKind::Let(_, inner) | hir::ExprKind::Implements(inner, _) => {
             signature_from_expr_name(inner, dotted_name, omit_first_param)
         }
-        hir::ExprKind::Match(scrutinee, arms) => {
+        hir::ExprKind::Match(scrutinee, arms, _) => {
             signature_from_expr_name(scrutinee, dotted_name, omit_first_param).or_else(|| {
                 arms.iter()
                     .find_map(|arm| signature_from_block(&arm.block, dotted_name, omit_first_param))
@@ -449,7 +449,7 @@ fn signature_from_expr_hir_id(
         hir::ExprKind::Let(_, inner) | hir::ExprKind::Implements(inner, _) => {
             signature_from_expr_hir_id(inner, hir_id, omit_first_param)
         }
-        hir::ExprKind::Match(scrutinee, arms) => {
+        hir::ExprKind::Match(scrutinee, arms, _) => {
             signature_from_expr_hir_id(scrutinee, hir_id, omit_first_param).or_else(|| {
                 arms.iter()
                     .find_map(|arm| signature_from_hir_id(&arm.block, hir_id, omit_first_param))
@@ -856,7 +856,7 @@ fn find_call_in_expr(expr: &hir::Expr, offset: u32) -> Option<&hir::CallExpressi
         | hir::ExprKind::Implements(inner, _) => {
             update_best_call(&mut best, find_call_in_expr(inner, offset));
         }
-        hir::ExprKind::Match(scrutinee, arms) => {
+        hir::ExprKind::Match(scrutinee, arms, _) => {
             update_best_call(&mut best, find_call_in_expr(scrutinee, offset));
             for arm in arms {
                 if let Some(guard) = &arm.guard {

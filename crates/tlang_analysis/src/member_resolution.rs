@@ -342,7 +342,7 @@ fn find_expr_in_expr(expr: &hir::Expr, offset: u32) -> Option<&hir::Expr> {
         | hir::ExprKind::Implements(inner, _) => {
             best = update_best_expr(best, find_expr_in_expr(inner, offset));
         }
-        hir::ExprKind::Match(scrutinee, arms) => {
+        hir::ExprKind::Match(scrutinee, arms, _) => {
             best = update_best_expr(best, find_expr_in_expr(scrutinee, offset));
             for arm in arms {
                 if let Some(guard) = &arm.guard {
@@ -530,7 +530,7 @@ fn find_field_access_in_expr(
         | hir::ExprKind::Implements(inner, _) => {
             return find_field_access_in_expr(inner, offset);
         }
-        hir::ExprKind::Match(scrutinee, arms) => {
+        hir::ExprKind::Match(scrutinee, arms, _) => {
             if let Some(found) = find_field_access_in_expr(scrutinee, offset) {
                 return Some(found);
             }

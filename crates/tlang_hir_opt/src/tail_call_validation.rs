@@ -97,7 +97,7 @@ fn check_expr(expr: &hir::Expr, is_tail: bool, diagnostics: &mut Vec<Diagnostic>
                 check_block(&else_clause.consequence, is_tail, diagnostics);
             }
         }
-        hir::ExprKind::Match(scrutinee, arms) => {
+        hir::ExprKind::Match(scrutinee, arms, _) => {
             check_expr(scrutinee, false, diagnostics);
             for arm in arms {
                 if let Some(guard) = &arm.guard {

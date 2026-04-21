@@ -136,7 +136,7 @@ fn expr_has_side_effects(expr: &hir::Expr) -> bool {
                         || block_has_side_effects(&branch.consequence)
                 })
         }
-        ExprKind::Match(scrutinee, arms) => {
+        ExprKind::Match(scrutinee, arms, _) => {
             expr_has_side_effects(scrutinee)
                 || arms.iter().any(|arm| {
                     arm.guard.as_ref().is_some_and(expr_has_side_effects)

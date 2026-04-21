@@ -1,0 +1,22 @@
+---
+source: crates/tlang_hir_opt/tests/exhaustive_enum_match.rs
+expression: pretty
+---
+enum Color {
+    Red
+    Green
+    Blue
+}
+fn name(color: Color) -> String {
+    match color {
+        Color::Red => {
+            "red"
+        },
+        Color::Green => {
+            "green"
+        },
+        _ => {
+            "fallback"
+        },
+    }
+}

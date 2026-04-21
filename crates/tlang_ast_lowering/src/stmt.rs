@@ -942,7 +942,11 @@ impl LoweringContext {
                 vec![],
                 Some(hir::Expr {
                     hir_id: this.unique_id(),
-                    kind: hir::ExprKind::Match(Box::new(match_value), match_arms),
+                    kind: hir::ExprKind::Match(
+                        Box::new(match_value),
+                        match_arms,
+                        hir::MatchMetadata::default(),
+                    ),
                     ty: hir::Ty::unknown(),
                     span: body_span,
                 }),

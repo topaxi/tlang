@@ -504,7 +504,7 @@ impl HirPretty {
             }
             hir::ExprKind::Literal(literal) => self.print_literal(literal),
             hir::ExprKind::Implements(expr, path) => self.print_implements_expr(expr, path),
-            hir::ExprKind::Match(expr, arms) => self.print_match_expr(expr, arms),
+            hir::ExprKind::Match(expr, arms, _) => self.print_match_expr(expr, arms),
             hir::ExprKind::Path(path) => self.print_path(path),
             hir::ExprKind::Range(range_expr) => self.print_range_expr(range_expr),
             hir::ExprKind::Wildcard => self.push_char('_'),

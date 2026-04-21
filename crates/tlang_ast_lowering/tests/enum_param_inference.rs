@@ -78,7 +78,7 @@ fn match_arms_of_first_fn(module: &tlang_hir::Module) -> &[tlang_hir::MatchArm] 
         .expect("expected a function declaration");
     let expr = func.body.expr.as_ref().expect("expected a body expression");
     match &expr.kind {
-        ExprKind::Match(_, arms) => arms,
+        ExprKind::Match(_, arms, _) => arms,
         _ => panic!("expected a match expression in function body"),
     }
 }

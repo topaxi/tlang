@@ -6,6 +6,7 @@ use tlang_hir_opt::HirPass;
 use tlang_hir_opt::symbol_resolution::SymbolResolution;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
+use tlang_typeck::typecheck_module;
 
 #[ctor::ctor]
 fn before_all() {
@@ -88,6 +89,14 @@ pub fn compile_src_with_warnings(
                 optimizer
                     .optimize_hir(&mut module, &mut ctx)
                     .expect("HIR optimization failed");
+                if let Ok(diagnostics) = typecheck_module(&mut module, &mut ctx)
+                    && !diagnostics.has_errors()
+                {
+                    let mut exhaustive_enum = tlang_hir_opt::ExhaustiveEnumMatch::default();
+                    exhaustive_enum
+                        .optimize_hir(&mut module, &mut ctx)
+                        .expect("exhaustive enum optimization failed");
+                }
             } else {
                 // Even without full optimization, SymbolResolution must run to
                 // populate path.res with HirId references — codegen relies on

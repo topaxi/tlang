@@ -82,6 +82,12 @@ pub fn lower_and_typecheck(result: &AnalysisResult) -> Option<TypedHir> {
     let mut diagnostics = typecheck_result.errors;
     diagnostics.extend(typecheck_result.warnings);
 
+    // Run exhaustive-enum-match elimination now that type information is
+    // available — the pass needs type-checked `pat.ty.kind` on catch-all arms
+    // to verify they match the same enum as the explicit variant arms.
+    let mut exhaustive_enum = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    exhaustive_enum.optimize_hir(&mut module, &mut ctx).ok()?;
+
     // Run unused-symbol detection now that type information is available.
     // This detects unused struct fields, dot-methods, and struct method
     // aliases that the AST-level VariableUsageValidator cannot resolve.
