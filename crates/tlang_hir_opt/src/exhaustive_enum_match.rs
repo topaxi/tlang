@@ -480,15 +480,11 @@ impl ExhaustiveEnumMatch {
     fn collapse_uniform_field_access(
         &mut self,
         expr: &mut hir::Expr,
-        scrutinee: &hir::Expr,
-        arms: &[hir::MatchArm],
-    ) -> bool {
-        let Some(field_index) = uniform_field_access_index(arms) else {
-            return false;
-        };
-
+        scrutinee: Box<hir::Expr>,
+        field_index: usize,
+    ) {
         expr.kind = ExprKind::IndexAccess(
-            Box::new(scrutinee.clone()),
+            scrutinee,
             Box::new(hir::Expr {
                 hir_id: self.hir_id_allocator.next_id(),
                 kind: ExprKind::Literal(Box::new(Literal::Integer(field_index as i64))),
@@ -501,7 +497,6 @@ impl ExhaustiveEnumMatch {
             }),
         );
         self.collapsed_match_exprs.insert(expr.hir_id);
-        true
     }
 
     fn restore_collapsed_match_completion(&mut self, block: &mut hir::Block) {
@@ -512,14 +507,18 @@ impl ExhaustiveEnumMatch {
         let Some(stmt) = block.stmts.last_mut() else {
             return;
         };
-        let StmtKind::Expr(expr) = &mut stmt.kind else {
+        let StmtKind::Expr(expr) = &stmt.kind else {
             return;
         };
         if !self.collapsed_match_exprs.contains(&expr.hir_id) {
             return;
         }
 
-        stmt.kind = StmtKind::Return(Some(expr.clone()));
+        let stmt_kind = std::mem::replace(&mut stmt.kind, StmtKind::Return(None));
+        let StmtKind::Expr(expr) = stmt_kind else {
+            unreachable!("checked above")
+        };
+        stmt.kind = StmtKind::Return(Some(expr));
         self.changed = true;
     }
 }
@@ -558,6 +557,7 @@ impl<'hir> Visitor<'hir> for ExhaustiveEnumMatch {
         // Visit children first (post-order).
         visit::walk_expr(self, expr, ctx);
 
+        let mut collapse_field_index = None;
         if let ExprKind::Match(scrutinee, arms, metadata) = &mut expr.kind {
             let was_exhaustive = metadata.exhaustive;
             metadata.exhaustive = self.analyze_exhaustiveness(scrutinee, arms).is_some();
@@ -577,12 +577,18 @@ impl<'hir> Visitor<'hir> for ExhaustiveEnumMatch {
             }
 
             if metadata.exhaustive {
-                let scrutinee = scrutinee.as_ref().clone();
-                let arms = arms.clone();
-                if self.collapse_uniform_field_access(expr, &scrutinee, &arms) {
-                    self.changed = true;
-                }
+                collapse_field_index = uniform_field_access_index(arms);
             }
+        }
+
+        if let Some(field_index) = collapse_field_index {
+            let ExprKind::Match(scrutinee, _, _) =
+                std::mem::replace(&mut expr.kind, ExprKind::Wildcard)
+            else {
+                unreachable!("match expression was just checked above")
+            };
+            self.collapse_uniform_field_access(expr, scrutinee, field_index);
+            self.changed = true;
         }
 
         if let ExprKind::FunctionExpression(decl) = &mut expr.kind {
