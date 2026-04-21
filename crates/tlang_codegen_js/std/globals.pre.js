@@ -172,7 +172,9 @@ export function $matchError(value) {
     typeName && tagName
       ? `${typeName}::${tagName}`
       : (tagName ?? typeName ?? $getType(value));
-  throw new $AssertError(`Non-exhaustive pattern match: unmatched value of type ${desc}`);
+  throw new $AssertError(
+    `Non-exhaustive pattern match: unmatched value of type ${desc}`,
+  );
 }
 
 export const $uncurryThis = (() => {
