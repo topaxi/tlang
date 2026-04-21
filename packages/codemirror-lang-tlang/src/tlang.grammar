@@ -126,7 +126,7 @@ VariableDeclaration {
 //!enumdeclaration
 
 EnumDeclaration {
-  kw<"pub">? kw<"enum"> identifier "{" commaSep<EnumVariant> "}"
+  kw<"pub">? kw<"enum"> TypeName "{" commaSep<EnumVariant> "}"
 }
 
 EnumVariant {
@@ -139,7 +139,7 @@ EnumVariant {
 //!structdeclaration
 
 StructDeclaration {
-  kw<"pub">? kw<"struct"> identifier "{" commaSep<StructField> "}"
+  kw<"pub">? kw<"struct"> TypeName "{" commaSep<StructField> "}"
 }
 
 StructField {
@@ -171,7 +171,7 @@ AssociatedTypeBinding {
 }
 
 ProtocolDeclaration {
-  kw<"pub">? kw<"protocol"> identifier TypeParamList?
+  kw<"pub">? kw<"protocol"> TypeName TypeParamList?
   (":" TypeAnnotation ("+" TypeAnnotation)*)?
   "{" (ProtocolMethodSignature | AssociatedTypeDeclaration)* "}"
 }
@@ -496,6 +496,8 @@ TaggedStringInterpolation[isolate] {
   identifierChar { @asciiLetter | $[_$\u{a1}-\u{10ffff}] }
 
   identifier { identifierChar (identifierChar | @digit)* }
+
+  TypeName { $[A-Z] (identifierChar | @digit)* }
 
   PropertyName { identifier }
 

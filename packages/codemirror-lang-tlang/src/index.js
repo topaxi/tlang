@@ -33,6 +33,7 @@ let parserWithMetadata = parser.configure({
       'let enum fn struct protocol impl pub': t.definitionKeyword,
       'in with apply type where implements matches as': t.keyword,
       'not and or': t.logicOperator,
+      TypeName: t.typeName,
       PropertyName: t.propertyName,
       PathSep: t.punctuation,
       'ProtocolDeclaration/...': t.typeName,
