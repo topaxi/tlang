@@ -261,3 +261,122 @@ fn exhaustive_match_without_catchall_is_marked_exhaustive() {
         other => panic!("expected match expression, got {other:?}"),
     }
 }
+
+#[test]
+fn exhaustive_uniform_field_access_collapses_to_index_access() {
+    let source = r#"
+        enum Expense {
+            Food(i64, String),
+            Transport(i64, String),
+        }
+
+        fn Expense.amount(Expense::Food(amount, _)) { amount }
+        fn Expense.amount(Expense::Transport(amount, _)) { amount }
+        fn Expense.amount(_) { 0 }
+    "#;
+
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
+
+    let amount = hir
+        .block
+        .stmts
+        .iter()
+        .find_map(|stmt| match &stmt.kind {
+            StmtKind::FunctionDeclaration(decl) if decl.name() == "Expense.amount" => Some(decl),
+            _ => None,
+        })
+        .expect("expected amount function");
+
+    let body_expr = amount
+        .body
+        .expr
+        .as_ref()
+        .expect("expected function body expression");
+    match &body_expr.kind {
+        ExprKind::IndexAccess(base, index) => {
+            assert!(matches!(base.kind, ExprKind::Path(_)));
+            match &index.kind {
+                ExprKind::Literal(literal) => {
+                    assert_eq!(**literal, tlang_ast::token::Literal::Integer(0));
+                }
+                other => panic!("expected integer literal index, got {other:?}"),
+            }
+        }
+        other => panic!("expected index access, got {other:?}"),
+    }
+}
+
+#[test]
+fn non_uniform_field_access_keeps_match() {
+    let source = r#"
+        enum Expense {
+            Food(i64, String),
+            Transport(String, i64),
+        }
+
+        fn Expense.amount(Expense::Food(amount, _)) { amount }
+        fn Expense.amount(Expense::Transport(_, amount)) { amount }
+        fn Expense.amount(_) { 0 }
+    "#;
+
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
+
+    let amount = hir
+        .block
+        .stmts
+        .iter()
+        .find_map(|stmt| match &stmt.kind {
+            StmtKind::FunctionDeclaration(decl) if decl.name() == "Expense.amount" => Some(decl),
+            _ => None,
+        })
+        .expect("expected amount function");
+
+    let body_expr = amount
+        .body
+        .expr
+        .as_ref()
+        .expect("expected function body expression");
+    assert!(
+        matches!(body_expr.kind, ExprKind::Match(_, _, _)),
+        "expected match to remain, got {body_expr:?}"
+    );
+}
+
+#[test]
+fn non_tail_field_use_keeps_match() {
+    let source = r#"
+        enum Expense {
+            Food(i64, String),
+            Transport(i64, String),
+        }
+
+        fn Expense.amount(Expense::Food(amount, _)) { amount + 1 }
+        fn Expense.amount(Expense::Transport(amount, _)) { amount + 1 }
+        fn Expense.amount(_) { 0 }
+    "#;
+
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
+
+    let amount = hir
+        .block
+        .stmts
+        .iter()
+        .find_map(|stmt| match &stmt.kind {
+            StmtKind::FunctionDeclaration(decl) if decl.name() == "Expense.amount" => Some(decl),
+            _ => None,
+        })
+        .expect("expected amount function");
+
+    let body_expr = amount
+        .body
+        .expr
+        .as_ref()
+        .expect("expected function body expression");
+    assert!(
+        matches!(body_expr.kind, ExprKind::Match(_, _, _)),
+        "expected match to remain, got {body_expr:?}"
+    );
+}

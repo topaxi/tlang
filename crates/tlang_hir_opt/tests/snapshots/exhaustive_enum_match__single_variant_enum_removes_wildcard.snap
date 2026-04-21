@@ -8,9 +8,5 @@ enum Wrapper {
     }
 }
 fn unwrap(wrapper: Wrapper) -> i64 {
-    match wrapper {
-        Wrapper::Value { 0: v } => {
-            v
-        },
-    }
+    wrapper[0]
 }

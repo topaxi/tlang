@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
+use tlang_ast::token::Literal;
 use tlang_defs::{DefId, DefKind};
 use tlang_hir::{
     self as hir, ExprKind, PatKind, Slot, StmtKind, TyKind,
     visit::{self, Visitor},
 };
-use tlang_span::HirId;
+use tlang_span::{HirId, HirIdAllocator};
 
 use crate::hir_opt::{HirOptContext, HirOptError, HirPass};
 
@@ -51,12 +52,16 @@ enum VariantIdentity {
 /// * Each variant arm must only use catch-all sub-patterns (identifiers or
 ///   wildcards) in its payload fields. A restrictive sub-pattern (e.g. a
 ///   literal like `Enum::V(0)`) does not fully cover the variant.
+/// * Exhaustive enum matches whose arms all immediately return the same
+///   positional payload field collapse to a direct `IndexAccess`.
 pub struct ExhaustiveEnumMatch {
     enum_variant_counts: EnumVariantCounts,
     variant_to_enum: VariantToEnum,
     enum_paths: HashMap<String, EnumIdentity>,
     builtin_variant_to_enum: HashMap<usize, EnumIdentity>,
     builtin_variant_counts: HashMap<EnumIdentity, usize>,
+    collapsed_match_exprs: HashSet<HirId>,
+    hir_id_allocator: HirIdAllocator,
     changed: bool,
 }
 
@@ -68,6 +73,8 @@ impl ExhaustiveEnumMatch {
             enum_paths: HashMap::new(),
             builtin_variant_to_enum: HashMap::new(),
             builtin_variant_counts: HashMap::new(),
+            collapsed_match_exprs: HashSet::new(),
+            hir_id_allocator: HirIdAllocator::default(),
             changed: false,
         }
     }
@@ -469,6 +476,52 @@ impl ExhaustiveEnumMatch {
             None
         }
     }
+
+    fn collapse_uniform_field_access(
+        &mut self,
+        expr: &mut hir::Expr,
+        scrutinee: &hir::Expr,
+        arms: &[hir::MatchArm],
+    ) -> bool {
+        let Some(field_index) = uniform_field_access_index(arms) else {
+            return false;
+        };
+
+        expr.kind = ExprKind::IndexAccess(
+            Box::new(scrutinee.clone()),
+            Box::new(hir::Expr {
+                hir_id: self.hir_id_allocator.next_id(),
+                kind: ExprKind::Literal(Box::new(Literal::Integer(field_index as i64))),
+                ty: hir::Ty {
+                    res: None,
+                    kind: TyKind::Primitive(hir::PrimTy::I64),
+                    span: expr.span,
+                },
+                span: expr.span,
+            }),
+        );
+        self.collapsed_match_exprs.insert(expr.hir_id);
+        true
+    }
+
+    fn restore_collapsed_match_completion(&mut self, block: &mut hir::Block) {
+        if block.expr.is_some() {
+            return;
+        }
+
+        let Some(stmt) = block.stmts.last_mut() else {
+            return;
+        };
+        let StmtKind::Expr(expr) = &mut stmt.kind else {
+            return;
+        };
+        if !self.collapsed_match_exprs.contains(&expr.hir_id) {
+            return;
+        }
+
+        stmt.kind = StmtKind::Return(Some(expr.clone()));
+        self.changed = true;
+    }
 }
 
 impl Default for ExhaustiveEnumMatch {
@@ -478,6 +531,29 @@ impl Default for ExhaustiveEnumMatch {
 }
 
 impl<'hir> Visitor<'hir> for ExhaustiveEnumMatch {
+    fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
+        visit::walk_stmt(self, stmt, ctx);
+
+        match &mut stmt.kind {
+            StmtKind::FunctionDeclaration(decl) => {
+                self.restore_collapsed_match_completion(&mut decl.body);
+            }
+            StmtKind::ProtocolDeclaration(decl) => {
+                for method in &mut decl.methods {
+                    if let Some(body) = &mut method.body {
+                        self.restore_collapsed_match_completion(body);
+                    }
+                }
+            }
+            StmtKind::ImplBlock(decl) => {
+                for method in &mut decl.methods {
+                    self.restore_collapsed_match_completion(&mut method.body);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
         // Visit children first (post-order).
         visit::walk_expr(self, expr, ctx);
@@ -499,6 +575,18 @@ impl<'hir> Visitor<'hir> for ExhaustiveEnumMatch {
                 arms.pop();
                 self.changed = true;
             }
+
+            if metadata.exhaustive {
+                let scrutinee = scrutinee.as_ref().clone();
+                let arms = arms.clone();
+                if self.collapse_uniform_field_access(expr, &scrutinee, &arms) {
+                    self.changed = true;
+                }
+            }
+        }
+
+        if let ExprKind::FunctionExpression(decl) = &mut expr.kind {
+            self.restore_collapsed_match_completion(&mut decl.body);
         }
     }
 }
@@ -514,8 +602,11 @@ impl HirPass for ExhaustiveEnumMatch {
         ctx: &mut HirOptContext,
     ) -> Result<bool, HirOptError> {
         self.changed = false;
+        self.collapsed_match_exprs.clear();
+        self.hir_id_allocator = ctx.hir_id_allocator;
         self.build_enum_maps(module, ctx);
         self.visit_module(module, &mut ());
+        ctx.hir_id_allocator = self.hir_id_allocator;
         Ok(self.changed)
     }
 }
@@ -524,6 +615,61 @@ impl HirPass for ExhaustiveEnumMatch {
 /// constraining the shape: `_` (wildcard) or a bare identifier.
 fn is_catch_all_pattern(pat: &hir::Pat) -> bool {
     matches!(pat.kind, PatKind::Wildcard | PatKind::Identifier(_, _))
+}
+
+fn uniform_field_access_index(arms: &[hir::MatchArm]) -> Option<usize> {
+    let (first, rest) = arms.split_first()?;
+    let field_index = returned_bound_field_index(first)?;
+
+    rest.iter()
+        .all(|arm| returned_bound_field_index(arm) == Some(field_index))
+        .then_some(field_index)
+}
+
+fn returned_bound_field_index(arm: &hir::MatchArm) -> Option<usize> {
+    let returned_binding = block_tail_binding_hir_id(&arm.block)?;
+    let PatKind::Enum(_, fields) = &arm.pat.kind else {
+        return None;
+    };
+
+    let mut bound_field_index = None;
+
+    for (field_name, pat) in fields {
+        match &pat.kind {
+            PatKind::Identifier(hir_id, _) if *hir_id == returned_binding => {
+                let field_index = field_name.as_str().parse::<usize>().ok()?;
+                if bound_field_index.replace(field_index).is_some() {
+                    return None;
+                }
+            }
+            PatKind::Wildcard => {}
+            _ => return None,
+        }
+    }
+
+    bound_field_index
+}
+
+fn block_tail_binding_hir_id(block: &hir::Block) -> Option<HirId> {
+    if block.stmts.is_empty() {
+        return block.expr.as_ref().and_then(expr_binding_hir_id);
+    }
+
+    if block.expr.is_none()
+        && block.stmts.len() == 1
+        && let StmtKind::Return(Some(expr)) = &block.stmts[0].kind
+    {
+        return expr_binding_hir_id(expr);
+    }
+
+    None
+}
+
+fn expr_binding_hir_id(expr: &hir::Expr) -> Option<HirId> {
+    match &expr.kind {
+        ExprKind::Path(path) => path.res.hir_id(),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
