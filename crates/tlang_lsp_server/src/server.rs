@@ -729,7 +729,7 @@ impl ServerState {
         )
     }
 
-    /// Collect cached diagnostics from a document state (parse + semantic).
+    /// Collect cached diagnostics from a document state (parse + non-parse).
     fn collect_cached_diagnostics(
         state: &crate::document_store::DocumentState,
     ) -> Vec<lsp_types::Diagnostic> {
@@ -774,6 +774,31 @@ impl ServerState {
                     .map(|d| diagnostics::from_tlang_diagnostic(d, uri))
                     .collect();
 
+                let has_semantic_errors = result
+                    .analyzer
+                    .get_diagnostics()
+                    .iter()
+                    .any(|diagnostic| diagnostic.is_error());
+
+                let (typed_hir, typed_diags) = if has_semantic_errors {
+                    (Some(None), Vec::new())
+                } else {
+                    match tlang_analysis::inlay_hints::lower_and_typecheck(&result) {
+                        Some(typed_hir) => {
+                            let typed_diags = typed_hir
+                                .diagnostics
+                                .iter()
+                                .map(|d| diagnostics::from_tlang_diagnostic(d, uri))
+                                .collect();
+                            (Some(Some(typed_hir)), typed_diags)
+                        }
+                        None => (Some(None), Vec::new()),
+                    }
+                };
+
+                let mut non_parse_diags = semantic_diags.clone();
+                non_parse_diags.extend(typed_diags);
+
                 // Update caches so unchanged-source republishing works.
                 // `result.module` is `Some` on a successful parse (even when
                 // semantic analysis emits errors) and `None` only when parsing
@@ -786,12 +811,13 @@ impl ServerState {
                         module: result.module.unwrap_or_else(empty_module),
                         diagnostics: parse_diags.clone(),
                     });
-                    doc.semantic_cache = Some(semantic_diags.clone());
+                    doc.semantic_cache = Some(non_parse_diags.clone());
                     doc.symbol_index = Some(symbol_index);
+                    doc.typed_hir = typed_hir;
                 }
 
                 let mut all = parse_diags;
-                all.extend(semantic_diags);
+                all.extend(non_parse_diags);
                 all
             }
             Err(_panic) => {
@@ -814,6 +840,7 @@ impl ServerState {
                     });
                     doc.semantic_cache = Some(vec![]);
                     doc.symbol_index = None;
+                    doc.typed_hir = Some(None);
                 }
 
                 vec![diag]
@@ -1029,6 +1056,19 @@ mod tests {
         assert!(
             !result.analyzer.get_diagnostics().is_empty(),
             "expected diagnostics for undeclared variable"
+        );
+    }
+
+    #[test]
+    fn run_diagnostics_includes_type_errors_from_typed_hir() {
+        let state = setup_server_with_source("fn f() -> String { 1 }");
+        let diags = ServerState::collect_cached_diagnostics(state.store.get(&test_uri()).unwrap());
+
+        assert!(
+            diags
+                .iter()
+                .any(|diag| diag.severity == Some(lsp_types::DiagnosticSeverity::ERROR)),
+            "expected an error diagnostic for typed-HIR/typecheck failure, got: {diags:?}"
         );
     }
 

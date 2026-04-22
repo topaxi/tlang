@@ -27,7 +27,7 @@ pub struct DocumentState {
     pub version: i32,
     /// Cached parse result (AST + parse diagnostics).
     pub parse_cache: Option<ParseCache>,
-    /// Cached semantic diagnostics.
+    /// Cached non-parse diagnostics (semantic + typed-HIR/typecheck).
     pub semantic_cache: Option<Vec<lsp_types::Diagnostic>>,
     /// Cached symbol index for hover/goto (extracted from analyzer).
     pub symbol_index: Option<SymbolIndex>,
