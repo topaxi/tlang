@@ -520,7 +520,7 @@ fn format_parameter(
     hir_ty: Option<&hir::TyKind>,
     type_var_names: &HashMap<TypeVarId, String>,
 ) -> String {
-    if matches!(param.pattern.kind, ast::PatKind::_Self) {
+    if is_self_parameter(param) {
         return "self".to_string();
     }
 
@@ -531,7 +531,7 @@ fn format_parameter(
 }
 
 fn format_parameter_from_ast(param: &ast::FunctionParameter) -> String {
-    if matches!(param.pattern.kind, ast::PatKind::_Self) {
+    if is_self_parameter(param) {
         return "self".to_string();
     }
 
@@ -542,6 +542,10 @@ fn format_parameter_from_ast(param: &ast::FunctionParameter) -> String {
         .map_or_else(|| "unknown".to_string(), format_ast_ty);
 
     format!("{pat}: {ty}")
+}
+
+fn is_self_parameter(param: &ast::FunctionParameter) -> bool {
+    matches!(param.pattern.kind, ast::PatKind::_Self)
 }
 
 fn hir_function_type_var_names(decl: &hir::FunctionDeclaration) -> HashMap<TypeVarId, String> {
@@ -701,6 +705,11 @@ fn format_literal(literal: &Literal) -> String {
     }
 }
 
+/// Extract rendered `///` doc comments from parser-attached comment tokens.
+///
+/// Parser comment attachment strips the leading `//` from single-line comments,
+/// so a source doc comment like `/// hello` arrives here as a `CommentToken`
+/// whose text starts with a single leading slash (`"/ hello"`).
 fn extract_doc_comments(comments: &[CommentToken]) -> Option<String> {
     let docs = comments
         .iter()
