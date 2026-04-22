@@ -189,7 +189,7 @@ pub fn completion_detail_from_def_kind(kind: DefKind) -> Option<String> {
 #[derive(Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi)]
 pub struct CodemirrorHoverInfo {
-    /// The hover text to display (e.g. `"(function) add/2"`).
+    /// The hover text to display (e.g. `"fn add(a: i64, b: i64) -> i64"`).
     pub text: String,
     /// UTF-16 code unit offset of the start of the hovered identifier.
     pub from: u32,

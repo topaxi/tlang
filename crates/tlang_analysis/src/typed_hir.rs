@@ -42,11 +42,27 @@ pub struct TypedHir {
 pub fn lower_and_typecheck(result: &AnalysisResult) -> Option<TypedHir> {
     let ast = result.module.as_ref()?;
     let parse_meta = result.parse_meta.as_ref()?;
+    lower_and_typecheck_parts(ast, &parse_meta.constant_pool_node_ids, &result.analyzer)
+}
 
+/// Run the full typed-HIR pipeline from precomputed AST analysis artifacts.
+///
+/// This variant is useful when callers already have an analyzed AST plus the
+/// parser's constant-pool node ids, and want to avoid reconstructing a full
+/// [`AnalysisResult`].
+///
+/// # Panics
+///
+/// Panics if a symbol table `RwLock` is poisoned (should not happen in
+/// single-threaded analysis).
+pub fn lower_and_typecheck_parts(
+    ast: &tlang_ast::node::Module,
+    constant_pool_node_ids: &[NodeId],
+    analyzer: &tlang_semantics::SemanticAnalyzer,
+) -> Option<TypedHir> {
     // Clone symbol tables so the lowering pass can mutate them without
     // corrupting the analyzer's state.
-    let symbol_tables: HashMap<NodeId, Arc<RwLock<DefScope>>> = result
-        .analyzer
+    let symbol_tables: HashMap<NodeId, Arc<RwLock<DefScope>>> = analyzer
         .symbol_tables()
         .iter()
         .map(|(&k, v)| (k, Arc::new(RwLock::new(v.read().unwrap().clone()))))
@@ -54,9 +70,9 @@ pub fn lower_and_typecheck(result: &AnalysisResult) -> Option<TypedHir> {
 
     let (mut module, meta) = tlang_ast_lowering::lower_to_hir(
         ast,
-        &parse_meta.constant_pool_node_ids,
-        result.analyzer.symbol_id_allocator(),
-        result.analyzer.root_symbol_table(),
+        constant_pool_node_ids,
+        analyzer.symbol_id_allocator(),
+        analyzer.root_symbol_table(),
         symbol_tables,
     )
     .ok()?;

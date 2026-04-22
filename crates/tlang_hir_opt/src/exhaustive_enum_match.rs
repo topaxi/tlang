@@ -579,7 +579,7 @@ mod tests {
 
         let nested_block =
             hir::Block::new(HirId::new(13), vec![enum_stmt], None, Default::default());
-        let mut module = hir::Module {
+        let module = hir::Module {
             hir_id: HirId::new(1),
             block: hir::Block::new(
                 HirId::new(2),
@@ -606,7 +606,7 @@ mod tests {
             current_scope: HirId::new(1),
             diagnostics: Vec::new(),
         };
-        pass.build_enum_maps(&mut module, &ctx);
+        pass.build_enum_maps(&module, &ctx);
 
         assert_eq!(pass.enum_variant_counts.get(&enum_hir_id), Some(&1));
         assert_eq!(

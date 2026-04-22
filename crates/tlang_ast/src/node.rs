@@ -593,6 +593,8 @@ pub struct ProtocolMethodSignature {
     pub parameters: Vec<FunctionParameter>,
     pub return_type_annotation: Option<Ty>,
     pub body: Option<Block>,
+    pub leading_comments: Vec<CommentToken>,
+    pub trailing_comments: Vec<CommentToken>,
     pub span: Span,
 }
 

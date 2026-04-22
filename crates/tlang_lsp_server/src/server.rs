@@ -249,23 +249,16 @@ impl ServerState {
 
         let mut resolved = Self::resolve_symbol(state, uri, pos);
 
-        // Enrich with type information from the typed HIR when available.
+        // Enrich shared hover details from the typed HIR when available.
         if let Some(ref mut sym) = resolved
-            && sym.type_info.is_none()
             && let Some(doc) = state.store.get(uri)
-            && let Some(Some(typed_hir)) = doc.typed_hir.as_ref()
+            && let Some(cache) = doc.parse_cache.as_ref()
         {
-            let def = &sym.def_span;
-            // def_span uses the lexer's mixed coordinate system;
-            // type_at_definition expects 0-based editor positions.
-            let def_line = def.start_lc.line;
-            let def_col = if def_line > 0 {
-                def.start_lc.column.saturating_sub(1)
-            } else {
-                def.start_lc.column
-            };
-            sym.type_info =
-                tlang_analysis::inlay_hints::type_at_definition(typed_hir, def_line, def_col);
+            tlang_analysis::query::enrich_hover_symbol(
+                &cache.module,
+                doc.typed_hir.as_ref().and_then(Option::as_ref),
+                sym,
+            );
         }
 
         // If standard symbol resolution didn't find anything, try the
@@ -1034,6 +1027,8 @@ fn char_column_to_utf16(source: &str, line: u32, char_column: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use lsp_types::{TextDocumentIdentifier, TextDocumentPositionParams};
+
     use super::*;
     use tlang_defs::DefKind;
 
@@ -1244,28 +1239,28 @@ mod tests {
     }
 
     #[test]
-    fn hover_includes_arity_for_functions() {
-        // `add` on the same line, avoid multiline column offset issues
-        let state = setup_server_with_source("fn add(a, b) { a + b }\nlet _ = add(1, 2);");
-        // `add` function defined at col 3 on line 0
-        let resolved = ServerState::resolve_symbol(
-            &state,
-            &test_uri(),
-            lsp_types::Position {
-                line: 0,
-                character: 3,
-            },
+    fn hover_includes_signature_and_docs_for_functions() {
+        let mut state = setup_server_with_source(
+            "/// Add numbers\nfn add(a: i64, b) -> i64 { a }\nlet _ = add(1, 2);",
         );
-        assert!(resolved.is_some(), "should resolve `add` at definition");
-        let resolved = resolved.unwrap();
-        let hover = resolved.to_hover();
+        let hover = futures::executor::block_on(ServerState::on_hover(
+            &mut state,
+            HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: test_uri() },
+                    position: lsp_types::Position {
+                        line: 1,
+                        character: 3,
+                    },
+                },
+                work_done_progress_params: Default::default(),
+            },
+        ))
+        .expect("hover request should succeed")
+        .expect("hover should be present");
         match hover.contents {
             lsp_types::HoverContents::Scalar(lsp_types::MarkedString::String(s)) => {
-                assert!(
-                    s.contains("function"),
-                    "hover should mention 'function': {s}"
-                );
-                assert!(s.contains("add"), "hover should contain name: {s}");
+                assert_eq!(s, "fn add(a: i64, b: unknown) -> i64\n\nAdd numbers");
             }
             _ => panic!("unexpected hover contents format"),
         }

@@ -635,17 +635,13 @@ impl<'src> Parser<'src> {
         let mut consts = Vec::new();
         let mut associated_types = Vec::new();
         while self.not_at_closing(TokenKind::RBrace) {
-            if matches!(
-                self.current_token_kind(),
-                TokenKind::SingleLineComment | TokenKind::MultiLineComment
-            ) {
-                self.parse_comments();
-            } else if let Some(item_visibility) = self.try_parse_const_item_visibility() {
+            let comments = self.parse_comments();
+            if let Some(item_visibility) = self.try_parse_const_item_visibility() {
                 consts.push(self.parse_const_item(item_visibility));
             } else if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Type)) {
                 associated_types.push(self.parse_associated_type_declaration());
             } else {
-                methods.push(self.parse_protocol_method_signature());
+                methods.push(self.parse_protocol_method_signature(comments));
             }
         }
         self.consume_token(TokenKind::RBrace);
@@ -680,7 +676,10 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_protocol_method_signature(&mut self) -> ProtocolMethodSignature {
+    fn parse_protocol_method_signature(
+        &mut self,
+        leading_comments: Vec<CommentToken>,
+    ) -> ProtocolMethodSignature {
         let mut span = self.create_span_from_current_token();
         self.consume_keyword_token(Keyword::Fn);
         let name = self.parse_identifier();
@@ -695,6 +694,7 @@ impl<'src> Parser<'src> {
         } else {
             None
         };
+        let trailing_comments = self.parse_comments();
 
         self.end_span_from_previous_token(&mut span);
         ProtocolMethodSignature {
@@ -704,6 +704,8 @@ impl<'src> Parser<'src> {
             parameters,
             return_type_annotation: return_type,
             body,
+            leading_comments,
+            trailing_comments,
             span,
         }
     }

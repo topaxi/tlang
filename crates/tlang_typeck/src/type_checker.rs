@@ -44,6 +44,10 @@ pub struct TypeChecker {
     /// Pre-scanned once at the start of `check_module` so both field-access
     /// typing and `apply` conflict detection can resolve user-defined methods.
     dot_methods: HashMap<String, tlang_span::HirId>,
+    /// Return types inferred in an earlier module pass. Used to seed
+    /// pre-registered function signatures for forward references without
+    /// turning unannotated function bodies into strict typed contexts.
+    seeded_function_returns: HashMap<tlang_span::HirId, TyKind>,
     /// Synthetic for-loop iterator bindings keyed by the lowered iterator local.
     iterator_item_types: HashMap<tlang_span::HirId, TyKind>,
     /// Allocator for checker-local type variables used by two-phase local
@@ -60,6 +64,7 @@ pub struct TypeChecker {
 
 impl TypeChecker {
     const MIN_PROTOCOL_PATH_SEGMENTS: usize = 2;
+    const MAX_MODULE_PASSES: usize = 8;
 
     pub fn new() -> Self {
         Self {
@@ -905,12 +910,20 @@ impl TypeChecker {
     /// Build a `Fn(params) -> return` type for a function declaration and
     /// store it in the type table keyed by the function's HIR id.
     fn register_function_signature(&mut self, decl: &hir::FunctionDeclaration) {
+        let ret_kind = if matches!(decl.return_type.kind, TyKind::Unknown) {
+            self.seeded_function_returns
+                .get(&decl.hir_id)
+                .cloned()
+                .unwrap_or_else(|| decl.return_type.kind.clone())
+        } else {
+            decl.return_type.kind.clone()
+        };
         let param_tys: Vec<Ty> = decl
             .parameters
             .iter()
             .map(|p| p.type_annotation.clone())
             .collect();
-        let fn_ty = Self::make_fn_ty(param_tys, decl.return_type.kind.clone());
+        let fn_ty = Self::make_fn_ty(param_tys, ret_kind);
         self.type_table.insert(
             decl.hir_id,
             TypeInfo {
@@ -920,6 +933,20 @@ impl TypeChecker {
                 },
             },
         );
+    }
+
+    fn pre_register_block_function_signatures(&mut self, block: &hir::Block) {
+        for stmt in &block.stmts {
+            match &stmt.kind {
+                hir::StmtKind::FunctionDeclaration(decl) => self.register_function_signature(decl),
+                hir::StmtKind::ImplBlock(impl_block) => {
+                    for method in &impl_block.methods {
+                        self.register_function_signature(method);
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
     /// After visiting the function body, infer the return type from the
@@ -1834,9 +1861,9 @@ impl TypeChecker {
         match kind {
             TyKind::Unknown | TyKind::Var(_) => false,
             TyKind::Path(path, type_args) => {
-                !ty_contains_unknown(kind)
-                    && !ty_contains_var(kind)
-                    && !(type_args.is_empty() && is_unspecialized_generic_builtin_path(path))
+                !(ty_contains_unknown(kind)
+                    || ty_contains_var(kind)
+                    || type_args.is_empty() && is_unspecialized_generic_builtin_path(path))
             }
             _ => !ty_contains_unknown(kind) && !ty_contains_var(kind),
         }
@@ -3077,7 +3104,34 @@ impl HirPass for TypeChecker {
         module: &mut hir::Module,
         ctx: &mut HirOptContext,
     ) -> Result<bool, HirOptError> {
-        self.check_module(module);
+        let original_snapshot = function_return_snapshot(module);
+        let mut previous_snapshot = original_snapshot.clone();
+        let mut final_checker = TypeChecker::new();
+        let mut first_pass = true;
+
+        for _ in 0..Self::MAX_MODULE_PASSES {
+            if !first_pass {
+                Self::reset_block_expr_types(&mut module.block);
+                restore_function_return_snapshot(module, &original_snapshot);
+            }
+            first_pass = false;
+
+            let mut pass_checker = TypeChecker::new();
+            pass_checker.seeded_function_returns =
+                snapshot_to_return_map(previous_snapshot.iter().cloned());
+            pass_checker.check_module(module);
+
+            let snapshot = function_return_snapshot(module);
+            let stabilized = snapshot == previous_snapshot;
+            previous_snapshot = snapshot;
+            final_checker = pass_checker;
+
+            if stabilized {
+                break;
+            }
+        }
+
+        *self = final_checker;
 
         // Convert any accumulated type errors into diagnostics.
         for error in self.errors.drain(..) {
@@ -3086,6 +3140,304 @@ impl HirPass for TypeChecker {
 
         // The type checker does not transform the HIR (no changes reported).
         Ok(false)
+    }
+}
+
+fn function_return_snapshot(module: &hir::Module) -> Vec<(tlang_span::HirId, TyKind)> {
+    let mut snapshot = Vec::new();
+    collect_block_function_returns(&module.block, &mut snapshot);
+    snapshot
+}
+
+fn snapshot_to_return_map(
+    snapshot: impl Iterator<Item = (tlang_span::HirId, TyKind)>,
+) -> HashMap<tlang_span::HirId, TyKind> {
+    snapshot.collect()
+}
+
+fn restore_function_return_snapshot(
+    module: &mut hir::Module,
+    snapshot: &[(tlang_span::HirId, TyKind)],
+) {
+    let snapshot = snapshot_to_return_map(snapshot.iter().cloned());
+    restore_block_function_returns(&mut module.block, &snapshot);
+}
+
+fn collect_block_function_returns(
+    block: &hir::Block,
+    snapshot: &mut Vec<(tlang_span::HirId, TyKind)>,
+) {
+    for stmt in &block.stmts {
+        collect_stmt_function_returns(stmt, snapshot);
+    }
+    if let Some(expr) = &block.expr {
+        collect_expr_function_returns(expr, snapshot);
+    }
+}
+
+fn restore_block_function_returns(
+    block: &mut hir::Block,
+    snapshot: &HashMap<tlang_span::HirId, TyKind>,
+) {
+    for stmt in &mut block.stmts {
+        restore_stmt_function_returns(stmt, snapshot);
+    }
+    if let Some(expr) = &mut block.expr {
+        restore_expr_function_returns(expr, snapshot);
+    }
+}
+
+fn collect_stmt_function_returns(
+    stmt: &hir::Stmt,
+    snapshot: &mut Vec<(tlang_span::HirId, TyKind)>,
+) {
+    match &stmt.kind {
+        hir::StmtKind::FunctionDeclaration(decl) => {
+            snapshot.push((decl.hir_id, decl.return_type.kind.clone()));
+            collect_block_function_returns(&decl.body, snapshot);
+        }
+        hir::StmtKind::ImplBlock(impl_block) => {
+            for method in &impl_block.methods {
+                snapshot.push((method.hir_id, method.return_type.kind.clone()));
+                collect_block_function_returns(&method.body, snapshot);
+            }
+        }
+        hir::StmtKind::ProtocolDeclaration(protocol) => {
+            for method in &protocol.methods {
+                snapshot.push((method.hir_id, method.return_type.kind.clone()));
+                if let Some(body) = &method.body {
+                    collect_block_function_returns(body, snapshot);
+                }
+            }
+        }
+        hir::StmtKind::Expr(expr) => collect_expr_function_returns(expr, snapshot),
+        hir::StmtKind::Let(_, expr, _)
+        | hir::StmtKind::Const(_, _, expr, _)
+        | hir::StmtKind::Return(Some(expr)) => collect_expr_function_returns(expr, snapshot),
+        hir::StmtKind::StructDeclaration(decl) => {
+            for const_item in &decl.consts {
+                collect_expr_function_returns(&const_item.value, snapshot);
+            }
+        }
+        hir::StmtKind::EnumDeclaration(decl) => {
+            for variant in &decl.variants {
+                if let Some(discriminant) = &variant.discriminant {
+                    collect_expr_function_returns(discriminant, snapshot);
+                }
+            }
+            for const_item in &decl.consts {
+                collect_expr_function_returns(&const_item.value, snapshot);
+            }
+        }
+        hir::StmtKind::DynFunctionDeclaration(_) | hir::StmtKind::Return(None) => {}
+    }
+}
+
+fn restore_stmt_function_returns(
+    stmt: &mut hir::Stmt,
+    snapshot: &HashMap<tlang_span::HirId, TyKind>,
+) {
+    match &mut stmt.kind {
+        hir::StmtKind::FunctionDeclaration(decl) => {
+            if let Some(return_ty) = snapshot.get(&decl.hir_id) {
+                decl.return_type.kind = return_ty.clone();
+            }
+            restore_block_function_returns(&mut decl.body, snapshot);
+        }
+        hir::StmtKind::ImplBlock(impl_block) => {
+            for method in &mut impl_block.methods {
+                if let Some(return_ty) = snapshot.get(&method.hir_id) {
+                    method.return_type.kind = return_ty.clone();
+                }
+                restore_block_function_returns(&mut method.body, snapshot);
+            }
+        }
+        hir::StmtKind::ProtocolDeclaration(protocol) => {
+            for method in &mut protocol.methods {
+                if let Some(return_ty) = snapshot.get(&method.hir_id) {
+                    method.return_type.kind = return_ty.clone();
+                }
+                if let Some(body) = &mut method.body {
+                    restore_block_function_returns(body, snapshot);
+                }
+            }
+        }
+        hir::StmtKind::Expr(expr) => restore_expr_function_returns(expr, snapshot),
+        hir::StmtKind::Let(_, expr, _)
+        | hir::StmtKind::Const(_, _, expr, _)
+        | hir::StmtKind::Return(Some(expr)) => restore_expr_function_returns(expr, snapshot),
+        hir::StmtKind::StructDeclaration(decl) => {
+            for const_item in &mut decl.consts {
+                restore_expr_function_returns(&mut const_item.value, snapshot);
+            }
+        }
+        hir::StmtKind::EnumDeclaration(decl) => {
+            for variant in &mut decl.variants {
+                if let Some(discriminant) = &mut variant.discriminant {
+                    restore_expr_function_returns(discriminant, snapshot);
+                }
+            }
+            for const_item in &mut decl.consts {
+                restore_expr_function_returns(&mut const_item.value, snapshot);
+            }
+        }
+        hir::StmtKind::DynFunctionDeclaration(_) | hir::StmtKind::Return(None) => {}
+    }
+}
+
+fn collect_expr_function_returns(
+    expr: &hir::Expr,
+    snapshot: &mut Vec<(tlang_span::HirId, TyKind)>,
+) {
+    match &expr.kind {
+        hir::ExprKind::FunctionExpression(decl) => {
+            snapshot.push((decl.hir_id, decl.return_type.kind.clone()));
+            collect_block_function_returns(&decl.body, snapshot);
+        }
+        hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
+            collect_block_function_returns(block, snapshot);
+        }
+        hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
+            collect_expr_function_returns(&call.callee, snapshot);
+            for argument in &call.arguments {
+                collect_expr_function_returns(argument, snapshot);
+            }
+        }
+        hir::ExprKind::Binary(_, lhs, rhs) | hir::ExprKind::IndexAccess(lhs, rhs) => {
+            collect_expr_function_returns(lhs, snapshot);
+            collect_expr_function_returns(rhs, snapshot);
+        }
+        hir::ExprKind::Unary(_, inner)
+        | hir::ExprKind::FieldAccess(inner, _)
+        | hir::ExprKind::Cast(inner, _)
+        | hir::ExprKind::TryCast(inner, _)
+        | hir::ExprKind::Break(Some(inner))
+        | hir::ExprKind::Let(_, inner)
+        | hir::ExprKind::Implements(inner, _) => collect_expr_function_returns(inner, snapshot),
+        hir::ExprKind::IfElse(condition, then_block, else_clauses) => {
+            collect_expr_function_returns(condition, snapshot);
+            collect_block_function_returns(then_block, snapshot);
+            for clause in else_clauses {
+                if let Some(condition) = &clause.condition {
+                    collect_expr_function_returns(condition, snapshot);
+                }
+                collect_block_function_returns(&clause.consequence, snapshot);
+            }
+        }
+        hir::ExprKind::Match(scrutinee, arms, _) => {
+            collect_expr_function_returns(scrutinee, snapshot);
+            for arm in arms {
+                if let Some(guard) = &arm.guard {
+                    collect_expr_function_returns(guard, snapshot);
+                }
+                collect_block_function_returns(&arm.block, snapshot);
+            }
+        }
+        hir::ExprKind::List(items) => {
+            for item in items {
+                collect_expr_function_returns(item, snapshot);
+            }
+        }
+        hir::ExprKind::Dict(entries) => {
+            for (key, value) in entries {
+                collect_expr_function_returns(key, snapshot);
+                collect_expr_function_returns(value, snapshot);
+            }
+        }
+        hir::ExprKind::TaggedString { tag, exprs, .. } => {
+            collect_expr_function_returns(tag, snapshot);
+            for expr in exprs {
+                collect_expr_function_returns(expr, snapshot);
+            }
+        }
+        hir::ExprKind::Range(range) => {
+            collect_expr_function_returns(&range.start, snapshot);
+            collect_expr_function_returns(&range.end, snapshot);
+        }
+        hir::ExprKind::Literal(_)
+        | hir::ExprKind::Path(_)
+        | hir::ExprKind::Continue
+        | hir::ExprKind::Break(None)
+        | hir::ExprKind::Wildcard => {}
+    }
+}
+
+fn restore_expr_function_returns(
+    expr: &mut hir::Expr,
+    snapshot: &HashMap<tlang_span::HirId, TyKind>,
+) {
+    match &mut expr.kind {
+        hir::ExprKind::FunctionExpression(decl) => {
+            if let Some(return_ty) = snapshot.get(&decl.hir_id) {
+                decl.return_type.kind = return_ty.clone();
+            }
+            restore_block_function_returns(&mut decl.body, snapshot);
+        }
+        hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
+            restore_block_function_returns(block, snapshot);
+        }
+        hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
+            restore_expr_function_returns(&mut call.callee, snapshot);
+            for argument in &mut call.arguments {
+                restore_expr_function_returns(argument, snapshot);
+            }
+        }
+        hir::ExprKind::Binary(_, lhs, rhs) | hir::ExprKind::IndexAccess(lhs, rhs) => {
+            restore_expr_function_returns(lhs, snapshot);
+            restore_expr_function_returns(rhs, snapshot);
+        }
+        hir::ExprKind::Unary(_, inner)
+        | hir::ExprKind::FieldAccess(inner, _)
+        | hir::ExprKind::Cast(inner, _)
+        | hir::ExprKind::TryCast(inner, _)
+        | hir::ExprKind::Break(Some(inner))
+        | hir::ExprKind::Let(_, inner)
+        | hir::ExprKind::Implements(inner, _) => restore_expr_function_returns(inner, snapshot),
+        hir::ExprKind::IfElse(condition, then_block, else_clauses) => {
+            restore_expr_function_returns(condition, snapshot);
+            restore_block_function_returns(then_block, snapshot);
+            for clause in else_clauses {
+                if let Some(condition) = &mut clause.condition {
+                    restore_expr_function_returns(condition, snapshot);
+                }
+                restore_block_function_returns(&mut clause.consequence, snapshot);
+            }
+        }
+        hir::ExprKind::Match(scrutinee, arms, _) => {
+            restore_expr_function_returns(scrutinee, snapshot);
+            for arm in arms {
+                if let Some(guard) = &mut arm.guard {
+                    restore_expr_function_returns(guard, snapshot);
+                }
+                restore_block_function_returns(&mut arm.block, snapshot);
+            }
+        }
+        hir::ExprKind::List(items) => {
+            for item in items {
+                restore_expr_function_returns(item, snapshot);
+            }
+        }
+        hir::ExprKind::Dict(entries) => {
+            for (key, value) in entries {
+                restore_expr_function_returns(key, snapshot);
+                restore_expr_function_returns(value, snapshot);
+            }
+        }
+        hir::ExprKind::TaggedString { tag, exprs, .. } => {
+            restore_expr_function_returns(tag, snapshot);
+            for expr in exprs {
+                restore_expr_function_returns(expr, snapshot);
+            }
+        }
+        hir::ExprKind::Range(range) => {
+            restore_expr_function_returns(&mut range.start, snapshot);
+            restore_expr_function_returns(&mut range.end, snapshot);
+        }
+        hir::ExprKind::Literal(_)
+        | hir::ExprKind::Path(_)
+        | hir::ExprKind::Continue
+        | hir::ExprKind::Break(None)
+        | hir::ExprKind::Wildcard => {}
     }
 }
 
@@ -3099,6 +3451,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
     }
 
     fn visit_block(&mut self, block: &'hir mut hir::Block, ctx: &mut Self::Context) {
+        self.pre_register_block_function_signatures(block);
         walk_block(self, block, ctx);
     }
 

@@ -18,6 +18,15 @@ pub struct BuiltinSignature {
     pub ret_builtin_type: Option<&'static str>,
 }
 
+/// Hover-specific metadata for a builtin function.
+pub struct BuiltinHoverSignature {
+    pub name: &'static str,
+    pub params: &'static [(&'static str, &'static str)],
+    pub ret: &'static str,
+    pub variadic: bool,
+    pub documentation: Option<&'static str>,
+}
+
 // Well-known type variable IDs — shared with builtin_methods.rs.
 const VAR_T: TypeVarId = TypeVarId::new(10_001);
 const VAR_U: TypeVarId = TypeVarId::new(10_002);
@@ -144,6 +153,11 @@ pub fn is_variadic(name: &str) -> bool {
     BUILTIN_SIGNATURES
         .iter()
         .any(|b| b.name == name && b.variadic)
+}
+
+/// Look up hover-specific signature metadata for a builtin function by name.
+pub fn lookup_hover_signature(name: &str) -> Option<&'static BuiltinHoverSignature> {
+    BUILTIN_HOVER_SIGNATURES.iter().find(|b| b.name == name)
 }
 
 /// Authoritative registry of builtin function type signatures.
@@ -286,5 +300,127 @@ static BUILTIN_SIGNATURES: &[BuiltinSignature] = &[
         ret: TyKind::Unknown,
         variadic: true,
         ret_builtin_type: Some("StringBuf"),
+    },
+];
+
+static BUILTIN_HOVER_SIGNATURES: &[BuiltinHoverSignature] = &[
+    BuiltinHoverSignature {
+        name: "log",
+        params: &[("values", "unknown")],
+        ret: "nil",
+        variadic: true,
+        documentation: Some("Logs one or more values to the console."),
+    },
+    BuiltinHoverSignature {
+        name: "len",
+        params: &[("iterable", "Iterable<unknown>")],
+        ret: "i64",
+        variadic: false,
+        documentation: Some("Returns the number of items in an iterable value."),
+    },
+    BuiltinHoverSignature {
+        name: "math::sqrt",
+        params: &[("value", "f64")],
+        ret: "f64",
+        variadic: false,
+        documentation: Some("Returns the square root of a floating-point number."),
+    },
+    BuiltinHoverSignature {
+        name: "math::floor",
+        params: &[("value", "f64")],
+        ret: "i64",
+        variadic: false,
+        documentation: Some("Rounds a floating-point number down to the nearest integer."),
+    },
+    BuiltinHoverSignature {
+        name: "math::random",
+        params: &[],
+        ret: "f64",
+        variadic: false,
+        documentation: Some("Returns a pseudo-random floating-point number between 0 and 1."),
+    },
+    BuiltinHoverSignature {
+        name: "math::min",
+        params: &[("values", "f64")],
+        ret: "f64",
+        variadic: true,
+        documentation: Some("Returns the smallest value from the provided arguments."),
+    },
+    BuiltinHoverSignature {
+        name: "math::max",
+        params: &[("values", "f64")],
+        ret: "f64",
+        variadic: true,
+        documentation: Some("Returns the largest value from the provided arguments."),
+    },
+    BuiltinHoverSignature {
+        name: "panic",
+        params: &[("message", "String")],
+        ret: "never",
+        variadic: false,
+        documentation: Some("Aborts evaluation with the provided error message."),
+    },
+    BuiltinHoverSignature {
+        name: "string::from_char_code",
+        params: &[("code", "i64")],
+        ret: "String",
+        variadic: false,
+        documentation: Some("Constructs a string from a Unicode code point."),
+    },
+    BuiltinHoverSignature {
+        name: "string::char_code_at",
+        params: &[("value", "String"), ("index", "i64")],
+        ret: "i64",
+        variadic: false,
+        documentation: Some("Returns the Unicode code point at the given string index."),
+    },
+    BuiltinHoverSignature {
+        name: "compose",
+        params: &[("f", "unknown"), ("g", "unknown")],
+        ret: "unknown",
+        variadic: false,
+        documentation: Some("Composes two functions into a new function."),
+    },
+    BuiltinHoverSignature {
+        name: "re",
+        params: &[("parts", "unknown"), ("values", "unknown")],
+        ret: "Regex",
+        variadic: false,
+        documentation: Some("Creates a regular expression, including from tagged template syntax."),
+    },
+    BuiltinHoverSignature {
+        name: "f",
+        params: &[("parts", "unknown"), ("values", "unknown")],
+        ret: "String",
+        variadic: false,
+        documentation: Some("Formats a tagged template into a string."),
+    },
+    BuiltinHoverSignature {
+        name: "Option::Some",
+        params: &[("value", "unknown")],
+        ret: "Option",
+        variadic: false,
+        documentation: Some("Constructs an `Option::Some` value."),
+    },
+    BuiltinHoverSignature {
+        name: "Result::Ok",
+        params: &[("value", "unknown")],
+        ret: "Result",
+        variadic: false,
+        documentation: Some("Constructs a successful `Result` value."),
+    },
+    BuiltinHoverSignature {
+        name: "Result::Err",
+        params: &[("error", "unknown")],
+        ret: "Result",
+        variadic: false,
+        documentation: Some("Constructs an error `Result` value."),
+    },
+    BuiltinHoverSignature {
+        name: "string::StringBuf",
+        params: &[("initial?", "String")],
+        ret: "StringBuf",
+        variadic: false,
+        documentation: Some("Constructs a mutable string buffer, optionally with initial text."),
     },
 ];
