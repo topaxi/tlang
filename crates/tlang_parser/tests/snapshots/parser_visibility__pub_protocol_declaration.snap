@@ -130,6 +130,8 @@ Module(
             ],
             return_type_annotation: None,
             body: None,
+            leading_comments: [],
+            trailing_comments: [],
             span: Span(
               start: 27,
               end: 42,

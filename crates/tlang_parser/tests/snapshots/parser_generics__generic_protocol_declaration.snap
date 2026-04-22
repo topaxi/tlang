@@ -162,6 +162,8 @@ Module(
               ),
             )),
             body: None,
+            leading_comments: [],
+            trailing_comments: [],
             span: Span(
               start: 23,
               end: 41,
