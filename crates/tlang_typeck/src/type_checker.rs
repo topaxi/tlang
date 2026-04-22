@@ -4868,6 +4868,10 @@ fn is_useful(
                     })
                 } else {
                     let default = default_matrix(matrix);
+                    // When every row starts with a wildcard, only the
+                    // "default" branch remains relevant: constructor-specific
+                    // rows cannot distinguish the infinite remainder of the
+                    // domain (e.g. numeric or string literals).
                     if default.len() == matrix.len() {
                         inner(&default, tail, tail_tys, type_table, seen)
                     } else {
