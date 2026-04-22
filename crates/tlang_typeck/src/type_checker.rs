@@ -1822,7 +1822,9 @@ impl TypeChecker {
                     params.iter().any(|p| ty_contains_unknown(&p.kind))
                         || ty_contains_unknown(&ret.kind)
                 }
-                TyKind::Path(_, type_args) => type_args.iter().any(|arg| ty_contains_unknown(&arg.kind)),
+                TyKind::Path(_, type_args) => {
+                    type_args.iter().any(|arg| ty_contains_unknown(&arg.kind))
+                }
                 TyKind::Union(types) => types.iter().any(|ty| ty_contains_unknown(&ty.kind)),
                 TyKind::Var(_) | TyKind::Primitive(_) | TyKind::Never => false,
             }

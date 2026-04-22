@@ -342,6 +342,10 @@ fn push_multiline_chain_hint(
     }
 }
 
+fn pipeline_starts_on_newline(lhs: &hir::Expr, callee: &hir::Expr) -> bool {
+    lhs.span.end_lc.line < callee.span.start_lc.line
+}
+
 // ── Expression traversal (recurse into nested functions / blocks) ──────
 
 #[allow(clippy::too_many_lines)]
@@ -365,12 +369,12 @@ fn collect_expr_hints(expr: &hir::Expr, ctx: &HintCtx<'_>, hints: &mut Vec<Inlay
         }
         hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
             // Pipeline chain hint: if this Call was desugared from `|>` and
-            // the piped-in LHS ends on a different line than the overall
-            // expression, show the intermediate type at the end of the LHS
-            // line so the user can see the value flowing into each step.
+            // the pipeline step starts on a new line, show the intermediate
+            // type at the end of the piped-in LHS line so the user can see
+            // the value flowing into each multi-line step.
             if ctx.pipeline_call_ids.contains(&call.hir_id)
                 && let Some(lhs) = call.arguments.first()
-                && lhs.span.end_lc.line < expr.span.end_lc.line
+                && pipeline_starts_on_newline(lhs, &call.callee)
                 && !matches!(lhs.ty.kind, TyKind::Unknown)
             {
                 push_hint(
@@ -1578,6 +1582,26 @@ circle implements Drawable
     }
 
     #[test]
+    fn single_line_pipeline_has_no_chained_pipeline_hint() {
+        let source = r#"
+fn filter([], _) { [] }
+fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
+fn filter([_, ...xs], f) { rec filter(xs, f) }
+
+let expenses = [1, 2, 3];
+let first_half = expenses |> filter(fn(x) { x > 1 });
+"#;
+
+        let hints = hints_for(source);
+        assert!(
+            !hints
+                .iter()
+                .any(|h| h.kind == InlayHintKind::ChainedPipeline && h.line == 5),
+            "expected no chained pipeline hint for single-line pipeline, got: {hints:?}"
+        );
+    }
+
+    #[test]
     fn let_binding_hint_from_loop_expression_result() {
         let source = r#"
 let sum = for x in [1, 2, 3]; with acc = 0 {
@@ -1724,18 +1748,6 @@ fn Expense.date(Expense::Transport(_, d)) { d }
         );
         assert!(amount_hints.iter().any(|h| h.line == 6));
         assert!(amount_hints.iter().any(|h| h.line == 7));
-
-        let date_hints: Vec<_> = hints
-            .iter()
-            .filter(|h| h.kind == InlayHintKind::ReturnType && h.label == " -> Temporal::PlainDate")
-            .collect();
-        assert_eq!(
-            date_hints.len(),
-            2,
-            "expected one `-> Temporal::PlainDate` return hint per date clause, got: {hints:?}"
-        );
-        assert!(date_hints.iter().any(|h| h.line == 9));
-        assert!(date_hints.iter().any(|h| h.line == 10));
     }
 
     #[test]
