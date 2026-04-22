@@ -8,10 +8,13 @@ use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DidSaveTextDocumentParams, GotoDefinitionParams, GotoDefinitionResponse, HoverParams,
-    HoverProviderCapability, InitializeParams, InitializeResult, InlayHint, InlayHintParams,
-    ParameterInformation, ParameterLabel, PublishDiagnosticsParams, ServerCapabilities,
-    SignatureHelpOptions, SignatureHelpParams, SignatureInformation, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions, Url,
+    HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, InlayHint,
+    InlayHintParams, NumberOrString, ParameterInformation, ParameterLabel, ProgressParams,
+    ProgressParamsValue, PublishDiagnosticsParams, ServerCapabilities, SignatureHelpOptions,
+    SignatureHelpParams, SignatureInformation, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, Url, WorkDoneProgress,
+    WorkDoneProgressBegin, WorkDoneProgressCreateParams, WorkDoneProgressEnd,
+    WorkDoneProgressReport,
 };
 use serde::Deserialize;
 use tlang_analysis::CompilationTarget;
@@ -82,6 +85,9 @@ pub struct ServerState {
     client: ClientSocket,
     store: DocumentStore,
     target: CompilationTarget,
+    progress_supported: bool,
+    next_progress_token: u64,
+    startup_progress_reported: bool,
 }
 
 impl ServerState {
@@ -91,6 +97,9 @@ impl ServerState {
             client,
             store: DocumentStore::new(),
             target: CompilationTarget::default(),
+            progress_supported: false,
+            next_progress_token: 0,
+            startup_progress_reported: false,
         });
 
         router
@@ -101,7 +110,7 @@ impl ServerState {
             .request::<lsp_types::request::Completion, _>(Self::on_completion)
             .request::<lsp_types::request::SignatureHelpRequest, _>(Self::on_signature_help)
             .request::<lsp_types::request::InlayHintRequest, _>(Self::on_inlay_hint)
-            .notification::<lsp_types::notification::Initialized>(|_, _| ControlFlow::Continue(()))
+            .notification::<lsp_types::notification::Initialized>(Self::on_initialized)
             .notification::<lsp_types::notification::Exit>(|_, _| ControlFlow::Break(Ok(())))
             .notification::<lsp_types::notification::DidOpenTextDocument>(Self::on_did_open)
             .notification::<lsp_types::notification::DidChangeTextDocument>(Self::on_did_change)
@@ -116,9 +125,14 @@ impl ServerState {
         params: InitializeParams,
     ) -> futures::future::BoxFuture<'static, Result<InitializeResult, async_lsp::ResponseError>>
     {
+        let InitializeParams {
+            initialization_options,
+            capabilities,
+            ..
+        } = params;
+
         // Parse initializationOptions if provided.
-        let settings: ServerSettings = params
-            .initialization_options
+        let settings: ServerSettings = initialization_options
             .and_then(|v| match serde_json::from_value(v) {
                 Ok(s) => Some(s),
                 Err(e) => {
@@ -129,6 +143,11 @@ impl ServerState {
             .unwrap_or_default();
 
         state.target = settings.target.into();
+        state.progress_supported = capabilities
+            .window
+            .as_ref()
+            .and_then(|window| window.work_done_progress)
+            == Some(true);
 
         Box::pin(async move {
             Ok(InitializeResult {
@@ -161,6 +180,30 @@ impl ServerState {
                 }),
             })
         })
+    }
+
+    fn on_initialized(
+        state: &mut Self,
+        _: InitializedParams,
+    ) -> ControlFlow<async_lsp::Result<()>> {
+        if state.startup_progress_reported {
+            return ControlFlow::Continue(());
+        }
+
+        if let Some(progress) = state.begin_progress(
+            "Starting tlang language server",
+            Some(format!(
+                "Preparing {target} analysis pipeline",
+                target = Self::target_label(state.target)
+            )),
+            Some(0),
+        ) {
+            progress.report("Ready to analyze documents", 100);
+            progress.finish("Language server ready");
+        }
+
+        state.startup_progress_reported = true;
+        ControlFlow::Continue(())
     }
 
     fn on_did_open(
@@ -472,10 +515,30 @@ impl ServerState {
         };
 
         let target = state.target;
-        let typed_hir = std::panic::catch_unwind(AssertUnwindSafe(|| {
-            let result = tlang_analysis::analyze_for_target(&source, target);
-            tlang_analysis::inlay_hints::lower_and_typecheck(&result)
+        let progress = state.begin_progress(
+            format!(
+                "Preparing editor features for {}",
+                Self::document_label(uri)
+            ),
+            Some("Parsing and semantic analysis".into()),
+            Some(10),
+        );
+
+        let analysis = std::panic::catch_unwind(AssertUnwindSafe(|| {
+            tlang_analysis::analyze_for_target(&source, target)
         }));
+
+        let typed_hir = match analysis {
+            Ok(result) => {
+                if let Some(progress) = progress.as_ref() {
+                    progress.report("Type checking", 70);
+                }
+                std::panic::catch_unwind(AssertUnwindSafe(|| {
+                    tlang_analysis::inlay_hints::lower_and_typecheck(&result)
+                }))
+            }
+            Err(err) => Err(err),
+        };
 
         if let Some(doc) = state.store.documents_mut().get_mut(uri) {
             doc.typed_hir = Some(match typed_hir {
@@ -485,6 +548,10 @@ impl ServerState {
                     None
                 }
             });
+        }
+
+        if let Some(progress) = progress {
+            progress.finish("Editor feature analysis complete");
         }
     }
 
@@ -744,6 +811,11 @@ impl ServerState {
     /// builtins for [`CompilationTarget::Interpreter`].
     fn run_diagnostics(&mut self, uri: &Url, source: &str) {
         let target = self.target;
+        let progress = self.begin_progress(
+            format!("Analyzing {}", Self::document_label(uri)),
+            Some("Parsing and semantic analysis".into()),
+            Some(10),
+        );
 
         // Run the full analysis pipeline (parse + semantic) with panic protection.
         let analysis = std::panic::catch_unwind(AssertUnwindSafe(|| {
@@ -752,6 +824,10 @@ impl ServerState {
 
         let all_diagnostics = match analysis {
             Ok(result) => {
+                if let Some(progress) = progress.as_ref() {
+                    progress.report("Indexing symbols", 55);
+                }
+
                 // Convert parse issues → LSP diagnostics.
                 let parse_diags: Vec<lsp_types::Diagnostic> = result
                     .parse_issues
@@ -773,11 +849,19 @@ impl ServerState {
                     .iter()
                     .any(|diagnostic| diagnostic.is_error());
 
+                let symbol_index = SymbolIndex::from_analyzer(&result.analyzer);
+
                 let (typed_hir, typed_diags) = if has_semantic_errors {
                     (Some(None), Vec::new())
                 } else {
-                    match tlang_analysis::inlay_hints::lower_and_typecheck(&result) {
-                        Some(typed_hir) => {
+                    if let Some(progress) = progress.as_ref() {
+                        progress.report("Type checking", 80);
+                    }
+
+                    match std::panic::catch_unwind(AssertUnwindSafe(|| {
+                        tlang_analysis::inlay_hints::lower_and_typecheck(&result)
+                    })) {
+                        Ok(Some(typed_hir)) => {
                             let typed_diags = typed_hir
                                 .diagnostics
                                 .iter()
@@ -785,7 +869,11 @@ impl ServerState {
                                 .collect();
                             (Some(Some(typed_hir)), typed_diags)
                         }
-                        None => (Some(None), Vec::new()),
+                        Ok(None) => (Some(None), Vec::new()),
+                        Err(_) => {
+                            error!("typed HIR computation panicked for {uri}");
+                            (Some(None), Vec::new())
+                        }
                     }
                 };
 
@@ -797,7 +885,6 @@ impl ServerState {
                 // semantic analysis emits errors) and `None` only when parsing
                 // fails outright; `empty_module()` is only a fallback for the
                 // parse-failure case.
-                let symbol_index = SymbolIndex::from_analyzer(&result.analyzer);
                 if let Some(doc) = self.store.documents_mut().get_mut(uri) {
                     doc.parse_cache = Some(ParseCache {
                         source_hash: doc.source_hash,
@@ -840,9 +927,17 @@ impl ServerState {
             }
         };
 
+        if let Some(progress) = progress.as_ref() {
+            progress.report("Publishing diagnostics", 95);
+        }
+
         // Publish all collected diagnostics.
         let version = self.store.get(uri).map(|d| d.version);
         self.publish_diagnostics(uri.clone(), all_diagnostics, version);
+
+        if let Some(progress) = progress {
+            progress.finish("Analysis complete");
+        }
     }
 
     /// Send diagnostics to the client.
@@ -859,6 +954,95 @@ impl ServerState {
         }) {
             warn!("failed to publish diagnostics: {err}");
         }
+    }
+
+    fn begin_progress(
+        &mut self,
+        title: impl Into<String>,
+        message: Option<String>,
+        percentage: Option<u32>,
+    ) -> Option<WorkDoneProgressReporter> {
+        if !self.progress_supported {
+            return None;
+        }
+
+        let token = NumberOrString::String(format!("tlang/progress/{}", self.next_progress_token));
+        self.next_progress_token += 1;
+
+        let mut client = self.client.clone();
+        std::mem::drop(
+            client.work_done_progress_create(WorkDoneProgressCreateParams {
+                token: token.clone(),
+            }),
+        );
+
+        let reporter = WorkDoneProgressReporter {
+            client,
+            token: token.clone(),
+        };
+
+        if reporter
+            .notify(WorkDoneProgress::Begin(WorkDoneProgressBegin {
+                title: title.into(),
+                cancellable: Some(false),
+                message,
+                percentage,
+            }))
+            .is_err()
+        {
+            return None;
+        }
+
+        Some(reporter)
+    }
+
+    fn document_label(uri: &Url) -> String {
+        uri.path_segments()
+            .and_then(|mut segments| segments.rfind(|segment| !segment.is_empty()))
+            .map(ToOwned::to_owned)
+            .filter(|label| !label.is_empty())
+            .unwrap_or_else(|| uri.as_str().to_owned())
+    }
+
+    fn target_label(target: CompilationTarget) -> &'static str {
+        match target {
+            CompilationTarget::Js => "JavaScript",
+            CompilationTarget::Interpreter => "interpreter",
+        }
+    }
+}
+
+struct WorkDoneProgressReporter {
+    client: ClientSocket,
+    token: NumberOrString,
+}
+
+impl WorkDoneProgressReporter {
+    fn report(&self, message: impl Into<String>, percentage: u32) {
+        let _ = self.notify(WorkDoneProgress::Report(WorkDoneProgressReport {
+            cancellable: Some(false),
+            message: Some(message.into()),
+            percentage: Some(percentage),
+        }));
+    }
+
+    fn finish(&self, message: impl Into<String>) {
+        let _ = self.notify(WorkDoneProgress::End(WorkDoneProgressEnd {
+            message: Some(message.into()),
+        }));
+    }
+
+    fn notify(&self, value: WorkDoneProgress) -> Result<(), async_lsp::Error> {
+        self.client
+            .clone()
+            .progress(ProgressParams {
+                token: self.token.clone(),
+                value: ProgressParamsValue::WorkDone(value),
+            })
+            .map_err(|err| {
+                warn!("failed to publish progress: {err}");
+                err
+            })
     }
 }
 
@@ -1139,6 +1323,9 @@ mod tests {
             client,
             store: DocumentStore::new(),
             target: CompilationTarget::Js,
+            progress_supported: false,
+            next_progress_token: 0,
+            startup_progress_reported: false,
         };
         let uri = test_uri();
         state.store.open(uri.clone(), 1, source.into());
@@ -1651,6 +1838,9 @@ mod tests {
             client,
             store: DocumentStore::new(),
             target: CompilationTarget::Js,
+            progress_supported: false,
+            next_progress_token: 0,
+            startup_progress_reported: false,
         };
         let uri = test_uri();
         state.store.open(uri.clone(), 1, "let x = 42;".into());
