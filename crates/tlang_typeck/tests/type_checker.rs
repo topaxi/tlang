@@ -2931,3 +2931,139 @@ fn mixed_numeric_arithmetic_no_spurious_conflict() {
         "#,
     );
 }
+
+#[test]
+fn pattern_type_mismatch_reports_dedicated_diagnostic() {
+    let errs = common::typecheck_errors("let [x] = 1;");
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("pattern") && e.contains("cannot match value of type `i64`")),
+        "expected pattern mismatch diagnostic, got: {errs:?}"
+    );
+}
+
+#[test]
+fn non_boolean_match_guard_reports_dedicated_diagnostic() {
+    let errs = common::typecheck_errors(
+        r#"
+        fn id(n: i64) -> i64 { n }
+        let value = match 42 {
+            n if id(n) => 1,
+            _ => 0,
+        };
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("match guard must have type `bool`")),
+        "expected non-bool guard diagnostic, got: {errs:?}"
+    );
+}
+
+#[test]
+fn exhaustive_nested_enum_bool_match_typechecks() {
+    common::typecheck_ok(
+        r#"
+        enum MaybeBool {
+            Some(bool),
+            None,
+        }
+
+        let value = match MaybeBool::Some(true) {
+            MaybeBool::Some(true) => 1,
+            MaybeBool::Some(false) => 2,
+            MaybeBool::None => 0,
+        };
+        "#,
+    );
+}
+
+#[test]
+fn non_exhaustive_bool_match_reports_dedicated_diagnostic() {
+    let errs = common::typecheck_errors(
+        r#"
+        let value = match true {
+            true => 1,
+        };
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("non-exhaustive match") && e.contains("bool")),
+        "expected non-exhaustive bool diagnostic, got: {errs:?}"
+    );
+}
+
+#[test]
+fn non_exhaustive_list_match_reports_dedicated_diagnostic() {
+    let errs = common::typecheck_errors(
+        r#"
+        fn head(xs: List<i64>) -> i64 {
+            match xs {
+                [] => 0,
+            }
+        }
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("non-exhaustive match") && e.contains("List")),
+        "expected non-exhaustive list diagnostic, got: {errs:?}"
+    );
+}
+
+#[test]
+fn non_exhaustive_numeric_match_reports_dedicated_diagnostic() {
+    let errs = common::typecheck_errors(
+        r#"
+        let value = match 42 {
+            0 => 1,
+        };
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("non-exhaustive match") && e.contains("i64")),
+        "expected non-exhaustive numeric diagnostic, got: {errs:?}"
+    );
+}
+
+#[test]
+fn non_exhaustive_string_match_reports_dedicated_diagnostic() {
+    let errs = common::typecheck_errors(
+        r#"
+        let value = match "a" {
+            "a" => 1,
+        };
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("non-exhaustive match") && e.contains("String")),
+        "expected non-exhaustive string diagnostic, got: {errs:?}"
+    );
+}
+
+#[test]
+fn redundant_match_arm_is_reported_as_warning() {
+    let (_, diagnostics) = common::typecheck(
+        r#"
+        let value = match true {
+            _ => 1,
+            false => 0,
+        };
+        "#,
+    );
+    let warnings = diagnostics
+        .into_iter()
+        .filter(|diagnostic| diagnostic.is_warning())
+        .map(|diagnostic| diagnostic.message().to_string())
+        .collect::<Vec<_>>();
+
+    assert!(
+        warnings
+            .iter()
+            .any(|message| message.contains("unreachable match arm")),
+        "expected redundant-arm warning, got: {warnings:?}"
+    );
+}

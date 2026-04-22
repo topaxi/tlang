@@ -114,6 +114,16 @@ pub enum TypeError {
         ty: String,
         span: Span,
     },
+    /// A pattern cannot match a value of the given scrutinee type.
+    PatternTypeMismatch {
+        pattern: String,
+        scrutinee: String,
+        span: Span,
+    },
+    /// A match guard (or guard-style path) must evaluate to a boolean.
+    NonBooleanGuard { actual: String, span: Span },
+    /// A match does not cover all values of the scrutinee type.
+    NonExhaustiveMatch { scrutinee: String, span: Span },
 }
 
 impl TypeError {
@@ -137,7 +147,10 @@ impl TypeError {
             | TypeError::MissingAssociatedType { span, .. }
             | TypeError::UnexpectedAssociatedType { span, .. }
             | TypeError::UnknownWhereClauseBound { span, .. }
-            | TypeError::InfiniteType { span, .. } => *span,
+            | TypeError::InfiniteType { span, .. }
+            | TypeError::PatternTypeMismatch { span, .. }
+            | TypeError::NonBooleanGuard { span, .. }
+            | TypeError::NonExhaustiveMatch { span, .. } => *span,
         }
     }
 
@@ -253,6 +266,17 @@ impl TypeError {
                 format!(
                     "infinite type detected: `{type_param}` occurs in `{ty}` during unification"
                 )
+            }
+            TypeError::PatternTypeMismatch {
+                pattern, scrutinee, ..
+            } => {
+                format!("pattern `{pattern}` cannot match value of type `{scrutinee}`")
+            }
+            TypeError::NonBooleanGuard { actual, .. } => {
+                format!("match guard must have type `bool`, found `{actual}`")
+            }
+            TypeError::NonExhaustiveMatch { scrutinee, .. } => {
+                format!("non-exhaustive match: missing cases for `{scrutinee}`")
             }
         }
     }
