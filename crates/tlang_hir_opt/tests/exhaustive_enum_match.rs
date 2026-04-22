@@ -308,6 +308,104 @@ fn exhaustive_uniform_field_access_collapses_to_index_access() {
 }
 
 #[test]
+fn collapsed_statement_match_does_not_gain_return() {
+    let source = r#"
+        enum Expense {
+            Food(i64, String),
+            Transport(i64, String),
+        }
+
+        fn amount(expense: Expense) {
+            match expense {
+                Expense::Food(amount, _) => amount,
+                Expense::Transport(amount, _) => amount,
+            };
+        }
+    "#;
+
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
+
+    let amount = hir
+        .block
+        .stmts
+        .iter()
+        .find_map(|stmt| match &stmt.kind {
+            StmtKind::FunctionDeclaration(decl) if decl.name() == "amount" => Some(decl),
+            _ => None,
+        })
+        .expect("expected amount function");
+
+    assert!(
+        amount.body.expr.is_none(),
+        "statement-position match should stay a statement"
+    );
+    match &amount.body.stmts[..] {
+        [stmt] => match &stmt.kind {
+            StmtKind::Expr(expr) => {
+                assert!(
+                    matches!(expr.kind, ExprKind::IndexAccess(_, _)),
+                    "expected collapsed statement match, got {expr:?}"
+                );
+            }
+            other => panic!("expected expression statement, got {other:?}"),
+        },
+        other => panic!("expected single statement, got {other:?}"),
+    }
+}
+
+#[test]
+fn collapsed_return_match_restores_return_statement() {
+    let source = r#"
+        enum Expense {
+            Food(i64, String),
+            Transport(i64, String),
+        }
+
+        fn amount(expense: Expense) {
+            match expense {
+                Expense::Food(amount, _) => {
+                    return amount;
+                },
+                Expense::Transport(amount, _) => {
+                    return amount;
+                },
+            };
+        }
+    "#;
+
+    let mut pass = tlang_hir_opt::ExhaustiveEnumMatch::default();
+    let hir = common::compile_typecheck_and_optimize(source, &mut pass);
+
+    let amount = hir
+        .block
+        .stmts
+        .iter()
+        .find_map(|stmt| match &stmt.kind {
+            StmtKind::FunctionDeclaration(decl) if decl.name() == "amount" => Some(decl),
+            _ => None,
+        })
+        .expect("expected amount function");
+
+    assert!(
+        amount.body.expr.is_none(),
+        "explicit returns should stay statements"
+    );
+    match &amount.body.stmts[..] {
+        [stmt] => match &stmt.kind {
+            StmtKind::Return(Some(expr)) => {
+                assert!(
+                    matches!(expr.kind, ExprKind::IndexAccess(_, _)),
+                    "expected collapsed return value, got {expr:?}"
+                );
+            }
+            other => panic!("expected return statement, got {other:?}"),
+        },
+        other => panic!("expected single statement, got {other:?}"),
+    }
+}
+
+#[test]
 fn non_uniform_field_access_keeps_match() {
     let source = r#"
         enum Expense {
