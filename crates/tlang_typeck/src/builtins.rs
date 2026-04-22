@@ -418,9 +418,9 @@ static BUILTIN_HOVER_SIGNATURES: &[BuiltinHoverSignature] = &[
     },
     BuiltinHoverSignature {
         name: "string::StringBuf",
-        params: &[("initial", "String")],
+        params: &[("initial?", "String")],
         ret: "StringBuf",
-        variadic: true,
+        variadic: false,
         documentation: Some("Constructs a mutable string buffer, optionally with initial text."),
     },
 ];

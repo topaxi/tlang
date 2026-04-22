@@ -985,7 +985,7 @@ fn format_literal(literal: &Literal) -> String {
 ///
 /// Parser comment attachment strips the leading `//` from single-line comments,
 /// so a source doc comment like `/// hello` arrives here as a `CommentToken`
-/// whose text starts with a single leading slash (`"/ hello"`).
+/// whose text starts with exactly one leading slash (`"/ hello"`).
 fn extract_doc_comments(comments: &[CommentToken]) -> Option<String> {
     let docs = comments
         .iter()
@@ -993,6 +993,7 @@ fn extract_doc_comments(comments: &[CommentToken]) -> Option<String> {
             CommentKind::SingleLine => comment
                 .text
                 .strip_prefix('/')
+                .filter(|text| !text.starts_with('/'))
                 .map(|text| text.trim_start().to_string()),
             CommentKind::MultiLine => None,
         })
@@ -1164,6 +1165,16 @@ mod tests {
         assert_eq!(
             resolved.hover_text(),
             "fn len(iterable: Iterable<unknown>) -> i64\n\nReturns the number of items in an iterable value."
+        );
+    }
+
+    #[test]
+    fn format_builtin_signature_marks_optional_single_argument_without_ellipsis() {
+        let signature = builtins::lookup_hover_signature("string::StringBuf").unwrap();
+
+        assert_eq!(
+            format_builtin_signature(signature),
+            "fn string::StringBuf(initial?: String) -> StringBuf"
         );
     }
 
@@ -1477,5 +1488,36 @@ for x in tree {
         let resolved = resolved.unwrap();
         assert_eq!(resolved.name, "x");
         assert_eq!(resolved.def_kind, DefKind::Variable);
+    }
+
+    #[test]
+    fn extract_doc_comments_only_accepts_exact_triple_slash_comments() {
+        let comments = vec![
+            CommentToken {
+                kind: CommentKind::SingleLine,
+                text: "/ first".into(),
+                span: Span::default(),
+            },
+            CommentToken {
+                kind: CommentKind::SingleLine,
+                text: "// not doc".into(),
+                span: Span::default(),
+            },
+            CommentToken {
+                kind: CommentKind::SingleLine,
+                text: " / not doc".into(),
+                span: Span::default(),
+            },
+            CommentToken {
+                kind: CommentKind::SingleLine,
+                text: "/ second".into(),
+                span: Span::default(),
+            },
+        ];
+
+        assert_eq!(
+            extract_doc_comments(&comments),
+            Some("first\nsecond".to_string())
+        );
     }
 }

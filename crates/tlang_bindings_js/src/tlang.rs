@@ -141,8 +141,8 @@ pub struct BuildArtifacts {
     /// is called.  `None` before analysis or when parsing fails.
     symbol_index: Option<SymbolIndex>,
     /// Cached typed HIR for editor features that need inferred callable
-    /// signatures. `Some(None)` means type lowering/type checking was attempted
-    /// but did not succeed.
+    /// signatures. `None` means typed HIR is not available yet, either because
+    /// analysis has not run or because lowering/type checking did not succeed.
     typed_hir: Option<tlang_analysis::typed_hir::TypedHir>,
 }
 
