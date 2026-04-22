@@ -290,6 +290,54 @@ fn test_enum_is_variant_with_positional_fields() {
 }
 
 #[test]
+fn test_enum_accessor_match_collapses_to_direct_index_access() {
+    let output = compile!(indoc! {"
+        enum Expense {
+            Food(i64, String),
+            Transport(i64, String),
+            Entertainment(i64, String),
+        }
+
+        fn Expense.amount(Expense::Food(amount, _)) { amount }
+        fn Expense.amount(Expense::Transport(amount, _)) { amount }
+        fn Expense.amount(Expense::Entertainment(amount, _)) { amount }
+
+        fn Expense.date(Expense::Food(_, date)) { date }
+        fn Expense.date(Expense::Transport(_, date)) { date }
+        fn Expense.date(Expense::Entertainment(_, date)) { date }
+    "});
+    let expected_output = indoc! {"
+        class Expense {
+            tag = this;
+            [0];
+            [1];
+            static Food = (arg, arg$0) => Object.assign(new this(), {
+                tag: this.Food,
+                0: arg,
+                1: arg$0
+            });
+            static Transport = (arg, arg$0) => Object.assign(new this(), {
+                tag: this.Transport,
+                0: arg,
+                1: arg$0
+            });
+            static Entertainment = (arg, arg$0) => Object.assign(new this(), {
+                tag: this.Entertainment,
+                0: arg,
+                1: arg$0
+            });
+        }
+        Expense.prototype.amount = function amount() {
+            return this[0];
+        };
+        Expense.prototype.date = function date() {
+            return this[1];
+        };
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
 fn test_discriminant_enum() {
     let output = compile!(indoc! {"
         enum HttpStatus {

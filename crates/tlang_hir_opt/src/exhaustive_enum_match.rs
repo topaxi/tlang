@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
+use tlang_ast::token::Literal;
 use tlang_defs::{DefId, DefKind};
 use tlang_hir::{
     self as hir, ExprKind, PatKind, Slot, StmtKind, TyKind,
     visit::{self, Visitor},
 };
-use tlang_span::HirId;
+use tlang_span::{HirId, HirIdAllocator};
 
 use crate::hir_opt::{HirOptContext, HirOptError, HirPass};
 
@@ -25,6 +26,18 @@ enum EnumIdentity {
 enum VariantIdentity {
     Hir(HirId),
     Global(usize),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UniformFieldAccessTailKind {
+    Expr,
+    Return,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct UniformFieldAccess {
+    field_index: usize,
+    tail_kind: UniformFieldAccessTailKind,
 }
 
 /// HIR optimisation pass that removes an unreachable trailing wildcard (or
@@ -51,12 +64,16 @@ enum VariantIdentity {
 /// * Each variant arm must only use catch-all sub-patterns (identifiers or
 ///   wildcards) in its payload fields. A restrictive sub-pattern (e.g. a
 ///   literal like `Enum::V(0)`) does not fully cover the variant.
+/// * Exhaustive enum matches whose arms all immediately return the same
+///   positional payload field collapse to a direct `IndexAccess`.
 pub struct ExhaustiveEnumMatch {
     enum_variant_counts: EnumVariantCounts,
     variant_to_enum: VariantToEnum,
     enum_paths: HashMap<String, EnumIdentity>,
     builtin_variant_to_enum: HashMap<usize, EnumIdentity>,
     builtin_variant_counts: HashMap<EnumIdentity, usize>,
+    collapsed_return_match_exprs: HashSet<HirId>,
+    hir_id_allocator: HirIdAllocator,
     changed: bool,
 }
 
@@ -68,6 +85,8 @@ impl ExhaustiveEnumMatch {
             enum_paths: HashMap::new(),
             builtin_variant_to_enum: HashMap::new(),
             builtin_variant_counts: HashMap::new(),
+            collapsed_return_match_exprs: HashSet::new(),
+            hir_id_allocator: HirIdAllocator::default(),
             changed: false,
         }
     }
@@ -469,6 +488,54 @@ impl ExhaustiveEnumMatch {
             None
         }
     }
+
+    fn collapse_uniform_field_access(
+        &mut self,
+        expr: &mut hir::Expr,
+        scrutinee: Box<hir::Expr>,
+        field_index: usize,
+        tail_kind: UniformFieldAccessTailKind,
+    ) {
+        expr.kind = ExprKind::IndexAccess(
+            scrutinee,
+            Box::new(hir::Expr {
+                hir_id: self.hir_id_allocator.next_id(),
+                kind: ExprKind::Literal(Box::new(Literal::Integer(field_index as i64))),
+                ty: hir::Ty {
+                    res: None,
+                    kind: TyKind::Primitive(hir::PrimTy::I64),
+                    span: expr.span,
+                },
+                span: expr.span,
+            }),
+        );
+        if tail_kind == UniformFieldAccessTailKind::Return {
+            self.collapsed_return_match_exprs.insert(expr.hir_id);
+        }
+    }
+
+    fn restore_collapsed_match_completion(&mut self, block: &mut hir::Block) {
+        if block.expr.is_some() {
+            return;
+        }
+
+        let Some(stmt) = block.stmts.last_mut() else {
+            return;
+        };
+        let StmtKind::Expr(expr) = &stmt.kind else {
+            return;
+        };
+        if !self.collapsed_return_match_exprs.contains(&expr.hir_id) {
+            return;
+        }
+
+        let stmt_kind = std::mem::replace(&mut stmt.kind, StmtKind::Return(None));
+        let StmtKind::Expr(expr) = stmt_kind else {
+            unreachable!("checked above")
+        };
+        stmt.kind = StmtKind::Return(Some(expr));
+        self.changed = true;
+    }
 }
 
 impl Default for ExhaustiveEnumMatch {
@@ -478,10 +545,34 @@ impl Default for ExhaustiveEnumMatch {
 }
 
 impl<'hir> Visitor<'hir> for ExhaustiveEnumMatch {
+    fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
+        visit::walk_stmt(self, stmt, ctx);
+
+        match &mut stmt.kind {
+            StmtKind::FunctionDeclaration(decl) => {
+                self.restore_collapsed_match_completion(&mut decl.body);
+            }
+            StmtKind::ProtocolDeclaration(decl) => {
+                for method in &mut decl.methods {
+                    if let Some(body) = &mut method.body {
+                        self.restore_collapsed_match_completion(body);
+                    }
+                }
+            }
+            StmtKind::ImplBlock(decl) => {
+                for method in &mut decl.methods {
+                    self.restore_collapsed_match_completion(&mut method.body);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
         // Visit children first (post-order).
         visit::walk_expr(self, expr, ctx);
 
+        let mut collapse_field_access = None;
         if let ExprKind::Match(scrutinee, arms, metadata) = &mut expr.kind {
             let was_exhaustive = metadata.exhaustive;
             metadata.exhaustive = self.analyze_exhaustiveness(scrutinee, arms).is_some();
@@ -499,6 +590,28 @@ impl<'hir> Visitor<'hir> for ExhaustiveEnumMatch {
                 arms.pop();
                 self.changed = true;
             }
+
+            if metadata.exhaustive {
+                collapse_field_access = uniform_field_access(arms);
+            }
+        }
+
+        if let Some(UniformFieldAccess {
+            field_index,
+            tail_kind,
+        }) = collapse_field_access
+        {
+            let ExprKind::Match(scrutinee, _, _) =
+                std::mem::replace(&mut expr.kind, ExprKind::Wildcard)
+            else {
+                unreachable!("match expression was just checked above")
+            };
+            self.collapse_uniform_field_access(expr, scrutinee, field_index, tail_kind);
+            self.changed = true;
+        }
+
+        if let ExprKind::FunctionExpression(decl) = &mut expr.kind {
+            self.restore_collapsed_match_completion(&mut decl.body);
         }
     }
 }
@@ -514,8 +627,11 @@ impl HirPass for ExhaustiveEnumMatch {
         ctx: &mut HirOptContext,
     ) -> Result<bool, HirOptError> {
         self.changed = false;
+        self.collapsed_return_match_exprs.clear();
+        self.hir_id_allocator = ctx.hir_id_allocator;
         self.build_enum_maps(module, ctx);
         self.visit_module(module, &mut ());
+        ctx.hir_id_allocator = self.hir_id_allocator;
         Ok(self.changed)
     }
 }
@@ -524,6 +640,69 @@ impl HirPass for ExhaustiveEnumMatch {
 /// constraining the shape: `_` (wildcard) or a bare identifier.
 fn is_catch_all_pattern(pat: &hir::Pat) -> bool {
     matches!(pat.kind, PatKind::Wildcard | PatKind::Identifier(_, _))
+}
+
+fn uniform_field_access(arms: &[hir::MatchArm]) -> Option<UniformFieldAccess> {
+    let (first, rest) = arms.split_first()?;
+    let access = returned_bound_field_access(first)?;
+
+    rest.iter()
+        .all(|arm| returned_bound_field_access(arm) == Some(access))
+        .then_some(access)
+}
+
+fn returned_bound_field_access(arm: &hir::MatchArm) -> Option<UniformFieldAccess> {
+    let (returned_binding, tail_kind) = block_tail_binding_hir_id(&arm.block)?;
+    let PatKind::Enum(_, fields) = &arm.pat.kind else {
+        return None;
+    };
+
+    let mut bound_field_index = None;
+
+    for (field_name, pat) in fields {
+        match &pat.kind {
+            PatKind::Identifier(hir_id, _) if *hir_id == returned_binding => {
+                let field_index = field_name.as_str().parse::<usize>().ok()?;
+                if bound_field_index.replace(field_index).is_some() {
+                    return None;
+                }
+            }
+            PatKind::Wildcard => {}
+            _ => return None,
+        }
+    }
+
+    bound_field_index.map(|field_index| UniformFieldAccess {
+        field_index,
+        tail_kind,
+    })
+}
+
+fn block_tail_binding_hir_id(block: &hir::Block) -> Option<(HirId, UniformFieldAccessTailKind)> {
+    if block.stmts.is_empty() {
+        return block
+            .expr
+            .as_ref()
+            .and_then(expr_binding_hir_id)
+            .map(|hir_id| (hir_id, UniformFieldAccessTailKind::Expr));
+    }
+
+    if block.expr.is_none()
+        && block.stmts.len() == 1
+        && let StmtKind::Return(Some(expr)) = &block.stmts[0].kind
+    {
+        return expr_binding_hir_id(expr)
+            .map(|hir_id| (hir_id, UniformFieldAccessTailKind::Return));
+    }
+
+    None
+}
+
+fn expr_binding_hir_id(expr: &hir::Expr) -> Option<HirId> {
+    match &expr.kind {
+        ExprKind::Path(path) => path.res.hir_id(),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
