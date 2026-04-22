@@ -48,14 +48,14 @@ fn Expense.is_utilities(_) { false }
 
 // ── Utility Functions ──────────────────────────────────────────────
 
-fn filter([], _) { [] }
-fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
-fn filter([_, ...xs], f) { rec filter(xs, f) }
+fn filter<T>([]: List<T>, _: fn(T) -> bool) -> List<T> { [] }
+fn filter<T>([x, ...xs]: List<T>, f: fn(T) -> bool) if f(x) -> List<T> { [x, ...filter(xs, f)] }
+fn filter<T>([_, ...xs]: List<T>, f: fn(T) -> bool) -> List<T> { rec filter(xs, f) }
 
-fn foldl([], acc, _) { acc }
-fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+fn foldl<T, U>([]: List<T>, acc: U, _: fn(U, T) -> U) -> U { acc }
+fn foldl<T, U>([x, ...xs]: List<T>, acc: U, f: fn(U, T) -> U) -> U { rec foldl(xs, f(acc, x), f) }
 
-fn sum_amounts(expenses) {
+fn sum_amounts(expenses: List<Expense>) -> f32 {
     expenses |> foldl(0, fn(acc, e) { acc + e.amount() })
 }
 
