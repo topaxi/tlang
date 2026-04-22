@@ -240,6 +240,7 @@ impl HirPretty {
                     self.push_newline();
                 }
                 for method in &decl.methods {
+                    self.print_comments(&method.leading_comments);
                     self.push_indent();
                     self.push_str("fn ");
                     self.push_str(method.name.as_str());
@@ -256,6 +257,7 @@ impl HirPretty {
                         self.print_block(body);
                     }
                     self.push_newline();
+                    self.print_comments(&method.trailing_comments);
                 }
                 self.dec_indent();
                 self.push_indent();

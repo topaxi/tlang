@@ -5,18 +5,26 @@
 //! LSP server and the WASM playground bindings share this implementation to
 //! ensure consistent behaviour.
 
+use std::collections::HashMap;
+
 use tlang_ast::node as ast;
+use tlang_ast::token::{CommentKind, CommentToken, Literal};
 use tlang_defs::DefKind;
-use tlang_span::Span;
+use tlang_hir as hir;
+use tlang_span::{HirId, NodeId, Span, TypeVarId};
 
 use crate::find_node;
+use crate::inlay_hints;
 use crate::symbol_index::SymbolIndex;
+use crate::typed_hir::TypedHir;
 
 /// Information about a symbol resolved from a cursor position.
 #[derive(Debug)]
 pub struct ResolvedSymbol {
     /// The identifier name as written in source.
     pub name: String,
+    /// The fully qualified symbol name stored in the symbol index.
+    pub qualified_name: String,
     /// The span of the identifier under the cursor.
     pub ident_span: Span,
     /// The kind of the resolved definition.
@@ -27,6 +35,14 @@ pub struct ResolvedSymbol {
     pub builtin: bool,
     /// Optional inferred type string (e.g. `"i64"`, `"Vector"`).
     pub type_info: Option<String>,
+    /// Optional AST node id of the definition.
+    pub node_id: Option<NodeId>,
+    /// Optional HIR id of the definition.
+    pub hir_id: Option<HirId>,
+    /// Optional declaration-like hover signature for callables.
+    pub signature: Option<String>,
+    /// Optional rendered documentation for the definition.
+    pub documentation: Option<String>,
 }
 
 impl ResolvedSymbol {
@@ -35,6 +51,13 @@ impl ResolvedSymbol {
     /// When type information is available, includes it:
     /// `(variable) v1: Vector` or `(function) add/2`.
     pub fn hover_text(&self) -> String {
+        if let Some(signature) = &self.signature {
+            if let Some(documentation) = &self.documentation {
+                return format!("{signature}\n\n{documentation}");
+            }
+            return signature.clone();
+        }
+
         let kind_label = self.def_kind.to_string();
         if let Some(arity) = self.def_kind.arity() {
             if arity == u16::MAX {
@@ -48,6 +71,36 @@ impl ResolvedSymbol {
             format!("({kind_label}) {name}", name = self.name)
         }
     }
+}
+
+/// Populate hover-specific type, signature, and documentation details.
+pub fn enrich_hover_symbol(
+    module: &ast::Module,
+    typed_hir: Option<&TypedHir>,
+    symbol: &mut ResolvedSymbol,
+) {
+    if let Some(typed_hir) = typed_hir
+        && !symbol.builtin
+    {
+        let def_line = symbol.def_span.start_lc.line;
+        let def_col = if def_line > 0 {
+            symbol.def_span.start_lc.column.saturating_sub(1)
+        } else {
+            symbol.def_span.start_lc.column
+        };
+        symbol.type_info = inlay_hints::type_at_definition(typed_hir, def_line, def_col);
+    }
+
+    let Some(callable) = find_ast_callable(module, symbol.node_id, &symbol.qualified_name) else {
+        return;
+    };
+
+    symbol.documentation = extract_doc_comments(callable.leading_comments());
+    symbol.signature = Some(format_callable_signature(
+        &callable,
+        typed_hir,
+        symbol.hir_id,
+    ));
 }
 
 /// Resolve the symbol under the cursor at the given **0-based** `(line, column)`.
@@ -115,24 +168,579 @@ pub fn resolve_symbol(
 
     Some(ResolvedSymbol {
         name: found.name,
+        qualified_name: entry.name.to_string(),
         ident_span: found.span,
         def_kind: entry.kind,
         def_span: entry.defined_at,
         builtin: entry.builtin,
         type_info: None,
+        node_id: entry.node_id,
+        hir_id: entry.hir_id,
+        signature: None,
+        documentation: None,
     })
+}
+
+enum AstCallableDecl<'a> {
+    Function {
+        decl: &'a ast::FunctionDeclaration,
+        leading_comments: &'a [CommentToken],
+    },
+    ProtocolMethod {
+        protocol: &'a ast::ProtocolDeclaration,
+        method: &'a ast::ProtocolMethodSignature,
+    },
+}
+
+impl AstCallableDecl<'_> {
+    fn leading_comments(&self) -> &[CommentToken] {
+        match self {
+            AstCallableDecl::Function {
+                leading_comments, ..
+            } => leading_comments,
+            AstCallableDecl::ProtocolMethod { method, .. } => &method.leading_comments,
+        }
+    }
+}
+
+enum HirCallableDecl<'a> {
+    Function(&'a hir::FunctionDeclaration),
+    ProtocolMethod {
+        protocol: &'a hir::ProtocolDeclaration,
+        method: &'a hir::ProtocolMethodSignature,
+    },
+}
+
+fn find_ast_callable<'a>(
+    module: &'a ast::Module,
+    node_id: Option<NodeId>,
+    qualified_name: &str,
+) -> Option<AstCallableDecl<'a>> {
+    for stmt in &module.statements {
+        if let Some(callable) = find_ast_callable_in_stmt(stmt, node_id, qualified_name) {
+            return Some(callable);
+        }
+    }
+    None
+}
+
+fn find_ast_callable_in_stmt<'a>(
+    stmt: &'a ast::Stmt,
+    node_id: Option<NodeId>,
+    qualified_name: &str,
+) -> Option<AstCallableDecl<'a>> {
+    match &stmt.kind {
+        ast::StmtKind::FunctionDeclaration(decl) => {
+            if node_id == Some(decl.id) || decl.name_or_invalid() == qualified_name {
+                Some(AstCallableDecl::Function {
+                    decl,
+                    leading_comments: if decl.leading_comments.is_empty() {
+                        &stmt.leading_comments
+                    } else {
+                        &decl.leading_comments
+                    },
+                })
+            } else {
+                None
+            }
+        }
+        ast::StmtKind::FunctionDeclarations(decls) => decls.iter().find_map(|decl| {
+            (node_id == Some(decl.id) || decl.name_or_invalid() == qualified_name).then_some(
+                AstCallableDecl::Function {
+                    decl,
+                    leading_comments: if decl.leading_comments.is_empty() {
+                        &stmt.leading_comments
+                    } else {
+                        &decl.leading_comments
+                    },
+                },
+            )
+        }),
+        ast::StmtKind::ImplBlock(impl_block) => impl_block.methods.iter().find_map(|decl| {
+            (node_id == Some(decl.id) || decl.name_or_invalid() == qualified_name).then_some(
+                AstCallableDecl::Function {
+                    decl,
+                    leading_comments: &decl.leading_comments,
+                },
+            )
+        }),
+        ast::StmtKind::ProtocolDeclaration(protocol) => {
+            protocol.methods.iter().find_map(|method| {
+                let protocol_qualified_name = format!("{}::{}", protocol.name, method.name);
+                (node_id == Some(method.id) || protocol_qualified_name == qualified_name)
+                    .then_some(AstCallableDecl::ProtocolMethod { protocol, method })
+            })
+        }
+        _ => None,
+    }
+}
+
+fn find_hir_callable<'a>(
+    typed_hir: &'a TypedHir,
+    hir_id: Option<HirId>,
+) -> Option<HirCallableDecl<'a>> {
+    let hir_id = hir_id?;
+    find_hir_callable_in_block(&typed_hir.module.block, hir_id)
+}
+
+fn find_hir_callable_in_block(block: &hir::Block, hir_id: HirId) -> Option<HirCallableDecl<'_>> {
+    for stmt in &block.stmts {
+        if let Some(callable) = find_hir_callable_in_stmt(stmt, hir_id) {
+            return Some(callable);
+        }
+    }
+    block
+        .expr
+        .as_ref()
+        .and_then(|expr| find_hir_callable_in_expr(expr, hir_id))
+}
+
+fn find_hir_callable_in_stmt(stmt: &hir::Stmt, hir_id: HirId) -> Option<HirCallableDecl<'_>> {
+    match &stmt.kind {
+        hir::StmtKind::FunctionDeclaration(decl) if decl.hir_id == hir_id => {
+            Some(HirCallableDecl::Function(decl))
+        }
+        hir::StmtKind::FunctionDeclaration(decl) => find_hir_callable_in_block(&decl.body, hir_id),
+        hir::StmtKind::ImplBlock(impl_block) => impl_block.methods.iter().find_map(|decl| {
+            if decl.hir_id == hir_id {
+                Some(HirCallableDecl::Function(decl))
+            } else {
+                find_hir_callable_in_block(&decl.body, hir_id)
+            }
+        }),
+        hir::StmtKind::ProtocolDeclaration(protocol) => {
+            protocol.methods.iter().find_map(|method| {
+                if method.hir_id == hir_id {
+                    Some(HirCallableDecl::ProtocolMethod { protocol, method })
+                } else {
+                    method
+                        .body
+                        .as_ref()
+                        .and_then(|body| find_hir_callable_in_block(body, hir_id))
+                }
+            })
+        }
+        hir::StmtKind::Expr(expr) => find_hir_callable_in_expr(expr, hir_id),
+        _ => None,
+    }
+}
+
+fn find_hir_callable_in_expr(expr: &hir::Expr, hir_id: HirId) -> Option<HirCallableDecl<'_>> {
+    match &expr.kind {
+        hir::ExprKind::FunctionExpression(decl) if decl.hir_id == hir_id => {
+            Some(HirCallableDecl::Function(decl))
+        }
+        hir::ExprKind::FunctionExpression(decl) => find_hir_callable_in_block(&decl.body, hir_id),
+        hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
+            find_hir_callable_in_block(block, hir_id)
+        }
+        hir::ExprKind::IfElse(condition, then_block, else_clauses) => {
+            find_hir_callable_in_expr(condition, hir_id)
+                .or_else(|| find_hir_callable_in_block(then_block, hir_id))
+                .or_else(|| {
+                    else_clauses.iter().find_map(|clause| {
+                        clause
+                            .condition
+                            .as_ref()
+                            .and_then(|condition| find_hir_callable_in_expr(condition, hir_id))
+                            .or_else(|| find_hir_callable_in_block(&clause.consequence, hir_id))
+                    })
+                })
+        }
+        hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
+            find_hir_callable_in_expr(&call.callee, hir_id).or_else(|| {
+                call.arguments
+                    .iter()
+                    .find_map(|argument| find_hir_callable_in_expr(argument, hir_id))
+            })
+        }
+        hir::ExprKind::Binary(_, lhs, rhs) => find_hir_callable_in_expr(lhs, hir_id)
+            .or_else(|| find_hir_callable_in_expr(rhs, hir_id)),
+        hir::ExprKind::Unary(_, inner)
+        | hir::ExprKind::FieldAccess(inner, _)
+        | hir::ExprKind::Cast(inner, _)
+        | hir::ExprKind::TryCast(inner, _)
+        | hir::ExprKind::Break(Some(inner))
+        | hir::ExprKind::Let(_, inner)
+        | hir::ExprKind::Implements(inner, _) => find_hir_callable_in_expr(inner, hir_id),
+        hir::ExprKind::Match(scrutinee, arms, _) => find_hir_callable_in_expr(scrutinee, hir_id)
+            .or_else(|| {
+                arms.iter()
+                    .find_map(|arm| find_hir_callable_in_block(&arm.block, hir_id))
+            }),
+        hir::ExprKind::IndexAccess(base, index) => find_hir_callable_in_expr(base, hir_id)
+            .or_else(|| find_hir_callable_in_expr(index, hir_id)),
+        hir::ExprKind::List(items) => items
+            .iter()
+            .find_map(|item| find_hir_callable_in_expr(item, hir_id)),
+        hir::ExprKind::Dict(entries) => entries.iter().find_map(|(key, value)| {
+            find_hir_callable_in_expr(key, hir_id)
+                .or_else(|| find_hir_callable_in_expr(value, hir_id))
+        }),
+        hir::ExprKind::TaggedString { tag, exprs, .. } => find_hir_callable_in_expr(tag, hir_id)
+            .or_else(|| {
+                exprs
+                    .iter()
+                    .find_map(|expr| find_hir_callable_in_expr(expr, hir_id))
+            }),
+        hir::ExprKind::Range(range) => find_hir_callable_in_expr(&range.start, hir_id)
+            .or_else(|| find_hir_callable_in_expr(&range.end, hir_id)),
+        hir::ExprKind::Literal(_)
+        | hir::ExprKind::Path(_)
+        | hir::ExprKind::Continue
+        | hir::ExprKind::Break(None)
+        | hir::ExprKind::Wildcard => None,
+    }
+}
+
+fn format_callable_signature(
+    callable: &AstCallableDecl<'_>,
+    typed_hir: Option<&TypedHir>,
+    hir_id: Option<HirId>,
+) -> String {
+    let hir_callable = typed_hir.and_then(|typed_hir| find_hir_callable(typed_hir, hir_id));
+
+    match callable {
+        AstCallableDecl::Function { decl, .. } => {
+            format_function_signature(decl, hir_callable.as_ref())
+        }
+        AstCallableDecl::ProtocolMethod { protocol, method } => {
+            format_protocol_method_signature(protocol, method, hir_callable.as_ref())
+        }
+    }
+}
+
+fn format_function_signature(
+    decl: &ast::FunctionDeclaration,
+    hir_callable: Option<&HirCallableDecl<'_>>,
+) -> String {
+    match hir_callable {
+        Some(HirCallableDecl::Function(hir_decl)) => {
+            let type_var_names = hir_function_type_var_names(hir_decl);
+            let params = decl
+                .parameters
+                .iter()
+                .enumerate()
+                .map(|(index, param)| {
+                    format_parameter(
+                        param,
+                        hir_decl
+                            .parameters
+                            .get(index)
+                            .map(|param| &param.type_annotation.kind),
+                        &type_var_names,
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            format!(
+                "fn {}({params}) -> {}",
+                decl.name_or_invalid(),
+                format_hir_ty_kind(&hir_decl.return_type.kind, &type_var_names)
+            )
+        }
+        _ => {
+            let params = decl
+                .parameters
+                .iter()
+                .map(format_parameter_from_ast)
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            format!(
+                "fn {}({params}) -> {}",
+                decl.name_or_invalid(),
+                decl.return_type_annotation
+                    .as_ref()
+                    .map_or_else(|| "unknown".to_string(), format_ast_ty)
+            )
+        }
+    }
+}
+
+fn format_protocol_method_signature(
+    protocol: &ast::ProtocolDeclaration,
+    method: &ast::ProtocolMethodSignature,
+    hir_callable: Option<&HirCallableDecl<'_>>,
+) -> String {
+    match hir_callable {
+        Some(HirCallableDecl::ProtocolMethod {
+            protocol: hir_protocol,
+            method: hir_method,
+        }) => {
+            let type_var_names = hir_protocol_method_type_var_names(hir_protocol, hir_method);
+            let params = method
+                .parameters
+                .iter()
+                .enumerate()
+                .map(|(index, param)| {
+                    format_parameter(
+                        param,
+                        hir_method
+                            .parameters
+                            .get(index)
+                            .map(|param| &param.type_annotation.kind),
+                        &type_var_names,
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            format!(
+                "fn {}.{}({params}) -> {}",
+                protocol.name,
+                method.name,
+                format_hir_ty_kind(&hir_method.return_type.kind, &type_var_names)
+            )
+        }
+        _ => {
+            let params = method
+                .parameters
+                .iter()
+                .map(format_parameter_from_ast)
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            format!(
+                "fn {}.{}({params}) -> {}",
+                protocol.name,
+                method.name,
+                method
+                    .return_type_annotation
+                    .as_ref()
+                    .map_or_else(|| "unknown".to_string(), format_ast_ty)
+            )
+        }
+    }
+}
+
+fn format_parameter(
+    param: &ast::FunctionParameter,
+    hir_ty: Option<&hir::TyKind>,
+    type_var_names: &HashMap<TypeVarId, String>,
+) -> String {
+    if matches!(param.pattern.kind, ast::PatKind::_Self) {
+        return "self".to_string();
+    }
+
+    let pat = format_ast_pat(&param.pattern);
+    let ty = hir_ty.cloned().unwrap_or(hir::TyKind::Unknown);
+
+    format!("{pat}: {}", format_hir_ty_kind(&ty, type_var_names))
+}
+
+fn format_parameter_from_ast(param: &ast::FunctionParameter) -> String {
+    if matches!(param.pattern.kind, ast::PatKind::_Self) {
+        return "self".to_string();
+    }
+
+    let pat = format_ast_pat(&param.pattern);
+    let ty = param
+        .type_annotation
+        .as_ref()
+        .map_or_else(|| "unknown".to_string(), format_ast_ty);
+
+    format!("{pat}: {ty}")
+}
+
+fn hir_function_type_var_names(decl: &hir::FunctionDeclaration) -> HashMap<TypeVarId, String> {
+    decl.all_type_params()
+        .map(|type_param| (type_param.type_var_id, type_param.name.to_string()))
+        .collect()
+}
+
+fn hir_protocol_method_type_var_names(
+    protocol: &hir::ProtocolDeclaration,
+    method: &hir::ProtocolMethodSignature,
+) -> HashMap<TypeVarId, String> {
+    protocol
+        .type_params
+        .iter()
+        .chain(method.type_params.iter())
+        .map(|type_param| (type_param.type_var_id, type_param.name.to_string()))
+        .collect()
+}
+
+fn format_hir_ty_kind(ty: &hir::TyKind, type_var_names: &HashMap<TypeVarId, String>) -> String {
+    match ty {
+        hir::TyKind::Unknown => "unknown".to_string(),
+        hir::TyKind::Primitive(prim) => prim.to_string(),
+        hir::TyKind::Fn(params, ret) => format!(
+            "fn({}) -> {}",
+            params
+                .iter()
+                .map(|param| format_hir_ty_kind(&param.kind, type_var_names))
+                .collect::<Vec<_>>()
+                .join(", "),
+            format_hir_ty_kind(&ret.kind, type_var_names)
+        ),
+        hir::TyKind::List(inner) => {
+            format!("List<{}>", format_hir_ty_kind(&inner.kind, type_var_names))
+        }
+        hir::TyKind::Slice(inner) => {
+            format!("Slice<{}>", format_hir_ty_kind(&inner.kind, type_var_names))
+        }
+        hir::TyKind::Dict(key, value) => format!(
+            "Dict<{}, {}>",
+            format_hir_ty_kind(&key.kind, type_var_names),
+            format_hir_ty_kind(&value.kind, type_var_names)
+        ),
+        hir::TyKind::Never => "never".to_string(),
+        hir::TyKind::Var(id) => type_var_names
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| format!("?{id}")),
+        hir::TyKind::Path(path, type_args) => {
+            if type_args.is_empty() {
+                path.to_string()
+            } else {
+                format!(
+                    "{path}<{}>",
+                    type_args
+                        .iter()
+                        .map(|ty| format_hir_ty_kind(&ty.kind, type_var_names))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+        }
+        hir::TyKind::Union(types) => types
+            .iter()
+            .map(|ty| format_hir_ty_kind(&ty.kind, type_var_names))
+            .collect::<Vec<_>>()
+            .join(" | "),
+    }
+}
+
+fn format_ast_ty(ty: &ast::Ty) -> String {
+    match &ty.kind {
+        ast::TyKind::Unknown => "unknown".to_string(),
+        ast::TyKind::Path(path) => {
+            if ty.parameters.is_empty() {
+                path.to_string()
+            } else {
+                format!(
+                    "{path}<{}>",
+                    ty.parameters
+                        .iter()
+                        .map(format_ast_ty)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+        }
+        ast::TyKind::Union(paths) => paths
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(" | "),
+        ast::TyKind::Fn(params, ret) => format!(
+            "fn({}) -> {}",
+            params
+                .iter()
+                .map(|param| match &param.name {
+                    Some(name) => format!("{name}: {}", format_ast_ty(&param.ty)),
+                    None => format_ast_ty(&param.ty),
+                })
+                .collect::<Vec<_>>()
+                .join(", "),
+            format_ast_ty(ret)
+        ),
+    }
+}
+
+fn format_ast_pat(pat: &ast::Pat) -> String {
+    match &pat.kind {
+        ast::PatKind::None => "<unknown>".to_string(),
+        ast::PatKind::Identifier(ident) => ident.to_string(),
+        ast::PatKind::Literal(literal) => format_literal(literal),
+        ast::PatKind::List(items) => format!(
+            "[{}]",
+            items
+                .iter()
+                .map(format_ast_pat)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        ast::PatKind::Rest(inner) => format!("...{}", format_ast_pat(inner)),
+        ast::PatKind::Enum(enum_pat) => {
+            if enum_pat.elements.is_empty() {
+                enum_pat.path.to_string()
+            } else {
+                let fields = enum_pat
+                    .elements
+                    .iter()
+                    .map(|(name, pat)| {
+                        if matches!(&pat.kind, ast::PatKind::Identifier(ident) if ident.as_str() == name.as_str())
+                        {
+                            name.to_string()
+                        } else {
+                            format!("{name}: {}", format_ast_pat(pat))
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("{} {{ {fields} }}", enum_pat.path)
+            }
+        }
+        ast::PatKind::Wildcard => "_".to_string(),
+        ast::PatKind::_Self => "self".to_string(),
+    }
+}
+
+fn format_literal(literal: &Literal) -> String {
+    match literal {
+        Literal::Boolean(value) => value.to_string(),
+        Literal::Integer(value) => value.to_string(),
+        Literal::UnsignedInteger(value) => value.to_string(),
+        Literal::Float(value) => value.to_string(),
+        Literal::String(value) => format!("\"{value}\""),
+        Literal::Char(value) => format!("'{}'", value),
+        Literal::None => "nil".to_string(),
+    }
+}
+
+fn extract_doc_comments(comments: &[CommentToken]) -> Option<String> {
+    let docs = comments
+        .iter()
+        .filter_map(|comment| match comment.kind {
+            CommentKind::SingleLine => comment
+                .text
+                .strip_prefix('/')
+                .map(|text| text.trim_start().to_string()),
+            CommentKind::MultiLine => None,
+        })
+        .collect::<Vec<_>>();
+
+    if docs.is_empty() {
+        None
+    } else {
+        Some(docs.join("\n"))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::symbol_index::SymbolIndex;
+    use crate::typed_hir::lower_and_typecheck;
 
     fn setup_and_resolve(source: &str, line: u32, column: u32) -> Option<ResolvedSymbol> {
         let result = crate::analyze(source, |_| {});
         let module = result.module.as_ref()?;
         let index = SymbolIndex::from_analyzer(&result.analyzer);
         resolve_symbol(module, &index, line, column)
+    }
+
+    fn setup_and_resolve_hover(source: &str, line: u32, column: u32) -> Option<ResolvedSymbol> {
+        let result = crate::analyze(source, |_| {});
+        let module = result.module.as_ref()?;
+        let index = SymbolIndex::from_analyzer(&result.analyzer);
+        let mut resolved = resolve_symbol(module, &index, line, column)?;
+        let typed_hir = lower_and_typecheck(&result);
+        enrich_hover_symbol(module, typed_hir.as_ref(), &mut resolved);
+        Some(resolved)
     }
 
     #[test]
@@ -220,6 +828,39 @@ mod tests {
         assert!(
             resolved.hover_text().contains("add"),
             "hover should contain name"
+        );
+    }
+
+    #[test]
+    fn hover_text_formats_function_signature_and_docs() {
+        let source = "/// Add numbers\nfn add(a: i64, b) -> i64 { a }\nlet _ = add(1, 2);";
+        let resolved = setup_and_resolve_hover(source, 1, 3).unwrap();
+
+        assert_eq!(
+            resolved.hover_text(),
+            "fn add(a: i64, b: unknown) -> i64\n\nAdd numbers"
+        );
+    }
+
+    #[test]
+    fn hover_text_formats_type_method_signature() {
+        let source = "/// Convert to text\nfn String.to_string(self) -> String { self }\nlet s = \"x\";\ns.to_string();";
+        let resolved = setup_and_resolve_hover(source, 3, 2).unwrap();
+
+        assert_eq!(
+            resolved.hover_text(),
+            "fn String.to_string(self) -> String\n\nConvert to text"
+        );
+    }
+
+    #[test]
+    fn hover_text_formats_protocol_method_signature_and_docs() {
+        let source = "protocol Display {\n    /// Render this value\n    fn to_string(self) -> String { \"\" }\n}";
+        let resolved = setup_and_resolve_hover(source, 2, 7).unwrap();
+
+        assert_eq!(
+            resolved.hover_text(),
+            "fn Display.to_string(self) -> String\n\nRender this value"
         );
     }
 

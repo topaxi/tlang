@@ -45,6 +45,7 @@ export class TCodeMirror extends LitElement {
       font-family: var(--t-font-family-mono, monospace);
       font-size: 0.85em;
       padding: 4px 8px;
+      white-space: pre-wrap;
     }
   `;
 

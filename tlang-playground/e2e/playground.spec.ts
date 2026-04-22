@@ -806,8 +806,8 @@ test.describe('Hover tooltip', () => {
     await expect(hoverContent).toBeVisible();
 
     const text = await hoverContent.textContent();
-    expect(text).toContain('function');
-    expect(text).toContain('add');
+    expect(text).toContain('fn add(');
+    expect(text).toContain('unknown');
   });
 
   test('hover tooltip disappears when moving away', async ({ page }) => {

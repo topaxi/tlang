@@ -489,6 +489,8 @@ impl LoweringContext {
             parameters: params,
             return_type: self.lower_ty(method.return_type_annotation.as_ref()),
             body,
+            leading_comments: method.leading_comments.clone(),
+            trailing_comments: method.trailing_comments.clone(),
             span: method.span,
         };
         self.pop_type_param_scope();

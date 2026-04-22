@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use tlang_defs::{DefKind, DefScope};
 use tlang_semantics::SemanticAnalyzer;
-use tlang_span::{NodeId, Span};
+use tlang_span::{HirId, NodeId, Span};
 
 /// A single symbol entry extracted from the semantic analyzer.
 #[derive(Debug, Clone)]
@@ -19,6 +19,8 @@ pub struct SymbolEntry {
     pub kind: DefKind,
     pub defined_at: Span,
     pub scope_start: u32,
+    pub node_id: Option<NodeId>,
+    pub hir_id: Option<HirId>,
     pub builtin: bool,
     /// Whether this is a compiler-generated temporary.
     pub temp: bool,
@@ -66,6 +68,8 @@ impl SymbolIndex {
                     kind: d.kind,
                     defined_at: d.defined_at,
                     scope_start: d.scope_start,
+                    node_id: d.node_id,
+                    hir_id: d.hir_id,
                     builtin: d.builtin,
                     temp: d.temp,
                 })

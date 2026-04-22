@@ -140,6 +140,10 @@ pub struct BuildArtifacts {
     /// Symbol index built from the semantic analyzer after [`Tlang::analyze`]
     /// is called.  `None` before analysis or when parsing fails.
     symbol_index: Option<SymbolIndex>,
+    /// Cached typed HIR for editor features that need inferred callable
+    /// signatures. `Some(None)` means type lowering/type checking was attempted
+    /// but did not succeed.
+    typed_hir: Option<tlang_analysis::typed_hir::TypedHir>,
 }
 
 #[wasm_bindgen]
@@ -291,6 +295,20 @@ impl Tlang {
             let _ = self.analyzer.analyze(ast);
             self.build.analyzed = true;
             self.build.symbol_index = Some(SymbolIndex::from_analyzer(&self.analyzer));
+            self.build.typed_hir = if self
+                .analyzer
+                .get_diagnostics()
+                .iter()
+                .any(|diagnostic| diagnostic.is_error())
+            {
+                None
+            } else {
+                tlang_analysis::typed_hir::lower_and_typecheck_parts(
+                    ast,
+                    &self.build.constant_pool_node_ids,
+                    &self.analyzer,
+                )
+            };
         }
     }
 
@@ -314,7 +332,12 @@ impl Tlang {
 
         let resolved = tlang_analysis::query::resolve_symbol(ast, index, line, column);
         match resolved {
-            Some(sym) => {
+            Some(mut sym) => {
+                tlang_analysis::query::enrich_hover_symbol(
+                    ast,
+                    self.build.typed_hir.as_ref(),
+                    &mut sym,
+                );
                 let info = CodemirrorHoverInfo {
                     text: sym.hover_text(),
                     from: codemirror::byte_offset_to_utf16(&self.source, sym.ident_span.start),
