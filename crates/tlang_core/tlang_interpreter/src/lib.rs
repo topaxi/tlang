@@ -593,6 +593,7 @@ impl Interpreter {
 
         match state.get_object(lhs_value) {
             Some(TlangObjectKind::Struct(obj)) => EvalResult::Value(obj[rhs_value.as_usize()]),
+            Some(TlangObjectKind::Enum(e)) => EvalResult::Value(e[rhs_value.as_usize()]),
             Some(TlangObjectKind::Slice(slice)) => {
                 EvalResult::Value(state.get_slice_value(*slice, rhs_value.as_usize()))
             }

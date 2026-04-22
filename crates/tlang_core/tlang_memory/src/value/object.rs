@@ -131,6 +131,14 @@ impl Shaped for &TlangEnum {
     }
 }
 
+impl Index<usize> for TlangEnum {
+    type Output = TlangValue;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.field_values[index]
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TlangSlice {
     of: TlangValue,
