@@ -41,7 +41,7 @@ pub struct SymbolIndex {
 }
 
 impl SymbolIndex {
-    fn choose_closest(entries: Vec<&SymbolEntry>, span: Span) -> Option<SymbolEntry> {
+    fn choose_closest(entries: &[&SymbolEntry], span: Span) -> Option<SymbolEntry> {
         if entries.is_empty() {
             return None;
         }
@@ -130,7 +130,7 @@ impl SymbolIndex {
             if let Some(entries) = self.scopes.get(&sid) {
                 let by_name: Vec<&SymbolEntry> =
                     entries.iter().filter(|e| *e.name == *name).collect();
-                if let Some(entry) = Self::choose_closest(by_name, span) {
+                if let Some(entry) = Self::choose_closest(&by_name, span) {
                     return Some(entry);
                 }
             }
@@ -158,7 +158,7 @@ impl SymbolIndex {
                     .iter()
                     .filter(|e| *e.name == *name && e.kind.arity() == Some(arity))
                     .collect();
-                if let Some(entry) = Self::choose_closest(by_name, span) {
+                if let Some(entry) = Self::choose_closest(&by_name, span) {
                     return Some(entry);
                 }
             }
