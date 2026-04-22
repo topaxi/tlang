@@ -973,6 +973,7 @@ impl LoweringContext {
                     .filter(|(_, d)| d.return_type_annotation.is_none())
                     .map(|(i, _)| i)
                     .collect();
+                decl.is_match_lowered = true;
                 // Multi-clause functions inherit visibility from the first clause.
                 decl.visibility = decls[0].visibility;
                 // Use the first clause's params_span so return-type hints land

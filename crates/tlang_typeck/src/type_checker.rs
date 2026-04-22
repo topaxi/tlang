@@ -3732,6 +3732,7 @@ mod tests {
                 ..Ty::default()
             },
             has_return_type: false,
+            is_match_lowered: false,
             body: hir::Block::new(dummy_hir_id(), vec![], None, tlang_span::Span::default()),
             span: tlang_span::Span::default(),
         }

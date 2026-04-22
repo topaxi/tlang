@@ -451,6 +451,7 @@ mod tests {
             return_hint_arm_indices: Vec::new(),
             return_type: hir::Ty::default(),
             has_return_type: false,
+            is_match_lowered: false,
             body: hir::Block {
                 hir_id: HirId::new(12),
                 stmts: vec![],
@@ -555,6 +556,7 @@ mod tests {
             return_hint_arm_indices: Vec::new(),
             return_type: hir::Ty::default(),
             has_return_type: false,
+            is_match_lowered: false,
             body: hir::Block {
                 hir_id: HirId::new(36),
                 stmts: vec![hir::Stmt::new(
@@ -619,6 +621,7 @@ mod tests {
             return_hint_arm_indices: Vec::new(),
             return_type: hir::Ty::default(),
             has_return_type: false,
+            is_match_lowered: false,
             body: hir::Block {
                 hir_id: HirId::new(12),
                 stmts: vec![],
@@ -678,6 +681,7 @@ mod tests {
             return_hint_arm_indices: Vec::new(),
             return_type: hir::Ty::default(),
             has_return_type: false,
+            is_match_lowered: false,
             body,
             span: Span::default(),
         };

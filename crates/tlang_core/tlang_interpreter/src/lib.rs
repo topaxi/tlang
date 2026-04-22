@@ -1191,6 +1191,7 @@ impl Interpreter {
                     return_hint_arm_indices: Vec::new(),
                     return_type: method.return_type.clone(),
                     has_return_type: !matches!(method.return_type.kind, hir::TyKind::Unknown),
+                    is_match_lowered: false,
                     body: body.clone(),
                     span: method.span,
                 };

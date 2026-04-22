@@ -250,7 +250,7 @@ fn collect_fn_decl_hints(
                         InlayHintKind::ReturnType,
                     );
                 }
-                collect_block_hints(&decl.body, &fn_ctx, hints);
+                collect_fn_body_hints(decl, &fn_ctx, hints);
                 return;
             }
         }
@@ -292,7 +292,7 @@ fn collect_fn_decl_hints(
     }
 
     // Recurse into the function body.
-    collect_block_hints(&decl.body, &fn_ctx, hints);
+    collect_fn_body_hints(decl, &fn_ctx, hints);
 }
 
 /// Check whether a type consists entirely of unresolved type variables.
@@ -344,6 +344,62 @@ fn push_multiline_chain_hint(
 
 fn pipeline_starts_on_newline(lhs: &hir::Expr, callee: &hir::Expr) -> bool {
     lhs.span.end_lc.line < callee.span.start_lc.line
+}
+
+fn collect_match_lowered_function_arm_pat_hints(
+    decl: &hir::FunctionDeclaration,
+    arm: &hir::MatchArm,
+    ctx: &HintCtx<'_>,
+    hints: &mut Vec<InlayHint>,
+) {
+    let collect_top_level_param_pat =
+        |param_idx: usize, pat: &hir::Pat, hints: &mut Vec<InlayHint>| {
+            let skip_explicit_identifier = decl
+                .parameters
+                .get(param_idx)
+                .is_some_and(|param| param.has_type_annotation)
+                && matches!(pat.kind, hir::PatKind::Identifier(..));
+            if !skip_explicit_identifier {
+                collect_pat_type_hints(pat, ctx.type_table, &ctx.type_var_names, ctx.range, hints);
+            }
+        };
+
+    match &arm.pat.kind {
+        hir::PatKind::List(pats) if decl.parameters.len() > 1 => {
+            for (idx, pat) in pats.iter().enumerate() {
+                collect_top_level_param_pat(idx, pat, hints);
+            }
+        }
+        _ => collect_top_level_param_pat(0, &arm.pat, hints),
+    }
+}
+
+fn collect_fn_body_hints(
+    decl: &hir::FunctionDeclaration,
+    ctx: &HintCtx<'_>,
+    hints: &mut Vec<InlayHint>,
+) {
+    for stmt in &decl.body.stmts {
+        collect_stmt_hints(stmt, ctx, hints);
+    }
+
+    if let Some(expr) = &decl.body.expr {
+        if decl.is_match_lowered
+            && let hir::ExprKind::Match(scrutinee, arms, _) = &expr.kind
+        {
+            collect_expr_hints(scrutinee, ctx, hints);
+            for arm in arms {
+                collect_match_lowered_function_arm_pat_hints(decl, arm, ctx, hints);
+                if let Some(guard) = &arm.guard {
+                    collect_expr_hints(guard, ctx, hints);
+                }
+                collect_block_hints(&arm.block, ctx, hints);
+            }
+            return;
+        }
+
+        collect_expr_hints(expr, ctx, hints);
+    }
 }
 
 // ── Expression traversal (recurse into nested functions / blocks) ──────
@@ -1320,6 +1376,25 @@ let [x, ...xs] = list;
         assert!(
             param_hints.is_empty(),
             "should not show hint for annotated parameter, got: {param_hints:?}"
+        );
+    }
+
+    #[test]
+    fn multi_clause_function_explicit_fn_parameter_has_no_duplicate_hint() {
+        let hints = hints_for(
+            r#"
+fn filter<T>([]: List<T>, _: fn(T) -> bool) -> List<T> { [] }
+fn filter<T>([x, ...xs]: List<T>, f: fn(T) -> bool) if f(x) -> List<T> { [x, ...filter(xs, f)] }
+fn filter<T>([_, ...xs]: List<T>, f: fn(T) -> bool) -> List<T> { rec filter(xs, f) }
+"#,
+        );
+        let param_hints: Vec<_> = hints
+            .iter()
+            .filter(|h| h.kind == InlayHintKind::Type && h.label == ": fn(T) -> bool")
+            .collect();
+        assert!(
+            param_hints.is_empty(),
+            "should not show duplicate hints for explicitly annotated function parameters, got: {param_hints:?}"
         );
     }
 

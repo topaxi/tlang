@@ -752,6 +752,7 @@ fn fold_function_decl<F: AnfFilter>(
         return_hint_arm_indices: decl.return_hint_arm_indices,
         return_type: decl.return_type,
         has_return_type: decl.has_return_type,
+        is_match_lowered: decl.is_match_lowered,
         body,
         span: decl.span,
     }

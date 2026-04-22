@@ -1027,6 +1027,9 @@ pub struct FunctionDeclaration {
     /// `false` when the return type was left unannotated (even if the type
     /// checker later fills in `return_type` via inference).
     pub has_return_type: bool,
+    /// Whether this declaration body is the synthetic match-dispatch wrapper
+    /// produced for function clauses or complex parameter patterns.
+    pub is_match_lowered: bool,
     pub body: Block,
     pub span: Span,
 }
@@ -1045,6 +1048,7 @@ impl FunctionDeclaration {
             return_hint_arm_indices: Vec::new(),
             return_type: Ty::default(),
             has_return_type: false,
+            is_match_lowered: false,
             body,
             span: Span::default(),
         }

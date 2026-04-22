@@ -316,6 +316,7 @@ fn fold_function_declaration<F: Folder>(
         return_hint_arm_indices: decl.return_hint_arm_indices,
         return_type: folder.fold_ty(decl.return_type),
         has_return_type: decl.has_return_type,
+        is_match_lowered: decl.is_match_lowered,
         body: folder.fold_block(decl.body),
         span: decl.span,
     }
