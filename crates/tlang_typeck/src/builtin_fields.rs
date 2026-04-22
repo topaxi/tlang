@@ -6,6 +6,7 @@ pub struct BuiltinField {
     pub ty: TyKind,
 }
 
+#[allow(clippy::type_complexity)]
 fn lookup_fields(type_name: &str) -> &'static [(&'static str, fn() -> TyKind)] {
     use TyKind::Primitive;
     use tlang_hir::PrimTy::{Bool, I64, String as TString};
