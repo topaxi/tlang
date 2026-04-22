@@ -158,8 +158,12 @@ pub fn resolve_symbol(
     let found = find_node::find_node_at_position(module, line, lexer_column)?;
 
     // Look up the symbol in the scope's symbol table.
-    let entry = index
-        .get_closest_by_name(found.scope_id, &found.name, found.span)
+    let entry = found
+        .call_arity
+        .and_then(|arity| {
+            index.get_closest_by_name_and_arity(found.scope_id, &found.name, found.span, arity)
+        })
+        .or_else(|| index.get_closest_by_name(found.scope_id, &found.name, found.span))
         .or_else(|| {
             // When the cursor is on a field of a field-access expression
             // (e.g. `v1.add`), the bare name `add` may not be in scope.
@@ -285,20 +289,32 @@ fn find_ast_callable_in_stmt<'a>(
                 None
             }
         }
-        ast::StmtKind::FunctionDeclarations(decls) => decls
-            .iter()
-            .filter(|decl| {
-                matches_grouped_function_decl(decl, node_id, qualified_name, expected_arity)
-            })
-            .max_by_key(|decl| informative_parameter_count(decl))
-            .map(|decl| AstCallableDecl::Function {
-                decl,
-                leading_comments: if decl.leading_comments.is_empty() {
-                    &stmt.leading_comments
-                } else {
-                    &decl.leading_comments
-                },
-            }),
+        ast::StmtKind::FunctionDeclarations(decls) => {
+            let matching = decls
+                .iter()
+                .filter(|decl| {
+                    matches_grouped_function_decl(decl, node_id, qualified_name, expected_arity)
+                })
+                .collect::<Vec<_>>();
+
+            matching
+                .iter()
+                .copied()
+                .find(|decl| node_id == Some(decl.id))
+                .or_else(|| {
+                    matching
+                        .into_iter()
+                        .max_by_key(|decl| informative_parameter_count(decl))
+                })
+                .map(|decl| AstCallableDecl::Function {
+                    decl,
+                    leading_comments: if decl.leading_comments.is_empty() {
+                        &stmt.leading_comments
+                    } else {
+                        &decl.leading_comments
+                    },
+                })
+        }
         ast::StmtKind::ImplBlock(impl_block) => impl_block.methods.iter().find_map(|decl| {
             matches_function_decl(decl, node_id, qualified_name, expected_arity).then_some(
                 AstCallableDecl::Function {
@@ -335,12 +351,14 @@ fn matches_grouped_function_decl(
     qualified_name: &str,
     expected_arity: Option<u16>,
 ) -> bool {
-    if expected_arity.is_some() {
-        decl.name_or_invalid() == qualified_name
-            && expected_arity.is_none_or(|arity| decl.parameters.len() as u16 == arity)
-    } else {
-        matches_function_decl(decl, node_id, qualified_name, expected_arity)
+    if node_id == Some(decl.id)
+        && expected_arity.is_none_or(|arity| decl.parameters.len() as u16 == arity)
+    {
+        return true;
     }
+
+    decl.name_or_invalid() == qualified_name
+        && expected_arity.is_none_or(|arity| decl.parameters.len() as u16 == arity)
 }
 
 fn informative_parameter_count(decl: &ast::FunctionDeclaration) -> usize {
@@ -371,6 +389,166 @@ fn find_hir_callable_by_span<'a>(
     name_span: Span,
 ) -> Option<HirCallableDecl<'a>> {
     find_hir_callable_in_block_by_span(&typed_hir.module.block, name_span)
+}
+
+fn find_hir_function_by_name_and_arity<'a>(
+    typed_hir: &'a TypedHir,
+    name: &str,
+    arity: u16,
+) -> Option<&'a hir::FunctionDeclaration> {
+    find_hir_function_in_block_by_name_and_arity(&typed_hir.module.block, name, arity)
+}
+
+fn canonical_callable_name(name: &str) -> &str {
+    name.split('/').next().unwrap_or(name)
+}
+
+fn find_hir_function_in_block_by_name_and_arity<'a>(
+    block: &'a hir::Block,
+    name: &str,
+    arity: u16,
+) -> Option<&'a hir::FunctionDeclaration> {
+    for stmt in &block.stmts {
+        if let Some(decl) = find_hir_function_in_stmt_by_name_and_arity(stmt, name, arity) {
+            return Some(decl);
+        }
+    }
+    block
+        .expr
+        .as_ref()
+        .and_then(|expr| find_hir_function_in_expr_by_name_and_arity(expr, name, arity))
+}
+
+fn find_hir_function_in_stmt_by_name_and_arity<'a>(
+    stmt: &'a hir::Stmt,
+    name: &str,
+    arity: u16,
+) -> Option<&'a hir::FunctionDeclaration> {
+    match &stmt.kind {
+        hir::StmtKind::FunctionDeclaration(decl)
+            if canonical_callable_name(&decl.name()) == name
+                && decl.parameters.len() as u16 == arity =>
+        {
+            Some(decl)
+        }
+        hir::StmtKind::FunctionDeclaration(decl) => {
+            find_hir_function_in_block_by_name_and_arity(&decl.body, name, arity)
+        }
+        hir::StmtKind::ImplBlock(impl_block) => impl_block.methods.iter().find_map(|decl| {
+            if canonical_callable_name(&decl.name()) == name
+                && decl.parameters.len() as u16 == arity
+            {
+                Some(decl)
+            } else {
+                find_hir_function_in_block_by_name_and_arity(&decl.body, name, arity)
+            }
+        }),
+        hir::StmtKind::ProtocolDeclaration(protocol) => {
+            protocol.methods.iter().find_map(|method| {
+                method.body.as_ref().and_then(|body| {
+                    find_hir_function_in_block_by_name_and_arity(body, name, arity)
+                })
+            })
+        }
+        hir::StmtKind::Expr(expr) => find_hir_function_in_expr_by_name_and_arity(expr, name, arity),
+        _ => None,
+    }
+}
+
+fn find_hir_function_in_expr_by_name_and_arity<'a>(
+    expr: &'a hir::Expr,
+    name: &str,
+    arity: u16,
+) -> Option<&'a hir::FunctionDeclaration> {
+    match &expr.kind {
+        hir::ExprKind::FunctionExpression(decl)
+            if canonical_callable_name(&decl.name()) == name
+                && decl.parameters.len() as u16 == arity =>
+        {
+            Some(decl)
+        }
+        hir::ExprKind::FunctionExpression(decl) => {
+            find_hir_function_in_block_by_name_and_arity(&decl.body, name, arity)
+        }
+        hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
+            find_hir_function_in_block_by_name_and_arity(block, name, arity)
+        }
+        hir::ExprKind::IfElse(condition, then_block, else_clauses) => {
+            find_hir_function_in_expr_by_name_and_arity(condition, name, arity)
+                .or_else(|| find_hir_function_in_block_by_name_and_arity(then_block, name, arity))
+                .or_else(|| {
+                    else_clauses.iter().find_map(|clause| {
+                        clause
+                            .condition
+                            .as_ref()
+                            .and_then(|condition| {
+                                find_hir_function_in_expr_by_name_and_arity(condition, name, arity)
+                            })
+                            .or_else(|| {
+                                find_hir_function_in_block_by_name_and_arity(
+                                    &clause.consequence,
+                                    name,
+                                    arity,
+                                )
+                            })
+                    })
+                })
+        }
+        hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
+            find_hir_function_in_expr_by_name_and_arity(&call.callee, name, arity).or_else(|| {
+                call.arguments.iter().find_map(|argument| {
+                    find_hir_function_in_expr_by_name_and_arity(argument, name, arity)
+                })
+            })
+        }
+        hir::ExprKind::Binary(_, lhs, rhs) => {
+            find_hir_function_in_expr_by_name_and_arity(lhs, name, arity)
+                .or_else(|| find_hir_function_in_expr_by_name_and_arity(rhs, name, arity))
+        }
+        hir::ExprKind::Unary(_, inner)
+        | hir::ExprKind::FieldAccess(inner, _)
+        | hir::ExprKind::Cast(inner, _)
+        | hir::ExprKind::TryCast(inner, _)
+        | hir::ExprKind::Break(Some(inner))
+        | hir::ExprKind::Let(_, inner)
+        | hir::ExprKind::Implements(inner, _) => {
+            find_hir_function_in_expr_by_name_and_arity(inner, name, arity)
+        }
+        hir::ExprKind::Match(scrutinee, arms, _) => {
+            find_hir_function_in_expr_by_name_and_arity(scrutinee, name, arity).or_else(|| {
+                arms.iter().find_map(|arm| {
+                    find_hir_function_in_block_by_name_and_arity(&arm.block, name, arity)
+                })
+            })
+        }
+        hir::ExprKind::IndexAccess(base, index) => {
+            find_hir_function_in_expr_by_name_and_arity(base, name, arity)
+                .or_else(|| find_hir_function_in_expr_by_name_and_arity(index, name, arity))
+        }
+        hir::ExprKind::List(items) => items
+            .iter()
+            .find_map(|item| find_hir_function_in_expr_by_name_and_arity(item, name, arity)),
+        hir::ExprKind::Dict(entries) => entries.iter().find_map(|(key, value)| {
+            find_hir_function_in_expr_by_name_and_arity(key, name, arity)
+                .or_else(|| find_hir_function_in_expr_by_name_and_arity(value, name, arity))
+        }),
+        hir::ExprKind::TaggedString { tag, exprs, .. } => {
+            find_hir_function_in_expr_by_name_and_arity(tag, name, arity).or_else(|| {
+                exprs
+                    .iter()
+                    .find_map(|expr| find_hir_function_in_expr_by_name_and_arity(expr, name, arity))
+            })
+        }
+        hir::ExprKind::Range(range) => {
+            find_hir_function_in_expr_by_name_and_arity(&range.start, name, arity)
+                .or_else(|| find_hir_function_in_expr_by_name_and_arity(&range.end, name, arity))
+        }
+        hir::ExprKind::Literal(_)
+        | hir::ExprKind::Path(_)
+        | hir::ExprKind::Continue
+        | hir::ExprKind::Break(None)
+        | hir::ExprKind::Wildcard => None,
+    }
 }
 
 fn find_hir_callable_in_block(block: &hir::Block, hir_id: HirId) -> Option<HirCallableDecl<'_>> {
@@ -641,8 +819,19 @@ fn format_function_signature(
     typed_hir: Option<&TypedHir>,
     hir_callable: Option<&HirCallableDecl<'_>>,
 ) -> String {
-    match hir_callable {
-        Some(HirCallableDecl::Function(hir_decl)) => {
+    let hir_decl = match hir_callable {
+        Some(HirCallableDecl::Function(hir_decl)) => Some(*hir_decl),
+        _ => typed_hir.and_then(|typed_hir| {
+            find_hir_function_by_name_and_arity(
+                typed_hir,
+                &decl.name_or_invalid(),
+                decl.parameters.len() as u16,
+            )
+        }),
+    };
+
+    match hir_decl {
+        Some(hir_decl) => {
             let type_var_names = hir_function_type_var_names(hir_decl);
             let params = decl
                 .parameters
@@ -1153,7 +1342,26 @@ mod tests {
 
         assert_eq!(
             resolved.hover_text(),
-            "fn binary_search(list: unknown, target: unknown, low: unknown, high: unknown) -> unknown"
+            "fn binary_search(list: unknown, target: unknown, low: unknown, high: unknown) -> i64"
+        );
+    }
+
+    #[test]
+    fn hover_text_uses_pipeline_effective_arity() {
+        let source = "fn binary_search(list, target) { binary_search(list, target, 0, len(list) - 1) }\nfn binary_search(_, _, low, high) if low > high; { -1 }\nfn binary_search(list, target, low, high) {\n    let mid = math::floor((low + high) / 2);\n    let mid_value = list[mid];\n    if mid_value == target; { mid } else if mid_value < target; {\n        rec binary_search(list, target, mid + 1, high)\n    } else {\n        rec binary_search(list, target, low, mid - 1)\n    }\n}\n[1, 2, 3, 4, 5] |> binary_search(4);";
+        let resolved = (0..40)
+            .filter_map(|col| {
+                setup_and_resolve_hover(source, 11, col)
+                    .map(|resolved| (col, resolved.name.clone(), resolved.hover_text()))
+            })
+            .collect::<Vec<_>>();
+
+        assert!(
+            resolved.iter().any(|(_, name, hover)| {
+                name == "binary_search"
+                    && hover == "fn binary_search(list: unknown, target: unknown) -> i64"
+            }),
+            "should resolve pipeline hover to binary_search/2, got: {resolved:?}"
         );
     }
 

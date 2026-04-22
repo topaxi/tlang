@@ -23,6 +23,10 @@ pub struct FoundNode {
     /// `v1.add`), this holds the name of the base expression (e.g. `"v1"`).
     /// Used by the query layer to attempt qualified method lookup.
     pub field_base: Option<String>,
+    /// When the cursor is on the callee of a call-like expression, this stores
+    /// the effective argument count at that call site. Pipelines count the
+    /// piped value as an extra leading argument.
+    pub call_arity: Option<u16>,
     /// Set when the cursor is on a declaration-context identifier that is not
     /// directly in the symbol table under its bare name (e.g. a method name
     /// inside `protocol Display { fn to_string(…) }` or a field name inside
@@ -46,6 +50,7 @@ pub fn find_node_at_position(module: &Module, line: u32, column: u32) -> Option<
         target: LineColumn::new(line, column),
         scope_stack: vec![module.id],
         result: None,
+        current_call_arity: None,
         in_declaration_name_context: false,
     };
     finder.visit_module(module, &mut ());
@@ -57,6 +62,7 @@ struct NodeFinder {
     target: LineColumn,
     scope_stack: Vec<NodeId>,
     result: Option<FoundNode>,
+    current_call_arity: Option<u16>,
     /// True when currently visiting a declaration-name context where bare
     /// identifiers should be resolved via qualified member-suffix lookup.
     in_declaration_name_context: bool,
@@ -93,6 +99,7 @@ impl NodeFinder {
                 span: *span,
                 scope_id: self.current_scope(),
                 field_base: None,
+                call_arity: self.current_call_arity,
                 is_declaration_name: self.in_declaration_name_context,
             });
         }
@@ -105,6 +112,7 @@ impl NodeFinder {
                 span: *span,
                 scope_id: self.current_scope(),
                 field_base: Some(base_name),
+                call_arity: self.current_call_arity,
                 is_declaration_name: false,
             });
         }
@@ -116,6 +124,13 @@ impl NodeFinder {
         self.in_declaration_name_context = true;
         f(self);
         self.in_declaration_name_context = prev;
+    }
+
+    fn with_call_arity<F: FnOnce(&mut Self)>(&mut self, arity: u16, f: F) {
+        let prev = self.current_call_arity;
+        self.current_call_arity = Some(arity);
+        f(self);
+        self.current_call_arity = prev;
     }
 
     /// Extract a simple name from an expression (for field access base tracking).
@@ -266,27 +281,52 @@ impl<'ast> Visitor<'ast> for NodeFinder {
 
     fn visit_expr(&mut self, expression: &'ast node::Expr, ctx: &mut ()) {
         // Only descend into expressions whose span contains the cursor.
-        if self.contains_position(&expression.span) {
-            // For field access expressions (e.g. `v1.add`), if the cursor is
-            // on the field name, record the base expression name so the query
-            // layer can try qualified method lookup (e.g. `Vector::add`).
-            if let node::ExprKind::FieldExpression(ref field_expr) = expression.kind
-                && self.contains_position(&field_expr.field.span)
-                && let Some(base_name) = Self::expr_name(&field_expr.base)
-            {
-                self.record_field_ident(
-                    field_expr.field.as_str(),
-                    &field_expr.field.span,
-                    base_name,
-                );
-                // Still walk the base in case the cursor is actually
-                // on the base (the field ident record only sticks if
-                // the cursor is on the field span).
-                self.visit_expr(&field_expr.base, ctx);
-                return;
-            }
-            visit::walk_expr(self, expression, ctx);
+        if !self.contains_position(&expression.span) {
+            return;
         }
+
+        if let node::ExprKind::BinaryOp(ref binary) = expression.kind
+            && binary.op == node::BinaryOpKind::Pipeline
+            && self.contains_position(&binary.rhs.span)
+        {
+            let effective_arity = match &binary.rhs.kind {
+                node::ExprKind::Call(call) => call.arguments.len().saturating_add(1) as u16,
+                _ => 1,
+            };
+            self.with_call_arity(effective_arity, |this| this.visit_expr(&binary.rhs, ctx));
+            self.visit_expr(&binary.lhs, ctx);
+            return;
+        }
+
+        if let node::ExprKind::Call(ref call) = expression.kind
+            && self.contains_position(&call.callee.span)
+        {
+            let effective_arity = self
+                .current_call_arity
+                .unwrap_or(call.arguments.len() as u16);
+            self.with_call_arity(effective_arity, |this| this.visit_expr(&call.callee, ctx));
+            for argument in &call.arguments {
+                self.visit_expr(argument, ctx);
+            }
+            return;
+        }
+
+        // For field access expressions (e.g. `v1.add`), if the cursor is
+        // on the field name, record the base expression name so the query
+        // layer can try qualified method lookup (e.g. `Vector::add`).
+        if let node::ExprKind::FieldExpression(ref field_expr) = expression.kind
+            && self.contains_position(&field_expr.field.span)
+            && let Some(base_name) = Self::expr_name(&field_expr.base)
+        {
+            self.record_field_ident(field_expr.field.as_str(), &field_expr.field.span, base_name);
+            // Still walk the base in case the cursor is actually
+            // on the base (the field ident record only sticks if
+            // the cursor is on the field span).
+            self.visit_expr(&field_expr.base, ctx);
+            return;
+        }
+
+        visit::walk_expr(self, expression, ctx);
     }
 
     fn visit_ty(&mut self, ty: &'ast node::Ty, _ctx: &mut ()) {
@@ -576,6 +616,32 @@ Vector::new(1, 2)
             i64_entries.len() >= 2,
             "should find at least 2 'i64' type annotations.\nAll found: {:?}",
             found
+        );
+    }
+
+    #[test]
+    fn find_call_arity_for_overloaded_function_call() {
+        let source = "fn binary_search(list, target) { binary_search(list, target, 0, 1) }\nfn binary_search(_, _, low, high) if low > high; { -1 }\nfn binary_search(list, target, low, high) { low }\nbinary_search([1, 2, 3], 2);";
+        let found = (0..20)
+            .filter_map(|col| parse_and_find(source, 3, col))
+            .find(|found| found.name == "binary_search" && found.call_arity == Some(2));
+
+        assert!(
+            found.is_some(),
+            "should find binary_search/2 call on line 3"
+        );
+    }
+
+    #[test]
+    fn find_pipeline_call_arity_counts_piped_receiver() {
+        let source = "fn binary_search(list, target) { 0 }\n[1, 2, 3] |> binary_search(2);";
+        let found = (0..30)
+            .filter_map(|col| parse_and_find(source, 1, col))
+            .find(|found| found.name == "binary_search" && found.call_arity == Some(2));
+
+        assert!(
+            found.is_some(),
+            "should find piped binary_search/2 call on line 1"
         );
     }
 }

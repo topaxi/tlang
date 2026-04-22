@@ -41,6 +41,34 @@ pub struct SymbolIndex {
 }
 
 impl SymbolIndex {
+    fn choose_closest(entries: Vec<&SymbolEntry>, span: Span) -> Option<SymbolEntry> {
+        if entries.is_empty() {
+            return None;
+        }
+
+        if let Some(definition) = entries.iter().find(|e| e.defined_at == span) {
+            return Some((**definition).clone());
+        }
+
+        let closest = entries
+            .iter()
+            .rev()
+            .find(|e| e.scope_start < span.start_lc.line)
+            .cloned();
+        if let Some(entry) = closest {
+            return Some(entry.clone());
+        }
+
+        entries
+            .iter()
+            .rev()
+            .find(|e| {
+                e.defined_at.start_lc < span.start_lc || e.kind.arity().is_some() || e.builtin
+            })
+            .cloned()
+            .cloned()
+    }
+
     /// Build a `SymbolIndex` from the semantic analyzer's symbol tables.
     ///
     /// # Panics
@@ -102,42 +130,39 @@ impl SymbolIndex {
             if let Some(entries) = self.scopes.get(&sid) {
                 let by_name: Vec<&SymbolEntry> =
                     entries.iter().filter(|e| *e.name == *name).collect();
-
-                if !by_name.is_empty() {
-                    // When the cursor is exactly on a symbol's definition site
-                    // (e.g. the name in `let a = …`), prefer that symbol over
-                    // any outer shadowed symbol with the same name.
-                    if let Some(definition) = by_name.iter().find(|e| e.defined_at == span) {
-                        return Some((*definition).clone());
-                    }
-
-                    // Try scope_start < line first.
-                    let closest = by_name
-                        .iter()
-                        .rev()
-                        .find(|e| e.scope_start < span.start_lc.line)
-                        .cloned();
-                    if let Some(entry) = closest {
-                        return Some(entry.clone());
-                    }
-
-                    // Fallback: defined_at < cursor, or is a function / builtin.
-                    let fallback = by_name
-                        .iter()
-                        .rev()
-                        .find(|e| {
-                            e.defined_at.start_lc < span.start_lc
-                                || e.kind.arity().is_some()
-                                || e.builtin
-                        })
-                        .cloned();
-                    if let Some(entry) = fallback {
-                        return Some(entry.clone());
-                    }
+                if let Some(entry) = Self::choose_closest(by_name, span) {
+                    return Some(entry);
                 }
             }
 
             // Walk up to the parent scope.
+            current = self.parents.get(&sid).copied();
+        }
+
+        None
+    }
+
+    /// Look up the closest callable symbol by name and arity.
+    pub fn get_closest_by_name_and_arity(
+        &self,
+        scope_id: NodeId,
+        name: &str,
+        span: Span,
+        arity: u16,
+    ) -> Option<SymbolEntry> {
+        let mut current = Some(scope_id);
+
+        while let Some(sid) = current {
+            if let Some(entries) = self.scopes.get(&sid) {
+                let by_name: Vec<&SymbolEntry> = entries
+                    .iter()
+                    .filter(|e| *e.name == *name && e.kind.arity() == Some(arity))
+                    .collect();
+                if let Some(entry) = Self::choose_closest(by_name, span) {
+                    return Some(entry);
+                }
+            }
+
             current = self.parents.get(&sid).copied();
         }
 
