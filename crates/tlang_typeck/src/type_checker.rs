@@ -1834,9 +1834,9 @@ impl TypeChecker {
         match kind {
             TyKind::Unknown | TyKind::Var(_) => false,
             TyKind::Path(path, type_args) => {
-                !ty_contains_unknown(kind)
-                    && !ty_contains_var(kind)
-                    && !(type_args.is_empty() && is_unspecialized_generic_builtin_path(path))
+                !(ty_contains_unknown(kind)
+                    || ty_contains_var(kind)
+                    || type_args.is_empty() && is_unspecialized_generic_builtin_path(path))
             }
             _ => !ty_contains_unknown(kind) && !ty_contains_var(kind),
         }
