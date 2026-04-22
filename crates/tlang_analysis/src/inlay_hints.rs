@@ -221,11 +221,6 @@ fn collect_fn_decl_hints(
         }) = decl.body.expr.as_ref()
             && decl.return_hint_spans.len() == decl.return_hint_arm_indices.len()
         {
-            if !has_informative_clause_completion(arms) {
-                collect_block_hints(&decl.body, &fn_ctx, hints);
-                return;
-            }
-
             let clause_returns: Option<Vec<_>> = return_hint_spans
                 .iter()
                 .zip(decl.return_hint_arm_indices.iter())
@@ -243,7 +238,9 @@ fn collect_fn_decl_hints(
                 })
                 .collect();
 
-            if let Some(clause_returns) = clause_returns {
+            if has_informative_clause_completion(arms)
+                && let Some(clause_returns) = clause_returns
+            {
                 for (span, ret_kind) in clause_returns {
                     push_hint(
                         hints,
@@ -1698,6 +1695,47 @@ fn Tree.to_list(Tree::Node { value, left, right }) {
             }),
             "expected node-clause return hint `-> List<isize>`, got: {hints:?}"
         );
+    }
+
+    #[test]
+    fn multi_clause_method_with_path_completion_still_shows_return_hints() {
+        let source = r#"
+enum Expense {
+    Food(f32, Temporal::PlainDate),
+    Transport(f32, Temporal::PlainDate),
+}
+
+fn Expense.amount(Expense::Food(a, _)) { a }
+fn Expense.amount(Expense::Transport(a, _)) { a }
+
+fn Expense.date(Expense::Food(_, d)) { d }
+fn Expense.date(Expense::Transport(_, d)) { d }
+"#;
+        let hints = hints_for(source);
+
+        let amount_hints: Vec<_> = hints
+            .iter()
+            .filter(|h| h.kind == InlayHintKind::ReturnType && h.label == " -> f32")
+            .collect();
+        assert_eq!(
+            amount_hints.len(),
+            2,
+            "expected one `-> f32` return hint per amount clause, got: {hints:?}"
+        );
+        assert!(amount_hints.iter().any(|h| h.line == 6));
+        assert!(amount_hints.iter().any(|h| h.line == 7));
+
+        let date_hints: Vec<_> = hints
+            .iter()
+            .filter(|h| h.kind == InlayHintKind::ReturnType && h.label == " -> Temporal::PlainDate")
+            .collect();
+        assert_eq!(
+            date_hints.len(),
+            2,
+            "expected one `-> Temporal::PlainDate` return hint per date clause, got: {hints:?}"
+        );
+        assert!(date_hints.iter().any(|h| h.line == 9));
+        assert!(date_hints.iter().any(|h| h.line == 10));
     }
 
     #[test]

@@ -1804,10 +1804,38 @@ impl TypeChecker {
     /// Field types declared in structs/enums are safe to propagate to
     /// destructuring bindings only when they resolved to a concrete type.
     fn should_propagate_field_ty(kind: &TyKind) -> bool {
+        fn is_unspecialized_generic_builtin_path(path: &hir::Path) -> bool {
+            matches!(
+                path.first_ident().as_str(),
+                "List" | "Dict" | "Option" | "Result"
+            )
+        }
+
+        fn ty_contains_unknown(kind: &TyKind) -> bool {
+            match kind {
+                TyKind::Unknown => true,
+                TyKind::List(inner) | TyKind::Slice(inner) => ty_contains_unknown(&inner.kind),
+                TyKind::Dict(key, value) => {
+                    ty_contains_unknown(&key.kind) || ty_contains_unknown(&value.kind)
+                }
+                TyKind::Fn(params, ret) => {
+                    params.iter().any(|p| ty_contains_unknown(&p.kind))
+                        || ty_contains_unknown(&ret.kind)
+                }
+                TyKind::Path(_, type_args) => type_args.iter().any(|arg| ty_contains_unknown(&arg.kind)),
+                TyKind::Union(types) => types.iter().any(|ty| ty_contains_unknown(&ty.kind)),
+                TyKind::Var(_) | TyKind::Primitive(_) | TyKind::Never => false,
+            }
+        }
+
         match kind {
             TyKind::Unknown | TyKind::Var(_) => false,
-            TyKind::Path(path, _) => !path.res.is_unresolved(),
-            _ => true,
+            TyKind::Path(path, type_args) => {
+                !ty_contains_unknown(kind)
+                    && !ty_contains_var(kind)
+                    && !(type_args.is_empty() && is_unspecialized_generic_builtin_path(path))
+            }
+            _ => !ty_contains_unknown(kind) && !ty_contains_var(kind),
         }
     }
 
