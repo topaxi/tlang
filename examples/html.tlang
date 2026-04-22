@@ -39,7 +39,7 @@ fn escape_html(s) {
     |> re"'".replace_all("&#39;")
 }
 
-// Wraps raw input in SafeHtml after escaping.
+/// Wraps raw input in SafeHtml after escaping.
 fn text(v) { SafeHtml::Html(escape_html(Display::to_string(v))) }
 
 // ── Render dispatch ─────────────────────────────────────────────────────────
@@ -66,8 +66,8 @@ fn html(parts, values) {
 fn join_html([]) { SafeHtml::Html("") }
 fn join_html([x, ...xs]) { SafeHtml::Html(render(x) + render(join_html(xs))) }
 
-// Strips the leading and trailing whitespace that triple-quoted strings
-// produce when formatted with surrounding line breaks.
+/// Strips the leading and trailing whitespace that triple-quoted strings
+/// produce when formatted with surrounding line breaks.
 fn trim(SafeHtml::Html(v)) { SafeHtml::Html(trim(v)) }
 fn trim<T: Display>(s: T) {
     s

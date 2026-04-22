@@ -12,6 +12,7 @@ use tlang_ast::token::{CommentKind, CommentToken, Literal};
 use tlang_defs::DefKind;
 use tlang_hir as hir;
 use tlang_span::{HirId, NodeId, Span, TypeVarId};
+use tlang_typeck::builtins;
 
 use crate::find_node;
 use crate::inlay_hints;
@@ -91,7 +92,18 @@ pub fn enrich_hover_symbol(
         symbol.type_info = inlay_hints::type_at_definition(typed_hir, def_line, def_col);
     }
 
-    let Some(callable) = find_ast_callable(module, symbol.node_id, &symbol.qualified_name) else {
+    let Some(callable) = find_ast_callable(
+        module,
+        symbol.node_id,
+        &symbol.qualified_name,
+        symbol.def_kind.arity(),
+    ) else {
+        if symbol.builtin
+            && let Some(signature) = builtins::lookup_hover_signature(&symbol.qualified_name)
+        {
+            symbol.signature = Some(format_builtin_signature(signature));
+            symbol.documentation = signature.documentation.map(str::to_string);
+        }
         return;
     };
 
@@ -101,6 +113,24 @@ pub fn enrich_hover_symbol(
         typed_hir,
         symbol.hir_id,
     ));
+}
+
+fn format_builtin_signature(signature: &builtins::BuiltinHoverSignature) -> String {
+    let params = signature
+        .params
+        .iter()
+        .enumerate()
+        .map(|(index, (name, ty))| {
+            if signature.variadic && index == signature.params.len().saturating_sub(1) {
+                format!("{name}: {ty}...")
+            } else {
+                format!("{name}: {ty}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    format!("fn {}({params}) -> {}", signature.name, signature.ret)
 }
 
 /// Resolve the symbol under the cursor at the given **0-based** `(line, column)`.
@@ -201,6 +231,13 @@ impl AstCallableDecl<'_> {
             AstCallableDecl::ProtocolMethod { method, .. } => &method.leading_comments,
         }
     }
+
+    fn name_span(&self) -> Span {
+        match self {
+            AstCallableDecl::Function { decl, .. } => decl.name.span,
+            AstCallableDecl::ProtocolMethod { method, .. } => method.name.span,
+        }
+    }
 }
 
 enum HirCallableDecl<'a> {
@@ -215,9 +252,12 @@ fn find_ast_callable<'a>(
     module: &'a ast::Module,
     node_id: Option<NodeId>,
     qualified_name: &str,
+    expected_arity: Option<u16>,
 ) -> Option<AstCallableDecl<'a>> {
     for stmt in &module.statements {
-        if let Some(callable) = find_ast_callable_in_stmt(stmt, node_id, qualified_name) {
+        if let Some(callable) =
+            find_ast_callable_in_stmt(stmt, node_id, qualified_name, expected_arity)
+        {
             return Some(callable);
         }
     }
@@ -228,10 +268,11 @@ fn find_ast_callable_in_stmt<'a>(
     stmt: &'a ast::Stmt,
     node_id: Option<NodeId>,
     qualified_name: &str,
+    expected_arity: Option<u16>,
 ) -> Option<AstCallableDecl<'a>> {
     match &stmt.kind {
         ast::StmtKind::FunctionDeclaration(decl) => {
-            if node_id == Some(decl.id) || decl.name_or_invalid() == qualified_name {
+            if matches_function_decl(decl, node_id, qualified_name, expected_arity) {
                 Some(AstCallableDecl::Function {
                     decl,
                     leading_comments: if decl.leading_comments.is_empty() {
@@ -244,20 +285,22 @@ fn find_ast_callable_in_stmt<'a>(
                 None
             }
         }
-        ast::StmtKind::FunctionDeclarations(decls) => decls.iter().find_map(|decl| {
-            (node_id == Some(decl.id) || decl.name_or_invalid() == qualified_name).then_some(
-                AstCallableDecl::Function {
-                    decl,
-                    leading_comments: if decl.leading_comments.is_empty() {
-                        &stmt.leading_comments
-                    } else {
-                        &decl.leading_comments
-                    },
+        ast::StmtKind::FunctionDeclarations(decls) => decls
+            .iter()
+            .filter(|decl| {
+                matches_grouped_function_decl(decl, node_id, qualified_name, expected_arity)
+            })
+            .max_by_key(|decl| informative_parameter_count(decl))
+            .map(|decl| AstCallableDecl::Function {
+                decl,
+                leading_comments: if decl.leading_comments.is_empty() {
+                    &stmt.leading_comments
+                } else {
+                    &decl.leading_comments
                 },
-            )
-        }),
+            }),
         ast::StmtKind::ImplBlock(impl_block) => impl_block.methods.iter().find_map(|decl| {
-            (node_id == Some(decl.id) || decl.name_or_invalid() == qualified_name).then_some(
+            matches_function_decl(decl, node_id, qualified_name, expected_arity).then_some(
                 AstCallableDecl::Function {
                     decl,
                     leading_comments: &decl.leading_comments,
@@ -275,12 +318,59 @@ fn find_ast_callable_in_stmt<'a>(
     }
 }
 
+fn matches_function_decl(
+    decl: &ast::FunctionDeclaration,
+    node_id: Option<NodeId>,
+    qualified_name: &str,
+    expected_arity: Option<u16>,
+) -> bool {
+    node_id == Some(decl.id)
+        || (decl.name_or_invalid() == qualified_name
+            && expected_arity.is_none_or(|arity| decl.parameters.len() as u16 == arity))
+}
+
+fn matches_grouped_function_decl(
+    decl: &ast::FunctionDeclaration,
+    node_id: Option<NodeId>,
+    qualified_name: &str,
+    expected_arity: Option<u16>,
+) -> bool {
+    if expected_arity.is_some() {
+        decl.name_or_invalid() == qualified_name
+            && expected_arity.is_none_or(|arity| decl.parameters.len() as u16 == arity)
+    } else {
+        matches_function_decl(decl, node_id, qualified_name, expected_arity)
+    }
+}
+
+fn informative_parameter_count(decl: &ast::FunctionDeclaration) -> usize {
+    decl.parameters
+        .iter()
+        .filter(|param| !is_uninformative_param_pattern(&param.pattern))
+        .count()
+}
+
+fn is_uninformative_param_pattern(pattern: &ast::Pat) -> bool {
+    pattern.is_wildcard()
+        || matches!(
+            &pattern.kind,
+            ast::PatKind::Identifier(ident) if ident.is_wildcard()
+        )
+}
+
 fn find_hir_callable<'a>(
     typed_hir: &'a TypedHir,
     hir_id: Option<HirId>,
 ) -> Option<HirCallableDecl<'a>> {
     let hir_id = hir_id?;
     find_hir_callable_in_block(&typed_hir.module.block, hir_id)
+}
+
+fn find_hir_callable_by_span<'a>(
+    typed_hir: &'a TypedHir,
+    name_span: Span,
+) -> Option<HirCallableDecl<'a>> {
+    find_hir_callable_in_block_by_span(&typed_hir.module.block, name_span)
 }
 
 fn find_hir_callable_in_block(block: &hir::Block, hir_id: HirId) -> Option<HirCallableDecl<'_>> {
@@ -393,25 +483,162 @@ fn find_hir_callable_in_expr(expr: &hir::Expr, hir_id: HirId) -> Option<HirCalla
     }
 }
 
+fn find_hir_callable_in_block_by_span(
+    block: &hir::Block,
+    name_span: Span,
+) -> Option<HirCallableDecl<'_>> {
+    for stmt in &block.stmts {
+        if let Some(callable) = find_hir_callable_in_stmt_by_span(stmt, name_span) {
+            return Some(callable);
+        }
+    }
+    block
+        .expr
+        .as_ref()
+        .and_then(|expr| find_hir_callable_in_expr_by_span(expr, name_span))
+}
+
+fn find_hir_callable_in_stmt_by_span(
+    stmt: &hir::Stmt,
+    name_span: Span,
+) -> Option<HirCallableDecl<'_>> {
+    match &stmt.kind {
+        hir::StmtKind::FunctionDeclaration(decl) if decl.name.span == name_span => {
+            Some(HirCallableDecl::Function(decl))
+        }
+        hir::StmtKind::FunctionDeclaration(decl) => {
+            find_hir_callable_in_block_by_span(&decl.body, name_span)
+        }
+        hir::StmtKind::ImplBlock(impl_block) => impl_block.methods.iter().find_map(|decl| {
+            if decl.name.span == name_span {
+                Some(HirCallableDecl::Function(decl))
+            } else {
+                find_hir_callable_in_block_by_span(&decl.body, name_span)
+            }
+        }),
+        hir::StmtKind::ProtocolDeclaration(protocol) => {
+            protocol.methods.iter().find_map(|method| {
+                if method.name.span == name_span {
+                    Some(HirCallableDecl::ProtocolMethod { protocol, method })
+                } else {
+                    method
+                        .body
+                        .as_ref()
+                        .and_then(|body| find_hir_callable_in_block_by_span(body, name_span))
+                }
+            })
+        }
+        hir::StmtKind::Expr(expr) => find_hir_callable_in_expr_by_span(expr, name_span),
+        _ => None,
+    }
+}
+
+fn find_hir_callable_in_expr_by_span(
+    expr: &hir::Expr,
+    name_span: Span,
+) -> Option<HirCallableDecl<'_>> {
+    match &expr.kind {
+        hir::ExprKind::FunctionExpression(decl) if decl.name.span == name_span => {
+            Some(HirCallableDecl::Function(decl))
+        }
+        hir::ExprKind::FunctionExpression(decl) => {
+            find_hir_callable_in_block_by_span(&decl.body, name_span)
+        }
+        hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
+            find_hir_callable_in_block_by_span(block, name_span)
+        }
+        hir::ExprKind::IfElse(condition, then_block, else_clauses) => {
+            find_hir_callable_in_expr_by_span(condition, name_span)
+                .or_else(|| find_hir_callable_in_block_by_span(then_block, name_span))
+                .or_else(|| {
+                    else_clauses.iter().find_map(|clause| {
+                        clause
+                            .condition
+                            .as_ref()
+                            .and_then(|condition| {
+                                find_hir_callable_in_expr_by_span(condition, name_span)
+                            })
+                            .or_else(|| {
+                                find_hir_callable_in_block_by_span(&clause.consequence, name_span)
+                            })
+                    })
+                })
+        }
+        hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
+            find_hir_callable_in_expr_by_span(&call.callee, name_span).or_else(|| {
+                call.arguments
+                    .iter()
+                    .find_map(|argument| find_hir_callable_in_expr_by_span(argument, name_span))
+            })
+        }
+        hir::ExprKind::Binary(_, lhs, rhs) => find_hir_callable_in_expr_by_span(lhs, name_span)
+            .or_else(|| find_hir_callable_in_expr_by_span(rhs, name_span)),
+        hir::ExprKind::Unary(_, inner)
+        | hir::ExprKind::FieldAccess(inner, _)
+        | hir::ExprKind::Cast(inner, _)
+        | hir::ExprKind::TryCast(inner, _)
+        | hir::ExprKind::Break(Some(inner))
+        | hir::ExprKind::Let(_, inner)
+        | hir::ExprKind::Implements(inner, _) => {
+            find_hir_callable_in_expr_by_span(inner, name_span)
+        }
+        hir::ExprKind::Match(scrutinee, arms, _) => {
+            find_hir_callable_in_expr_by_span(scrutinee, name_span).or_else(|| {
+                arms.iter()
+                    .find_map(|arm| find_hir_callable_in_block_by_span(&arm.block, name_span))
+            })
+        }
+        hir::ExprKind::IndexAccess(base, index) => {
+            find_hir_callable_in_expr_by_span(base, name_span)
+                .or_else(|| find_hir_callable_in_expr_by_span(index, name_span))
+        }
+        hir::ExprKind::List(items) => items
+            .iter()
+            .find_map(|item| find_hir_callable_in_expr_by_span(item, name_span)),
+        hir::ExprKind::Dict(entries) => entries.iter().find_map(|(key, value)| {
+            find_hir_callable_in_expr_by_span(key, name_span)
+                .or_else(|| find_hir_callable_in_expr_by_span(value, name_span))
+        }),
+        hir::ExprKind::TaggedString { tag, exprs, .. } => {
+            find_hir_callable_in_expr_by_span(tag, name_span).or_else(|| {
+                exprs
+                    .iter()
+                    .find_map(|expr| find_hir_callable_in_expr_by_span(expr, name_span))
+            })
+        }
+        hir::ExprKind::Range(range) => find_hir_callable_in_expr_by_span(&range.start, name_span)
+            .or_else(|| find_hir_callable_in_expr_by_span(&range.end, name_span)),
+        hir::ExprKind::Literal(_)
+        | hir::ExprKind::Path(_)
+        | hir::ExprKind::Continue
+        | hir::ExprKind::Break(None)
+        | hir::ExprKind::Wildcard => None,
+    }
+}
+
 fn format_callable_signature(
     callable: &AstCallableDecl<'_>,
     typed_hir: Option<&TypedHir>,
     hir_id: Option<HirId>,
 ) -> String {
-    let hir_callable = typed_hir.and_then(|typed_hir| find_hir_callable(typed_hir, hir_id));
+    let hir_callable = typed_hir.and_then(|typed_hir| {
+        find_hir_callable(typed_hir, hir_id)
+            .or_else(|| find_hir_callable_by_span(typed_hir, callable.name_span()))
+    });
 
     match callable {
         AstCallableDecl::Function { decl, .. } => {
-            format_function_signature(decl, hir_callable.as_ref())
+            format_function_signature(decl, typed_hir, hir_callable.as_ref())
         }
         AstCallableDecl::ProtocolMethod { protocol, method } => {
-            format_protocol_method_signature(protocol, method, hir_callable.as_ref())
+            format_protocol_method_signature(protocol, method, typed_hir, hir_callable.as_ref())
         }
     }
 }
 
 fn format_function_signature(
     decl: &ast::FunctionDeclaration,
+    typed_hir: Option<&TypedHir>,
     hir_callable: Option<&HirCallableDecl<'_>>,
 ) -> String {
     match hir_callable {
@@ -422,22 +649,18 @@ fn format_function_signature(
                 .iter()
                 .enumerate()
                 .map(|(index, param)| {
-                    format_parameter(
-                        param,
-                        hir_decl
-                            .parameters
-                            .get(index)
-                            .map(|param| &param.type_annotation.kind),
-                        &type_var_names,
-                    )
+                    format_parameter(param, hir_decl.parameters.get(index), &type_var_names)
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
+            let return_kind = typed_hir
+                .and_then(|typed_hir| inferred_function_return_ty(typed_hir, hir_decl))
+                .unwrap_or(&hir_decl.return_type.kind);
 
             format!(
                 "fn {}({params}) -> {}",
                 decl.name_or_invalid(),
-                format_hir_ty_kind(&hir_decl.return_type.kind, &type_var_names)
+                format_hir_ty_kind(return_kind, &type_var_names)
             )
         }
         _ => {
@@ -462,6 +685,7 @@ fn format_function_signature(
 fn format_protocol_method_signature(
     protocol: &ast::ProtocolDeclaration,
     method: &ast::ProtocolMethodSignature,
+    typed_hir: Option<&TypedHir>,
     hir_callable: Option<&HirCallableDecl<'_>>,
 ) -> String {
     match hir_callable {
@@ -475,23 +699,19 @@ fn format_protocol_method_signature(
                 .iter()
                 .enumerate()
                 .map(|(index, param)| {
-                    format_parameter(
-                        param,
-                        hir_method
-                            .parameters
-                            .get(index)
-                            .map(|param| &param.type_annotation.kind),
-                        &type_var_names,
-                    )
+                    format_parameter(param, hir_method.parameters.get(index), &type_var_names)
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
+            let return_kind = typed_hir
+                .and_then(|typed_hir| inferred_protocol_method_return_ty(typed_hir, hir_method))
+                .unwrap_or(&hir_method.return_type.kind);
 
             format!(
                 "fn {}.{}({params}) -> {}",
                 protocol.name,
                 method.name,
-                format_hir_ty_kind(&hir_method.return_type.kind, &type_var_names)
+                format_hir_ty_kind(return_kind, &type_var_names)
             )
         }
         _ => {
@@ -515,17 +735,60 @@ fn format_protocol_method_signature(
     }
 }
 
+fn inferred_function_return_ty<'a>(
+    typed_hir: &'a TypedHir,
+    decl: &'a hir::FunctionDeclaration,
+) -> Option<&'a hir::TyKind> {
+    (!matches!(decl.return_type.kind, hir::TyKind::Unknown))
+        .then_some(&decl.return_type.kind)
+        .or_else(|| {
+            typed_hir
+                .type_table
+                .get(&decl.hir_id)
+                .and_then(|info| match &info.ty.kind {
+                    hir::TyKind::Fn(_, ret) => Some(&ret.kind),
+                    _ => None,
+                })
+        })
+        .or_else(|| decl.body.expr.as_ref().map(|expr| &expr.ty.kind))
+}
+
+fn inferred_protocol_method_return_ty<'a>(
+    typed_hir: &'a TypedHir,
+    method: &'a hir::ProtocolMethodSignature,
+) -> Option<&'a hir::TyKind> {
+    (!matches!(method.return_type.kind, hir::TyKind::Unknown))
+        .then_some(&method.return_type.kind)
+        .or_else(|| {
+            typed_hir
+                .type_table
+                .get(&method.hir_id)
+                .and_then(|info| match &info.ty.kind {
+                    hir::TyKind::Fn(_, ret) => Some(&ret.kind),
+                    _ => None,
+                })
+        })
+        .or_else(|| {
+            method
+                .body
+                .as_ref()
+                .and_then(|body| body.expr.as_ref().map(|expr| &expr.ty.kind))
+        })
+}
+
 fn format_parameter(
     param: &ast::FunctionParameter,
-    hir_ty: Option<&hir::TyKind>,
+    hir_param: Option<&hir::FunctionParameter>,
     type_var_names: &HashMap<TypeVarId, String>,
 ) -> String {
     if is_self_parameter(param) {
         return "self".to_string();
     }
 
-    let pat = format_ast_pat(&param.pattern);
-    let ty = hir_ty.cloned().unwrap_or(hir::TyKind::Unknown);
+    let pat = preferred_parameter_name(param, hir_param);
+    let ty = hir_param
+        .map(|param| param.type_annotation.kind.clone())
+        .unwrap_or(hir::TyKind::Unknown);
 
     format!("{pat}: {}", format_hir_ty_kind(&ty, type_var_names))
 }
@@ -546,6 +809,19 @@ fn format_parameter_from_ast(param: &ast::FunctionParameter) -> String {
 
 fn is_self_parameter(param: &ast::FunctionParameter) -> bool {
     matches!(param.pattern.kind, ast::PatKind::_Self)
+}
+
+fn preferred_parameter_name(
+    param: &ast::FunctionParameter,
+    hir_param: Option<&hir::FunctionParameter>,
+) -> String {
+    match &param.pattern.kind {
+        ast::PatKind::Identifier(ident) if !ident.is_wildcard() => ident.to_string(),
+        ast::PatKind::_Self => "self".to_string(),
+        _ => hir_param
+            .map(|param| param.name.to_string())
+            .unwrap_or_else(|| format_ast_pat(&param.pattern)),
+    }
 }
 
 fn hir_function_type_var_names(decl: &hir::FunctionDeclaration) -> HashMap<TypeVarId, String> {
@@ -752,6 +1028,16 @@ mod tests {
         Some(resolved)
     }
 
+    fn setup_and_resolve_hover_js(source: &str, line: u32, column: u32) -> Option<ResolvedSymbol> {
+        let result = crate::analyze_with_js_symbols(source);
+        let module = result.module.as_ref()?;
+        let index = SymbolIndex::from_analyzer(&result.analyzer);
+        let mut resolved = resolve_symbol(module, &index, line, column)?;
+        let typed_hir = lower_and_typecheck(&result);
+        enrich_hover_symbol(module, typed_hir.as_ref(), &mut resolved);
+        Some(resolved)
+    }
+
     #[test]
     fn resolve_variable_reference() {
         let resolved = setup_and_resolve("fn f(x) { x }", 0, 10);
@@ -848,6 +1134,36 @@ mod tests {
         assert_eq!(
             resolved.hover_text(),
             "fn add(a: i64, b: unknown) -> i64\n\nAdd numbers"
+        );
+    }
+
+    #[test]
+    fn hover_text_uses_inferred_function_return_type() {
+        let source = "enum SafeHtml { Html(String) }\nfn text(v) { SafeHtml::Html(v) }\nlet _ = text(\"x\");";
+        let resolved = setup_and_resolve_hover(source, 1, 3).unwrap();
+
+        assert_eq!(resolved.hover_text(), "fn text(v: unknown) -> SafeHtml");
+    }
+
+    #[test]
+    fn hover_text_uses_matching_function_arity() {
+        let source = "fn binary_search(list, target) { binary_search(list, target, 0, len(list) - 1) }\nfn binary_search(_, _, low, high) if low > high; { -1 }\nfn binary_search(list, target, low, high) {\n    let mid = math::floor((low + high) / 2);\n    let midValue = list[mid];\n\n    if midValue == target; {\n        mid\n    } else if midValue < target; {\n        rec binary_search(list, target, mid + 1, high)\n    } else {\n        rec binary_search(list, target, low, mid - 1)\n    }\n}";
+        let resolved = setup_and_resolve_hover(source, 9, 12).unwrap();
+
+        assert_eq!(
+            resolved.hover_text(),
+            "fn binary_search(list: unknown, target: unknown, low: unknown, high: unknown) -> unknown"
+        );
+    }
+
+    #[test]
+    fn hover_text_formats_builtin_signature_and_docs() {
+        let source = "let f = len;";
+        let resolved = setup_and_resolve_hover_js(source, 0, 8).unwrap();
+
+        assert_eq!(
+            resolved.hover_text(),
+            "fn len(iterable: Iterable<unknown>) -> i64\n\nReturns the number of items in an iterable value."
         );
     }
 
