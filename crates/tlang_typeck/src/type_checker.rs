@@ -8,6 +8,7 @@ use tlang_hir::{self as hir, BinaryOpKind, PrimTy, Ty, TyKind};
 use tlang_hir_opt::hir_opt::{HirOptContext, HirOptError, HirPass};
 use tlang_span::{TypeVarId, TypeVarIdAllocator};
 
+use crate::builtin_fields;
 use crate::builtin_methods;
 use crate::builtin_protocols;
 use crate::builtin_types;
@@ -2350,6 +2351,21 @@ impl TypeChecker {
                     span,
                 });
             }
+        }
+
+        if let Some(type_name) = builtin_methods::type_name_from_kind(base_ty_kind)
+            && let Some(field_ty) = builtin_fields::lookup(type_name, field_name)
+        {
+            self.type_table.insert(
+                expr_hir_id,
+                TypeInfo {
+                    ty: Ty {
+                        kind: field_ty.clone(),
+                        ..Ty::default()
+                    },
+                },
+            );
+            return field_ty;
         }
 
         // Fall back to builtin method lookup for native types.

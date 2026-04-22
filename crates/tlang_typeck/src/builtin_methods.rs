@@ -59,6 +59,12 @@
 //!     fn any(self, f: fn(T) -> bool) -> bool { ... }
 //!     fn all(self, f: fn(T) -> bool) -> bool { ... }
 //! }
+//!
+//! impl Temporal.PlainDate {
+//!     fn since(self, other: Temporal::PlainDate) -> Temporal::Duration { ... }
+//!     fn since(self, other: Temporal::PlainDate, smallest_unit: String) -> Temporal::Duration { ... }
+//!     fn since(self, other: Temporal::PlainDate, smallest_unit: String, largest_unit: String) -> Temporal::Duration { ... }
+//! }
 //! ```
 
 use tlang_hir::{PrimTy, Ty, TyKind};
@@ -86,6 +92,17 @@ fn builtin_path(name: &str) -> TyKind {
     builtin_types::lookup(name).unwrap_or(TyKind::Unknown)
 }
 
+fn path_ty(name: &str) -> TyKind {
+    let segments = name
+        .split("::")
+        .map(|segment| tlang_hir::PathSegment::from_str(segment, tlang_span::Span::default()))
+        .collect();
+    TyKind::Path(
+        tlang_hir::Path::new(segments, tlang_span::Span::default()),
+        Vec::new(),
+    )
+}
+
 /// Look up the type signatures for a method on a builtin type.
 ///
 /// Returns all matching `TyKind::Fn(params, ret)` overloads, or an empty `Vec`
@@ -99,6 +116,7 @@ pub fn lookup_all(type_name: &str, method_name: &str) -> Vec<TyKind> {
         "Result" => lookup_result(method_name),
         "List" => lookup_list(method_name),
         "String" => lookup_string(method_name),
+        "PlainDate" => lookup_plain_date(method_name),
         _ => vec![],
     }
 }
@@ -294,8 +312,15 @@ pub struct BuiltinMethod {
 }
 
 /// The list of builtin type names that have methods.
-pub const BUILTIN_TYPE_NAMES: &[&str] =
-    &["Regex", "StringBuf", "Option", "Result", "List", "String"];
+pub const BUILTIN_TYPE_NAMES: &[&str] = &[
+    "Regex",
+    "StringBuf",
+    "Option",
+    "Result",
+    "List",
+    "String",
+    "PlainDate",
+];
 
 /// Enumerate all builtin methods available on a type.
 ///
@@ -309,6 +334,7 @@ pub fn methods_for(type_name: &str) -> Vec<BuiltinMethod> {
         "Result" => methods_for_result(),
         "List" => methods_for_list(),
         "String" => methods_for_string(),
+        "PlainDate" => methods_for_plain_date(),
         _ => vec![],
     }
 }
@@ -397,6 +423,56 @@ fn methods_for_string() -> Vec<BuiltinMethod> {
     .iter()
     .flat_map(|&name| {
         lookup_string(name)
+            .into_iter()
+            .map(move |signature| BuiltinMethod { name, signature })
+    })
+    .collect()
+}
+
+fn lookup_plain_date(method: &str) -> Vec<TyKind> {
+    use PrimTy::*;
+    use TyKind::*;
+
+    let plain_date = path_ty("Temporal::PlainDate");
+    let duration = path_ty("Temporal::Duration");
+
+    match method {
+        "since" | "until" => vec![
+            fn_ty(vec![plain_date.clone()], duration.clone()),
+            fn_ty(
+                vec![plain_date.clone(), Primitive(String)],
+                duration.clone(),
+            ),
+            fn_ty(
+                vec![plain_date, Primitive(String), Primitive(String)],
+                duration,
+            ),
+        ],
+        "equals" => vec![fn_ty(vec![path_ty("Temporal::PlainDate")], Primitive(Bool))],
+        "day_of_week" | "day_of_year" => vec![fn_ty(vec![], Primitive(I64))],
+        "add" | "subtract" => vec![fn_ty(
+            vec![path_ty("Temporal::Duration")],
+            path_ty("Temporal::PlainDate"),
+        )],
+        "to_string" => vec![fn_ty(vec![], Primitive(String))],
+        _ => vec![],
+    }
+}
+
+fn methods_for_plain_date() -> Vec<BuiltinMethod> {
+    [
+        "since",
+        "until",
+        "equals",
+        "day_of_week",
+        "day_of_year",
+        "add",
+        "subtract",
+        "to_string",
+    ]
+    .iter()
+    .flat_map(|&name| {
+        lookup_plain_date(name)
             .into_iter()
             .map(move |signature| BuiltinMethod { name, signature })
     })

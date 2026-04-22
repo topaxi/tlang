@@ -16,6 +16,7 @@ use tlang_defs::DefKind;
 use tlang_hir as hir;
 use tlang_hir::TyKind;
 use tlang_span::Span;
+use tlang_typeck::builtin_fields;
 use tlang_typeck::builtin_methods;
 
 use crate::signature_help::{ParameterInformation, SignatureInformation};
@@ -116,7 +117,20 @@ pub fn resolve_member_at_position(
         });
     }
 
-    // 3. Try user-defined methods/fields from the HIR (struct methods, etc.).
+    // 3. Try builtin fields.
+    if let Some(field_ty) = builtin_fields::lookup(type_name, member_name) {
+        return Some(ResolvedMember {
+            name: member_name.to_string(),
+            receiver_ty: base_ty,
+            kind: MemberKind::Field,
+            signature: None,
+            return_ty: Some(field_ty),
+            def_span: None,
+            builtin: true,
+        });
+    }
+
+    // 4. Try user-defined methods/fields from the HIR (struct methods, etc.).
     if let Some(info) = resolve_hir_member(&typed_hir.module.block, type_name, member_name) {
         return Some(ResolvedMember {
             name: member_name.to_string(),
@@ -165,7 +179,21 @@ pub fn complete_members_for_type(
     let mut candidates = Vec::new();
     let mut seen = std::collections::HashSet::new();
 
-    // 1. Builtin methods.
+    // 1. Builtin fields.
+    for field in builtin_fields::fields_for(type_name) {
+        if seen.insert(field.name.to_string()) {
+            candidates.push(MemberCandidate {
+                name: field.name.to_string(),
+                kind: MemberKind::Field,
+                signature: None,
+                return_ty: Some(field.ty),
+                def_span: None,
+                builtin: true,
+            });
+        }
+    }
+
+    // 2. Builtin methods.
     for method in builtin_methods::methods_for(type_name) {
         if seen.insert(method.name.to_string()) {
             let return_ty = extract_return_ty(&method.signature);
@@ -181,7 +209,7 @@ pub fn complete_members_for_type(
         }
     }
 
-    // 2. Protocol impl methods.
+    // 3. Protocol impl methods.
     for impl_info in typed_hir.type_table.impls() {
         if impl_info.target_type_name != type_name {
             continue;
@@ -221,7 +249,7 @@ pub fn complete_members_for_type(
         }
     }
 
-    // 3. User-defined methods and fields from the symbol index.
+    // 4. User-defined methods and fields from the symbol index.
     if let Some(index) = symbol_index {
         for item in index.collect_method_completions(type_name) {
             if seen.insert(item.label.clone()) {
@@ -982,6 +1010,28 @@ mod tests {
         assert!(resolved.builtin);
     }
 
+    #[test]
+    fn resolve_builtin_temporal_duration_field() {
+        let source = r#"
+let start = Temporal::PlainDate::from("2025-03-01");
+let end = Temporal::PlainDate::from("2025-03-16");
+let _ = end.since(start).days;
+"#;
+        let typed_hir = typed_hir(source);
+        let line = source.lines().nth(3).unwrap();
+        let col = line.find("days").unwrap() as u32;
+        let resolved = resolve_member_at_position(source, &typed_hir, 3, col);
+        assert!(resolved.is_some(), "should resolve Temporal::Duration.days");
+        let resolved = resolved.unwrap();
+        assert_eq!(resolved.name, "days");
+        assert_eq!(resolved.kind, MemberKind::Field);
+        assert!(resolved.builtin);
+        assert_eq!(
+            resolved.return_ty,
+            Some(TyKind::Primitive(hir::PrimTy::I64))
+        );
+    }
+
     // ── complete_members_at_position ───────────────────────────────────
 
     #[test]
@@ -1018,6 +1068,43 @@ mod tests {
         assert!(names.contains(&"map"), "should contain map");
         assert!(names.contains(&"filter"), "should contain filter");
         assert!(names.contains(&"foldl"), "should contain foldl");
+    }
+
+    #[test]
+    fn complete_members_for_temporal_duration_includes_fields() {
+        let source = r#"let start = Temporal::PlainDate::from("2025-03-01");"#;
+        let hir = typed_hir(source);
+        let candidates = complete_members_for_type(&hir, None, "Duration");
+
+        let days = candidates.iter().find(|candidate| candidate.name == "days");
+        assert!(days.is_some(), "should contain builtin field 'days'");
+        assert_eq!(days.unwrap().kind, MemberKind::Field);
+
+        let calendar = candidates
+            .iter()
+            .find(|candidate| candidate.name == "calendar");
+        assert!(
+            calendar.is_none(),
+            "Duration should not contain fields from other Temporal types"
+        );
+
+        let field_names: Vec<&str> = candidates
+            .iter()
+            .filter(|candidate| candidate.kind == MemberKind::Field)
+            .map(|candidate| candidate.name.as_str())
+            .collect();
+        assert!(field_names.contains(&"years"));
+        assert!(field_names.contains(&"months"));
+        assert!(field_names.contains(&"weeks"));
+        assert!(field_names.contains(&"days"));
+        assert!(field_names.contains(&"hours"));
+        assert!(field_names.contains(&"minutes"));
+        assert!(field_names.contains(&"seconds"));
+        assert!(field_names.contains(&"milliseconds"));
+        assert!(field_names.contains(&"microseconds"));
+        assert!(field_names.contains(&"nanoseconds"));
+        assert!(field_names.contains(&"sign"));
+        assert!(field_names.contains(&"blank"));
     }
 
     #[test]

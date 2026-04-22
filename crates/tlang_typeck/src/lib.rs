@@ -1,3 +1,4 @@
+pub mod builtin_fields;
 pub mod builtin_methods;
 pub mod builtin_protocols;
 pub mod builtin_types;

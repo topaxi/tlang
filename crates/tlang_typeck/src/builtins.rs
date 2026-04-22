@@ -36,6 +36,17 @@ fn mk_fn_ty(params: Vec<TyKind>, ret: TyKind) -> TyKind {
     )
 }
 
+fn path_ty(name: &str) -> TyKind {
+    let segments = name
+        .split("::")
+        .map(|segment| tlang_hir::PathSegment::from_str(segment, tlang_span::Span::default()))
+        .collect();
+    TyKind::Path(
+        tlang_hir::Path::new(segments, tlang_span::Span::default()),
+        Vec::new(),
+    )
+}
+
 /// Look up the type signature for a built-in function by name.
 ///
 /// Returns a `TyKind::Fn` wrapping the parameter types and return type,
@@ -81,6 +92,42 @@ fn lookup_generic(name: &str) -> Option<TyKind> {
                 mk_fn_ty(vec![t], u.clone()),
             ],
             TyKind::List(Box::new(mk_ty(u))),
+        )),
+        "Temporal::Duration::from" => Some(mk_fn_ty(
+            vec![TyKind::Unknown],
+            path_ty("Temporal::Duration"),
+        )),
+        "Temporal::PlainDate::from" => Some(mk_fn_ty(
+            vec![TyKind::Primitive(PrimTy::String)],
+            path_ty("Temporal::PlainDate"),
+        )),
+        "Temporal::PlainDate::new" => Some(mk_fn_ty(
+            vec![
+                TyKind::Primitive(PrimTy::I64),
+                TyKind::Primitive(PrimTy::I64),
+                TyKind::Primitive(PrimTy::I64),
+            ],
+            path_ty("Temporal::PlainDate"),
+        )),
+        "Temporal::PlainDateTime::from" => Some(mk_fn_ty(
+            vec![TyKind::Primitive(PrimTy::String)],
+            path_ty("Temporal::PlainDateTime"),
+        )),
+        "Temporal::PlainMonthDay::from" => Some(mk_fn_ty(
+            vec![TyKind::Primitive(PrimTy::String)],
+            path_ty("Temporal::PlainMonthDay"),
+        )),
+        "Temporal::PlainTime::from" => Some(mk_fn_ty(
+            vec![TyKind::Primitive(PrimTy::String)],
+            path_ty("Temporal::PlainTime"),
+        )),
+        "Temporal::PlainYearMonth::from" => Some(mk_fn_ty(
+            vec![TyKind::Primitive(PrimTy::String)],
+            path_ty("Temporal::PlainYearMonth"),
+        )),
+        "Temporal::ZonedDateTime::from" => Some(mk_fn_ty(
+            vec![TyKind::Primitive(PrimTy::String)],
+            path_ty("Temporal::ZonedDateTime"),
         )),
         _ => None,
     }

@@ -2090,6 +2090,43 @@ for x in tree {
     }
 
     #[test]
+    fn type_at_definition_temporal_since_binding() {
+        let source = r#"
+enum Expense {
+    Food(f32, Temporal::PlainDate),
+}
+
+fn Expense.date(Expense::Food(_, d)) -> Temporal::PlainDate { d }
+
+let mid_month = Temporal::PlainDate::from("2025-03-16");
+let expense = Expense::Food(12.0, Temporal::PlainDate::from("2025-03-01"));
+let diff = mid_month.since(expense.date());
+"#;
+        let typed_hir = typed_hir_for(source);
+        let ty = type_at_definition(&typed_hir, 9, 4);
+        assert_eq!(ty.as_deref(), Some("Temporal::Duration"));
+    }
+
+    #[test]
+    fn type_at_definition_temporal_duration_field_binding() {
+        let source = r#"
+enum Expense {
+    Food(f32, Temporal::PlainDate),
+}
+
+fn Expense.date(Expense::Food(_, d)) -> Temporal::PlainDate { d }
+
+let mid_month = Temporal::PlainDate::from("2025-03-16");
+let expense = Expense::Food(12.0, Temporal::PlainDate::from("2025-03-01"));
+let diff = mid_month.since(expense.date());
+let days = diff.days;
+"#;
+        let typed_hir = typed_hir_for(source);
+        let ty = type_at_definition(&typed_hir, 10, 4);
+        assert_eq!(ty.as_deref(), Some("i64"));
+    }
+
+    #[test]
     fn hover_on_closure_fn_keyword_shows_signature() {
         // Hovering on the `fn` keyword of a closure should show its full type.
         let source = r#"
