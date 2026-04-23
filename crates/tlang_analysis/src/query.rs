@@ -577,7 +577,9 @@ impl<'ast> Visitor<'ast> for ReferenceNodeCollector {
         }
 
         if let ast::ExprKind::Call(call) = &expression.kind {
-            let effective_arity = self.current_call_arity.unwrap_or(call.arguments.len() as u16);
+            let effective_arity = self
+                .current_call_arity
+                .unwrap_or(call.arguments.len() as u16);
             self.with_call_arity(effective_arity, |this| this.visit_expr(&call.callee, ctx));
             for argument in &call.arguments {
                 self.visit_expr(argument, ctx);
