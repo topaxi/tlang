@@ -2256,13 +2256,12 @@ impl TypeChecker {
     }
 
     fn match_column_tys(scrutinee: &hir::Expr) -> Option<Vec<TyKind>> {
-        if !Self::is_synthetic_match_value(scrutinee) {
-            return None;
-        }
-
         let hir::ExprKind::List(items) = &scrutinee.kind else {
             return None;
         };
+        if !Self::is_synthetic_match_value(scrutinee) {
+            return None;
+        }
 
         Some(items.iter().map(|item| item.ty.kind.clone()).collect())
     }
@@ -4903,7 +4902,7 @@ fn is_useful(
         hasher.finish()
     }
 
-    fn hash_patterns<T: Hash>(value: &T) -> u64 {
+    fn hash_value<T: Hash>(value: &T) -> u64 {
         let mut hasher = DefaultHasher::new();
         value.hash(&mut hasher);
         hasher.finish()
@@ -4922,8 +4921,8 @@ fn is_useful(
 
         let state = UsefulnessState {
             tys: hash_ty_kinds(tys),
-            matrix: hash_patterns(&matrix),
-            vector: hash_patterns(&vector),
+            matrix: hash_value(&matrix),
+            vector: hash_value(&vector),
         };
         if !seen.insert(state) {
             return false;
