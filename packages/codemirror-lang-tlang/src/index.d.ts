@@ -29,13 +29,27 @@ export interface SignatureHelp {
   activeParameter: number;
 }
 
+export interface SemanticToken {
+  from: number;
+  to: number;
+  type: string;
+  modifiers?: string[];
+}
+
 export type HoverProvider = (pos: number) => HoverInfo | null;
 export type GotoDefinitionProvider = (pos: number) => DefinitionLocation | null;
 export type SignatureHelpProvider = (
   pos: number,
 ) => SignatureHelp | null | Promise<SignatureHelp | null>;
+export type SemanticTokenProvider = (
+  code: string,
+) => SemanticToken[] | Promise<SemanticToken[]>;
 
 export function tlangSignatureHelp(provider: SignatureHelpProvider): Extension;
+export function tlangSemanticTokens(
+  source: SemanticToken[] | SemanticTokenProvider,
+  config?: { debounceMs?: number },
+): Extension;
 
 export function tlangLanguageSupport(options?: {
   reLanguage?: Language;
@@ -48,4 +62,7 @@ export function tlangLanguageSupport(options?: {
   hoverProvider?: HoverProvider;
   gotoDefinitionProvider?: GotoDefinitionProvider;
   signatureHelpProvider?: SignatureHelpProvider;
+  semanticTokens?: SemanticToken[];
+  semanticTokenProvider?: SemanticTokenProvider;
+  semanticTokenDebounceMs?: number;
 }): LanguageSupport;

@@ -1,4 +1,5 @@
 import { parser } from './parser.js';
+import { StateEffect, StateField } from '@codemirror/state';
 import {
   foldNodeProp,
   foldInside,
@@ -9,7 +10,12 @@ import {
 import { styleTags, tags as t } from '@lezer/highlight';
 import { parseMixed } from '@lezer/common';
 import { completeFromList } from '@codemirror/autocomplete';
-import { hoverTooltip, EditorView, ViewPlugin } from '@codemirror/view';
+import {
+  hoverTooltip,
+  EditorView,
+  ViewPlugin,
+  Decoration,
+} from '@codemirror/view';
 
 let parserWithMetadata = parser.configure({
   props: [
@@ -186,6 +192,15 @@ export const tlangCompletion = tlangLanguage.data.of({
  * }} SignatureHelp
  *
  * @typedef {(pos: number) => SignatureHelp | null | Promise<SignatureHelp | null>} SignatureHelpProvider
+ *
+ * @typedef {{
+ *   from: number,
+ *   to: number,
+ *   type: string,
+ *   modifiers?: string[],
+ * }} SemanticToken
+ *
+ * @typedef {(code: string) => SemanticToken[] | Promise<SemanticToken[]>} SemanticTokenProvider
  */
 
 /**
@@ -200,6 +215,9 @@ export const tlangCompletion = tlangLanguage.data.of({
  *   hoverProvider?: HoverProvider,
  *   gotoDefinitionProvider?: GotoDefinitionProvider,
  *   signatureHelpProvider?: SignatureHelpProvider,
+ *   semanticTokens?: SemanticToken[],
+ *   semanticTokenProvider?: SemanticTokenProvider,
+ *   semanticTokenDebounceMs?: number,
  * }} [options]
  */
 export function tlangLanguageSupport(options = {}) {
@@ -219,6 +237,16 @@ export function tlangLanguageSupport(options = {}) {
 
   if (options.signatureHelpProvider) {
     extensions.push(tlangSignatureHelp(options.signatureHelpProvider));
+  }
+
+  if (options.semanticTokens) {
+    extensions.push(tlangSemanticTokens(options.semanticTokens));
+  } else if (options.semanticTokenProvider) {
+    extensions.push(
+      tlangSemanticTokens(options.semanticTokenProvider, {
+        debounceMs: options.semanticTokenDebounceMs,
+      }),
+    );
   }
 
   return new LanguageSupport(lang, extensions);
@@ -444,6 +472,180 @@ export function tlangSignatureHelp(provider) {
       },
     ),
   ];
+}
+
+const setSemanticTokensEffect = StateEffect.define();
+
+const semanticTokensField = StateField.define({
+  create: () => Decoration.none,
+  update(decorations, tr) {
+    decorations = decorations.map(tr.changes);
+    for (const effect of tr.effects) {
+      if (effect.is(setSemanticTokensEffect)) {
+        decorations = effect.value;
+      }
+    }
+    return decorations;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
+/**
+ * @param {SemanticToken[]} tokens
+ * @param {import('@codemirror/state').Text} doc
+ */
+function buildSemanticTokenDecorations(tokens, doc) {
+  if (!tokens || tokens.length === 0) return Decoration.none;
+
+  const ranges = tokens
+    .map((token) => normalizeSemanticToken(token, doc.length))
+    .filter((token) => token !== null)
+    .map((token) =>
+      Decoration.mark({
+        class: semanticTokenClassName(token),
+      }).range(token.from, token.to),
+    );
+
+  return ranges.length === 0 ? Decoration.none : Decoration.set(ranges, true);
+}
+
+/**
+ * @param {SemanticToken} token
+ * @param {number} docLength
+ */
+function normalizeSemanticToken(token, docLength) {
+  if (!token) return null;
+
+  const from = Math.max(0, Math.min(token.from, docLength));
+  const to = Math.max(from, Math.min(token.to, docLength));
+  if (to <= from) return null;
+
+  return {
+    from,
+    to,
+    type: token.type,
+    modifiers: Array.isArray(token.modifiers) ? token.modifiers : [],
+  };
+}
+
+/**
+ * @param {{ type: string, modifiers?: string[] }} token
+ */
+function semanticTokenClassName(token) {
+  const classes = [
+    'cm-semantic-token',
+    `cm-semantic-token-${sanitizeSemanticTokenPart(token.type)}`,
+  ];
+
+  for (const modifier of token.modifiers ?? []) {
+    classes.push(
+      `cm-semantic-token-mod-${sanitizeSemanticTokenPart(modifier)}`,
+    );
+  }
+
+  return classes.join(' ');
+}
+
+/**
+ * @param {string} value
+ */
+function sanitizeSemanticTokenPart(value) {
+  return String(value)
+    .replace(/[^a-z0-9_-]+/gi, '-')
+    .toLowerCase();
+}
+
+/**
+ * @param {SemanticTokenProvider} provider
+ * @param {number} debounceMs
+ */
+function makeSemanticTokenPlugin(provider, debounceMs) {
+  return ViewPlugin.fromClass(
+    class {
+      version = 0;
+      timeout = null;
+
+      /**
+       * @param {EditorView} view
+       */
+      constructor(view) {
+        this.view = view;
+        this.schedule();
+      }
+
+      /**
+       * @param {import('@codemirror/view').ViewUpdate} update
+       */
+      update(update) {
+        if (update.docChanged) {
+          this.schedule();
+        }
+      }
+
+      destroy() {
+        if (this.timeout !== null) clearTimeout(this.timeout);
+        this.version++;
+      }
+
+      schedule() {
+        if (this.timeout !== null) clearTimeout(this.timeout);
+        this.timeout = setTimeout(() => {
+          this.timeout = null;
+          void this.run();
+        }, debounceMs);
+      }
+
+      async run() {
+        const version = ++this.version;
+        const code = this.view.state.doc.toString();
+
+        let tokens;
+        try {
+          tokens = await Promise.resolve(provider(code));
+        } catch {
+          return;
+        }
+
+        if (version !== this.version) return;
+
+        this.view.dispatch({
+          effects: setSemanticTokensEffect.of(
+            buildSemanticTokenDecorations(tokens, this.view.state.doc),
+          ),
+        });
+      }
+    },
+  );
+}
+
+/**
+ * Create a CodeMirror semantic-highlighting extension from semantic token data
+ * or a provider that recomputes tokens from the current document text.
+ *
+ * The returned decorations add CSS classes like:
+ * - `cm-semantic-token`
+ * - `cm-semantic-token-function`
+ * - `cm-semantic-token-mod-declaration`
+ *
+ * Hosts can theme those classes to layer semantic highlighting on top of the
+ * existing Lezer syntax highlighting without forking the language package.
+ *
+ * @param {SemanticToken[] | SemanticTokenProvider} source
+ * @param {{ debounceMs?: number }} [config]
+ */
+export function tlangSemanticTokens(source, config = {}) {
+  if (typeof source !== 'function') {
+    return StateField.define({
+      create: (state) => buildSemanticTokenDecorations(source, state.doc),
+      update(decorations, tr) {
+        return decorations.map(tr.changes);
+      },
+      provide: (field) => EditorView.decorations.from(field),
+    });
+  }
+
+  const debounceMs = config.debounceMs ?? 75;
+  return [semanticTokensField, makeSemanticTokenPlugin(source, debounceMs)];
 }
 
 /**
