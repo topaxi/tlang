@@ -228,12 +228,10 @@ pub fn type_at_position(
     line: u32,
     column: u32,
 ) -> Option<String> {
-    if let Some(symbol) = resolve_symbol(module, index, line, column) {
+    if let Some(mut symbol) = resolve_symbol(module, index, line, column) {
         if symbol.type_info.is_some() {
             return symbol.type_info;
         }
-
-        let mut symbol = symbol;
         enrich_hover_symbol(module, typed_hir, &mut symbol);
         if symbol.type_info.is_some() {
             return symbol.type_info;

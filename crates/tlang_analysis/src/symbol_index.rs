@@ -129,6 +129,8 @@ impl SymbolIndex {
                 }
 
                 let def_line = entry.defined_at.start_lc.line;
+                // Spans use the lexer's mixed coordinate system: line 0 is
+                // already 0-based, while subsequent lines are 1-based.
                 let def_col = if def_line > 0 {
                     entry.defined_at.start_lc.column.saturating_sub(1)
                 } else {
