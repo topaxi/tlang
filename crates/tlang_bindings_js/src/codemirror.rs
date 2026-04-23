@@ -208,6 +208,19 @@ pub struct CodemirrorDefinitionLocation {
     pub to: u32,
 }
 
+/// A reference location formatted for CodeMirror 6.
+#[derive(Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi)]
+#[serde(rename_all = "camelCase")]
+pub struct CodemirrorReferenceLocation {
+    /// UTF-16 code unit offset of the start of the reference.
+    pub from: u32,
+    /// UTF-16 code unit offset of the end of the reference.
+    pub to: u32,
+    /// Whether this reference is also a declaration site.
+    pub is_declaration: bool,
+}
+
 /// An inlay hint formatted for CodeMirror 6.
 ///
 /// The `position` is a UTF-16 code unit offset matching JavaScript string

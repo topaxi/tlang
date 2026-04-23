@@ -10,12 +10,12 @@ use lsp_types::{
     DidSaveTextDocumentParams, GotoDefinitionParams, GotoDefinitionResponse, HoverParams,
     HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, InlayHint,
     InlayHintParams, NumberOrString, ParameterInformation, ParameterLabel, ProgressParams,
-    ProgressParamsValue, PublishDiagnosticsParams, SemanticTokensFullOptions, SemanticTokensParams,
-    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities,
-    SignatureHelpOptions, SignatureHelpParams, SignatureInformation, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions, Url,
-    WorkDoneProgress, WorkDoneProgressBegin, WorkDoneProgressCreateParams, WorkDoneProgressEnd,
-    WorkDoneProgressReport,
+    ProgressParamsValue, PublishDiagnosticsParams, ReferenceParams, SemanticTokensFullOptions,
+    SemanticTokensParams, SemanticTokensResult, SemanticTokensServerCapabilities,
+    ServerCapabilities, SignatureHelpOptions, SignatureHelpParams, SignatureInformation,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions, Url, WorkDoneProgress, WorkDoneProgressBegin,
+    WorkDoneProgressCreateParams, WorkDoneProgressEnd, WorkDoneProgressReport,
 };
 use serde::Deserialize;
 use tlang_analysis::CompilationTarget;
@@ -109,6 +109,7 @@ impl ServerState {
             .request::<lsp_types::request::Shutdown, _>(|_, _| Box::pin(async { Ok(()) }))
             .request::<lsp_types::request::HoverRequest, _>(Self::on_hover)
             .request::<lsp_types::request::GotoDefinition, _>(Self::on_goto_definition)
+            .request::<lsp_types::request::References, _>(Self::on_references)
             .request::<lsp_types::request::Completion, _>(Self::on_completion)
             .request::<lsp_types::request::SignatureHelpRequest, _>(Self::on_signature_help)
             .request::<lsp_types::request::InlayHintRequest, _>(Self::on_inlay_hint)
@@ -167,6 +168,7 @@ impl ServerState {
                     )),
                     hover_provider: Some(HoverProviderCapability::Simple(true)),
                     definition_provider: Some(lsp_types::OneOf::Left(true)),
+                    references_provider: Some(lsp_types::OneOf::Left(true)),
                     completion_provider: Some(CompletionOptions {
                         trigger_characters: Some(vec![".".into(), ":".into()]),
                         ..CompletionOptions::default()
@@ -408,6 +410,20 @@ impl ServerState {
         };
 
         Box::pin(async move { Ok(Some(CompletionResponse::Array(items))) })
+    }
+
+    fn on_references(
+        state: &mut Self,
+        params: ReferenceParams,
+    ) -> futures::future::BoxFuture<
+        'static,
+        Result<Option<Vec<lsp_types::Location>>, async_lsp::ResponseError>,
+    > {
+        let uri = params.text_document_position.text_document.uri;
+        let pos = params.text_document_position.position;
+        let include_declaration = params.context.include_declaration;
+        let references = Self::collect_references(state, &uri, pos, include_declaration);
+        Box::pin(async move { Ok(references) })
     }
 
     fn on_signature_help(
@@ -833,6 +849,33 @@ impl ServerState {
             typed_hir,
             pos.line,
             pos.character,
+        )
+    }
+
+    fn collect_references(
+        state: &Self,
+        uri: &Url,
+        pos: lsp_types::Position,
+        include_declaration: bool,
+    ) -> Option<Vec<lsp_types::Location>> {
+        let doc = state.store.get(uri)?;
+        let cache = doc.parse_cache.as_ref()?;
+        let index = doc.symbol_index.as_ref()?;
+
+        Some(
+            tlang_analysis::query::find_references(
+                &cache.module,
+                index,
+                pos.line,
+                pos.character,
+                include_declaration,
+            )
+            .into_iter()
+            .map(|reference| lsp_types::Location {
+                uri: uri.clone(),
+                range: diagnostics::span_to_range(&reference.ident_span),
+            })
+            .collect(),
         )
     }
 
@@ -1744,6 +1787,91 @@ mod tests {
             }
             _ => panic!("expected scalar location"),
         }
+    }
+
+    #[test]
+    fn references_return_locations_and_respect_include_declaration() {
+        let source = "fn id(value) { value }\nlet value = id(1);\nid(value);";
+        let mut state = setup_server_with_source(source);
+        let params = |include_declaration| ReferenceParams {
+            text_document_position: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: test_uri() },
+                position: lsp_types::Position {
+                    line: 2,
+                    character: 0,
+                },
+            },
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+            context: lsp_types::ReferenceContext {
+                include_declaration,
+            },
+        };
+
+        let with_declaration =
+            futures::executor::block_on(ServerState::on_references(&mut state, params(true)))
+                .expect("references request should succeed")
+                .expect("references should be present");
+        let without_declaration =
+            futures::executor::block_on(ServerState::on_references(&mut state, params(false)))
+                .expect("references request should succeed")
+                .expect("references should be present");
+
+        assert_eq!(
+            with_declaration
+                .iter()
+                .map(|location| (location.range.start.line, location.range.start.character))
+                .collect::<Vec<_>>(),
+            vec![(0, 3), (1, 12), (2, 0)]
+        );
+        assert_eq!(
+            without_declaration
+                .iter()
+                .map(|location| (location.range.start.line, location.range.start.character))
+                .collect::<Vec<_>>(),
+            vec![(1, 12), (2, 0)]
+        );
+    }
+
+    #[test]
+    fn references_handle_shadowed_bindings() {
+        let source = "fn demo(value) {\n  let inner = value;\n  if true; {\n    let value = 2;\n    value\n  }\n  value\n}";
+        let state = setup_server_with_source(source);
+        let outer_refs = ServerState::collect_references(
+            &state,
+            &test_uri(),
+            lsp_types::Position {
+                line: 6,
+                character: 2,
+            },
+            true,
+        )
+        .expect("outer references should resolve");
+        let inner_refs = ServerState::collect_references(
+            &state,
+            &test_uri(),
+            lsp_types::Position {
+                line: 4,
+                character: 4,
+            },
+            true,
+        )
+        .expect("inner references should resolve");
+
+        assert_eq!(
+            outer_refs
+                .iter()
+                .map(|location| (location.range.start.line, location.range.start.character))
+                .collect::<Vec<_>>(),
+            vec![(0, 8), (1, 14), (6, 2)]
+        );
+        assert_eq!(
+            inner_refs
+                .iter()
+                .map(|location| (location.range.start.line, location.range.start.character))
+                .collect::<Vec<_>>(),
+            vec![(3, 8), (4, 4)]
+        );
     }
 
     #[test]

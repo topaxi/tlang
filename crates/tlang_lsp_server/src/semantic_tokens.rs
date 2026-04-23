@@ -730,6 +730,7 @@ impl Collector<'_> {
             def_kind: entry.kind,
             def_span: entry.defined_at,
             builtin: entry.builtin,
+            temp: entry.temp,
             type_info: None,
             node_id: entry.node_id,
             hir_id: entry.hir_id,
