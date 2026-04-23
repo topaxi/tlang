@@ -485,7 +485,7 @@ impl<'ast> Visitor<'ast> for ReferenceNodeCollector {
             }
             for assoc_type in &decl.associated_types {
                 self.with_declaration_name_context(|this| {
-                    this.visit_ident(&assoc_type.name, &mut ())
+                    this.visit_ident(&assoc_type.name, &mut ());
                 });
                 for type_param in &assoc_type.type_params {
                     self.visit_ident(&type_param.name, ctx);
@@ -534,7 +534,7 @@ impl<'ast> Visitor<'ast> for ReferenceNodeCollector {
             }
             for assoc_type in &impl_block.associated_types {
                 self.with_declaration_name_context(|this| {
-                    this.visit_ident(&assoc_type.name, &mut ())
+                    this.visit_ident(&assoc_type.name, &mut ());
                 });
                 for type_param in &assoc_type.type_params {
                     self.visit_ident(&type_param.name, ctx);
