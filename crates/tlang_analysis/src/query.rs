@@ -1460,7 +1460,7 @@ mod tests {
         type_at_position(source, module, &index, typed_hir.as_ref(), line, column)
     }
 
-    fn setup_references(
+    fn find_test_references(
         source: &str,
         line: u32,
         column: u32,
@@ -1475,7 +1475,7 @@ mod tests {
         find_references(module, &index, line, column, include_declaration)
     }
 
-    fn setup_references_js(
+    fn find_test_references_with_js_symbols(
         source: &str,
         line: u32,
         column: u32,
@@ -1683,8 +1683,8 @@ mod tests {
     fn references_include_and_exclude_declaration() {
         let source = "fn id(value) { value }\nlet value = id(1);\nid(value);";
 
-        let with_declaration = setup_references(source, 2, 0, true);
-        let without_declaration = setup_references(source, 2, 0, false);
+        let with_declaration = find_test_references(source, 2, 0, true);
+        let without_declaration = find_test_references(source, 2, 0, false);
 
         assert_eq!(
             with_declaration
@@ -1718,8 +1718,8 @@ mod tests {
     fn references_respect_shadowing_in_nested_scopes() {
         let source = "fn demo(value) {\n  let inner = value;\n  if true; {\n    let value = 2;\n    value\n  }\n  value\n}";
 
-        let outer_refs = setup_references(source, 6, 2, true);
-        let inner_refs = setup_references(source, 4, 4, true);
+        let outer_refs = find_test_references(source, 6, 2, true);
+        let inner_refs = find_test_references(source, 4, 4, true);
 
         assert_eq!(
             outer_refs
@@ -1746,7 +1746,7 @@ mod tests {
     #[test]
     fn references_group_multi_clause_functions() {
         let source = "fn size([]) { 0 }\nfn size([_, ...xs]) { 1 + size(xs) }\nsize([1, 2, 3]);";
-        let references = setup_references(source, 2, 0, true);
+        let references = find_test_references(source, 2, 0, true);
 
         assert_eq!(
             references
@@ -1764,7 +1764,7 @@ mod tests {
     fn references_find_struct_field_usages() {
         let source =
             "struct Point { x: i64 }\nfn value(point: Point) -> i64 { point.x }\nPoint { x: 1 }.x;";
-        let references = setup_references(source, 0, 15, true);
+        let references = find_test_references(source, 0, 15, true);
 
         assert_eq!(
             references
@@ -1781,7 +1781,7 @@ mod tests {
     #[test]
     fn references_skip_builtin_symbols() {
         let source = "let size = len([1, 2, 3]);";
-        let references = setup_references_js(source, 0, 11, true);
+        let references = find_test_references_with_js_symbols(source, 0, 11, true);
 
         assert!(references.is_empty());
     }
@@ -1789,7 +1789,7 @@ mod tests {
     #[test]
     fn references_group_recursive_function_self_references() {
         let source = "fn fact(n) { if n == 0; { 1 } else { rec fact(n - 1) } }\nfact(3);";
-        let references = setup_references(source, 1, 0, true);
+        let references = find_test_references(source, 1, 0, true);
 
         assert_eq!(
             references
