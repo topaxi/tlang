@@ -61,23 +61,30 @@ pub(crate) struct ProtocolRegistryEntry {
 }
 
 const BUILTIN_PROTOCOL_HIR_ID_BASE: usize = 900_000_000;
-const BUILTIN_PROTOCOLS: &[(&str, &[&str])] = &[
-    ("Truthy", &["truthy"]),
-    ("Functor", &["map"]),
-    ("Accepts", &["accepts"]),
-    ("Iterable", &["iter"]),
-    ("Iterator", &["next"]),
-    ("Display", &["to_string"]),
-    ("Into", &["into"]),
-    ("TryInto", &["try_into"]),
+
+/// Builtin protocols with stable explicit `HirId` offsets.
+///
+/// The offset in each tuple is fixed and must match the corresponding entry in
+/// `tlang_typeck::builtin_protocols` (which uses the same base + same position
+/// order).  Using explicit offsets (instead of deriving them from position via
+/// `enumerate`) ensures that inserting or reordering entries in this list never
+/// silently shifts the identity of other protocols.
+const BUILTIN_PROTOCOLS: &[(usize, &str, &[&str])] = &[
+    (1, "Truthy", &["truthy"]),
+    (2, "Functor", &["map"]),
+    (3, "Accepts", &["accepts"]),
+    (4, "Iterable", &["iter"]),
+    (5, "Iterator", &["next"]),
+    (6, "Display", &["to_string"]),
+    (7, "Into", &["into"]),
+    (8, "TryInto", &["try_into"]),
 ];
 
 fn builtin_protocol_registry_entries() -> Vec<ProtocolRegistryEntry> {
     BUILTIN_PROTOCOLS
         .iter()
-        .enumerate()
-        .map(|(index, (name, methods))| ProtocolRegistryEntry {
-            hir_id: HirId::new(BUILTIN_PROTOCOL_HIR_ID_BASE + index + 1),
+        .map(|(offset, name, methods)| ProtocolRegistryEntry {
+            hir_id: HirId::new(BUILTIN_PROTOCOL_HIR_ID_BASE + offset),
             ident: Ident::new(name, Span::default()),
             methods: methods.iter().map(|method| (*method).to_string()).collect(),
             constraints: Vec::new(),

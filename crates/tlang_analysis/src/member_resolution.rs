@@ -742,17 +742,20 @@ fn find_lowered_protocol_dispatch_in_expr<'a>(
     expr: &'a hir::Expr,
     offset: u32,
 ) -> Option<(&'a hir::Expr, &'a tlang_ast::node::Ident, TyKind)> {
-    if let hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) = &expr.kind {
-        if let hir::ExprKind::Path(path) = &call.callee.kind
-            && let Some(member) = path.segments.last().map(|segment| &segment.ident)
-            && path.segments.len() >= 2
-            && span_contains_offset(&member.span, offset)
-            && member.span.start > 0
-            && source.as_bytes().get(member.span.start as usize - 1) == Some(&b'.')
-            && let Some(receiver) = call.arguments.first()
-        {
-            return Some((receiver, member, receiver.ty.kind.clone()));
-        }
+    if let hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) = &expr.kind
+        && let hir::ExprKind::Path(path) = &call.callee.kind
+        && let Some(member) = path.segments.last().map(|segment| &segment.ident)
+        && path.segments.len() >= 2
+        && span_contains_offset(&member.span, offset)
+        && source.as_bytes()[..member.span.start as usize]
+            .iter()
+            .rev()
+            .skip_while(|&&b| b == b' ' || b == b'\t' || b == b'\n' || b == b'\r')
+            .next()
+            == Some(&b'.')
+        && let Some(receiver) = call.arguments.first()
+    {
+        return Some((receiver, member, receiver.ty.kind.clone()));
     }
 
     match &expr.kind {
@@ -1038,20 +1041,45 @@ fn resolve_bound_protocol_method(
     };
 
     let bounds = type_table.get_type_param_bounds(*type_var_id)?;
+
+    // Build a work-list that includes all transitively reachable constraint
+    // protocols so that, e.g., a `T: Ord` bound also exposes `Eq`/`PartialEq`
+    // methods that `Ord` inherits.
+    let mut pending: Vec<(
+        &tlang_typeck::ProtocolInfo,
+        std::collections::HashMap<tlang_span::TypeVarId, TyKind>,
+    )> = Vec::new();
     for bound in bounds {
-        let Some((protocol, type_args)) = type_table.resolve_protocol_bound(bound) else {
+        if let Some((protocol, type_args)) = type_table.resolve_protocol_bound(bound) {
+            let mut bindings = std::collections::HashMap::new();
+            for (proto_type_param, type_arg) in protocol.type_param_var_ids.iter().zip(type_args) {
+                bindings.insert(*proto_type_param, type_arg.kind.clone());
+            }
+            pending.push((protocol, bindings));
+        }
+    }
+
+    let mut visited_protocols = std::collections::HashSet::new();
+    while let Some((protocol, type_bindings)) = pending.pop() {
+        if !visited_protocols.insert(protocol.hir_id) {
             continue;
-        };
+        }
+
+        // Enqueue transitively-reachable constraint protocols.
+        for constraint_name in &protocol.constraints {
+            if let Some(constraint_protocol) = type_table.get_protocol_info(constraint_name) {
+                pending.push((constraint_protocol, std::collections::HashMap::new()));
+            }
+        }
+
         let protocol_name = protocol.name.to_string();
-        let method = protocol
+        let Some(method) = protocol
             .methods
             .iter()
-            .find(|candidate| candidate.name.as_str() == method_name)?;
-
-        let mut type_bindings = std::collections::HashMap::new();
-        for (proto_type_param, type_arg) in protocol.type_param_var_ids.iter().zip(type_args) {
-            type_bindings.insert(*proto_type_param, type_arg.kind.clone());
-        }
+            .find(|candidate| candidate.name.as_str() == method_name)
+        else {
+            continue;
+        };
 
         let params: Vec<String> = method
             .param_tys
@@ -1090,19 +1118,40 @@ fn complete_bound_protocol_methods(
         return vec![];
     };
 
+    // Build a work-list seeded with all direct bounds, then expand into
+    // transitively-reachable constraint protocols so completions include
+    // inherited methods (e.g. `Eq`/`PartialEq` for a `T: Ord` bound).
+    let mut pending: Vec<(
+        &tlang_typeck::ProtocolInfo,
+        std::collections::HashMap<tlang_span::TypeVarId, TyKind>,
+    )> = Vec::new();
+    for bound in bounds {
+        if let Some((protocol, type_args)) = type_table.resolve_protocol_bound(bound) {
+            let mut bindings = std::collections::HashMap::new();
+            for (proto_type_param, type_arg) in protocol.type_param_var_ids.iter().zip(type_args) {
+                bindings.insert(*proto_type_param, type_arg.kind.clone());
+            }
+            pending.push((protocol, bindings));
+        }
+    }
+
+    let mut visited_protocols = std::collections::HashSet::new();
     let mut seen = std::collections::HashSet::new();
     let mut candidates = Vec::new();
 
-    for bound in bounds {
-        let Some((protocol, type_args)) = type_table.resolve_protocol_bound(bound) else {
+    while let Some((protocol, type_bindings)) = pending.pop() {
+        if !visited_protocols.insert(protocol.hir_id) {
             continue;
-        };
-        let protocol_name = protocol.name.to_string();
-
-        let mut type_bindings = std::collections::HashMap::new();
-        for (proto_type_param, type_arg) in protocol.type_param_var_ids.iter().zip(type_args) {
-            type_bindings.insert(*proto_type_param, type_arg.kind.clone());
         }
+
+        // Enqueue transitively-reachable constraint protocols.
+        for constraint_name in &protocol.constraints {
+            if let Some(constraint_protocol) = type_table.get_protocol_info(constraint_name) {
+                pending.push((constraint_protocol, std::collections::HashMap::new()));
+            }
+        }
+
+        let protocol_name = protocol.name.to_string();
 
         for method in &protocol.methods {
             let name = method.name.to_string();

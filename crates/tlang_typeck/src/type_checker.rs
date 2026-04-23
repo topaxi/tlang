@@ -1302,19 +1302,51 @@ impl TypeChecker {
             .iter()
             .find(|candidate| candidate.name.as_str() == method_name)?;
         let bounds = self.type_table.get_type_param_bounds(*type_var_id)?;
-        let bound = bounds.iter().find(|bound| {
-            self.type_table
-                .resolve_protocol_bound(bound)
-                .is_some_and(|(bound_protocol, _)| bound_protocol.hir_id == proto_info.hir_id)
-        })?;
 
-        let mut type_bindings = HashMap::new();
-        if let TyKind::Path(_, type_args) = &bound.kind {
-            for (proto_type_param, type_arg) in proto_info.type_param_var_ids.iter().zip(type_args)
-            {
-                type_bindings.insert(*proto_type_param, type_arg.kind.clone());
+        // Walk the direct bounds and their transitive constraint chains to find
+        // one whose protocol matches `proto_info`.  This handles cases such as
+        // `T: Ord` enabling dispatch to `Eq::…` because `Ord : Eq`.
+        let mut type_bindings = None;
+        'outer: for bound in bounds {
+            let Some((bound_protocol, _)) = self.type_table.resolve_protocol_bound(bound) else {
+                continue;
+            };
+
+            let mut initial_type_bindings = HashMap::new();
+            if let TyKind::Path(_, type_args) = &bound.kind {
+                for (proto_type_param, type_arg) in
+                    bound_protocol.type_param_var_ids.iter().zip(type_args)
+                {
+                    initial_type_bindings.insert(*proto_type_param, type_arg.kind.clone());
+                }
+            }
+
+            let mut visited = HashSet::new();
+            let mut stack = vec![(bound_protocol, initial_type_bindings)];
+            while let Some((candidate_protocol, candidate_type_bindings)) = stack.pop() {
+                if !visited.insert(candidate_protocol.hir_id) {
+                    continue;
+                }
+
+                if candidate_protocol.hir_id == proto_info.hir_id {
+                    type_bindings = Some(candidate_type_bindings);
+                    break 'outer;
+                }
+
+                for constraint_name in &candidate_protocol.constraints {
+                    let Some(constraint_protocol) =
+                        self.type_table.get_protocol_info(constraint_name)
+                    else {
+                        continue;
+                    };
+                    // Constraints are stored as bare names without type args, so
+                    // we carry the parent's bindings forward unchanged.
+                    stack.push((constraint_protocol, candidate_type_bindings.clone()));
+                }
             }
         }
+
+        let type_bindings = type_bindings?;
 
         let mut param_tys: Vec<Ty> = method
             .param_tys
@@ -3790,7 +3822,16 @@ impl TypeChecker {
     }
 }
 
-fn match_lowered_param_pat(pat: &hir::Pat, index: usize, arity: usize) -> Option<&hir::Pat> {
+/// Extract the pattern for a single parameter column from a lowered match arm.
+///
+/// Multi-clause functions are lowered to a match with a list scrutinee that
+/// packs all parameters together.  This helper recovers the sub-pattern at
+/// position `index` for a given `arity`.
+///
+/// - When `arity == 1` the arm's pattern *is* the single parameter pattern.
+/// - When `arity > 1` the arm's pattern is a `PatKind::List` of exactly
+///   `arity` non-rest items; this returns the item at `index`.
+pub fn match_lowered_param_pat(pat: &hir::Pat, index: usize, arity: usize) -> Option<&hir::Pat> {
     if arity == 1 {
         return Some(pat);
     }

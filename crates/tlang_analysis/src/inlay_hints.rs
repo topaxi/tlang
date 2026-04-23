@@ -19,6 +19,7 @@ use tlang_hir as hir;
 use tlang_hir::{PrimTy, TyKind};
 use tlang_span::{HirId, LineColumn, Span, TypeVarId};
 use tlang_typeck::TypeTable;
+use tlang_typeck::match_lowered_param_pat;
 
 // Re-export from the dedicated typed_hir module so existing consumers
 // (e.g. `use crate::inlay_hints::TypedHir`) keep working.
@@ -1092,24 +1093,6 @@ fn infer_match_lowered_param_hint_ty(
     }
 
     saw_constraining_arm.then_some(inferred).flatten()
-}
-
-fn match_lowered_param_pat(pat: &hir::Pat, index: usize, arity: usize) -> Option<&hir::Pat> {
-    if arity == 1 {
-        return Some(pat);
-    }
-
-    match &pat.kind {
-        hir::PatKind::List(items)
-            if items.len() == arity
-                && !items
-                    .iter()
-                    .any(|item| matches!(item.kind, hir::PatKind::Rest(_))) =>
-        {
-            items.get(index)
-        }
-        _ => None,
-    }
 }
 
 fn infer_match_lowered_pat_hint_ty(pat: &hir::Pat, type_table: &TypeTable) -> Option<TyKind> {
