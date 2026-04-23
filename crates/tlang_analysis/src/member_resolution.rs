@@ -8,9 +8,9 @@
 //! ## Coordinate system
 //!
 //! All public functions accept **0-based line** and **0-based UTF-16 column**
-//! positions (matching the LSP / CodeMirror convention).  Internal helpers
-//! handle conversion to byte offsets and the lexer's mixed coordinate system
-//! so callers do not need to worry about coordinate mismatches.
+//! positions (matching the LSP / CodeMirror convention). Internal helpers
+//! handle conversion to byte offsets so callers do not need to worry about
+//! coordinate mismatches.
 
 use tlang_defs::DefKind;
 use tlang_hir as hir;

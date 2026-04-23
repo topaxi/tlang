@@ -5,12 +5,14 @@
 //! LSP server and the WASM playground bindings share this implementation to
 //! ensure consistent symbol resolution behaviour.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use tlang_defs::{DefKind, DefScope};
 use tlang_semantics::SemanticAnalyzer;
 use tlang_span::{HirId, NodeId, Span};
+
+use crate::typed_hir::TypedHir;
 
 /// A single symbol entry extracted from the semantic analyzer.
 #[derive(Debug, Clone)]
@@ -21,6 +23,7 @@ pub struct SymbolEntry {
     pub scope_start: u32,
     pub node_id: Option<NodeId>,
     pub hir_id: Option<HirId>,
+    pub type_info: Option<String>,
     pub builtin: bool,
     /// Whether this is a compiler-generated temporary.
     pub temp: bool,
@@ -98,6 +101,7 @@ impl SymbolIndex {
                     scope_start: d.scope_start,
                     node_id: d.node_id,
                     hir_id: d.hir_id,
+                    type_info: None,
                     builtin: d.builtin,
                     temp: d.temp,
                 })
@@ -114,6 +118,25 @@ impl SymbolIndex {
         }
 
         index
+    }
+
+    /// Populate inferred type information for entries from typed HIR.
+    pub fn populate_type_info(&mut self, typed_hir: &TypedHir) {
+        let definition_types = crate::inlay_hints::collect_definition_types(typed_hir);
+
+        for entries in self.scopes.values_mut() {
+            for entry in entries {
+                if entry.builtin {
+                    continue;
+                }
+
+                let key = (
+                    entry.defined_at.start_lc.line,
+                    entry.defined_at.start_lc.column,
+                );
+                entry.type_info = definition_types.get(&key).cloned();
+            }
+        }
     }
 
     /// Look up the closest matching symbol by name, mimicking
@@ -171,25 +194,23 @@ impl SymbolIndex {
 
     /// Collect all user-defined completion items from every scope.
     ///
-    /// Items are deduplicated by `(label, detail)` and sorted
-    /// alphabetically.  Temporary and builtin symbols are excluded.
+    /// Items are deduplicated by `(label, kind)` and prefer richer inferred
+    /// type details over fallback arity hints. Temporary and builtin symbols
+    /// are excluded.
     ///
     /// This is the canonical implementation shared by both the LSP server
     /// and the WASM playground bindings.
     pub fn collect_completion_items(&self) -> Vec<CompletionItem> {
-        let mut seen = HashSet::new();
-        let mut items = Vec::new();
+        let mut items = HashMap::new();
 
         for entries in self.scopes.values() {
             for entry in entries.iter().filter(|e| !e.builtin && !e.temp) {
                 let item = CompletionItem::from_symbol_entry(entry);
-                let key = (item.label.clone(), item.detail.clone());
-
-                if seen.insert(key) {
-                    items.push(item);
-                }
+                insert_completion_item(&mut items, item);
             }
         }
+
+        let mut items: Vec<_> = items.into_values().collect();
 
         items.sort_by(|a, b| {
             a.label
@@ -209,8 +230,7 @@ impl SymbolIndex {
     /// the qualified `Type::method` form).
     pub fn collect_method_completions(&self, type_name: &str) -> Vec<CompletionItem> {
         let prefix = format!("{type_name}::");
-        let mut seen = HashSet::new();
-        let mut items = Vec::new();
+        let mut items = HashMap::new();
 
         for entries in self.scopes.values() {
             for entry in entries {
@@ -227,16 +247,14 @@ impl SymbolIndex {
                 }
                 let item = CompletionItem {
                     label: member_name.to_string(),
-                    kind: entry.kind,
-                    detail: completion_detail(entry.kind),
+                    kind: normalized_completion_kind(entry.kind),
+                    detail: completion_detail_for_entry(entry),
                 };
-                let key = (item.label.clone(), item.detail.clone());
-                if seen.insert(key) {
-                    items.push(item);
-                }
+                insert_completion_item(&mut items, item);
             }
         }
 
+        let mut items: Vec<_> = items.into_values().collect();
         items.sort_by(|a, b| a.label.cmp(&b.label));
         items
     }
@@ -249,8 +267,7 @@ impl SymbolIndex {
     /// form).
     pub fn collect_protocol_completions(&self, protocol_name: &str) -> Vec<CompletionItem> {
         let prefix = format!("{protocol_name}::");
-        let mut seen = HashSet::new();
-        let mut items = Vec::new();
+        let mut items = HashMap::new();
 
         for entries in self.scopes.values() {
             for entry in entries {
@@ -266,16 +283,14 @@ impl SymbolIndex {
                 }
                 let item = CompletionItem {
                     label: method_name.to_string(),
-                    kind: entry.kind,
-                    detail: completion_detail(entry.kind),
+                    kind: normalized_completion_kind(entry.kind),
+                    detail: completion_detail_for_entry(entry),
                 };
-                let key = (item.label.clone(), item.detail.clone());
-                if seen.insert(key) {
-                    items.push(item);
-                }
+                insert_completion_item(&mut items, item);
             }
         }
 
+        let mut items: Vec<_> = items.into_values().collect();
         items.sort_by(|a, b| a.label.cmp(&b.label));
         items
     }
@@ -343,10 +358,86 @@ impl CompletionItem {
     pub fn from_symbol_entry(entry: &SymbolEntry) -> Self {
         Self {
             label: entry.name.to_string(),
-            kind: entry.kind,
-            detail: completion_detail(entry.kind),
+            kind: normalized_completion_kind(entry.kind),
+            detail: completion_detail_for_entry(entry),
         }
     }
+}
+
+fn normalized_completion_kind(kind: DefKind) -> DefKind {
+    match kind {
+        DefKind::FunctionSelfRef(arity) => DefKind::Function(arity),
+        _ => kind,
+    }
+}
+
+fn insert_completion_item(
+    items: &mut HashMap<(String, DefKind), CompletionItem>,
+    item: CompletionItem,
+) {
+    let key = (item.label.clone(), item.kind);
+
+    match items.entry(key) {
+        std::collections::hash_map::Entry::Vacant(entry) => {
+            entry.insert(item);
+        }
+        std::collections::hash_map::Entry::Occupied(mut entry) => {
+            if should_prefer_completion(entry.get(), &item) {
+                entry.insert(item);
+            }
+        }
+    }
+}
+
+fn should_prefer_completion(existing: &CompletionItem, candidate: &CompletionItem) -> bool {
+    let existing_rank = completion_detail_rank(existing);
+    let candidate_rank = completion_detail_rank(candidate);
+
+    candidate_rank > existing_rank
+        || (candidate_rank == existing_rank
+            && candidate
+                .detail
+                .as_ref()
+                .zip(existing.detail.as_ref())
+                .is_some_and(|(candidate, existing)| candidate.len() > existing.len()))
+}
+
+fn completion_detail_rank(item: &CompletionItem) -> u8 {
+    match item.detail.as_deref() {
+        None => 0,
+        Some(detail) if completion_detail(item.kind).as_deref() == Some(detail) => 1,
+        Some(_) => 2,
+    }
+}
+
+fn completion_detail_for_entry(entry: &SymbolEntry) -> Option<String> {
+    entry
+        .type_info
+        .as_ref()
+        .filter(|ty| is_informative_type_detail(entry, ty))
+        .cloned()
+        .or_else(|| completion_detail(entry.kind))
+}
+
+fn is_informative_type_detail(entry: &SymbolEntry, ty: &str) -> bool {
+    if ty_contains_unknown_token(ty) {
+        return false;
+    }
+
+    if matches!(
+        entry.kind,
+        DefKind::Enum | DefKind::Struct | DefKind::Protocol | DefKind::Module
+    ) && ty == entry.name.as_ref()
+    {
+        return false;
+    }
+
+    true
+}
+
+fn ty_contains_unknown_token(ty: &str) -> bool {
+    ty.split(|c: char| !c.is_alphanumeric() && c != '_')
+        .any(|segment| segment == "unknown")
 }
 
 /// Build an optional detail string for a completion item based on its
@@ -450,6 +541,57 @@ mod tests {
     #[test]
     fn completion_detail_for_variable() {
         assert_eq!(completion_detail(DefKind::Variable), None);
+    }
+
+    #[test]
+    fn completion_items_prefer_inferred_type_info() {
+        let result = crate::analyze(
+            "fn add(a: i64, b: i64) -> i64 { a + b }\nlet answer = add(1, 2);",
+            |_| {},
+        );
+        let mut index = SymbolIndex::from_analyzer(&result.analyzer);
+        let typed_hir = crate::typed_hir::lower_and_typecheck(&result).unwrap();
+        index.populate_type_info(&typed_hir);
+
+        let items = index.collect_completion_items();
+        let add = items.iter().find(|item| item.label == "add").unwrap();
+        let answer = items.iter().find(|item| item.label == "answer").unwrap();
+
+        assert_eq!(add.detail.as_deref(), Some("fn(i64, i64) -> i64"));
+        assert_eq!(answer.detail.as_deref(), Some("i64"));
+    }
+
+    #[test]
+    fn completion_items_deduplicate_multi_clause_functions_after_type_enrichment() {
+        let source = r#"
+enum Expr {
+    Value(isize),
+    Add(Expr, Expr),
+}
+
+fn evaluate(Expr::Value(value)) { value }
+fn evaluate(Expr::Add(left, right)) { evaluate(left) + evaluate(right) }
+"#;
+        let result = crate::analyze(source, |_| {});
+        let mut index = SymbolIndex::from_analyzer(&result.analyzer);
+        let typed_hir = crate::typed_hir::lower_and_typecheck(&result).unwrap();
+        index.populate_type_info(&typed_hir);
+
+        let items = index.collect_completion_items();
+        let evaluate_items: Vec<_> = items
+            .iter()
+            .filter(|item| item.label == "evaluate")
+            .collect();
+
+        assert_eq!(
+            evaluate_items.len(),
+            1,
+            "multi-clause functions should stay deduplicated after type enrichment, got: {items:?}"
+        );
+        assert_eq!(
+            evaluate_items[0].detail.as_deref(),
+            Some("fn(Expr) -> isize")
+        );
     }
 
     #[test]

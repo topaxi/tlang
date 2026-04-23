@@ -85,11 +85,11 @@ fn test_block_scope() {
             defined_at: Span::lc(
                 LineColumn {
                     line: 1,
-                    column: 13
+                    column: 12
                 },
                 LineColumn {
                     line: 1,
-                    column: 14
+                    column: 13
                 }
             ),
             scope_start: 1,
@@ -127,11 +127,11 @@ fn test_block_scope() {
             defined_at: Span::lc(
                 LineColumn {
                     line: 1,
-                    column: 13
+                    column: 12
                 },
                 LineColumn {
                     line: 1,
-                    column: 14
+                    column: 13
                 }
             ),
             scope_start: 1,
@@ -153,11 +153,11 @@ fn test_block_scope() {
             defined_at: Span::lc(
                 LineColumn {
                     line: 3,
-                    column: 17
+                    column: 16
                 },
                 LineColumn {
                     line: 3,
-                    column: 18
+                    column: 17
                 }
             ),
             scope_start: 3,
@@ -197,11 +197,11 @@ fn test_block_scope() {
             defined_at: Span::lc(
                 LineColumn {
                     line: 1,
-                    column: 13
+                    column: 12
                 },
                 LineColumn {
                     line: 1,
-                    column: 14
+                    column: 13
                 }
             ),
             scope_start: 1,
@@ -223,11 +223,11 @@ fn test_block_scope() {
             defined_at: Span::lc(
                 LineColumn {
                     line: 3,
-                    column: 17
+                    column: 16
                 },
                 LineColumn {
                     line: 3,
-                    column: 18
+                    column: 17
                 }
             ),
             scope_start: 3,
@@ -249,11 +249,11 @@ fn test_block_scope() {
             defined_at: Span::lc(
                 LineColumn {
                     line: 5,
-                    column: 21
+                    column: 20
                 },
                 LineColumn {
                     line: 5,
-                    column: 22
+                    column: 21
                 }
             ),
             scope_start: 5,
@@ -413,10 +413,10 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                 name: "factorial".into(),
                 kind: DefKind::Function(2),
                 defined_at: Span::lc(
-                    LineColumn { line: 1, column: 4 },
+                    LineColumn { line: 1, column: 3 },
                     LineColumn {
                         line: 1,
-                        column: 13
+                        column: 12
                     }
                 ),
                 scope_start: 1,
@@ -457,11 +457,8 @@ fn should_collect_function_arguments_with_enum_extraction() {
                 name: "unwrap".into(),
                 kind: DefKind::Function(1),
                 defined_at: Span::lc(
-                    LineColumn { line: 5, column: 4 },
-                    LineColumn {
-                        line: 5,
-                        column: 10
-                    }
+                    LineColumn { line: 5, column: 3 },
+                    LineColumn { line: 5, column: 9 }
                 ),
                 scope_start: 5,
                 declared: true,
@@ -477,11 +474,8 @@ fn should_collect_function_arguments_with_enum_extraction() {
                 name: "unwrap".into(),
                 kind: DefKind::Function(1),
                 defined_at: Span::lc(
-                    LineColumn { line: 6, column: 4 },
-                    LineColumn {
-                        line: 6,
-                        column: 10
-                    }
+                    LineColumn { line: 6, column: 3 },
+                    LineColumn { line: 6, column: 9 }
                 ),
                 scope_start: 6,
                 declared: true,
@@ -538,10 +532,10 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                 name: "used_fn".into(),
                 kind: DefKind::Function(1),
                 defined_at: Span::lc(
-                    LineColumn { line: 1, column: 4 },
+                    LineColumn { line: 1, column: 3 },
                     LineColumn {
                         line: 1,
-                        column: 11
+                        column: 10
                     }
                 ),
                 scope_start: 1,

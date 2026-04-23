@@ -294,7 +294,7 @@ impl Tlang {
         if let Some(Ok(ast)) = &mut self.build.parse_result {
             let _ = self.analyzer.analyze(ast);
             self.build.analyzed = true;
-            self.build.symbol_index = Some(SymbolIndex::from_analyzer(&self.analyzer));
+            let mut symbol_index = SymbolIndex::from_analyzer(&self.analyzer);
             self.build.typed_hir = if self
                 .analyzer
                 .get_diagnostics()
@@ -309,6 +309,10 @@ impl Tlang {
                     &self.analyzer,
                 )
             };
+            if let Some(typed_hir) = self.build.typed_hir.as_ref() {
+                symbol_index.populate_type_info(typed_hir);
+            }
+            self.build.symbol_index = Some(symbol_index);
         }
     }
 
@@ -345,6 +349,34 @@ impl Tlang {
                 };
                 serde_wasm_bindgen::to_value(&info)
             }
+            None => Ok(JsValue::NULL),
+        }
+    }
+
+    /// Get the inferred type information for the value at the given UTF-16 position.
+    #[wasm_bindgen(js_name = "getTypeAtPosition")]
+    pub fn get_type_at_position(&self, pos: u32) -> Result<JsValue, serde_wasm_bindgen::Error> {
+        let ast = match self.ast() {
+            Some(ast) => ast,
+            None => return Ok(JsValue::NULL),
+        };
+        let index = match &self.build.symbol_index {
+            Some(idx) => idx,
+            None => return Ok(JsValue::NULL),
+        };
+
+        let byte_pos = codemirror::utf16_to_byte_offset(&self.source, pos);
+        let (line, column) = codemirror::byte_offset_to_line_column(&self.source, byte_pos);
+
+        match tlang_analysis::query::type_at_position(
+            &self.source,
+            ast,
+            index,
+            self.build.typed_hir.as_ref(),
+            line,
+            column,
+        ) {
+            Some(ty) => serde_wasm_bindgen::to_value(&ty),
             None => Ok(JsValue::NULL),
         }
     }

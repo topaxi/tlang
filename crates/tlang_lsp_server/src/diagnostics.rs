@@ -5,26 +5,17 @@ use tlang_span::Span;
 
 /// Convert a tlang `Span` to an LSP `Range`.
 ///
-/// The lexer uses 0-based columns on line 0 but 1-based columns on subsequent
-/// lines (`current_column` resets to 1 after each newline).  LSP positions are
-/// always 0-based, so we adjust columns on lines > 0.
+/// tlang spans use 0-based line/column positions. LSP positions use the same
+/// convention, so this is a direct conversion.
 pub fn span_to_range(span: &Span) -> Range {
     Range {
         start: Position {
             line: span.start_lc.line,
-            character: if span.start_lc.line > 0 {
-                span.start_lc.column.saturating_sub(1)
-            } else {
-                span.start_lc.column
-            },
+            character: span.start_lc.column,
         },
         end: Position {
             line: span.end_lc.line,
-            character: if span.end_lc.line > 0 {
-                span.end_lc.column.saturating_sub(1)
-            } else {
-                span.end_lc.column
-            },
+            character: span.end_lc.column,
         },
     }
 }
@@ -129,6 +120,17 @@ mod tests {
         assert_eq!(diag.message, "undefined variable");
         assert_eq!(diag.severity, Some(DiagnosticSeverity::ERROR));
         assert_eq!(diag.range.start.line, 2);
+    }
+
+    #[test]
+    fn multiline_span_to_range_preserves_zero_based_columns() {
+        let span = make_span(1, 0, 1, 3);
+        let range = span_to_range(&span);
+
+        assert_eq!(range.start.line, 1);
+        assert_eq!(range.start.character, 0);
+        assert_eq!(range.end.line, 1);
+        assert_eq!(range.end.character, 3);
     }
 
     #[test]

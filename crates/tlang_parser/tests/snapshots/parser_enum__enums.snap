@@ -35,11 +35,11 @@ Module(
                 end: 22,
                 start_lc: LineColumn(
                   line: 1,
-                  column: 5,
+                  column: 4,
                 ),
                 end_lc: LineColumn(
                   line: 1,
-                  column: 9,
+                  column: 8,
                 ),
               ),
             ),
@@ -72,11 +72,11 @@ Module(
                           end: 24,
                           start_lc: LineColumn(
                             line: 1,
-                            column: 10,
+                            column: 9,
                           ),
                           end_lc: LineColumn(
                             line: 1,
-                            column: 11,
+                            column: 10,
                           ),
                         ),
                       ),
@@ -87,11 +87,11 @@ Module(
                       end: 24,
                       start_lc: LineColumn(
                         line: 1,
-                        column: 10,
+                        column: 9,
                       ),
                       end_lc: LineColumn(
                         line: 1,
-                        column: 11,
+                        column: 10,
                       ),
                     ),
                   )),
@@ -101,11 +101,11 @@ Module(
                     end: 24,
                     start_lc: LineColumn(
                       line: 1,
-                      column: 10,
+                      column: 9,
                     ),
                     end_lc: LineColumn(
                       line: 1,
-                      column: 11,
+                      column: 10,
                     ),
                   ),
                 ),
@@ -117,11 +117,11 @@ Module(
               end: 25,
               start_lc: LineColumn(
                 line: 1,
-                column: 5,
+                column: 4,
               ),
               end_lc: LineColumn(
                 line: 1,
-                column: 12,
+                column: 11,
               ),
             ),
           ),
@@ -134,11 +134,11 @@ Module(
                 end: 35,
                 start_lc: LineColumn(
                   line: 2,
-                  column: 5,
+                  column: 4,
                 ),
                 end_lc: LineColumn(
                   line: 2,
-                  column: 9,
+                  column: 8,
                 ),
               ),
             ),
@@ -149,11 +149,11 @@ Module(
               end: 35,
               start_lc: LineColumn(
                 line: 2,
-                column: 5,
+                column: 4,
               ),
               end_lc: LineColumn(
                 line: 2,
-                column: 9,
+                column: 8,
               ),
             ),
           ),
@@ -169,7 +169,7 @@ Module(
         ),
         end_lc: LineColumn(
           line: 3,
-          column: 2,
+          column: 1,
         ),
       ),
       leading_comments: [],
@@ -187,11 +187,11 @@ Module(
               end: 45,
               start_lc: LineColumn(
                 line: 5,
-                column: 5,
+                column: 4,
               ),
               end_lc: LineColumn(
                 line: 5,
-                column: 6,
+                column: 5,
               ),
             ),
           )),
@@ -202,11 +202,11 @@ Module(
             end: 45,
             start_lc: LineColumn(
               line: 5,
-              column: 5,
+              column: 4,
             ),
             end_lc: LineColumn(
               line: 5,
-              column: 6,
+              column: 5,
             ),
           ),
         ),
@@ -224,11 +224,11 @@ Module(
                       end: 54,
                       start_lc: LineColumn(
                         line: 5,
-                        column: 9,
+                        column: 8,
                       ),
                       end_lc: LineColumn(
                         line: 5,
-                        column: 15,
+                        column: 14,
                       ),
                     ),
                   ),
@@ -239,11 +239,11 @@ Module(
                       end: 60,
                       start_lc: LineColumn(
                         line: 5,
-                        column: 17,
+                        column: 16,
                       ),
                       end_lc: LineColumn(
                         line: 5,
-                        column: 21,
+                        column: 20,
                       ),
                     ),
                   ),
@@ -254,11 +254,11 @@ Module(
                   end: 60,
                   start_lc: LineColumn(
                     line: 5,
-                    column: 9,
+                    column: 8,
                   ),
                   end_lc: LineColumn(
                     line: 5,
-                    column: 21,
+                    column: 20,
                   ),
                 ),
               )),
@@ -269,11 +269,11 @@ Module(
                 end: 60,
                 start_lc: LineColumn(
                   line: 5,
-                  column: 9,
+                  column: 8,
                 ),
                 end_lc: LineColumn(
                   line: 5,
-                  column: 21,
+                  column: 20,
                 ),
               ),
             ),
@@ -288,11 +288,11 @@ Module(
                   end: 63,
                   start_lc: LineColumn(
                     line: 5,
-                    column: 22,
+                    column: 21,
                   ),
                   end_lc: LineColumn(
                     line: 5,
-                    column: 24,
+                    column: 23,
                   ),
                 ),
               ),
@@ -305,11 +305,11 @@ Module(
             end: 64,
             start_lc: LineColumn(
               line: 5,
-              column: 9,
+              column: 8,
             ),
             end_lc: LineColumn(
               line: 5,
-              column: 25,
+              column: 24,
             ),
           ),
         ),
@@ -320,11 +320,11 @@ Module(
         end: 65,
         start_lc: LineColumn(
           line: 5,
-          column: 1,
+          column: 0,
         ),
         end_lc: LineColumn(
           line: 5,
-          column: 26,
+          column: 25,
         ),
       ),
       leading_comments: [],
@@ -340,7 +340,7 @@ Module(
     ),
     end_lc: LineColumn(
       line: 5,
-      column: 26,
+      column: 25,
     ),
   ),
 )

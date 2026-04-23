@@ -16,6 +16,7 @@ use tlang_typeck::builtins;
 
 use crate::find_node;
 use crate::inlay_hints;
+use crate::member_resolution;
 use crate::symbol_index::SymbolIndex;
 use crate::typed_hir::TypedHir;
 
@@ -84,11 +85,7 @@ pub fn enrich_hover_symbol(
         && !symbol.builtin
     {
         let def_line = symbol.def_span.start_lc.line;
-        let def_col = if def_line > 0 {
-            symbol.def_span.start_lc.column.saturating_sub(1)
-        } else {
-            symbol.def_span.start_lc.column
-        };
+        let def_col = symbol.def_span.start_lc.column;
         symbol.type_info = inlay_hints::type_at_definition(typed_hir, def_line, def_col);
     }
 
@@ -135,27 +132,15 @@ fn format_builtin_signature(signature: &builtins::BuiltinHoverSignature) -> Stri
 
 /// Resolve the symbol under the cursor at the given **0-based** `(line, column)`.
 ///
-/// The column is automatically adjusted for the lexer's coordinate system
-/// (line 0 uses 0-based columns, subsequent lines use 1-based columns).
-///
 /// Returns `None` when the cursor is not on an identifier or the identifier
 /// cannot be resolved in the symbol index.
 pub fn resolve_symbol(
     module: &ast::Module,
     index: &SymbolIndex,
     line: u32,
-    column_0based: u32,
+    column: u32,
 ) -> Option<ResolvedSymbol> {
-    // The lexer uses 0-based columns on line 0 but 1-based columns on
-    // subsequent lines (current_column resets to 1 after '\n').  Editor
-    // positions are always 0-based, so adjust here.
-    let lexer_column = if line > 0 {
-        column_0based + 1
-    } else {
-        column_0based
-    };
-
-    let found = find_node::find_node_at_position(module, line, lexer_column)?;
+    let found = find_node::find_node_at_position(module, line, column)?;
 
     // Look up the symbol in the scope's symbol table.
     let entry = found
@@ -207,12 +192,49 @@ pub fn resolve_symbol(
         def_kind: entry.kind,
         def_span: entry.defined_at,
         builtin: entry.builtin,
-        type_info: None,
+        type_info: entry.type_info.clone(),
         node_id: entry.node_id,
         hir_id: entry.hir_id,
         signature: None,
         documentation: None,
     })
+}
+
+/// Resolve the inferred type for the value or symbol under the cursor.
+///
+/// `line` and `column` are editor-style 0-based coordinates.
+///
+/// Returns a human-readable type string when the position resolves to a
+/// symbol, member access, or definition-like HIR node with inferred type
+/// information.
+pub fn type_at_position(
+    source: &str,
+    module: &ast::Module,
+    index: &SymbolIndex,
+    typed_hir: Option<&TypedHir>,
+    line: u32,
+    column: u32,
+) -> Option<String> {
+    if let Some(mut symbol) = resolve_symbol(module, index, line, column) {
+        if symbol.type_info.is_some() {
+            return symbol.type_info;
+        }
+        enrich_hover_symbol(module, typed_hir, &mut symbol);
+        if symbol.type_info.is_some() {
+            return symbol.type_info;
+        }
+    }
+
+    let typed_hir = typed_hir?;
+
+    if let Some(member) =
+        member_resolution::resolve_member_at_position(source, typed_hir, line, column)
+        && let Some(return_ty) = member.return_ty
+    {
+        return Some(return_ty.to_string());
+    }
+
+    inlay_hints::type_at_definition(typed_hir, line, column)
 }
 
 enum AstCallableDecl<'a> {
@@ -1228,6 +1250,17 @@ mod tests {
         Some(resolved)
     }
 
+    fn setup_type_at_position(source: &str, line: u32, column: u32) -> Option<String> {
+        let result = crate::analyze(source, |_| {});
+        let module = result.module.as_ref()?;
+        let mut index = SymbolIndex::from_analyzer(&result.analyzer);
+        let typed_hir = lower_and_typecheck(&result);
+        if let Some(typed_hir) = typed_hir.as_ref() {
+            index.populate_type_info(typed_hir);
+        }
+        type_at_position(source, module, &index, typed_hir.as_ref(), line, column)
+    }
+
     #[test]
     fn resolve_variable_reference() {
         let resolved = setup_and_resolve("fn f(x) { x }", 0, 10);
@@ -1415,6 +1448,20 @@ mod tests {
         assert!(!resolved.builtin);
         // The def_span.start should be at the parameter `x` position (col 5).
         assert_eq!(resolved.def_span.start_lc.column, 5);
+    }
+
+    #[test]
+    fn type_at_position_returns_reference_type() {
+        let source = "fn id(x: i64) -> i64 {\n  x\n}";
+        let ty = setup_type_at_position(source, 1, 2);
+        assert_eq!(ty.as_deref(), Some("i64"));
+    }
+
+    #[test]
+    fn type_at_position_returns_member_type() {
+        let source = "struct Vector { x: i64 }\nfn get(point: Vector) -> i64 {\n  point.x\n}";
+        let ty = setup_type_at_position(source, 2, 8);
+        assert_eq!(ty.as_deref(), Some("i64"));
     }
 
     #[test]

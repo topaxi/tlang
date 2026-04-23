@@ -416,6 +416,25 @@ fn test_token_span() {
 }
 
 #[test]
+fn test_multiline_token_span_uses_zero_based_columns() {
+    let mut lexer = Lexer::new("let x = 1;\nlet y = 2;");
+
+    assert_eq!(lexer.next_token().kind, TokenKind::Keyword(Keyword::Let));
+
+    let second_let = loop {
+        let token = lexer.next_token();
+        if token.kind == TokenKind::Keyword(Keyword::Let) {
+            break token;
+        }
+    };
+
+    assert_eq!(second_let.span.start_lc.line, 1);
+    assert_eq!(second_let.span.start_lc.column, 0);
+    assert_eq!(second_let.span.end_lc.line, 1);
+    assert_eq!(second_let.span.end_lc.column, 3);
+}
+
+#[test]
 fn test_underscore_keyword() {
     let mut lexer = Lexer::new("_ _test");
 

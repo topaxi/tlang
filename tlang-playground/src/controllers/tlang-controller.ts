@@ -294,6 +294,10 @@ export class TlangController {
     return this.tlang.getHoverInfo(pos) ?? null;
   }
 
+  getTypeAtPosition(pos: number): string | null {
+    return this.tlang.getTypeAtPosition(pos) ?? null;
+  }
+
   getDefinitionLocation(pos: number): { from: number; to: number } | null {
     return this.tlang.getDefinitionLocation(pos) ?? null;
   }
