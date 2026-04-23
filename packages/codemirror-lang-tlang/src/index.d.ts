@@ -14,6 +14,12 @@ export interface DefinitionLocation {
   to: number;
 }
 
+export interface ReferenceLocation {
+  from: number;
+  to: number;
+  isDeclaration: boolean;
+}
+
 export interface SignatureParameterInformation {
   label: string;
 }
@@ -38,6 +44,10 @@ export interface SemanticToken {
 
 export type HoverProvider = (pos: number) => HoverInfo | null;
 export type GotoDefinitionProvider = (pos: number) => DefinitionLocation | null;
+export type ReferencesProvider = (
+  pos: number,
+  includeDeclaration?: boolean,
+) => ReferenceLocation[] | null;
 export type SignatureHelpProvider = (
   pos: number,
 ) => SignatureHelp | null | Promise<SignatureHelp | null>;
@@ -61,6 +71,7 @@ export function tlangLanguageSupport(options?: {
   markdownLanguage?: Language;
   hoverProvider?: HoverProvider;
   gotoDefinitionProvider?: GotoDefinitionProvider;
+  referencesProvider?: ReferencesProvider;
   signatureHelpProvider?: SignatureHelpProvider;
   semanticTokens?: SemanticToken[];
   semanticTokenProvider?: SemanticTokenProvider;

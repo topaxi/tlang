@@ -302,6 +302,13 @@ export class TlangController {
     return this.tlang.getDefinitionLocation(pos) ?? null;
   }
 
+  getReferences(
+    pos: number,
+    includeDeclaration = true,
+  ): { from: number; to: number; isDeclaration: boolean }[] {
+    return this.tlang.getReferences(pos, includeDeclaration);
+  }
+
   getInlayHints(): { position: number; label: string; kind: string }[] {
     return this.tlang.getInlayHints();
   }

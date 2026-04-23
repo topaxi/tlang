@@ -11,6 +11,7 @@ import {
   type GotoDefinitionProvider,
   type SemanticToken,
   type SemanticTokenProvider,
+  type ReferencesProvider,
   type SignatureHelpProvider,
 } from 'codemirror-lang-tlang';
 import { inlayHints, type InlayHintSource } from 'codemirror-inlay-hints';
@@ -94,6 +95,9 @@ export class TCodeMirror extends LitElement {
   gotoDefinitionProvider?: GotoDefinitionProvider;
 
   @property({ attribute: false })
+  referencesProvider?: ReferencesProvider;
+
+  @property({ attribute: false })
   signatureHelpProvider?: SignatureHelpProvider;
 
   @property({ attribute: false })
@@ -133,6 +137,7 @@ export class TCodeMirror extends LitElement {
       markdownLanguage,
       hoverProvider: this.hoverProvider,
       gotoDefinitionProvider: this.gotoDefinitionProvider,
+      referencesProvider: this.referencesProvider,
       signatureHelpProvider: this.signatureHelpProvider,
       semanticTokens: this.semanticTokens,
       semanticTokenProvider: this.semanticTokenProvider,
@@ -236,6 +241,7 @@ export class TCodeMirror extends LitElement {
         this.language === 'tlang' &&
         (changedProperties.has('hoverProvider') ||
           changedProperties.has('gotoDefinitionProvider') ||
+          changedProperties.has('referencesProvider') ||
           changedProperties.has('signatureHelpProvider') ||
           changedProperties.has('semanticTokens') ||
           changedProperties.has('semanticTokenProvider') ||

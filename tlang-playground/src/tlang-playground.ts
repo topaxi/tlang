@@ -382,6 +382,11 @@ export class TlangPlayground extends LitElement {
   private readonly gotoDefinitionProvider = (pos: number) =>
     this.tlang.getDefinitionLocation(pos);
 
+  private readonly referencesProvider = (
+    pos: number,
+    includeDeclaration = true,
+  ) => this.tlang.getReferences(pos, includeDeclaration);
+
   private readonly signatureHelpProvider = (pos: number) =>
     this.tlang.getSignatureHelp(pos);
 
@@ -755,6 +760,7 @@ export class TlangPlayground extends LitElement {
                 with-diagnostics
                 .hoverProvider=${this.hoverProvider}
                 .gotoDefinitionProvider=${this.gotoDefinitionProvider}
+                .referencesProvider=${this.referencesProvider}
                 .signatureHelpProvider=${this.signatureHelpProvider}
                 .inlayHintSource=${this.hasInlayHints
                   ? this.inlayHintSource

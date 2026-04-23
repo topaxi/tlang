@@ -26,7 +26,7 @@ use wasm_bindgen::prelude::*;
 use crate::codemirror;
 use crate::codemirror::{
     CodemirrorDefinitionLocation, CodemirrorHoverInfo, CodemirrorParameterInformation,
-    CodemirrorSignatureHelp, CodemirrorSignatureInformation,
+    CodemirrorReferenceLocation, CodemirrorSignatureHelp, CodemirrorSignatureInformation,
 };
 use crate::ts_types::{JsDiagnostic, JsParseIssue};
 
@@ -46,6 +46,9 @@ extern "C" {
 
     #[wasm_bindgen(typescript_type = "CodemirrorInlayHint[]")]
     pub type JsCodemirrorInlayHintArray;
+
+    #[wasm_bindgen(typescript_type = "CodemirrorReferenceLocation[]")]
+    pub type JsCodemirrorReferenceArray;
 
     #[wasm_bindgen(typescript_type = "unknown")]
     pub type JsUnknown;
@@ -411,6 +414,51 @@ impl Tlang {
             }
             _ => Ok(JsValue::NULL),
         }
+    }
+
+    /// Get references for the symbol at the given UTF-16 position.
+    #[wasm_bindgen(js_name = "getReferences")]
+    pub fn get_references(
+        &self,
+        pos: u32,
+        include_declaration: bool,
+    ) -> Result<JsCodemirrorReferenceArray, serde_wasm_bindgen::Error> {
+        let ast = match self.ast() {
+            Some(ast) => ast,
+            None => {
+                return Ok(
+                    serde_wasm_bindgen::to_value(&Vec::<CodemirrorReferenceLocation>::new())?
+                        .unchecked_into(),
+                );
+            }
+        };
+        let index = match &self.build.symbol_index {
+            Some(idx) => idx,
+            None => {
+                return Ok(
+                    serde_wasm_bindgen::to_value(&Vec::<CodemirrorReferenceLocation>::new())?
+                        .unchecked_into(),
+                );
+            }
+        };
+
+        let byte_pos = codemirror::utf16_to_byte_offset(&self.source, pos);
+        let (line, column) = codemirror::byte_offset_to_line_column(&self.source, byte_pos);
+
+        let references: Vec<CodemirrorReferenceLocation> =
+            tlang_analysis::query::find_references(ast, index, line, column, include_declaration)
+                .into_iter()
+                .map(|reference| CodemirrorReferenceLocation {
+                    from: codemirror::byte_offset_to_utf16(
+                        &self.source,
+                        reference.ident_span.start,
+                    ),
+                    to: codemirror::byte_offset_to_utf16(&self.source, reference.ident_span.end),
+                    is_declaration: reference.is_declaration,
+                })
+                .collect();
+
+        Ok(serde_wasm_bindgen::to_value(&references)?.unchecked_into())
     }
 
     /// Get signature help for the call at the given UTF-16 position.

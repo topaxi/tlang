@@ -1,14 +1,15 @@
-//! High-level symbol query API for hover and goto-definition.
+//! High-level symbol query API for hover, goto-definition, and references.
 //!
 //! This module provides [`resolve_symbol`] which combines the AST node finder
 //! and symbol index to resolve the symbol under a cursor position.  Both the
 //! LSP server and the WASM playground bindings share this implementation to
 //! ensure consistent behaviour.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use tlang_ast::node as ast;
 use tlang_ast::token::{CommentKind, CommentToken, Literal};
+use tlang_ast::visit::{self, Visitor};
 use tlang_defs::DefKind;
 use tlang_hir as hir;
 use tlang_span::{HirId, NodeId, Span, TypeVarId};
@@ -35,6 +36,8 @@ pub struct ResolvedSymbol {
     pub def_span: Span,
     /// Whether the symbol is a builtin (no source location to jump to).
     pub builtin: bool,
+    /// Whether the symbol is a compiler-generated temporary.
+    pub temp: bool,
     /// Optional inferred type string (e.g. `"i64"`, `"Vector"`).
     pub type_info: Option<String>,
     /// Optional AST node id of the definition.
@@ -73,6 +76,17 @@ impl ResolvedSymbol {
             format!("({kind_label}) {name}", name = self.name)
         }
     }
+}
+
+/// A reference to a resolved symbol.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SymbolReference {
+    /// The span of this reference occurrence in the source module.
+    pub ident_span: Span,
+    /// The span where the referenced symbol is declared.
+    pub def_span: Span,
+    /// Whether this occurrence is itself a declaration.
+    pub is_declaration: bool,
 }
 
 /// Populate hover-specific type, signature, and documentation details.
@@ -192,12 +206,75 @@ pub fn resolve_symbol(
         def_kind: entry.kind,
         def_span: entry.defined_at,
         builtin: entry.builtin,
+        temp: entry.temp,
         type_info: entry.type_info.clone(),
         node_id: entry.node_id,
         hir_id: entry.hir_id,
         signature: None,
         documentation: None,
     })
+}
+
+/// Find all references to the symbol under the given **0-based** `(line, column)`.
+///
+/// Builtins and compiler-generated temporaries do not produce references.
+pub fn find_references(
+    module: &ast::Module,
+    index: &SymbolIndex,
+    line: u32,
+    column: u32,
+    include_declaration: bool,
+) -> Vec<SymbolReference> {
+    let Some(target) = resolve_symbol(module, index, line, column) else {
+        return vec![];
+    };
+
+    if target.builtin || target.temp {
+        return vec![];
+    }
+
+    let target_key = ReferenceSymbolKey::from_resolved(&target);
+    let mut collector = ReferenceCandidateCollector::default();
+    collector.visit_module(module, &mut ());
+
+    let mut seen = HashSet::new();
+    let mut references = vec![];
+
+    for span in collector.spans {
+        let Some(resolved) =
+            resolve_symbol(module, index, span.start_lc.line, span.start_lc.column)
+        else {
+            continue;
+        };
+
+        if resolved.builtin || resolved.temp || !target_key.matches(&resolved) {
+            continue;
+        }
+
+        let is_declaration = span == resolved.def_span;
+        if !include_declaration && is_declaration {
+            continue;
+        }
+
+        if seen.insert((span.start, span.end)) {
+            references.push(SymbolReference {
+                ident_span: span,
+                def_span: resolved.def_span,
+                is_declaration,
+            });
+        }
+    }
+
+    references.sort_by_key(|reference| {
+        (
+            reference.ident_span.start_lc.line,
+            reference.ident_span.start_lc.column,
+            reference.ident_span.end_lc.line,
+            reference.ident_span.end_lc.column,
+        )
+    });
+
+    references
 }
 
 /// Resolve the inferred type for the value or symbol under the cursor.
@@ -235,6 +312,128 @@ pub fn type_at_position(
     }
 
     inlay_hints::type_at_definition(typed_hir, line, column)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ReferenceSymbolKey {
+    Callable {
+        qualified_name: String,
+        kind: DefKind,
+    },
+    Hir(HirId),
+    Node(NodeId),
+    Named {
+        qualified_name: String,
+        kind: DefKind,
+        def_span: Span,
+    },
+}
+
+impl ReferenceSymbolKey {
+    fn from_resolved(symbol: &ResolvedSymbol) -> Self {
+        let kind = normalize_reference_kind(symbol.def_kind);
+
+        if matches!(
+            kind,
+            DefKind::Function(_)
+                | DefKind::StructMethod(_)
+                | DefKind::ProtocolMethod(_)
+                | DefKind::EnumVariant(_)
+        ) {
+            return Self::Callable {
+                qualified_name: symbol.qualified_name.clone(),
+                kind,
+            };
+        }
+
+        if let Some(hir_id) = symbol.hir_id {
+            return Self::Hir(hir_id);
+        }
+
+        if let Some(node_id) = symbol.node_id {
+            return Self::Node(node_id);
+        }
+
+        Self::Named {
+            qualified_name: symbol.qualified_name.clone(),
+            kind,
+            def_span: symbol.def_span,
+        }
+    }
+
+    fn matches(&self, symbol: &ResolvedSymbol) -> bool {
+        let other = Self::from_resolved(symbol);
+        self == &other
+    }
+}
+
+fn normalize_reference_kind(kind: DefKind) -> DefKind {
+    match kind {
+        DefKind::FunctionSelfRef(arity) => DefKind::Function(arity),
+        _ => kind,
+    }
+}
+
+#[derive(Default)]
+struct ReferenceCandidateCollector {
+    spans: Vec<Span>,
+}
+
+impl ReferenceCandidateCollector {
+    fn record_span(&mut self, span: Span) {
+        self.spans.push(span);
+    }
+}
+
+impl<'ast> Visitor<'ast> for ReferenceCandidateCollector {
+    type Context = ();
+
+    fn visit_ident(&mut self, ident: &'ast ast::Ident, _ctx: &mut ()) {
+        self.record_span(ident.span);
+    }
+
+    fn visit_path(&mut self, path: &'ast ast::Path, _ctx: &mut ()) {
+        self.record_span(path.span);
+    }
+
+    fn visit_ty(&mut self, ty: &'ast ast::Ty, ctx: &mut ()) {
+        match &ty.kind {
+            ast::TyKind::Path(path) => self.record_span(path.span),
+            ast::TyKind::Union(paths) => {
+                for path in paths {
+                    self.record_span(path.span);
+                }
+            }
+            ast::TyKind::Unknown => {}
+            ast::TyKind::Fn(params, ret) => {
+                for param in params {
+                    self.visit_ty(&param.ty, ctx);
+                }
+                self.visit_ty(ret, ctx);
+            }
+        }
+
+        for param in &ty.parameters {
+            self.visit_ty(param, ctx);
+        }
+    }
+
+    fn visit_stmt(&mut self, statement: &'ast ast::Stmt, ctx: &mut ()) {
+        if let ast::StmtKind::UseDeclaration(decl) = &statement.kind {
+            for segment in &decl.path {
+                self.record_span(segment.span);
+            }
+            for item in &decl.items {
+                self.record_span(item.name.span);
+                if let Some(alias) = &item.alias {
+                    self.record_span(alias.span);
+                }
+            }
+            return;
+        }
+
+        visit::walk_stmt(self, statement, ctx);
+    }
 }
 
 enum AstCallableDecl<'a> {
@@ -1261,6 +1460,21 @@ mod tests {
         type_at_position(source, module, &index, typed_hir.as_ref(), line, column)
     }
 
+    fn setup_references(
+        source: &str,
+        line: u32,
+        column: u32,
+        include_declaration: bool,
+    ) -> Vec<SymbolReference> {
+        let result = crate::analyze(source, |_| {});
+        let module = result
+            .module
+            .as_ref()
+            .expect("source should parse for references test");
+        let index = SymbolIndex::from_analyzer(&result.analyzer);
+        find_references(module, &index, line, column, include_declaration)
+    }
+
     #[test]
     fn resolve_variable_reference() {
         let resolved = setup_and_resolve("fn f(x) { x }", 0, 10);
@@ -1448,6 +1662,105 @@ mod tests {
         assert!(!resolved.builtin);
         // The def_span.start should be at the parameter `x` position (col 5).
         assert_eq!(resolved.def_span.start_lc.column, 5);
+    }
+
+    #[test]
+    fn references_include_and_exclude_declaration() {
+        let source = "fn id(value) { value }\nlet value = id(1);\nid(value);";
+
+        let with_declaration = setup_references(source, 2, 0, true);
+        let without_declaration = setup_references(source, 2, 0, false);
+
+        assert_eq!(
+            with_declaration
+                .iter()
+                .map(|reference| (
+                    reference.ident_span.start_lc.line,
+                    reference.ident_span.start_lc.column
+                ))
+                .collect::<Vec<_>>(),
+            vec![(0, 3), (1, 12), (2, 0)]
+        );
+        assert_eq!(
+            without_declaration
+                .iter()
+                .map(|reference| (
+                    reference.ident_span.start_lc.line,
+                    reference.ident_span.start_lc.column
+                ))
+                .collect::<Vec<_>>(),
+            vec![(1, 12), (2, 0)]
+        );
+        assert!(with_declaration[0].is_declaration);
+        assert!(
+            without_declaration
+                .iter()
+                .all(|reference| !reference.is_declaration)
+        );
+    }
+
+    #[test]
+    fn references_respect_shadowing_in_nested_scopes() {
+        let source = "fn demo(value) {\n  let inner = value;\n  if true; {\n    let value = 2;\n    value\n  }\n  value\n}";
+
+        let outer_refs = setup_references(source, 6, 2, true);
+        let inner_refs = setup_references(source, 4, 4, true);
+
+        assert_eq!(
+            outer_refs
+                .iter()
+                .map(|reference| (
+                    reference.ident_span.start_lc.line,
+                    reference.ident_span.start_lc.column
+                ))
+                .collect::<Vec<_>>(),
+            vec![(0, 8), (1, 14), (6, 2)]
+        );
+        assert_eq!(
+            inner_refs
+                .iter()
+                .map(|reference| (
+                    reference.ident_span.start_lc.line,
+                    reference.ident_span.start_lc.column
+                ))
+                .collect::<Vec<_>>(),
+            vec![(3, 8), (4, 4)]
+        );
+    }
+
+    #[test]
+    fn references_group_multi_clause_functions() {
+        let source = "fn size([]) { 0 }\nfn size([_, ...xs]) { 1 + size(xs) }\nsize([1, 2, 3]);";
+        let references = setup_references(source, 2, 0, true);
+
+        assert_eq!(
+            references
+                .iter()
+                .map(|reference| (
+                    reference.ident_span.start_lc.line,
+                    reference.ident_span.start_lc.column
+                ))
+                .collect::<Vec<_>>(),
+            vec![(0, 3), (1, 3), (1, 26), (2, 0)]
+        );
+    }
+
+    #[test]
+    fn references_find_struct_field_usages() {
+        let source =
+            "struct Point { x: i64 }\nfn value(point: Point) -> i64 { point.x }\nPoint { x: 1 }.x;";
+        let references = setup_references(source, 0, 15, true);
+
+        assert_eq!(
+            references
+                .iter()
+                .map(|reference| (
+                    reference.ident_span.start_lc.line,
+                    reference.ident_span.start_lc.column
+                ))
+                .collect::<Vec<_>>(),
+            vec![(0, 15), (1, 38)]
+        );
     }
 
     #[test]
