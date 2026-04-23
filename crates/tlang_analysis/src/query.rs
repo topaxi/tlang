@@ -1475,6 +1475,21 @@ mod tests {
         find_references(module, &index, line, column, include_declaration)
     }
 
+    fn setup_references_js(
+        source: &str,
+        line: u32,
+        column: u32,
+        include_declaration: bool,
+    ) -> Vec<SymbolReference> {
+        let result = crate::analyze_with_js_symbols(source);
+        let module = result
+            .module
+            .as_ref()
+            .expect("source should parse for references test");
+        let index = SymbolIndex::from_analyzer(&result.analyzer);
+        find_references(module, &index, line, column, include_declaration)
+    }
+
     #[test]
     fn resolve_variable_reference() {
         let resolved = setup_and_resolve("fn f(x) { x }", 0, 10);
@@ -1760,6 +1775,31 @@ mod tests {
                 ))
                 .collect::<Vec<_>>(),
             vec![(0, 15), (1, 38)]
+        );
+    }
+
+    #[test]
+    fn references_skip_builtin_symbols() {
+        let source = "let size = len([1, 2, 3]);";
+        let references = setup_references_js(source, 0, 11, true);
+
+        assert!(references.is_empty());
+    }
+
+    #[test]
+    fn references_group_recursive_function_self_references() {
+        let source = "fn fact(n) { if n == 0; { 1 } else { rec fact(n - 1) } }\nfact(3);";
+        let references = setup_references(source, 1, 0, true);
+
+        assert_eq!(
+            references
+                .iter()
+                .map(|reference| (
+                    reference.ident_span.start_lc.line,
+                    reference.ident_span.start_lc.column
+                ))
+                .collect::<Vec<_>>(),
+            vec![(0, 3), (0, 41), (1, 0)]
         );
     }
 

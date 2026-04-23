@@ -426,19 +426,19 @@ impl Tlang {
         let ast = match self.ast() {
             Some(ast) => ast,
             None => {
-                return Ok(
-                    serde_wasm_bindgen::to_value(&Vec::<CodemirrorReferenceLocation>::new())?
-                        .unchecked_into(),
-                );
+                return Ok(serde_wasm_bindgen::to_value(
+                    &Vec::<CodemirrorReferenceLocation>::new(),
+                )?
+                .unchecked_into());
             }
         };
         let index = match &self.build.symbol_index {
             Some(idx) => idx,
             None => {
-                return Ok(
-                    serde_wasm_bindgen::to_value(&Vec::<CodemirrorReferenceLocation>::new())?
-                        .unchecked_into(),
-                );
+                return Ok(serde_wasm_bindgen::to_value(
+                    &Vec::<CodemirrorReferenceLocation>::new(),
+                )?
+                .unchecked_into());
             }
         };
 
