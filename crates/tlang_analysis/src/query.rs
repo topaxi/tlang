@@ -396,7 +396,7 @@ impl<'ast> Visitor<'ast> for ReferenceCandidateCollector {
         self.record_span(path.span);
     }
 
-    fn visit_ty(&mut self, ty: &'ast ast::Ty, ctx: &mut ()) {
+    fn visit_ty(&mut self, ty: &'ast ast::Ty, _ctx: &mut ()) {
         match &ty.kind {
             ast::TyKind::Path(path) => self.record_span(path.span),
             ast::TyKind::Union(paths) => {
@@ -407,14 +407,14 @@ impl<'ast> Visitor<'ast> for ReferenceCandidateCollector {
             ast::TyKind::Unknown => {}
             ast::TyKind::Fn(params, ret) => {
                 for param in params {
-                    self.visit_ty(&param.ty, ctx);
+                    self.visit_ty(&param.ty, _ctx);
                 }
-                self.visit_ty(ret, ctx);
+                self.visit_ty(ret, _ctx);
             }
         }
 
         for param in &ty.parameters {
-            self.visit_ty(param, ctx);
+            self.visit_ty(param, _ctx);
         }
     }
 
