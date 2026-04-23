@@ -1068,7 +1068,7 @@ fn resolve_bound_protocol_method(
         // Enqueue transitively-reachable constraint protocols.
         for constraint_name in &protocol.constraints {
             if let Some(constraint_protocol) = type_table.get_protocol_info(constraint_name) {
-                pending.push((constraint_protocol, std::collections::HashMap::new()));
+                pending.push((constraint_protocol, type_bindings.clone()));
             }
         }
 
@@ -1147,7 +1147,7 @@ fn complete_bound_protocol_methods(
         // Enqueue transitively-reachable constraint protocols.
         for constraint_name in &protocol.constraints {
             if let Some(constraint_protocol) = type_table.get_protocol_info(constraint_name) {
-                pending.push((constraint_protocol, std::collections::HashMap::new()));
+                pending.push((constraint_protocol, type_bindings.clone()));
             }
         }
 
