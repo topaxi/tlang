@@ -79,7 +79,7 @@ fn test_should_error_on_undefined_functions() {
         diagnostics,
         vec![
             Diagnostic::error("Use of undeclared function `b/0`", Span::lc((0, 0), (0, 1)),),
-            Diagnostic::error("Use of undeclared function `b/1`", Span::lc((1, 1), (1, 2)),)
+            Diagnostic::error("Use of undeclared function `b/1`", Span::lc((1, 0), (1, 1)),)
         ]
     );
 }
@@ -132,7 +132,7 @@ fn test_should_allow_shadowing_of_single_variable() {
                 id: DefId::new(2),
                 name: "a".into(),
                 kind: DefKind::Variable,
-                defined_at: Span::lc((1, 5), (1, 6)),
+                defined_at: Span::lc((1, 4), (1, 5)),
                 scope_start: 1,
                 declared: true,
                 temp: false,
@@ -193,7 +193,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             id: DefId::new(2),
             name: "a".into(),
             kind: DefKind::Variable,
-            defined_at: Span::lc((1, 5), (1, 6)),
+            defined_at: Span::lc((1, 4), (1, 5)),
             scope_start: 1,
             declared: true,
             temp: false,
@@ -220,11 +220,11 @@ fn test_should_error_on_unused_identifier_in_function_definition() {
                 Span::lc(
                     LineColumn {
                         line: 1,
-                        column: 13
+                        column: 12
                     },
                     LineColumn {
                         line: 1,
-                        column: 14
+                        column: 13
                     }
                 ),
             )
@@ -254,13 +254,13 @@ fn should_not_allow_using_variables_from_outer_function_scope_before_declaration
         vec![
             Diagnostic::error(
                 "Use of undeclared variable `c`, did you mean the variable `c`?",
-                Span::lc((1, 5), (1, 6)),
+                Span::lc((1, 4), (1, 5)),
             )
-            .with_label("variable `c` is defined here", Span::lc((4, 5), (4, 6)),),
+            .with_label("variable `c` is defined here", Span::lc((4, 4), (4, 5)),),
             Diagnostic::warn("Unused function `add/2`", Span::lc((0, 3), (0, 6)),),
             Diagnostic::warn(
                 "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`",
-                Span::lc((4, 5), (4, 6))
+                Span::lc((4, 4), (4, 5))
             ),
         ]
     );
@@ -290,7 +290,7 @@ fn should_warn_about_unused_variables() {
             ),
             Diagnostic::warn(
                 "Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`",
-                Span::lc((1, 5), (1, 6)),
+                Span::lc((1, 4), (1, 5)),
             ),
         ],
     );
@@ -316,7 +316,7 @@ fn should_warn_about_unused_function_and_parameters() {
             ),
             Diagnostic::warn(
                 "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`",
-                Span::lc((1, 9), (1, 10)),
+                Span::lc((1, 8), (1, 9)),
             ),
             Diagnostic::warn("Unused function `add/2`", Span::lc((0, 3), (0, 6)),),
         ]
