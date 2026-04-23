@@ -12,6 +12,8 @@ use tlang_defs::{DefKind, DefScope};
 use tlang_semantics::SemanticAnalyzer;
 use tlang_span::{HirId, NodeId, Span};
 
+use crate::typed_hir::TypedHir;
+
 /// A single symbol entry extracted from the semantic analyzer.
 #[derive(Debug, Clone)]
 pub struct SymbolEntry {
@@ -21,6 +23,7 @@ pub struct SymbolEntry {
     pub scope_start: u32,
     pub node_id: Option<NodeId>,
     pub hir_id: Option<HirId>,
+    pub type_info: Option<String>,
     pub builtin: bool,
     /// Whether this is a compiler-generated temporary.
     pub temp: bool,
@@ -98,6 +101,7 @@ impl SymbolIndex {
                     scope_start: d.scope_start,
                     node_id: d.node_id,
                     hir_id: d.hir_id,
+                    type_info: None,
                     builtin: d.builtin,
                     temp: d.temp,
                 })
@@ -114,6 +118,26 @@ impl SymbolIndex {
         }
 
         index
+    }
+
+    /// Populate inferred type information for entries from typed HIR.
+    pub fn populate_type_info(&mut self, typed_hir: &TypedHir) {
+        for entries in self.scopes.values_mut() {
+            for entry in entries {
+                if entry.builtin {
+                    continue;
+                }
+
+                let def_line = entry.defined_at.start_lc.line;
+                let def_col = if def_line > 0 {
+                    entry.defined_at.start_lc.column.saturating_sub(1)
+                } else {
+                    entry.defined_at.start_lc.column
+                };
+                entry.type_info =
+                    crate::inlay_hints::type_at_definition(typed_hir, def_line, def_col);
+            }
+        }
     }
 
     /// Look up the closest matching symbol by name, mimicking
@@ -228,7 +252,7 @@ impl SymbolIndex {
                 let item = CompletionItem {
                     label: member_name.to_string(),
                     kind: entry.kind,
-                    detail: completion_detail(entry.kind),
+                    detail: completion_detail_for_entry(entry),
                 };
                 let key = (item.label.clone(), item.detail.clone());
                 if seen.insert(key) {
@@ -267,7 +291,7 @@ impl SymbolIndex {
                 let item = CompletionItem {
                     label: method_name.to_string(),
                     kind: entry.kind,
-                    detail: completion_detail(entry.kind),
+                    detail: completion_detail_for_entry(entry),
                 };
                 let key = (item.label.clone(), item.detail.clone());
                 if seen.insert(key) {
@@ -344,9 +368,18 @@ impl CompletionItem {
         Self {
             label: entry.name.to_string(),
             kind: entry.kind,
-            detail: completion_detail(entry.kind),
+            detail: completion_detail_for_entry(entry),
         }
     }
+}
+
+fn completion_detail_for_entry(entry: &SymbolEntry) -> Option<String> {
+    entry
+        .type_info
+        .as_ref()
+        .filter(|ty| ty.as_str() != entry.name.as_ref() && !ty.contains("unknown"))
+        .cloned()
+        .or_else(|| completion_detail(entry.kind))
 }
 
 /// Build an optional detail string for a completion item based on its
@@ -450,6 +483,24 @@ mod tests {
     #[test]
     fn completion_detail_for_variable() {
         assert_eq!(completion_detail(DefKind::Variable), None);
+    }
+
+    #[test]
+    fn completion_items_prefer_inferred_type_info() {
+        let result = crate::analyze(
+            "fn add(a: i64, b: i64) -> i64 { a + b }\nlet answer = add(1, 2);",
+            |_| {},
+        );
+        let mut index = SymbolIndex::from_analyzer(&result.analyzer);
+        let typed_hir = crate::typed_hir::lower_and_typecheck(&result).unwrap();
+        index.populate_type_info(&typed_hir);
+
+        let items = index.collect_completion_items();
+        let add = items.iter().find(|item| item.label == "add").unwrap();
+        let answer = items.iter().find(|item| item.label == "answer").unwrap();
+
+        assert_eq!(add.detail.as_deref(), Some("fn(i64, i64) -> i64"));
+        assert_eq!(answer.detail.as_deref(), Some("i64"));
     }
 
     #[test]

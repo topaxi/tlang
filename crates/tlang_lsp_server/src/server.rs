@@ -849,7 +849,7 @@ impl ServerState {
                     .iter()
                     .any(|diagnostic| diagnostic.is_error());
 
-                let symbol_index = SymbolIndex::from_analyzer(&result.analyzer);
+                let mut symbol_index = SymbolIndex::from_analyzer(&result.analyzer);
 
                 let (typed_hir, typed_diags) = if has_semantic_errors {
                     (Some(None), Vec::new())
@@ -862,6 +862,7 @@ impl ServerState {
                         tlang_analysis::inlay_hints::lower_and_typecheck(&result)
                     })) {
                         Ok(Some(typed_hir)) => {
+                            symbol_index.populate_type_info(&typed_hir);
                             let typed_diags = typed_hir
                                 .diagnostics
                                 .iter()
@@ -1596,6 +1597,19 @@ mod tests {
         let items = ServerState::collect_completions(&state, &test_uri());
         let add = items.iter().find(|i| i.label == "add").unwrap();
         assert_eq!(add.detail.as_deref(), Some("fn(2)"));
+    }
+
+    #[test]
+    fn completion_items_prefer_concrete_type_detail() {
+        let state = setup_server_with_source(
+            "fn add(a: i64, b: i64) -> i64 { a + b }\nlet result = add(1, 2);",
+        );
+        let items = ServerState::collect_completions(&state, &test_uri());
+        let add = items.iter().find(|i| i.label == "add").unwrap();
+        let result = items.iter().find(|i| i.label == "result").unwrap();
+
+        assert_eq!(add.detail.as_deref(), Some("fn(i64, i64) -> i64"));
+        assert_eq!(result.detail.as_deref(), Some("i64"));
     }
 
     #[test]

@@ -444,6 +444,19 @@ fn get_signature_help_returns_function_signature() -> Result<(), JsError> {
 }
 
 #[wasm_bindgen_test]
+fn get_type_at_position_returns_symbol_type() -> Result<(), JsError> {
+    let source = "fn id(x: i64) -> i64 {\n  x\n}";
+    let mut tlang = Tlang::new(source.to_string(), Runner::JavaScript);
+    tlang.analyze();
+    let cursor = (source.rfind("\n  x").unwrap() + 3) as u32;
+    let value = tlang.get_type_at_position(cursor)?;
+    let ty: String = serde_wasm_bindgen::from_value(value).unwrap();
+
+    assert_eq!(ty, "i64");
+    Ok(())
+}
+
+#[wasm_bindgen_test]
 fn get_hir_pretty_nonempty() -> Result<(), JsError> {
     let mut tlang = Tlang::new("pub fn foo() { 1 + 2 }".to_string(), Runner::Interpreter);
     let pretty = tlang.hir_pretty(None)?;
