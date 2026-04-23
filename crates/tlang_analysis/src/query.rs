@@ -85,11 +85,7 @@ pub fn enrich_hover_symbol(
         && !symbol.builtin
     {
         let def_line = symbol.def_span.start_lc.line;
-        let def_col = if def_line > 0 {
-            symbol.def_span.start_lc.column.saturating_sub(1)
-        } else {
-            symbol.def_span.start_lc.column
-        };
+        let def_col = symbol.def_span.start_lc.column;
         symbol.type_info = inlay_hints::type_at_definition(typed_hir, def_line, def_col);
     }
 
@@ -136,27 +132,15 @@ fn format_builtin_signature(signature: &builtins::BuiltinHoverSignature) -> Stri
 
 /// Resolve the symbol under the cursor at the given **0-based** `(line, column)`.
 ///
-/// The column is automatically adjusted for the lexer's coordinate system
-/// (line 0 uses 0-based columns, subsequent lines use 1-based columns).
-///
 /// Returns `None` when the cursor is not on an identifier or the identifier
 /// cannot be resolved in the symbol index.
 pub fn resolve_symbol(
     module: &ast::Module,
     index: &SymbolIndex,
     line: u32,
-    column_0based: u32,
+    column: u32,
 ) -> Option<ResolvedSymbol> {
-    // The lexer uses 0-based columns on line 0 but 1-based columns on
-    // subsequent lines (current_column resets to 1 after '\n').  Editor
-    // positions are always 0-based, so adjust here.
-    let lexer_column = if line > 0 {
-        column_0based + 1
-    } else {
-        column_0based
-    };
-
-    let found = find_node::find_node_at_position(module, line, lexer_column)?;
+    let found = find_node::find_node_at_position(module, line, column)?;
 
     // Look up the symbol in the scope's symbol table.
     let entry = found
@@ -218,8 +202,11 @@ pub fn resolve_symbol(
 
 /// Resolve the inferred type for the value or symbol under the cursor.
 ///
-/// Returns a human-readable type string when the position resolves to a symbol,
-/// member access, or definition-like HIR node with inferred type information.
+/// `line` and `column` are editor-style 0-based coordinates.
+///
+/// Returns a human-readable type string when the position resolves to a
+/// symbol, member access, or definition-like HIR node with inferred type
+/// information.
 pub fn type_at_position(
     source: &str,
     module: &ast::Module,

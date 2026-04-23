@@ -39,8 +39,7 @@ pub(crate) fn utf16_to_byte_offset(source: &str, utf16_offset: u32) -> u32 {
 /// Convert a byte offset in `source` to a 0-based `(line, column)` pair.
 ///
 /// Both `line` and `column` are 0-based.  This is the common editor convention
-/// (LSP, CodeMirror).  Callers that need the lexer's coordinate system should
-/// use [`tlang_analysis::query::resolve_symbol`] which adjusts internally.
+/// (LSP, CodeMirror), and matches tlang spans.
 pub(crate) fn byte_offset_to_line_column(source: &str, byte_offset: u32) -> (u32, u32) {
     let byte_offset = (byte_offset as usize).min(source.len());
     let mut line = 0u32;

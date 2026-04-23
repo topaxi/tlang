@@ -100,7 +100,7 @@ impl<'src> Lexer<'src> {
 
         if previous_char == '\n' {
             self.current_line += 1;
-            self.current_column = 1;
+            self.current_column = 0;
         } else {
             self.current_column += 1;
         }

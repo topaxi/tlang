@@ -37,12 +37,6 @@ pub struct FoundNode {
 
 /// Walk the AST to find the identifier at the given `(line, column)` position.
 ///
-/// **Coordinate system**: `line` and `column` must be in the **lexer's**
-/// coordinate system where line 0 uses 0-based columns but lines after the
-/// first use 1-based columns (the lexer resets `current_column` to 1 after
-/// each newline).  Callers converting from an editor position (which is
-/// typically always 0-based) should add 1 to `character` when `line > 0`.
-///
 /// Returns `Some(FoundNode)` when the cursor is on a recognized identifier,
 /// or `None` when the position is on whitespace / punctuation / literal.
 pub fn find_node_at_position(module: &Module, line: u32, column: u32) -> Option<FoundNode> {
@@ -436,13 +430,11 @@ mod tests {
 
     #[test]
     fn find_multiline() {
-        // The lexer resets `current_column` to 1 (not 0) after a newline,
-        // so every column on lines after the first is offset by +1
-        // compared to a 0-indexed column.  `x` at two-space indent on
-        // line 2 is reported at column 3 by the lexer.
+        // `x` at two-space indent on line 2 is reported at the editor-style
+        // 0-based column 2.
         let source = "fn f() {\n  let x = 1;\n  x\n}";
-        let found = parse_and_find(source, 2, 3);
-        assert!(found.is_some(), "should find 'x' at (2,3)");
+        let found = parse_and_find(source, 2, 2);
+        assert!(found.is_some(), "should find 'x' at (2,2)");
         assert_eq!(found.unwrap().name, "x");
     }
 

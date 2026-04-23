@@ -122,22 +122,19 @@ impl SymbolIndex {
 
     /// Populate inferred type information for entries from typed HIR.
     pub fn populate_type_info(&mut self, typed_hir: &TypedHir) {
+        let definition_types = crate::inlay_hints::collect_definition_types(typed_hir);
+
         for entries in self.scopes.values_mut() {
             for entry in entries {
                 if entry.builtin {
                     continue;
                 }
 
-                let def_line = entry.defined_at.start_lc.line;
-                // Spans use the lexer's mixed coordinate system: line 0 is
-                // already 0-based, while subsequent lines are 1-based.
-                let def_col = if def_line > 0 {
-                    entry.defined_at.start_lc.column.saturating_sub(1)
-                } else {
-                    entry.defined_at.start_lc.column
-                };
-                entry.type_info =
-                    crate::inlay_hints::type_at_definition(typed_hir, def_line, def_col);
+                let key = (
+                    entry.defined_at.start_lc.line,
+                    entry.defined_at.start_lc.column,
+                );
+                entry.type_info = definition_types.get(&key).cloned();
             }
         }
     }
