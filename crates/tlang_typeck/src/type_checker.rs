@@ -410,6 +410,43 @@ impl TypeChecker {
         };
     }
 
+    fn seed_match_lowered_parameter_types(&self, decl: &mut hir::FunctionDeclaration) {
+        if !decl.is_match_lowered {
+            return;
+        }
+
+        let Some(body_expr) = decl.body.expr.as_ref() else {
+            return;
+        };
+
+        let inferred: Vec<Option<TyKind>> = decl
+            .parameters
+            .iter()
+            .enumerate()
+            .map(|(index, param)| {
+                if param.has_type_annotation
+                    || !matches!(param.type_annotation.kind, TyKind::Unknown)
+                {
+                    None
+                } else {
+                    infer_match_lowered_param_ty(
+                        decl,
+                        body_expr,
+                        index,
+                        param.hir_id,
+                        &self.type_table,
+                    )
+                }
+            })
+            .collect();
+
+        for (param, inferred) in decl.parameters.iter_mut().zip(inferred) {
+            if let Some(kind) = inferred {
+                param.type_annotation.kind = kind;
+            }
+        }
+    }
+
     /// Resolve the result type of `base[index]`.
     ///
     /// Only slice indexing currently has aligned type-checker and runtime
@@ -1224,6 +1261,13 @@ impl TypeChecker {
 
         let (protocol_name, method_name) = self.protocol_dispatch_parts(path)?;
         let receiver_ty = &call.arguments[0].ty.kind;
+        if let Some(fn_ty) = self.resolve_bounded_type_var_protocol_dispatch_callee_type(
+            &protocol_name,
+            &method_name,
+            receiver_ty,
+        ) {
+            return Some(fn_ty);
+        }
         let receiver_type_name = Self::receiver_dispatch_type_name(receiver_ty)?;
 
         self.resolve_impl_protocol_dispatch_callee_type(
@@ -1240,6 +1284,57 @@ impl TypeChecker {
                 &receiver_type_name,
             )
         })
+    }
+
+    fn resolve_bounded_type_var_protocol_dispatch_callee_type(
+        &self,
+        protocol_name: &str,
+        method_name: &str,
+        receiver_ty: &TyKind,
+    ) -> Option<TyKind> {
+        let TyKind::Var(type_var_id) = receiver_ty else {
+            return None;
+        };
+
+        let proto_info = self.type_table.get_protocol_info(protocol_name)?;
+        let method = proto_info
+            .methods
+            .iter()
+            .find(|candidate| candidate.name.as_str() == method_name)?;
+        let bounds = self.type_table.get_type_param_bounds(*type_var_id)?;
+        let bound = bounds.iter().find(|bound| {
+            self.type_table
+                .resolve_protocol_bound(bound)
+                .is_some_and(|(bound_protocol, _)| bound_protocol.hir_id == proto_info.hir_id)
+        })?;
+
+        let mut type_bindings = HashMap::new();
+        if let TyKind::Path(_, type_args) = &bound.kind {
+            for (proto_type_param, type_arg) in proto_info.type_param_var_ids.iter().zip(type_args)
+            {
+                type_bindings.insert(*proto_type_param, type_arg.kind.clone());
+            }
+        }
+
+        let mut param_tys: Vec<Ty> = method
+            .param_tys
+            .iter()
+            .map(|ty| Ty {
+                kind: substitute_type_vars(&ty.kind, &type_bindings),
+                ..ty.clone()
+            })
+            .collect();
+        if let Some(self_param) = param_tys.first_mut() {
+            self_param.kind = receiver_ty.clone();
+        }
+
+        Some(TyKind::Fn(
+            param_tys,
+            Box::new(Ty {
+                kind: substitute_type_vars(&method.return_ty.kind, &type_bindings),
+                ..method.return_ty.clone()
+            }),
+        ))
     }
 
     fn resolve_impl_protocol_dispatch_callee_type(
@@ -1422,12 +1517,19 @@ impl TypeChecker {
         }
 
         let method_name = path.last_ident().as_str().to_string();
-        let protocol_name = path.segments[..path.segments.len() - 1]
-            .iter()
-            .map(|segment| segment.ident.as_str())
-            .collect::<Vec<_>>()
-            .join("::");
-        let proto_info = self.type_table.get_protocol_info(&protocol_name)?;
+        let proto_info = path
+            .res
+            .hir_id()
+            .and_then(|hir_id| self.type_table.get_protocol_info_by_hir_id(hir_id))
+            .or_else(|| {
+                let protocol_name = path.segments[..path.segments.len() - 1]
+                    .iter()
+                    .map(|segment| segment.ident.as_str())
+                    .collect::<Vec<_>>()
+                    .join("::");
+                self.type_table.get_protocol_info(&protocol_name)
+            })?;
+        let protocol_name = proto_info.name.to_string();
         proto_info
             .methods
             .iter()
@@ -2472,6 +2574,7 @@ impl TypeChecker {
     /// Register a struct declaration in the type table: store field metadata
     /// and register a constructor function type `Fn(field_tys…) → Path(Struct)`.
     fn register_struct_declaration(&mut self, decl: &hir::StructDeclaration) {
+        self.register_type_param_bounds(&decl.type_params);
         let mut struct_path = hir::Path::new(
             vec![hir::PathSegment { ident: decl.name }],
             tlang_span::Span::default(),
@@ -2519,6 +2622,7 @@ impl TypeChecker {
     /// Register an enum declaration in the type table: store variant metadata
     /// and register each variant constructor.
     fn register_enum_declaration(&mut self, decl: &hir::EnumDeclaration) {
+        self.register_type_param_bounds(&decl.type_params);
         let mut enum_path = hir::Path::new(
             vec![hir::PathSegment { ident: decl.name }],
             tlang_span::Span::default(),
@@ -2599,6 +2703,7 @@ impl TypeChecker {
     /// Register a protocol declaration in the type table: store method
     /// signatures and constraint protocol names.
     fn register_protocol_declaration(&mut self, decl: &hir::ProtocolDeclaration) {
+        self.register_type_param_bounds(&decl.type_params);
         let methods: Vec<ProtocolMethodInfo> = decl
             .methods
             .iter()
@@ -2623,6 +2728,7 @@ impl TypeChecker {
             })
             .collect();
         self.type_table.insert_protocol_info(ProtocolInfo {
+            hir_id: Some(decl.hir_id),
             name: decl.name,
             type_param_var_ids: decl
                 .type_params
@@ -2652,6 +2758,13 @@ impl TypeChecker {
                     },
                 },
             );
+        }
+    }
+
+    fn register_type_param_bounds(&mut self, type_params: &[hir::TypeParam]) {
+        for type_param in type_params {
+            self.type_table
+                .insert_type_param_bounds(type_param.type_var_id, type_param.bounds.clone());
         }
     }
 
@@ -3526,6 +3639,8 @@ impl TypeChecker {
         let enclosing = self.current_context();
         let closure_ctx = TypingContext::for_closure(decl, enclosing);
         self.push_context(closure_ctx);
+        self.register_type_param_bounds(&decl.owner_type_params);
+        self.register_type_param_bounds(&decl.type_params);
 
         self.register_function_signature(decl);
 
@@ -3608,8 +3723,11 @@ impl TypeChecker {
     /// and impl block methods.
     fn typecheck_function_decl(&mut self, decl: &mut hir::FunctionDeclaration) {
         self.seed_dot_method_receiver_type(decl);
+        self.seed_match_lowered_parameter_types(decl);
         let fn_ctx = TypingContext::for_function(decl);
         self.push_context(fn_ctx);
+        self.register_type_param_bounds(&decl.owner_type_params);
+        self.register_type_param_bounds(&decl.type_params);
         self.register_function_signature(decl);
 
         for param in &decl.parameters {
@@ -3631,47 +3749,194 @@ impl TypeChecker {
         self.flush_local_inference_errors();
         self.check_function_body_return(decl);
 
-        if matches!(decl.return_type.kind, TyKind::Unknown) {
-            let body_ty = decl
-                .body
-                .expr
-                .as_ref()
-                .map(|e| e.ty.kind.clone())
-                .or_else(|| self.infer_return_type_from_observed())
-                .unwrap_or_else(|| decl.return_type.kind.clone());
+        let body_ty = decl
+            .body
+            .expr
+            .as_ref()
+            .map(|e| e.ty.kind.clone())
+            .or_else(|| self.infer_return_type_from_observed())
+            .unwrap_or_else(|| decl.return_type.kind.clone());
 
-            // Write the inferred return type back so inlay hints can read it.
-            if !decl.has_return_type {
-                decl.return_type.kind = body_ty.clone();
-            }
-
-            let signature_ret_ty = if decl.has_return_type {
-                decl.return_type.kind.clone()
-            } else {
-                body_ty.clone()
-            };
-
-            let param_tys: Vec<Ty> = decl
-                .parameters
-                .iter()
-                .map(|p| p.type_annotation.clone())
-                .collect();
-            let fn_ty = Self::make_fn_ty(param_tys, signature_ret_ty);
-            self.type_table.insert(
-                decl.hir_id,
-                TypeInfo {
-                    ty: Ty {
-                        kind: fn_ty,
-                        ..Ty::default()
-                    },
-                },
-            );
+        // Write the inferred return type back so inlay hints can read it.
+        if matches!(decl.return_type.kind, TyKind::Unknown) && !decl.has_return_type {
+            decl.return_type.kind = body_ty.clone();
         }
+
+        let signature_ret_ty = if decl.has_return_type {
+            decl.return_type.kind.clone()
+        } else {
+            body_ty
+        };
+
+        let param_tys: Vec<Ty> = decl
+            .parameters
+            .iter()
+            .map(|p| p.type_annotation.clone())
+            .collect();
+        let fn_ty = Self::make_fn_ty(param_tys, signature_ret_ty);
+        self.type_table.insert(
+            decl.hir_id,
+            TypeInfo {
+                ty: Ty {
+                    kind: fn_ty,
+                    ..Ty::default()
+                },
+            },
+        );
 
         self.observed_return_types.pop();
         self.return_type_stack.pop();
         self.pop_context();
     }
+}
+
+fn match_lowered_param_pat(pat: &hir::Pat, index: usize, arity: usize) -> Option<&hir::Pat> {
+    if arity == 1 {
+        return Some(pat);
+    }
+
+    match &pat.kind {
+        hir::PatKind::List(items)
+            if items.len() == arity
+                && !items
+                    .iter()
+                    .any(|item| matches!(item.kind, hir::PatKind::Rest(_))) =>
+        {
+            items.get(index)
+        }
+        _ => None,
+    }
+}
+
+fn infer_match_lowered_param_ty(
+    decl: &hir::FunctionDeclaration,
+    body_expr: &hir::Expr,
+    index: usize,
+    param_hir_id: tlang_span::HirId,
+    type_table: &TypeTable,
+) -> Option<TyKind> {
+    match &body_expr.kind {
+        hir::ExprKind::Match(_, arms, _) => {
+            let arity = decl.parameters.len();
+            let mut inferred: Option<TyKind> = None;
+
+            for arm in arms {
+                let Some(column_pat) = match_lowered_param_pat(&arm.pat, index, arity) else {
+                    return None;
+                };
+                let Some(candidate) = infer_match_lowered_pat_ty(column_pat, type_table) else {
+                    continue;
+                };
+
+                if let Some(existing) = &inferred {
+                    if *existing != candidate {
+                        return None;
+                    }
+                } else {
+                    inferred = Some(candidate);
+                }
+            }
+
+            inferred
+        }
+        hir::ExprKind::IfElse(condition, _, else_clauses) => {
+            let mut inferred = infer_match_lowered_if_enum_ty(condition, param_hir_id, type_table);
+
+            for else_clause in else_clauses {
+                let Some(condition) = &else_clause.condition else {
+                    continue;
+                };
+                let candidate = infer_match_lowered_if_enum_ty(condition, param_hir_id, type_table);
+                match (&inferred, candidate) {
+                    (Some(existing), Some(candidate)) if *existing != candidate => return None,
+                    (None, Some(candidate)) => inferred = Some(candidate),
+                    _ => {}
+                }
+            }
+
+            inferred
+        }
+        _ => None,
+    }
+}
+
+fn infer_match_lowered_pat_ty(pat: &hir::Pat, type_table: &TypeTable) -> Option<TyKind> {
+    match &pat.kind {
+        hir::PatKind::Identifier(..) | hir::PatKind::Wildcard | hir::PatKind::Rest(_) => None,
+        hir::PatKind::Literal(lit) => Some(match lit.as_ref() {
+            Literal::Integer(_) | Literal::UnsignedInteger(_) => TyKind::Primitive(PrimTy::I64),
+            Literal::Float(_) => TyKind::Primitive(PrimTy::F64),
+            Literal::Boolean(_) => TyKind::Primitive(PrimTy::Bool),
+            Literal::String(_) => TyKind::Primitive(PrimTy::String),
+            Literal::Char(_) => TyKind::Primitive(PrimTy::Char),
+            Literal::None => TyKind::Primitive(PrimTy::Nil),
+        }),
+        hir::PatKind::List(_) => Some(TyKind::List(Box::new(hir::Ty::unknown()))),
+        hir::PatKind::Enum(path, _) => type_table.get(&path.res.hir_id()?).map(|info| match &info
+            .ty
+            .kind
+        {
+            TyKind::Fn(_, ret) => ret.kind.clone(),
+            kind => kind.clone(),
+        }),
+    }
+}
+
+fn infer_match_lowered_if_enum_ty(
+    expr: &hir::Expr,
+    param_hir_id: tlang_span::HirId,
+    type_table: &TypeTable,
+) -> Option<TyKind> {
+    match &expr.kind {
+        hir::ExprKind::Binary(op, lhs, rhs) => match op {
+            BinaryOpKind::Eq | BinaryOpKind::NotEq => {
+                match (
+                    condition_expr_targets_param(lhs, param_hir_id),
+                    condition_expr_variant_ty(rhs, type_table),
+                    condition_expr_targets_param(rhs, param_hir_id),
+                    condition_expr_variant_ty(lhs, type_table),
+                ) {
+                    (true, Some(candidate), _, _) | (_, _, true, Some(candidate)) => {
+                        Some(candidate)
+                    }
+                    _ => None,
+                }
+            }
+            BinaryOpKind::And | BinaryOpKind::Or => {
+                let lhs_ty = infer_match_lowered_if_enum_ty(lhs, param_hir_id, type_table);
+                let rhs_ty = infer_match_lowered_if_enum_ty(rhs, param_hir_id, type_table);
+                match (lhs_ty, rhs_ty) {
+                    (Some(lhs), Some(rhs)) if lhs != rhs => None,
+                    (Some(lhs), _) => Some(lhs),
+                    (_, Some(rhs)) => Some(rhs),
+                    _ => None,
+                }
+            }
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn condition_expr_targets_param(expr: &hir::Expr, param_hir_id: tlang_span::HirId) -> bool {
+    match &expr.kind {
+        hir::ExprKind::Path(path) => path.res.hir_id() == Some(param_hir_id),
+        hir::ExprKind::FieldAccess(base, _) => condition_expr_targets_param(base, param_hir_id),
+        _ => false,
+    }
+}
+
+fn condition_expr_variant_ty(expr: &hir::Expr, type_table: &TypeTable) -> Option<TyKind> {
+    let hir::ExprKind::Path(path) = &expr.kind else {
+        return None;
+    };
+
+    type_table
+        .get(&path.res.hir_id()?)
+        .map(|info| match &info.ty.kind {
+            TyKind::Fn(_, ret) => ret.kind.clone(),
+            kind => kind.clone(),
+        })
 }
 
 fn unary_op_str(op: UnaryOp) -> &'static str {
@@ -5366,6 +5631,7 @@ mod tests {
     fn protocol_dispatch_parts_requires_known_protocol_method() {
         let mut checker = TypeChecker::new();
         checker.type_table.insert_protocol_info(ProtocolInfo {
+            hir_id: None,
             name: Ident::new("Functor", tlang_span::Span::default()),
             type_param_var_ids: Vec::new(),
             methods: vec![ProtocolMethodInfo {
@@ -5402,6 +5668,7 @@ mod tests {
     fn visit_dispatch_receiver_arg_requires_known_protocol_dispatch_site() {
         let mut checker = TypeChecker::new();
         checker.type_table.insert_protocol_info(ProtocolInfo {
+            hir_id: None,
             name: Ident::new("Functor", tlang_span::Span::default()),
             type_param_var_ids: Vec::new(),
             methods: vec![ProtocolMethodInfo {

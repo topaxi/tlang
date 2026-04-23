@@ -136,3 +136,24 @@ fn test_protocol_self_dispatch_not_applied_in_nested_fn() {
         "f(self) should remain as-is:\n{output}"
     );
 }
+
+#[test]
+fn test_protocol_dispatch_on_constrained_generic_parameter() {
+    let hir = hir_from_str(
+        r#"
+            fn print<T: Display>(value: T) {
+                log(value.to_string())
+            }
+        "#,
+    );
+
+    let output = pretty_print(&hir);
+    assert!(
+        output.contains("Display::to_string(value)"),
+        "expected constrained generic call to lower to protocol dispatch:\n{output}"
+    );
+    assert!(
+        !output.contains("value.to_string"),
+        "expected dot call to be rewritten during lowering:\n{output}"
+    );
+}

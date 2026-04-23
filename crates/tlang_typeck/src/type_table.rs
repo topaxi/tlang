@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
 use tlang_ast::node::Ident;
-use tlang_hir::Ty;
+use tlang_hir::{Ty, TyKind};
 use tlang_span::HirId;
 use tlang_span::TypeVarId;
+
+use crate::builtin_protocols;
 
 /// Supplementary type metadata for a given HIR node.
 ///
@@ -59,6 +61,7 @@ pub struct AssociatedTypeInfo {
 /// constraint protocols.
 #[derive(Debug, Clone)]
 pub struct ProtocolInfo {
+    pub hir_id: Option<HirId>,
     pub name: Ident,
     pub type_param_var_ids: Vec<TypeVarId>,
     pub methods: Vec<ProtocolMethodInfo>,
@@ -99,8 +102,12 @@ pub struct TypeTable {
     enum_info: HashMap<HirId, EnumInfo>,
     /// Protocol declarations keyed by the protocol name.
     protocol_info: HashMap<String, ProtocolInfo>,
+    /// Protocol declarations keyed by their lowered `HirId` when available.
+    protocol_info_by_hir_id: HashMap<HirId, ProtocolInfo>,
     /// Registered impl blocks.
     impl_info: Vec<ImplInfo>,
+    /// Constraint bounds recorded for lowered type variables.
+    type_param_bounds: HashMap<TypeVarId, Vec<Ty>>,
 }
 
 impl TypeTable {
@@ -164,6 +171,9 @@ impl TypeTable {
 
     /// Register protocol declaration metadata.
     pub fn insert_protocol_info(&mut self, info: ProtocolInfo) {
+        if let Some(hir_id) = info.hir_id {
+            self.protocol_info_by_hir_id.insert(hir_id, info.clone());
+        }
         self.protocol_info.insert(info.name.to_string(), info);
     }
 
@@ -172,9 +182,48 @@ impl TypeTable {
         self.protocol_info.get(name)
     }
 
+    /// Look up protocol info by declaration `HirId`.
+    pub fn get_protocol_info_by_hir_id(&self, hir_id: HirId) -> Option<&ProtocolInfo> {
+        self.protocol_info_by_hir_id.get(&hir_id)
+    }
+
+    /// Resolve a protocol-bound type annotation to the registered protocol info
+    /// plus its type arguments.
+    pub fn resolve_protocol_bound<'a>(
+        &'a self,
+        bound: &'a Ty,
+    ) -> Option<(&'a ProtocolInfo, &'a [Ty])> {
+        let TyKind::Path(path, type_args) = &bound.kind else {
+            return None;
+        };
+
+        let protocol = path
+            .res
+            .hir_id()
+            .or(bound.res)
+            .and_then(|hir_id| self.get_protocol_info_by_hir_id(hir_id))
+            .or_else(|| {
+                builtin_protocols::builtin_hir_id(&path.join("::"))
+                    .and_then(|hir_id| self.get_protocol_info_by_hir_id(hir_id))
+            })
+            .or_else(|| self.get_protocol_info(&path.join("::")))?;
+
+        Some((protocol, type_args.as_slice()))
+    }
+
     /// Register an impl block.
     pub fn insert_impl_info(&mut self, info: ImplInfo) {
         self.impl_info.push(info);
+    }
+
+    /// Register the bounds attached to a lowered type variable.
+    pub fn insert_type_param_bounds(&mut self, type_var_id: TypeVarId, bounds: Vec<Ty>) {
+        self.type_param_bounds.insert(type_var_id, bounds);
+    }
+
+    /// Look up the declared bounds for a lowered type variable.
+    pub fn get_type_param_bounds(&self, type_var_id: TypeVarId) -> Option<&[Ty]> {
+        self.type_param_bounds.get(&type_var_id).map(Vec::as_slice)
     }
 
     /// Return all registered impl blocks.

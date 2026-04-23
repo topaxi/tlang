@@ -1430,6 +1430,17 @@ fn protocol_method_call_with_return_type_propagates() {
     );
 }
 
+#[test]
+fn constrained_generic_protocol_method_call_typechecks() {
+    common::typecheck_ok(
+        r#"
+        fn print<T: Display>(value: T) {
+            log(value.to_string())
+        }
+        "#,
+    );
+}
+
 // ── Default method bodies ───────────────────────────────────────────────
 
 #[test]

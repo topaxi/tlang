@@ -129,8 +129,12 @@ impl LoweringContext {
         // the outer protocol's `self`, so we must not rewrite field-access
         // calls inside the nested body.
         let saved_ctx = self.protocol_dispatch_ctx.take();
+        let saved_generic_ctx = self.generic_protocol_dispatch_ctx.take();
+        let saved_generic_ctx_by_name = self.generic_protocol_dispatch_ctx_by_name.take();
         let result = hir::ExprKind::FunctionExpression(Box::new(self.lower_fn_decl(decl)));
         self.protocol_dispatch_ctx = saved_ctx;
+        self.generic_protocol_dispatch_ctx = saved_generic_ctx;
+        self.generic_protocol_dispatch_ctx_by_name = saved_generic_ctx_by_name;
         result
     }
 
@@ -343,7 +347,7 @@ impl LoweringContext {
     }
 
     fn lower_call_expr(&mut self, node: &ast::node::CallExpression) -> hir::CallExpression {
-        // ── Implicit self-dispatch in protocol default implementations ──────────
+        // ── Implicit protocol dispatch rewrites ────────────────────────────────
         //
         // Inside a protocol default method body, a call of the form
         //   `self.method(arg1, arg2, …)`
@@ -358,46 +362,41 @@ impl LoweringContext {
             base,
             field,
         }) = &node.callee.kind
-            && let Some(ctx) = self.protocol_dispatch_ctx.as_ref()
+            && let ast::node::ExprKind::Path(path) = &base.kind
         {
-            // Identify the `self` receiver using compiler information:
-            //
-            // 1. Primary check – the path segment is the compiler's reserved
-            //    `kw::_Self` keyword ("self"), which the parser only emits for
-            //    the genuine `self` keyword, never for a regular identifier.
-            //
-            // 2. Reinforcing check – if semantic analysis has resolved the path
-            //    to a specific declaration (`Res::Def(node_id)`), verify that
-            //    the declaration is our tracked `self` parameter node.  This
-            //    handles shadowing: a `let self = …` binding would resolve to a
-            //    *different* NodeId and fail this check.
-            let is_self_receiver = if let ast::node::ExprKind::Path(path) = &base.kind {
-                if path.segments.len() == 1 && path.segments[0].as_str() == kw::_Self {
-                    // If the AST resolver has already set a Def node id,
-                    // use it for identity confirmation; otherwise fall back
-                    // to the keyword check alone.
-                    match path.res {
-                        ast::node::Res::Def(node_id) => node_id == ctx.self_param_node_id,
-                        ast::node::Res::Unresolved => true,
-                        ast::node::Res::PrimTy => false,
-                    }
-                } else {
-                    false
+            let protocol_ident = match path.res {
+                ast::node::Res::Def(node_id) => self
+                    .protocol_dispatch_ctx
+                    .as_ref()
+                    .filter(|ctx| ctx.self_param_node_id == node_id)
+                    .and_then(|ctx| ctx.method_dispatch_map.get(field.as_str()))
+                    .or_else(|| {
+                        self.generic_protocol_dispatch_ctx
+                            .as_ref()
+                            .and_then(|ctx| ctx.get(&node_id))
+                            .and_then(|dispatch_map| dispatch_map.get(field.as_str()))
+                    })
+                    .copied(),
+                ast::node::Res::Unresolved
+                    if path.segments.len() == 1 && path.segments[0].as_str() == kw::_Self =>
+                {
+                    self.protocol_dispatch_ctx
+                        .as_ref()
+                        .and_then(|ctx| ctx.method_dispatch_map.get(field.as_str()))
+                        .copied()
                 }
-            } else {
-                false
+                ast::node::Res::Unresolved if path.segments.len() == 1 => self
+                    .generic_protocol_dispatch_ctx_by_name
+                    .as_ref()
+                    .and_then(|ctx| ctx.get(path.segments[0].as_str()))
+                    .and_then(|dispatch_map| dispatch_map.get(field.as_str()))
+                    .copied(),
+                _ => None,
             };
 
-            if is_self_receiver
-                && let Some(&protocol_ident) = ctx.method_dispatch_map.get(field.as_str())
-            {
-                // Build the qualified callee path `OwningProtocol::method_name`.
-                // When the protocol method is defined with multiple arities,
-                // append the `/arity` suffix (total arity = 1 for `self` +
-                // the number of explicit arguments).
+            if let Some(target) = protocol_ident {
                 let method_str = field.as_str();
-                let total_arity = node.arguments.len() + 1; // +1 for self
-
+                let total_arity = node.arguments.len() + 1;
                 let method_segment_name = if self.has_multi_arity_fn(method_str, total_arity) {
                     format!("{method_str}/{total_arity}")
                 } else {
@@ -405,19 +404,21 @@ impl LoweringContext {
                 };
 
                 let span = node.callee.span;
-                let path = hir::Path::new(
+                let mut path = hir::Path::new(
                     vec![
-                        hir::PathSegment::from_str(protocol_ident.as_str(), protocol_ident.span),
+                        hir::PathSegment::from_str(target.ident.as_str(), target.ident.span),
                         hir::PathSegment::from_str(&method_segment_name, field.span),
                     ],
                     span,
                 );
-
+                if let Some(protocol_hir_id) = target.protocol_hir_id {
+                    path.res.set_hir_id(protocol_hir_id);
+                    path.res.set_binding_kind(hir::BindingKind::Enum);
+                }
                 let callee_hir = self.expr(span, hir::ExprKind::Path(Box::new(path)));
 
-                // The first argument is the `self` receiver; the rest follow.
-                let self_arg = self.lower_expr(base);
-                let mut arguments = vec![self_arg];
+                let receiver_arg = self.lower_expr(base);
+                let mut arguments = vec![receiver_arg];
                 arguments.extend(self.lower_exprs(&node.arguments));
 
                 return hir::CallExpression {

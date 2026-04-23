@@ -1790,6 +1790,71 @@ mod tests {
     }
 
     #[test]
+    fn hover_and_goto_work_for_protocol_methods_on_constrained_generics() {
+        let source = "protocol Printable { fn show(self) -> String }\nfn print<T: Printable>(value: T) { log(value.show()) }";
+        let mut state = setup_server_with_source(source);
+        let uri = test_uri();
+        let call_col = source
+            .lines()
+            .nth(1)
+            .and_then(|line| line.rfind("show"))
+            .expect("call site should contain show") as u32;
+        let decl_col = source
+            .lines()
+            .next()
+            .and_then(|line| line.find("show"))
+            .expect("protocol declaration should contain show") as u32;
+        let pos = lsp_types::Position {
+            line: 1,
+            character: call_col,
+        };
+
+        let hover = futures::executor::block_on(ServerState::on_hover(
+            &mut state,
+            HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri.clone() },
+                    position: pos,
+                },
+                work_done_progress_params: Default::default(),
+            },
+        ))
+        .expect("hover request should succeed")
+        .expect("hover should be present");
+        match hover.contents {
+            lsp_types::HoverContents::Scalar(lsp_types::MarkedString::String(s)) => {
+                assert!(
+                    s.contains("show"),
+                    "expected hover to describe the protocol method, got: {s}"
+                );
+            }
+            _ => panic!("unexpected hover contents format"),
+        }
+
+        let goto = futures::executor::block_on(ServerState::on_goto_definition(
+            &mut state,
+            GotoDefinitionParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri.clone() },
+                    position: pos,
+                },
+                work_done_progress_params: Default::default(),
+                partial_result_params: Default::default(),
+            },
+        ))
+        .expect("goto request should succeed")
+        .expect("goto should be present");
+
+        match goto {
+            GotoDefinitionResponse::Scalar(loc) => {
+                assert_eq!(loc.range.start.line, 0);
+                assert_eq!(loc.range.start.character, decl_col);
+            }
+            _ => panic!("expected scalar location"),
+        }
+    }
+
+    #[test]
     fn references_return_locations_and_respect_include_declaration() {
         let source = "fn id(value) { value }\nlet value = id(1);\nid(value);";
         let mut state = setup_server_with_source(source);

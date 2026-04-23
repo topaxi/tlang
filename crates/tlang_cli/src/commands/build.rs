@@ -133,7 +133,7 @@ fn generate_module_code(
 ) -> Option<String> {
     let mut hir_module = compiled.hir.clone();
     let mut optimizer = CompileTargetHirOptimizer::JavaScript(
-        tlang_codegen_js::js_hir_opt::JsHirOptimizer::default(),
+        tlang_codegen_js::js_hir_opt::JsHirOptimizer::pre_typecheck(),
     );
     let mut ctx = compiled.lower_meta.clone().into();
     if let Err(err) = run_hir_passes(&mut optimizer, &mut hir_module, &mut ctx) {
@@ -151,6 +151,12 @@ fn generate_module_code(
     // ExhaustiveEnumMatch must run after type checking.
     let mut exhaustive_enum = tlang_hir_opt::ExhaustiveEnumMatch::default();
     if let Err(err) = exhaustive_enum.optimize_hir(&mut hir_module, &mut ctx) {
+        eprint!("{}", render_ice(&err));
+        return None;
+    }
+
+    let mut js_post_optimizer = tlang_codegen_js::js_hir_opt::JsHirOptimizer::post_typecheck();
+    if let Err(err) = js_post_optimizer.optimize_hir(&mut hir_module, &mut ctx) {
         eprint!("{}", render_ice(&err));
         return None;
     }
