@@ -377,9 +377,30 @@ fn completion_detail_for_entry(entry: &SymbolEntry) -> Option<String> {
     entry
         .type_info
         .as_ref()
-        .filter(|ty| ty.as_str() != entry.name.as_ref() && !ty.contains("unknown"))
+        .filter(|ty| is_informative_type_detail(entry, ty))
         .cloned()
         .or_else(|| completion_detail(entry.kind))
+}
+
+fn is_informative_type_detail(entry: &SymbolEntry, ty: &str) -> bool {
+    if ty_contains_unknown_token(ty) {
+        return false;
+    }
+
+    if matches!(
+        entry.kind,
+        DefKind::Enum | DefKind::Struct | DefKind::Protocol | DefKind::Module
+    ) && ty == entry.name.as_ref()
+    {
+        return false;
+    }
+
+    true
+}
+
+fn ty_contains_unknown_token(ty: &str) -> bool {
+    ty.split(|c: char| !c.is_alphanumeric() && c != '_')
+        .any(|segment| segment == "unknown")
 }
 
 /// Build an optional detail string for a completion item based on its
