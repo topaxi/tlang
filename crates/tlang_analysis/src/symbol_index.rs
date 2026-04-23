@@ -5,7 +5,7 @@
 //! LSP server and the WASM playground bindings share this implementation to
 //! ensure consistent symbol resolution behaviour.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use tlang_defs::{DefKind, DefScope};
@@ -194,25 +194,23 @@ impl SymbolIndex {
 
     /// Collect all user-defined completion items from every scope.
     ///
-    /// Items are deduplicated by `(label, detail)` and sorted
-    /// alphabetically.  Temporary and builtin symbols are excluded.
+    /// Items are deduplicated by `(label, kind)` and prefer richer inferred
+    /// type details over fallback arity hints. Temporary and builtin symbols
+    /// are excluded.
     ///
     /// This is the canonical implementation shared by both the LSP server
     /// and the WASM playground bindings.
     pub fn collect_completion_items(&self) -> Vec<CompletionItem> {
-        let mut seen = HashSet::new();
-        let mut items = Vec::new();
+        let mut items = HashMap::new();
 
         for entries in self.scopes.values() {
             for entry in entries.iter().filter(|e| !e.builtin && !e.temp) {
                 let item = CompletionItem::from_symbol_entry(entry);
-                let key = (item.label.clone(), item.detail.clone());
-
-                if seen.insert(key) {
-                    items.push(item);
-                }
+                insert_completion_item(&mut items, item);
             }
         }
+
+        let mut items: Vec<_> = items.into_values().collect();
 
         items.sort_by(|a, b| {
             a.label
@@ -232,8 +230,7 @@ impl SymbolIndex {
     /// the qualified `Type::method` form).
     pub fn collect_method_completions(&self, type_name: &str) -> Vec<CompletionItem> {
         let prefix = format!("{type_name}::");
-        let mut seen = HashSet::new();
-        let mut items = Vec::new();
+        let mut items = HashMap::new();
 
         for entries in self.scopes.values() {
             for entry in entries {
@@ -250,16 +247,14 @@ impl SymbolIndex {
                 }
                 let item = CompletionItem {
                     label: member_name.to_string(),
-                    kind: entry.kind,
+                    kind: normalized_completion_kind(entry.kind),
                     detail: completion_detail_for_entry(entry),
                 };
-                let key = (item.label.clone(), item.detail.clone());
-                if seen.insert(key) {
-                    items.push(item);
-                }
+                insert_completion_item(&mut items, item);
             }
         }
 
+        let mut items: Vec<_> = items.into_values().collect();
         items.sort_by(|a, b| a.label.cmp(&b.label));
         items
     }
@@ -272,8 +267,7 @@ impl SymbolIndex {
     /// form).
     pub fn collect_protocol_completions(&self, protocol_name: &str) -> Vec<CompletionItem> {
         let prefix = format!("{protocol_name}::");
-        let mut seen = HashSet::new();
-        let mut items = Vec::new();
+        let mut items = HashMap::new();
 
         for entries in self.scopes.values() {
             for entry in entries {
@@ -289,16 +283,14 @@ impl SymbolIndex {
                 }
                 let item = CompletionItem {
                     label: method_name.to_string(),
-                    kind: entry.kind,
+                    kind: normalized_completion_kind(entry.kind),
                     detail: completion_detail_for_entry(entry),
                 };
-                let key = (item.label.clone(), item.detail.clone());
-                if seen.insert(key) {
-                    items.push(item);
-                }
+                insert_completion_item(&mut items, item);
             }
         }
 
+        let mut items: Vec<_> = items.into_values().collect();
         items.sort_by(|a, b| a.label.cmp(&b.label));
         items
     }
@@ -366,9 +358,55 @@ impl CompletionItem {
     pub fn from_symbol_entry(entry: &SymbolEntry) -> Self {
         Self {
             label: entry.name.to_string(),
-            kind: entry.kind,
+            kind: normalized_completion_kind(entry.kind),
             detail: completion_detail_for_entry(entry),
         }
+    }
+}
+
+fn normalized_completion_kind(kind: DefKind) -> DefKind {
+    match kind {
+        DefKind::FunctionSelfRef(arity) => DefKind::Function(arity),
+        _ => kind,
+    }
+}
+
+fn insert_completion_item(
+    items: &mut HashMap<(String, DefKind), CompletionItem>,
+    item: CompletionItem,
+) {
+    let key = (item.label.clone(), item.kind);
+
+    match items.entry(key) {
+        std::collections::hash_map::Entry::Vacant(entry) => {
+            entry.insert(item);
+        }
+        std::collections::hash_map::Entry::Occupied(mut entry) => {
+            if should_prefer_completion(entry.get(), &item) {
+                entry.insert(item);
+            }
+        }
+    }
+}
+
+fn should_prefer_completion(existing: &CompletionItem, candidate: &CompletionItem) -> bool {
+    let existing_rank = completion_detail_rank(existing);
+    let candidate_rank = completion_detail_rank(candidate);
+
+    candidate_rank > existing_rank
+        || (candidate_rank == existing_rank
+            && candidate
+                .detail
+                .as_ref()
+                .zip(existing.detail.as_ref())
+                .is_some_and(|(candidate, existing)| candidate.len() > existing.len()))
+}
+
+fn completion_detail_rank(item: &CompletionItem) -> u8 {
+    match item.detail.as_deref() {
+        None => 0,
+        Some(detail) if completion_detail(item.kind).as_deref() == Some(detail) => 1,
+        Some(_) => 2,
     }
 }
 
@@ -521,6 +559,39 @@ mod tests {
 
         assert_eq!(add.detail.as_deref(), Some("fn(i64, i64) -> i64"));
         assert_eq!(answer.detail.as_deref(), Some("i64"));
+    }
+
+    #[test]
+    fn completion_items_deduplicate_multi_clause_functions_after_type_enrichment() {
+        let source = r#"
+enum Expr {
+    Value(isize),
+    Add(Expr, Expr),
+}
+
+fn evaluate(Expr::Value(value)) { value }
+fn evaluate(Expr::Add(left, right)) { evaluate(left) + evaluate(right) }
+"#;
+        let result = crate::analyze(source, |_| {});
+        let mut index = SymbolIndex::from_analyzer(&result.analyzer);
+        let typed_hir = crate::typed_hir::lower_and_typecheck(&result).unwrap();
+        index.populate_type_info(&typed_hir);
+
+        let items = index.collect_completion_items();
+        let evaluate_items: Vec<_> = items
+            .iter()
+            .filter(|item| item.label == "evaluate")
+            .collect();
+
+        assert_eq!(
+            evaluate_items.len(),
+            1,
+            "multi-clause functions should stay deduplicated after type enrichment, got: {items:?}"
+        );
+        assert_eq!(
+            evaluate_items[0].detail.as_deref(),
+            Some("fn(Expr) -> isize")
+        );
     }
 
     #[test]
