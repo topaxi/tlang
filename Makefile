@@ -11,6 +11,7 @@ verify:
 	cargo clippy
 	npm ci
 	npm run lint
+	npx lit-analyzer tlang-playground/src
 	$(MAKE) test-coverage
 	$(MAKE) test
 	$(MAKE) test-bindings-js
