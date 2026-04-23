@@ -423,7 +423,7 @@ impl ServerState {
         let pos = params.text_document_position.position;
         let include_declaration = params.context.include_declaration;
         let references = Self::collect_references(state, &uri, pos, include_declaration);
-        Box::pin(async move { Ok(references.map(Some).unwrap_or_default()) })
+        Box::pin(async move { Ok(references) })
     }
 
     fn on_signature_help(

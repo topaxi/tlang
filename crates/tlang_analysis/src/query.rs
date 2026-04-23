@@ -155,7 +155,10 @@ pub fn resolve_symbol(
     column: u32,
 ) -> Option<ResolvedSymbol> {
     let found = find_node::find_node_at_position(module, line, column)?;
+    resolve_found_node(index, found)
+}
 
+fn resolve_found_node(index: &SymbolIndex, found: find_node::FoundNode) -> Option<ResolvedSymbol> {
     // Look up the symbol in the scope's symbol table.
     let entry = found
         .call_arity
@@ -234,16 +237,15 @@ pub fn find_references(
     }
 
     let target_key = ReferenceSymbolKey::from_resolved(&target);
-    let mut collector = ReferenceCandidateCollector::default();
+    let mut collector = ReferenceNodeCollector::default();
     collector.visit_module(module, &mut ());
 
     let mut seen = HashSet::new();
     let mut references = vec![];
 
-    for span in collector.spans {
-        let Some(resolved) =
-            resolve_symbol(module, index, span.start_lc.line, span.start_lc.column)
-        else {
+    for found in collector.nodes {
+        let span = found.span;
+        let Some(resolved) = resolve_found_node(index, found) else {
             continue;
         };
 
@@ -375,64 +377,245 @@ fn normalize_reference_kind(kind: DefKind) -> DefKind {
 }
 
 #[derive(Default)]
-struct ReferenceCandidateCollector {
-    spans: Vec<Span>,
+struct ReferenceNodeCollector {
+    scope_stack: Vec<NodeId>,
+    current_call_arity: Option<u16>,
+    in_declaration_name_context: bool,
+    nodes: Vec<find_node::FoundNode>,
 }
 
-impl ReferenceCandidateCollector {
-    fn record_span(&mut self, span: Span) {
-        self.spans.push(span);
+impl ReferenceNodeCollector {
+    fn current_scope(&self) -> NodeId {
+        *self.scope_stack.last().expect("scope stack is never empty")
+    }
+
+    fn record_ident(&mut self, name: &str, span: Span) {
+        self.nodes.push(find_node::FoundNode {
+            name: name.to_string(),
+            span,
+            scope_id: self.current_scope(),
+            field_base: None,
+            call_arity: self.current_call_arity,
+            is_declaration_name: self.in_declaration_name_context,
+        });
+    }
+
+    fn record_field_ident(&mut self, name: &str, span: Span, base_name: String) {
+        self.nodes.push(find_node::FoundNode {
+            name: name.to_string(),
+            span,
+            scope_id: self.current_scope(),
+            field_base: Some(base_name),
+            call_arity: self.current_call_arity,
+            is_declaration_name: false,
+        });
+    }
+
+    fn with_declaration_name_context<F: FnOnce(&mut Self)>(&mut self, f: F) {
+        let prev = self.in_declaration_name_context;
+        self.in_declaration_name_context = true;
+        f(self);
+        self.in_declaration_name_context = prev;
+    }
+
+    fn with_call_arity<F: FnOnce(&mut Self)>(&mut self, arity: u16, f: F) {
+        let prev = self.current_call_arity;
+        self.current_call_arity = Some(arity);
+        f(self);
+        self.current_call_arity = prev;
+    }
+
+    fn expr_name(expr: &ast::Expr) -> Option<String> {
+        match &expr.kind {
+            ast::ExprKind::Path(path) if path.segments.len() == 1 => {
+                Some(path.segments[0].to_string())
+            }
+            _ => None,
+        }
     }
 }
 
-impl<'ast> Visitor<'ast> for ReferenceCandidateCollector {
+impl<'ast> Visitor<'ast> for ReferenceNodeCollector {
     type Context = ();
 
+    fn enter_scope(&mut self, node_id: NodeId, _ctx: &mut ()) {
+        self.scope_stack.push(node_id);
+    }
+
+    fn leave_scope(&mut self, _node_id: NodeId, _ctx: &mut ()) {
+        self.scope_stack.pop();
+    }
+
+    fn visit_module(&mut self, module: &'ast ast::Module, ctx: &mut ()) {
+        visit::walk_module(self, module, ctx);
+    }
+
     fn visit_ident(&mut self, ident: &'ast ast::Ident, _ctx: &mut ()) {
-        self.record_span(ident.span);
+        self.record_ident(ident.as_str(), ident.span);
     }
 
     fn visit_path(&mut self, path: &'ast ast::Path, _ctx: &mut ()) {
-        self.record_span(path.span);
+        if path.segments.len() > 1 {
+            self.record_ident(&path.to_string(), path.span);
+        } else if let Some(segment) = path.segments.first() {
+            self.record_ident(segment.as_str(), path.span);
+        }
     }
 
-    fn visit_ty(&mut self, ty: &'ast ast::Ty, _ctx: &mut ()) {
-        match &ty.kind {
-            ast::TyKind::Path(path) => self.record_span(path.span),
-            ast::TyKind::Union(paths) => {
-                for path in paths {
-                    self.record_span(path.span);
-                }
-            }
-            ast::TyKind::Unknown => {}
-            ast::TyKind::Fn(params, ret) => {
-                for param in params {
-                    self.visit_ty(&param.ty, _ctx);
-                }
-                self.visit_ty(ret, _ctx);
-            }
+    fn visit_struct_decl(&mut self, decl: &'ast ast::StructDeclaration, ctx: &mut ()) {
+        self.visit_ident(&decl.name, ctx);
+        for ast::StructField { name, ty, .. } in &decl.fields {
+            self.with_declaration_name_context(|this| this.visit_ident(name, &mut ()));
+            self.visit_ty(ty, ctx);
         }
-
-        for param in &ty.parameters {
-            self.visit_ty(param, _ctx);
+        for const_decl in &decl.consts {
+            self.visit_ident(&const_decl.name, ctx);
+            self.visit_expr(&const_decl.expression, ctx);
         }
     }
 
     fn visit_stmt(&mut self, statement: &'ast ast::Stmt, ctx: &mut ()) {
+        if let ast::StmtKind::ProtocolDeclaration(decl) = &statement.kind {
+            self.visit_ident(&decl.name, ctx);
+            for constraint in &decl.constraints {
+                self.visit_path(constraint, ctx);
+            }
+            for type_param in &decl.type_params {
+                self.visit_ident(&type_param.name, ctx);
+            }
+            for assoc_type in &decl.associated_types {
+                self.with_declaration_name_context(|this| {
+                    this.visit_ident(&assoc_type.name, &mut ())
+                });
+                for type_param in &assoc_type.type_params {
+                    self.visit_ident(&type_param.name, ctx);
+                }
+            }
+            for method in &decl.methods {
+                self.with_declaration_name_context(|this| this.visit_ident(&method.name, &mut ()));
+                for type_param in &method.type_params {
+                    self.visit_ident(&type_param.name, ctx);
+                }
+                for param in &method.parameters {
+                    self.visit_fn_param(param, ctx);
+                }
+                if let Some(ret_ty) = &method.return_type_annotation {
+                    self.visit_fn_ret_ty(ret_ty, ctx);
+                }
+                if let Some(body) = &method.body {
+                    self.enter_scope(body.id, ctx);
+                    visit::walk_block(self, &body.statements, &body.expression, ctx);
+                    self.leave_scope(body.id, ctx);
+                }
+            }
+            for const_decl in &decl.consts {
+                self.visit_ident(&const_decl.name, ctx);
+                self.visit_expr(&const_decl.expression, ctx);
+            }
+            return;
+        }
+
+        if let ast::StmtKind::ImplBlock(impl_block) = &statement.kind {
+            for type_param in &impl_block.type_params {
+                self.visit_ident(&type_param.name, ctx);
+            }
+            self.visit_path(&impl_block.protocol_name, ctx);
+            for ty_arg in &impl_block.type_arguments {
+                self.visit_ty(ty_arg, ctx);
+            }
+            self.visit_path(&impl_block.target_type, ctx);
+            if let Some(where_clause) = &impl_block.where_clause {
+                for predicate in &where_clause.predicates {
+                    self.visit_ident(&predicate.name, ctx);
+                    for bound in &predicate.bounds {
+                        self.visit_ty(bound, ctx);
+                    }
+                }
+            }
+            for assoc_type in &impl_block.associated_types {
+                self.with_declaration_name_context(|this| {
+                    this.visit_ident(&assoc_type.name, &mut ())
+                });
+                for type_param in &assoc_type.type_params {
+                    self.visit_ident(&type_param.name, ctx);
+                }
+                self.visit_ty(&assoc_type.ty, ctx);
+            }
+            for decl in &impl_block.methods {
+                self.visit_fn_decl(decl, ctx);
+            }
+            return;
+        }
+
         if let ast::StmtKind::UseDeclaration(decl) = &statement.kind {
             for segment in &decl.path {
-                self.record_span(segment.span);
+                self.visit_ident(segment, ctx);
             }
             for item in &decl.items {
-                self.record_span(item.name.span);
+                self.visit_ident(&item.name, ctx);
                 if let Some(alias) = &item.alias {
-                    self.record_span(alias.span);
+                    self.visit_ident(alias, ctx);
                 }
             }
             return;
         }
 
         visit::walk_stmt(self, statement, ctx);
+    }
+
+    fn visit_expr(&mut self, expression: &'ast ast::Expr, ctx: &mut ()) {
+        if let ast::ExprKind::BinaryOp(binary) = &expression.kind
+            && binary.op == ast::BinaryOpKind::Pipeline
+        {
+            let effective_arity = match &binary.rhs.kind {
+                ast::ExprKind::Call(call) => call.arguments.len().saturating_add(1) as u16,
+                _ => 1,
+            };
+            self.with_call_arity(effective_arity, |this| this.visit_expr(&binary.rhs, ctx));
+            self.visit_expr(&binary.lhs, ctx);
+            return;
+        }
+
+        if let ast::ExprKind::Call(call) = &expression.kind {
+            let effective_arity = self.current_call_arity.unwrap_or(call.arguments.len() as u16);
+            self.with_call_arity(effective_arity, |this| this.visit_expr(&call.callee, ctx));
+            for argument in &call.arguments {
+                self.visit_expr(argument, ctx);
+            }
+            return;
+        }
+
+        if let ast::ExprKind::FieldExpression(field_expr) = &expression.kind
+            && let Some(base_name) = Self::expr_name(&field_expr.base)
+        {
+            self.record_field_ident(field_expr.field.as_str(), field_expr.field.span, base_name);
+            self.visit_expr(&field_expr.base, ctx);
+            return;
+        }
+
+        visit::walk_expr(self, expression, ctx);
+    }
+
+    fn visit_ty(&mut self, ty: &'ast ast::Ty, ctx: &mut ()) {
+        match &ty.kind {
+            ast::TyKind::Path(path) => self.visit_path(path, ctx),
+            ast::TyKind::Union(paths) => {
+                for path in paths {
+                    self.visit_path(path, ctx);
+                }
+            }
+            ast::TyKind::Unknown => {}
+            ast::TyKind::Fn(params, ret) => {
+                for param in params {
+                    self.visit_ty(&param.ty, ctx);
+                }
+                self.visit_ty(ret, ctx);
+            }
+        }
+
+        for param in &ty.parameters {
+            self.visit_ty(param, ctx);
+        }
     }
 }
 

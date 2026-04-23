@@ -173,15 +173,8 @@ export const tlangCompletion = tlangLanguage.data.of({
  *   to: number,
  * }} DefinitionLocation
  *
- * @typedef {{
- *   from: number,
- *   to: number,
- *   isDeclaration: boolean,
- * }} ReferenceLocation
- *
  * @typedef {(pos: number) => HoverInfo | null} HoverProvider
  * @typedef {(pos: number) => DefinitionLocation | null} GotoDefinitionProvider
- * @typedef {(pos: number, includeDeclaration?: boolean) => ReferenceLocation[] | null} ReferencesProvider
  *
  * @typedef {{
  *   label: string,
@@ -221,7 +214,6 @@ export const tlangCompletion = tlangLanguage.data.of({
  *   markdownLanguage?: import('@codemirror/language').Language,
  *   hoverProvider?: HoverProvider,
  *   gotoDefinitionProvider?: GotoDefinitionProvider,
- *   referencesProvider?: ReferencesProvider,
  *   signatureHelpProvider?: SignatureHelpProvider,
  *   semanticTokens?: SemanticToken[],
  *   semanticTokenProvider?: SemanticTokenProvider,
