@@ -796,7 +796,7 @@ fn token_kind_index(kind: TokenKind) -> u32 {
     TOKEN_TYPES
         .iter()
         .position(|candidate| *candidate == kind)
-        .expect("token kind must be in legend") as u32
+        .unwrap_or_else(|| panic!("token kind {kind:?} must be in legend")) as u32
 }
 
 fn modifiers_bitset(modifiers: &[TokenModifier]) -> u32 {
@@ -804,7 +804,8 @@ fn modifiers_bitset(modifiers: &[TokenModifier]) -> u32 {
         let index = TOKEN_MODIFIERS
             .iter()
             .position(|candidate| *candidate == *modifier)
-            .expect("token modifier must be in legend") as u32;
+            .unwrap_or_else(|| panic!("token modifier {modifier:?} must be in legend"))
+            as u32;
         bits | (1 << index)
     })
 }
@@ -927,5 +928,7 @@ mod tests {
             .find(|token| token.delta_line == 1 && token.delta_start == 2)
             .expect("expected token on line 1 column 2");
         assert_eq!(value_ref.length, 5);
+        assert_eq!(value_ref.token_type, token_kind_index(TokenKind::Parameter));
+        assert_eq!(value_ref.token_modifiers_bitset, modifiers_bitset(&[]));
     }
 }

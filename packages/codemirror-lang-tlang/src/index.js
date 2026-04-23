@@ -561,7 +561,7 @@ function sanitizeSemanticTokenPart(value) {
  */
 function makeSemanticTokenPlugin(provider, debounceMs) {
   return ViewPlugin.fromClass(
-    class {
+    class SemanticTokenView {
       version = 0;
       timeout = null;
 
