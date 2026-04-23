@@ -1,7 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, hash_map::DefaultHasher};
+use std::hash::{Hash, Hasher};
 
 use tlang_ast::node::UnaryOp;
 use tlang_ast::token::Literal;
+use tlang_diagnostics::Diagnostic;
 use tlang_hir::Visitor;
 use tlang_hir::visit::{walk_block, walk_expr, walk_stmt};
 use tlang_hir::{self as hir, BinaryOpKind, PrimTy, Ty, TyKind};
@@ -30,6 +32,8 @@ use crate::{TypeError, TypeInfo, TypeTable};
 pub struct TypeChecker {
     /// Accumulated type errors from the current pass.
     pub errors: Vec<TypeError>,
+    /// Accumulated warnings from the current pass.
+    pub warnings: Vec<Diagnostic>,
     /// Side-table mapping HIR nodes to their resolved types.
     pub type_table: TypeTable,
     /// Stack of typing contexts (strict/permissive) for nested functions.
@@ -1877,6 +1881,592 @@ impl TypeChecker {
         }
     }
 
+    fn push_warning(&mut self, message: impl Into<String>, span: tlang_span::Span) {
+        self.warnings.push(Diagnostic::warn(&message.into(), span));
+    }
+
+    fn enum_info_for_ty(&self, ty_kind: &TyKind) -> Option<&EnumInfo> {
+        Self::resolve_type_hir_id(ty_kind)
+            .and_then(|hir_id| self.type_table.get_enum_info(&hir_id))
+            .or_else(|| match ty_kind {
+                TyKind::Path(path, _) => self
+                    .type_table
+                    .get_enum_info_by_name(path.first_ident().as_str()),
+                _ => None,
+            })
+    }
+
+    fn struct_info_for_ty(&self, ty_kind: &TyKind) -> Option<&StructInfo> {
+        Self::resolve_type_hir_id(ty_kind)
+            .and_then(|hir_id| self.type_table.get_struct_info(&hir_id))
+            .or_else(|| match ty_kind {
+                TyKind::Path(path, _) => self
+                    .type_table
+                    .get_struct_info_by_name(path.first_ident().as_str()),
+                _ => None,
+            })
+    }
+
+    fn emit_pattern_type_mismatch(&mut self, pat: &hir::Pat, scrutinee_ty: &TyKind) {
+        if matches!(scrutinee_ty, TyKind::Unknown | TyKind::Var(_)) {
+            return;
+        }
+
+        self.errors.push(TypeError::PatternTypeMismatch {
+            pattern: describe_pattern(pat),
+            scrutinee: scrutinee_ty.to_string(),
+            span: pat.span,
+        });
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn pattern_shape(
+        &mut self,
+        pat: &hir::Pat,
+        scrutinee_ty: &TyKind,
+        emit_diagnostics: bool,
+    ) -> Option<PatShape> {
+        if let TyKind::Union(members) = scrutinee_ty {
+            if let Some(shape) = members
+                .iter()
+                .find_map(|member| self.pattern_shape(pat, &member.kind, false))
+            {
+                return Some(shape);
+            }
+
+            if emit_diagnostics {
+                self.emit_pattern_type_mismatch(pat, scrutinee_ty);
+            }
+            return None;
+        }
+
+        match &pat.kind {
+            hir::PatKind::Wildcard | hir::PatKind::Identifier(..) => Some(PatShape::Wildcard),
+            hir::PatKind::Literal(literal) => {
+                if !literal_matches_type(literal, scrutinee_ty)
+                    && !matches!(scrutinee_ty, TyKind::Unknown | TyKind::Var(_))
+                {
+                    if emit_diagnostics {
+                        self.emit_pattern_type_mismatch(pat, scrutinee_ty);
+                    }
+                    return None;
+                }
+
+                let constructor = match (scrutinee_ty, literal.as_ref()) {
+                    (TyKind::Primitive(PrimTy::Bool), Literal::Boolean(value)) => {
+                        PatConstructor::Bool(*value)
+                    }
+                    _ => PatConstructor::Literal(literal_key(literal)),
+                };
+
+                Some(PatShape::Constructor(constructor, vec![]))
+            }
+            hir::PatKind::List(items) => {
+                let elem_ty = match scrutinee_ty {
+                    TyKind::List(inner) | TyKind::Slice(inner) => inner.kind.clone(),
+                    TyKind::Path(path, type_args)
+                        if path.first_ident().as_str() == "List" && type_args.len() == 1 =>
+                    {
+                        type_args[0].kind.clone()
+                    }
+                    TyKind::Path(path, _) if path.first_ident().as_str() == "List" => {
+                        TyKind::Unknown
+                    }
+                    TyKind::Unknown | TyKind::Var(_) => TyKind::Unknown,
+                    _ => {
+                        if emit_diagnostics {
+                            self.emit_pattern_type_mismatch(pat, scrutinee_ty);
+                        }
+                        return None;
+                    }
+                };
+
+                self.list_pattern_shape(items, &elem_ty, scrutinee_ty, emit_diagnostics)
+            }
+            hir::PatKind::Rest(_) => {
+                if emit_diagnostics {
+                    self.emit_pattern_type_mismatch(pat, scrutinee_ty);
+                }
+                None
+            }
+            hir::PatKind::Enum(path, fields) => {
+                if is_list_like_type(scrutinee_ty)
+                    && path.segments.len() >= 2
+                    && path.segments[path.segments.len() - 2].ident.as_str() == "List"
+                {
+                    let elem_ty = list_item_ty(scrutinee_ty).unwrap_or(TyKind::Unknown);
+                    return match path.last_ident().as_str() {
+                        "Nil" => Some(PatShape::Constructor(PatConstructor::ListEmpty, vec![])),
+                        "Cons" => {
+                            let head_pat = fields.first().map(|(_, pat)| pat);
+                            let tail_pat = fields.get(1).map(|(_, pat)| pat);
+                            Some(PatShape::Constructor(
+                                PatConstructor::ListCons,
+                                vec![
+                                    match head_pat {
+                                        Some(head_pat) => self.pattern_shape(
+                                            head_pat,
+                                            &elem_ty,
+                                            emit_diagnostics,
+                                        )?,
+                                        None => PatShape::Wildcard,
+                                    },
+                                    match tail_pat {
+                                        Some(tail_pat) => self.pattern_shape(
+                                            tail_pat,
+                                            scrutinee_ty,
+                                            emit_diagnostics,
+                                        )?,
+                                        None => PatShape::Wildcard,
+                                    },
+                                ],
+                            ))
+                        }
+                        _ => {
+                            if emit_diagnostics {
+                                self.emit_pattern_type_mismatch(pat, scrutinee_ty);
+                            }
+                            None
+                        }
+                    };
+                }
+
+                let is_struct_pat = path.res.binding_kind() == hir::BindingKind::Struct
+                    || (path.segments.len() == 1
+                        && self
+                            .type_table
+                            .get_struct_info_by_name(path.last_ident().as_str())
+                            .is_some());
+
+                if is_struct_pat {
+                    let Some(struct_info) = self.struct_info_for_ty(scrutinee_ty).cloned() else {
+                        if emit_diagnostics {
+                            self.emit_pattern_type_mismatch(pat, scrutinee_ty);
+                        }
+                        return None;
+                    };
+
+                    if struct_info.name != *path.last_ident() {
+                        if emit_diagnostics {
+                            self.emit_pattern_type_mismatch(pat, scrutinee_ty);
+                        }
+                        return None;
+                    }
+
+                    let args = struct_info
+                        .fields
+                        .iter()
+                        .enumerate()
+                        .map(|(index, (field_name, field_ty))| {
+                            let field_pat = fields
+                                .iter()
+                                .find(|(name, _)| name.as_str() == field_name.as_str())
+                                .or_else(|| fields.get(index))
+                                .map(|(_, pat)| pat);
+                            match field_pat {
+                                Some(field_pat) => {
+                                    self.pattern_shape(field_pat, &field_ty.kind, emit_diagnostics)
+                                }
+                                None => Some(PatShape::Wildcard),
+                            }
+                        })
+                        .collect::<Option<Vec<_>>>()?;
+
+                    Some(PatShape::Constructor(
+                        PatConstructor::Struct(struct_info.name.to_string()),
+                        args,
+                    ))
+                } else {
+                    if let Some(enum_info) = self.enum_info_for_ty(scrutinee_ty).cloned() {
+                        if path.segments.len() >= 2
+                            && enum_info.name.as_str()
+                                != path.segments[path.segments.len() - 2].ident.as_str()
+                        {
+                            if emit_diagnostics {
+                                self.emit_pattern_type_mismatch(pat, scrutinee_ty);
+                            }
+                            return None;
+                        }
+
+                        let Some(variant) = enum_info
+                            .variants
+                            .iter()
+                            .find(|variant| variant.name == *path.last_ident())
+                        else {
+                            if emit_diagnostics {
+                                self.emit_pattern_type_mismatch(pat, scrutinee_ty);
+                            }
+                            return None;
+                        };
+
+                        let args = variant
+                            .parameters
+                            .iter()
+                            .enumerate()
+                            .map(|(index, (field_name, field_ty))| {
+                                let field_pat = fields
+                                    .iter()
+                                    .find(|(name, _)| name.as_str() == field_name.as_str())
+                                    .or_else(|| fields.get(index))
+                                    .map(|(_, pat)| pat);
+                                match field_pat {
+                                    Some(field_pat) => self.pattern_shape(
+                                        field_pat,
+                                        &field_ty.kind,
+                                        emit_diagnostics,
+                                    ),
+                                    None => Some(PatShape::Wildcard),
+                                }
+                            })
+                            .collect::<Option<Vec<_>>>()?;
+
+                        Some(PatShape::Constructor(
+                            PatConstructor::EnumVariant {
+                                enum_name: enum_info.name.to_string(),
+                                variant_name: variant.name.to_string(),
+                            },
+                            args,
+                        ))
+                    } else if let Some(constructors) = builtin_enum_constructors(scrutinee_ty) {
+                        let enum_name = path
+                            .segments
+                            .iter()
+                            .nth_back(1)
+                            .map(|segment| segment.ident.to_string())
+                            .unwrap_or_default();
+                        let variant_name = path.last_ident().to_string();
+
+                        let Some((_, field_tys)) =
+                            constructors.into_iter().find(|(constructor, _)| {
+                                matches!(
+                                    constructor,
+                                    PatConstructor::EnumVariant {
+                                        enum_name: ctor_enum,
+                                        variant_name: ctor_variant,
+                                    } if *ctor_enum == enum_name && *ctor_variant == variant_name
+                                )
+                            })
+                        else {
+                            if emit_diagnostics {
+                                self.emit_pattern_type_mismatch(pat, scrutinee_ty);
+                            }
+                            return None;
+                        };
+
+                        let args = field_tys
+                            .iter()
+                            .enumerate()
+                            .map(|(index, field_ty)| {
+                                let field_pat = fields.get(index).map(|(_, pat)| pat);
+                                match field_pat {
+                                    Some(field_pat) => {
+                                        self.pattern_shape(field_pat, field_ty, emit_diagnostics)
+                                    }
+                                    None => Some(PatShape::Wildcard),
+                                }
+                            })
+                            .collect::<Option<Vec<_>>>()?;
+
+                        Some(PatShape::Constructor(
+                            PatConstructor::EnumVariant {
+                                enum_name,
+                                variant_name,
+                            },
+                            args,
+                        ))
+                    } else {
+                        if emit_diagnostics {
+                            self.emit_pattern_type_mismatch(pat, scrutinee_ty);
+                        }
+                        None
+                    }
+                }
+            }
+        }
+    }
+
+    fn list_pattern_shape(
+        &mut self,
+        items: &[hir::Pat],
+        elem_ty: &TyKind,
+        list_ty: &TyKind,
+        emit_diagnostics: bool,
+    ) -> Option<PatShape> {
+        fn tail_shape(
+            this: &mut TypeChecker,
+            items: &[hir::Pat],
+            elem_ty: &TyKind,
+            list_ty: &TyKind,
+            emit_diagnostics: bool,
+        ) -> Option<PatShape> {
+            match items {
+                [] => Some(PatShape::Wildcard),
+                [
+                    hir::Pat {
+                        kind: hir::PatKind::Rest(inner),
+                        ..
+                    },
+                ] => this.pattern_shape(inner, list_ty, emit_diagnostics),
+                [
+                    hir::Pat {
+                        kind: hir::PatKind::Rest(_),
+                        ..
+                    },
+                    ..,
+                ] => {
+                    if emit_diagnostics {
+                        this.emit_pattern_type_mismatch(&items[0], list_ty);
+                    }
+                    None
+                }
+                [head, tail @ ..] => Some(PatShape::Constructor(
+                    PatConstructor::ListCons,
+                    vec![
+                        this.pattern_shape(head, elem_ty, emit_diagnostics)?,
+                        tail_shape(this, tail, elem_ty, list_ty, emit_diagnostics)?,
+                    ],
+                )),
+            }
+        }
+
+        match items {
+            [] => Some(PatShape::Constructor(PatConstructor::ListEmpty, vec![])),
+            _ => tail_shape(self, items, elem_ty, list_ty, emit_diagnostics),
+        }
+    }
+
+    fn check_pattern_compatibility(&mut self, pat: &hir::Pat, scrutinee_ty: &TyKind) {
+        let _ = self.pattern_shape(pat, scrutinee_ty, true);
+    }
+
+    fn check_match_pattern_compatibility(&mut self, pat: &hir::Pat, scrutinee: &hir::Expr) {
+        if let (hir::PatKind::List(pats), hir::ExprKind::List(items)) = (&pat.kind, &scrutinee.kind)
+            && pats.len() == items.len()
+            && !pats
+                .iter()
+                .any(|item| matches!(item.kind, hir::PatKind::Rest(_)))
+        {
+            for (item_pat, item_expr) in pats.iter().zip(items.iter()) {
+                self.check_pattern_compatibility(item_pat, &item_expr.ty.kind);
+            }
+            return;
+        }
+
+        self.check_pattern_compatibility(pat, &scrutinee.ty.kind);
+    }
+
+    fn match_column_tys(scrutinee: &hir::Expr) -> Option<Vec<TyKind>> {
+        let hir::ExprKind::List(items) = &scrutinee.kind else {
+            return None;
+        };
+        if !Self::is_synthetic_match_value(scrutinee) {
+            return None;
+        }
+
+        Some(items.iter().map(|item| item.ty.kind.clone()).collect())
+    }
+
+    fn is_synthetic_match_value(scrutinee: &hir::Expr) -> bool {
+        if scrutinee.span != tlang_span::Span::default() {
+            return false;
+        }
+
+        let hir::ExprKind::List(items) = &scrutinee.kind else {
+            return false;
+        };
+
+        !items.is_empty()
+            && items.iter().all(|item| {
+                matches!(
+                    &item.kind,
+                    hir::ExprKind::Path(path)
+                        if path.res.binding_kind() == hir::BindingKind::Param
+                )
+            })
+    }
+
+    fn pattern_vector_for_match(
+        &mut self,
+        pat: &hir::Pat,
+        column_tys: &[TyKind],
+    ) -> Option<Vec<PatShape>> {
+        match &pat.kind {
+            hir::PatKind::Wildcard | hir::PatKind::Identifier(..) => {
+                Some(vec![PatShape::Wildcard; column_tys.len()])
+            }
+            hir::PatKind::List(items)
+                if items.len() == column_tys.len()
+                    && !items
+                        .iter()
+                        .any(|item| matches!(item.kind, hir::PatKind::Rest(_))) =>
+            {
+                items
+                    .iter()
+                    .zip(column_tys.iter())
+                    .map(|(item, ty)| self.pattern_shape(item, ty, false))
+                    .collect()
+            }
+            _ => None,
+        }
+    }
+
+    fn warn_on_redundant_match_arms(&mut self, scrutinee: &hir::Expr, arms: &[hir::MatchArm]) {
+        if let Some(column_tys) = Self::match_column_tys(scrutinee)
+            && arms.iter().all(|arm| {
+                self.pattern_vector_for_match(&arm.pat, &column_tys)
+                    .is_some()
+            })
+        {
+            let mut matrix: Vec<Vec<PatShape>> = Vec::new();
+            for arm in arms {
+                let shape = self
+                    .pattern_vector_for_match(&arm.pat, &column_tys)
+                    .expect("checked above");
+                if !is_useful(&matrix, &shape, &column_tys, &self.type_table) {
+                    self.push_warning(
+                        "unreachable match arm: pattern is already covered by previous arms",
+                        arm.pat.span,
+                    );
+                }
+                if arm.guard.is_none() {
+                    matrix.push(shape);
+                }
+            }
+            return;
+        }
+
+        let scrutinee_ty = scrutinee.ty.kind.clone();
+        let mut matrix: Vec<Vec<PatShape>> = Vec::new();
+
+        for arm in arms {
+            let Some(shape) = self.pattern_shape(&arm.pat, &scrutinee_ty, false) else {
+                continue;
+            };
+
+            if !is_useful(
+                &matrix,
+                std::slice::from_ref(&shape),
+                std::slice::from_ref(&scrutinee_ty),
+                &self.type_table,
+            ) {
+                self.push_warning(
+                    "unreachable match arm: pattern is already covered by previous arms",
+                    arm.pat.span,
+                );
+            }
+
+            if arm.guard.is_none() {
+                matrix.push(vec![shape]);
+            }
+        }
+    }
+
+    fn check_match_exhaustiveness(
+        &mut self,
+        expr_span: tlang_span::Span,
+        scrutinee: &hir::Expr,
+        arms: &[hir::MatchArm],
+    ) {
+        if arms.iter().any(|arm| arm.guard.is_some()) {
+            return;
+        }
+
+        if arms.iter().any(|arm| {
+            arm.guard.is_none()
+                && matches!(
+                    arm.pat.kind,
+                    hir::PatKind::Wildcard | hir::PatKind::Identifier(..)
+                )
+        }) {
+            return;
+        }
+
+        if let Some(column_tys) = Self::match_column_tys(scrutinee)
+            && arms.iter().all(|arm| {
+                self.pattern_vector_for_match(&arm.pat, &column_tys)
+                    .is_some()
+            })
+        {
+            if column_tys
+                .iter()
+                .any(|ty| matches!(ty, TyKind::Unknown | TyKind::Var(_) | TyKind::Union(_)))
+            {
+                return;
+            }
+
+            if arms.iter().filter(|arm| arm.guard.is_none()).any(|arm| {
+                self.pattern_vector_for_match(&arm.pat, &column_tys)
+                    .is_some_and(|patterns| patterns.iter().all(|pat| *pat == PatShape::Wildcard))
+            }) {
+                return;
+            }
+
+            let matrix = arms
+                .iter()
+                .filter(|arm| arm.guard.is_none())
+                .map(|arm| {
+                    self.pattern_vector_for_match(&arm.pat, &column_tys)
+                        .expect("checked above")
+                })
+                .collect::<Vec<_>>();
+
+            let wildcard_vector = vec![PatShape::Wildcard; column_tys.len()];
+            if is_useful(&matrix, &wildcard_vector, &column_tys, &self.type_table) {
+                self.errors.push(TypeError::NonExhaustiveMatch {
+                    scrutinee: scrutinee.ty.kind.to_string(),
+                    span: expr_span,
+                });
+            }
+            return;
+        }
+
+        let scrutinee_ty = &scrutinee.ty.kind;
+        if matches!(
+            scrutinee_ty,
+            TyKind::Unknown | TyKind::Var(_) | TyKind::Union(_)
+        ) {
+            return;
+        }
+
+        let matrix = arms
+            .iter()
+            .filter(|arm| arm.guard.is_none())
+            .filter_map(|arm| {
+                self.pattern_shape(&arm.pat, scrutinee_ty, false)
+                    .map(|shape| vec![shape])
+            })
+            .collect::<Vec<_>>();
+
+        if is_useful(
+            &matrix,
+            &[PatShape::Wildcard],
+            std::slice::from_ref(scrutinee_ty),
+            &self.type_table,
+        ) {
+            self.errors.push(TypeError::NonExhaustiveMatch {
+                scrutinee: scrutinee_ty.to_string(),
+                span: expr_span,
+            });
+        }
+    }
+
+    fn check_match_guard_type(&mut self, guard: &hir::Expr) {
+        if guard.is_let() {
+            return;
+        }
+
+        if matches!(guard.ty.kind, TyKind::Unknown | TyKind::Var(_)) {
+            return;
+        }
+
+        if !matches!(guard.ty.kind, TyKind::Primitive(PrimTy::Bool)) {
+            self.errors.push(TypeError::NonBooleanGuard {
+                actual: guard.ty.kind.to_string(),
+                span: guard.span,
+            });
+        }
+    }
+
     // ── Struct and enum declaration registration ──────────────────────
 
     /// Register a struct declaration in the type table: store field metadata
@@ -3137,6 +3727,7 @@ impl HirPass for TypeChecker {
         for error in self.errors.drain(..) {
             ctx.diagnostics.push((&error).into());
         }
+        ctx.diagnostics.append(&mut self.warnings);
 
         // The type checker does not transform the HIR (no changes reported).
         Ok(false)
@@ -3492,6 +4083,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     ty.kind.clone()
                 };
 
+                self.check_pattern_compatibility(pat, &binding_ty);
                 self.register_pat_bindings(pat, &binding_ty);
                 pat.ty.kind = binding_ty;
             }
@@ -3513,6 +4105,7 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     ty.kind.clone()
                 };
 
+                self.check_pattern_compatibility(pat, &binding_ty);
                 self.register_pat_bindings(pat, &binding_ty);
                 pat.ty.kind = binding_ty;
             }
@@ -3694,11 +4287,13 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 let mut arm_tys = Vec::with_capacity(arms.len());
                 for arm in arms.iter_mut() {
                     self.register_match_pat_bindings(&mut arm.pat, scrutinee);
+                    self.check_match_pattern_compatibility(&arm.pat, scrutinee);
                     if let Some(item_ty) = &iterator_item_ty {
                         self.register_iterator_next_pattern_bindings(&mut arm.pat, item_ty);
                     }
                     if let Some(guard) = &mut arm.guard {
                         self.visit_expr(guard, ctx);
+                        self.check_match_guard_type(guard);
                     }
                     self.visit_block(&mut arm.block, ctx);
                     arm_tys.push(
@@ -3711,6 +4306,8 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                 }
                 let match_ty =
                     Self::common_completion_type(arm_tys.iter()).unwrap_or(TyKind::Unknown);
+                self.warn_on_redundant_match_arms(scrutinee, arms);
+                self.check_match_exhaustiveness(expr.span, scrutinee, arms);
                 self.assign_expr_type(expr, match_ty);
             }
             hir::ExprKind::Loop(block) => {
@@ -3822,6 +4419,13 @@ impl<'hir> Visitor<'hir> for TypeChecker {
                     _ => TyKind::Unknown,
                 };
                 self.assign_expr_type(expr, result_ty);
+            }
+            hir::ExprKind::Let(pat, value) => {
+                self.visit_expr(value, ctx);
+                self.check_pattern_compatibility(pat, &value.ty.kind);
+                self.register_pat_bindings(pat, &value.ty.kind);
+                pat.ty.kind = value.ty.kind.clone();
+                self.assign_expr_type(expr, TyKind::Primitive(PrimTy::Bool));
             }
             _ => {
                 walk_expr(self, expr, ctx);
@@ -3947,6 +4551,442 @@ fn ty_contains_var(ty: &TyKind) -> bool {
         TyKind::Union(tys) => tys.iter().any(|t| ty_contains_var(&t.kind)),
         _ => false,
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum PatShape {
+    Wildcard,
+    Constructor(PatConstructor, Vec<PatShape>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum PatConstructor {
+    Bool(bool),
+    Literal(LiteralKey),
+    EnumVariant {
+        enum_name: String,
+        variant_name: String,
+    },
+    Struct(String),
+    ListEmpty,
+    ListCons,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum LiteralKey {
+    Bool(bool),
+    Integer(i64),
+    UnsignedInteger(u64),
+    Float(u64),
+    String(String),
+    Char(String),
+    None,
+}
+
+fn literal_key(literal: &Literal) -> LiteralKey {
+    match literal {
+        Literal::Boolean(value) => LiteralKey::Bool(*value),
+        Literal::Integer(value) => LiteralKey::Integer(*value),
+        Literal::UnsignedInteger(value) => LiteralKey::UnsignedInteger(*value),
+        Literal::Float(value) => LiteralKey::Float(value.to_bits()),
+        Literal::String(value) => LiteralKey::String(value.to_string()),
+        Literal::Char(value) => LiteralKey::Char(value.to_string()),
+        Literal::None => LiteralKey::None,
+    }
+}
+
+fn describe_pattern(pat: &hir::Pat) -> String {
+    match &pat.kind {
+        hir::PatKind::Wildcard => "_".to_string(),
+        hir::PatKind::Identifier(_, ident) => ident.to_string(),
+        hir::PatKind::Literal(literal) => format!("{literal:?}"),
+        hir::PatKind::List(_) => "list pattern".to_string(),
+        hir::PatKind::Rest(_) => "rest pattern".to_string(),
+        hir::PatKind::Enum(path, _) => path.join("::"),
+    }
+}
+
+fn literal_matches_type(literal: &Literal, ty: &TyKind) -> bool {
+    match ty {
+        TyKind::Unknown | TyKind::Var(_) => true,
+        TyKind::Primitive(PrimTy::Bool) => matches!(literal, Literal::Boolean(_)),
+        TyKind::Primitive(prim) if prim.is_signed_integer() => {
+            matches!(literal, Literal::Integer(_) | Literal::UnsignedInteger(_))
+        }
+        TyKind::Primitive(prim) if prim.is_unsigned_integer() => {
+            matches!(literal, Literal::UnsignedInteger(_) | Literal::Integer(_))
+        }
+        TyKind::Primitive(prim) if prim.is_float() => {
+            matches!(
+                literal,
+                Literal::Float(_) | Literal::Integer(_) | Literal::UnsignedInteger(_)
+            )
+        }
+        TyKind::Primitive(PrimTy::String) => matches!(literal, Literal::String(_)),
+        TyKind::Primitive(PrimTy::Char) => matches!(literal, Literal::Char(_)),
+        _ => false,
+    }
+}
+
+fn is_list_like_type(ty: &TyKind) -> bool {
+    matches!(ty, TyKind::List(_) | TyKind::Slice(_))
+        || matches!(ty, TyKind::Path(path, _) if path.first_ident().as_str() == "List")
+}
+
+fn list_item_ty(ty: &TyKind) -> Option<TyKind> {
+    match ty {
+        TyKind::List(inner) | TyKind::Slice(inner) => Some(inner.kind.clone()),
+        TyKind::Path(path, type_args) if path.first_ident().as_str() == "List" => type_args
+            .first()
+            .map(|ty| ty.kind.clone())
+            .or(Some(TyKind::Unknown)),
+        _ => None,
+    }
+}
+
+fn builtin_enum_constructors(ty: &TyKind) -> Option<Vec<(PatConstructor, Vec<TyKind>)>> {
+    match ty {
+        TyKind::Path(path, type_args) if path.first_ident().as_str() == "Option" => {
+            let item_ty = type_args
+                .first()
+                .map(|ty| ty.kind.clone())
+                .unwrap_or(TyKind::Unknown);
+            Some(vec![
+                (
+                    PatConstructor::EnumVariant {
+                        enum_name: "Option".to_string(),
+                        variant_name: "Some".to_string(),
+                    },
+                    vec![item_ty],
+                ),
+                (
+                    PatConstructor::EnumVariant {
+                        enum_name: "Option".to_string(),
+                        variant_name: "None".to_string(),
+                    },
+                    vec![],
+                ),
+            ])
+        }
+        TyKind::Path(path, type_args) if path.first_ident().as_str() == "Result" => {
+            let ok_ty = type_args
+                .first()
+                .map(|ty| ty.kind.clone())
+                .unwrap_or(TyKind::Unknown);
+            let err_ty = type_args
+                .get(1)
+                .map(|ty| ty.kind.clone())
+                .unwrap_or(TyKind::Unknown);
+            Some(vec![
+                (
+                    PatConstructor::EnumVariant {
+                        enum_name: "Result".to_string(),
+                        variant_name: "Ok".to_string(),
+                    },
+                    vec![ok_ty],
+                ),
+                (
+                    PatConstructor::EnumVariant {
+                        enum_name: "Result".to_string(),
+                        variant_name: "Err".to_string(),
+                    },
+                    vec![err_ty],
+                ),
+            ])
+        }
+        _ => None,
+    }
+}
+
+fn constructors_for_type(
+    ty: &TyKind,
+    type_table: &TypeTable,
+) -> Option<Vec<(PatConstructor, Vec<TyKind>)>> {
+    match ty {
+        TyKind::Primitive(PrimTy::Bool) => Some(vec![
+            (PatConstructor::Bool(false), vec![]),
+            (PatConstructor::Bool(true), vec![]),
+        ]),
+        TyKind::List(inner) => Some(vec![
+            (PatConstructor::ListEmpty, vec![]),
+            (
+                PatConstructor::ListCons,
+                vec![inner.kind.clone(), ty.clone()],
+            ),
+        ]),
+        TyKind::Slice(inner) => Some(vec![
+            (PatConstructor::ListEmpty, vec![]),
+            (
+                PatConstructor::ListCons,
+                vec![inner.kind.clone(), ty.clone()],
+            ),
+        ]),
+        TyKind::Path(path, type_args) if path.first_ident().as_str() == "List" => {
+            let item_ty = type_args
+                .first()
+                .map(|ty| ty.kind.clone())
+                .unwrap_or(TyKind::Unknown);
+            Some(vec![
+                (PatConstructor::ListEmpty, vec![]),
+                (PatConstructor::ListCons, vec![item_ty, ty.clone()]),
+            ])
+        }
+        TyKind::Path(path, _) => {
+            let name = path.first_ident().as_str();
+            if let Some(enum_info) = path
+                .res
+                .hir_id()
+                .and_then(|hir_id| type_table.get_enum_info(&hir_id))
+                .or_else(|| type_table.get_enum_info_by_name(name))
+            {
+                return Some(
+                    enum_info
+                        .variants
+                        .iter()
+                        .map(|variant| {
+                            (
+                                PatConstructor::EnumVariant {
+                                    enum_name: enum_info.name.to_string(),
+                                    variant_name: variant.name.to_string(),
+                                },
+                                variant
+                                    .parameters
+                                    .iter()
+                                    .map(|(_, variant_ty)| {
+                                        if ty_kinds_compatible(&variant_ty.kind, ty) {
+                                            TyKind::Unknown
+                                        } else {
+                                            variant_ty.kind.clone()
+                                        }
+                                    })
+                                    .collect(),
+                            )
+                        })
+                        .collect(),
+                );
+            }
+
+            if let Some(constructors) = builtin_enum_constructors(ty) {
+                return Some(constructors);
+            }
+
+            type_table.get_struct_info_by_name(name).map(|struct_info| {
+                vec![(
+                    PatConstructor::Struct(struct_info.name.to_string()),
+                    struct_info
+                        .fields
+                        .iter()
+                        .map(|(_, ty)| ty.kind.clone())
+                        .collect(),
+                )]
+            })
+        }
+        _ => None,
+    }
+}
+
+fn constructor_sub_tys(
+    ctor: &PatConstructor,
+    ty: &TyKind,
+    type_table: &TypeTable,
+) -> Option<Vec<TyKind>> {
+    constructors_for_type(ty, type_table)
+        .and_then(|constructors| {
+            constructors
+                .into_iter()
+                .find(|(candidate, _)| candidate == ctor)
+        })
+        .map(|(_, sub_tys)| sub_tys)
+        .or_else(|| match ctor {
+            PatConstructor::Literal(_) | PatConstructor::Bool(_) => Some(vec![]),
+            _ => None,
+        })
+}
+
+fn specialize_row(row: &[PatShape], ctor: &PatConstructor, arity: usize) -> Option<Vec<PatShape>> {
+    let head = row.first()?;
+    let tail = &row[1..];
+    match head {
+        PatShape::Wildcard => {
+            let mut specialized = vec![PatShape::Wildcard; arity];
+            specialized.extend_from_slice(tail);
+            Some(specialized)
+        }
+        PatShape::Constructor(candidate, args) if candidate == ctor => {
+            let mut specialized = args.clone();
+            specialized.extend_from_slice(tail);
+            Some(specialized)
+        }
+        _ => None,
+    }
+}
+
+fn specialize_matrix(
+    matrix: &[Vec<PatShape>],
+    ctor: &PatConstructor,
+    arity: usize,
+) -> Vec<Vec<PatShape>> {
+    matrix
+        .iter()
+        .filter_map(|row| specialize_row(row, ctor, arity))
+        .collect()
+}
+
+fn default_matrix(matrix: &[Vec<PatShape>]) -> Vec<Vec<PatShape>> {
+    matrix
+        .iter()
+        .filter_map(|row| match row.first() {
+            Some(PatShape::Wildcard) => Some(row[1..].to_vec()),
+            _ => None,
+        })
+        .collect()
+}
+
+#[allow(clippy::too_many_lines)]
+fn is_useful(
+    matrix: &[Vec<PatShape>],
+    vector: &[PatShape],
+    tys: &[TyKind],
+    type_table: &TypeTable,
+) -> bool {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    struct UsefulnessState {
+        tys: u64,
+        matrix: u64,
+        vector: u64,
+    }
+
+    fn hash_ty_kind(kind: &TyKind, state: &mut impl Hasher) {
+        std::mem::discriminant(kind).hash(state);
+        match kind {
+            TyKind::Unknown | TyKind::Never => {}
+            TyKind::Primitive(prim) => prim.hash(state),
+            TyKind::Fn(params, ret) => {
+                params.len().hash(state);
+                for param in params {
+                    hash_ty_kind(&param.kind, state);
+                }
+                hash_ty_kind(&ret.kind, state);
+            }
+            TyKind::List(inner) | TyKind::Slice(inner) => hash_ty_kind(&inner.kind, state),
+            TyKind::Dict(key, value) => {
+                hash_ty_kind(&key.kind, state);
+                hash_ty_kind(&value.kind, state);
+            }
+            TyKind::Var(id) => id.hash(state),
+            TyKind::Path(path, type_args) => {
+                path.segments.len().hash(state);
+                for segment in &path.segments {
+                    segment.ident.as_str().hash(state);
+                }
+                type_args.len().hash(state);
+                for type_arg in type_args {
+                    hash_ty_kind(&type_arg.kind, state);
+                }
+            }
+            TyKind::Union(types) => {
+                types.len().hash(state);
+                for ty in types {
+                    hash_ty_kind(&ty.kind, state);
+                }
+            }
+        }
+    }
+
+    fn hash_ty_kinds(tys: &[TyKind]) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        tys.len().hash(&mut hasher);
+        for ty in tys {
+            hash_ty_kind(ty, &mut hasher);
+        }
+        hasher.finish()
+    }
+
+    fn hash_value<T: Hash>(value: &T) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn inner(
+        matrix: &[Vec<PatShape>],
+        vector: &[PatShape],
+        tys: &[TyKind],
+        type_table: &TypeTable,
+        seen: &mut HashSet<UsefulnessState>,
+    ) -> bool {
+        if vector.is_empty() {
+            return matrix.is_empty();
+        }
+
+        let state = UsefulnessState {
+            tys: hash_ty_kinds(tys),
+            matrix: hash_value(&matrix),
+            vector: hash_value(&vector),
+        };
+        if !seen.insert(state) {
+            return false;
+        }
+
+        let head = &vector[0];
+        let tail = &vector[1..];
+        let head_ty = &tys[0];
+        let tail_tys = &tys[1..];
+
+        match head {
+            PatShape::Wildcard => {
+                if let Some(constructors) = constructors_for_type(head_ty, type_table) {
+                    constructors.into_iter().any(|(ctor, sub_tys)| {
+                        let arity = sub_tys.len();
+                        let mut specialized_vector = vec![PatShape::Wildcard; arity];
+                        specialized_vector.extend_from_slice(tail);
+
+                        let mut specialized_tys = sub_tys;
+                        specialized_tys.extend_from_slice(tail_tys);
+
+                        inner(
+                            &specialize_matrix(matrix, &ctor, arity),
+                            &specialized_vector,
+                            &specialized_tys,
+                            type_table,
+                            seen,
+                        )
+                    })
+                } else {
+                    let default = default_matrix(matrix);
+                    // When every row starts with a wildcard, only the
+                    // "default" branch remains relevant: constructor-specific
+                    // rows cannot distinguish the infinite remainder of the
+                    // domain (e.g. numeric or string literals).
+                    if default.len() == matrix.len() {
+                        inner(&default, tail, tail_tys, type_table, seen)
+                    } else {
+                        true
+                    }
+                }
+            }
+            PatShape::Constructor(ctor, args) => {
+                let Some(sub_tys) = constructor_sub_tys(ctor, head_ty, type_table) else {
+                    return true;
+                };
+                let mut specialized_vector = args.clone();
+                specialized_vector.extend_from_slice(tail);
+
+                let mut specialized_tys = sub_tys;
+                specialized_tys.extend_from_slice(tail_tys);
+
+                inner(
+                    &specialize_matrix(matrix, ctor, args.len()),
+                    &specialized_vector,
+                    &specialized_tys,
+                    type_table,
+                    seen,
+                )
+            }
+        }
+    }
+
+    inner(matrix, vector, tys, type_table, &mut HashSet::new())
 }
 
 /// Structurally match a concrete type against a pattern that may contain
