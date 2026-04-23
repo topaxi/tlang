@@ -710,6 +710,15 @@ pub fn type_at_definition(typed_hir: &TypedHir, def_line: u32, def_col: u32) -> 
 }
 
 /// Collect inferred types for definition-like positions in a single HIR walk.
+///
+/// The returned keys are 0-based `(line, column)` pairs matching editor/LSP
+/// coordinates. "Definition-like" includes named bindings and declarations
+/// such as `let`/`const` pattern bindings, function names, closure `fn`
+/// keywords, parameters, and nominal type declarations.
+///
+/// Use this when many definition lookups are needed at once (for example when
+/// enriching completion-oriented symbol tables). Use [`type_at_definition`] for
+/// one-off lookups at a specific position.
 pub fn collect_definition_types(typed_hir: &TypedHir) -> HashMap<(u32, u32), String> {
     let mut definitions = HashMap::new();
     collect_block_definition_types(
@@ -1010,10 +1019,14 @@ fn collect_fn_decl_definition_types(
         (decl.name.span.start_lc.line, decl.name.span.start_lc.column),
         signature.clone(),
     );
-    out.insert(
-        (decl.span.start_lc.line, decl.span.start_lc.column),
-        signature,
-    );
+    if decl.name.span.start == decl.name.span.end
+        && decl.name.span.start_lc == decl.name.span.end_lc
+    {
+        out.insert(
+            (decl.span.start_lc.line, decl.span.start_lc.column),
+            signature,
+        );
+    }
 
     for param in &decl.parameters {
         let ty = type_table.get(&param.hir_id).map(|info| &info.ty.kind);
