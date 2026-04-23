@@ -458,10 +458,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
                 kind: DefKind::Function(1),
                 defined_at: Span::lc(
                     LineColumn { line: 5, column: 3 },
-                    LineColumn {
-                        line: 5,
-                        column: 9
-                    }
+                    LineColumn { line: 5, column: 9 }
                 ),
                 scope_start: 5,
                 declared: true,
@@ -478,10 +475,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
                 kind: DefKind::Function(1),
                 defined_at: Span::lc(
                     LineColumn { line: 6, column: 3 },
-                    LineColumn {
-                        line: 6,
-                        column: 9
-                    }
+                    LineColumn { line: 6, column: 9 }
                 ),
                 scope_start: 6,
                 declared: true,
