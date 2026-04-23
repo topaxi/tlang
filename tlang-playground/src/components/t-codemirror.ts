@@ -9,6 +9,8 @@ import {
   tlangLanguageSupport,
   type HoverProvider,
   type GotoDefinitionProvider,
+  type SemanticToken,
+  type SemanticTokenProvider,
   type SignatureHelpProvider,
 } from 'codemirror-lang-tlang';
 import { inlayHints, type InlayHintSource } from 'codemirror-inlay-hints';
@@ -95,6 +97,15 @@ export class TCodeMirror extends LitElement {
   signatureHelpProvider?: SignatureHelpProvider;
 
   @property({ attribute: false })
+  semanticTokens?: SemanticToken[];
+
+  @property({ attribute: false })
+  semanticTokenProvider?: SemanticTokenProvider;
+
+  @property({ type: Number, attribute: 'semantic-token-debounce-ms' })
+  semanticTokenDebounceMs?: number;
+
+  @property({ attribute: false })
   inlayHintSource?: InlayHintSource;
 
   @hostListener('keyup')
@@ -123,6 +134,9 @@ export class TCodeMirror extends LitElement {
       hoverProvider: this.hoverProvider,
       gotoDefinitionProvider: this.gotoDefinitionProvider,
       signatureHelpProvider: this.signatureHelpProvider,
+      semanticTokens: this.semanticTokens,
+      semanticTokenProvider: this.semanticTokenProvider,
+      semanticTokenDebounceMs: this.semanticTokenDebounceMs,
     });
   }
 
@@ -222,7 +236,10 @@ export class TCodeMirror extends LitElement {
         this.language === 'tlang' &&
         (changedProperties.has('hoverProvider') ||
           changedProperties.has('gotoDefinitionProvider') ||
-          changedProperties.has('signatureHelpProvider'))
+          changedProperties.has('signatureHelpProvider') ||
+          changedProperties.has('semanticTokens') ||
+          changedProperties.has('semanticTokenProvider') ||
+          changedProperties.has('semanticTokenDebounceMs'))
       ) {
         this.view.dispatch({
           effects: this.tlangLangCompartment.reconfigure(

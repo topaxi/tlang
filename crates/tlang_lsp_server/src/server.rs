@@ -10,10 +10,11 @@ use lsp_types::{
     DidSaveTextDocumentParams, GotoDefinitionParams, GotoDefinitionResponse, HoverParams,
     HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, InlayHint,
     InlayHintParams, NumberOrString, ParameterInformation, ParameterLabel, ProgressParams,
-    ProgressParamsValue, PublishDiagnosticsParams, ServerCapabilities, SignatureHelpOptions,
-    SignatureHelpParams, SignatureInformation, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, Url, WorkDoneProgress,
-    WorkDoneProgressBegin, WorkDoneProgressCreateParams, WorkDoneProgressEnd,
+    ProgressParamsValue, PublishDiagnosticsParams, SemanticTokensFullOptions, SemanticTokensParams,
+    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities,
+    SignatureHelpOptions, SignatureHelpParams, SignatureInformation, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions, Url,
+    WorkDoneProgress, WorkDoneProgressBegin, WorkDoneProgressCreateParams, WorkDoneProgressEnd,
     WorkDoneProgressReport,
 };
 use serde::Deserialize;
@@ -24,6 +25,7 @@ use tracing::{error, warn};
 
 use crate::diagnostics;
 use crate::document_store::{DocumentStore, ParseCache, SymbolIndex};
+use crate::semantic_tokens;
 
 /// Create an empty AST module (used as a placeholder when parsing fails).
 fn empty_module() -> tlang_ast::node::Module {
@@ -110,6 +112,9 @@ impl ServerState {
             .request::<lsp_types::request::Completion, _>(Self::on_completion)
             .request::<lsp_types::request::SignatureHelpRequest, _>(Self::on_signature_help)
             .request::<lsp_types::request::InlayHintRequest, _>(Self::on_inlay_hint)
+            .request::<lsp_types::request::SemanticTokensFullRequest, _>(
+                Self::on_semantic_tokens_full,
+            )
             .notification::<lsp_types::notification::Initialized>(Self::on_initialized)
             .notification::<lsp_types::notification::Exit>(|_, _| ControlFlow::Break(Ok(())))
             .notification::<lsp_types::notification::DidOpenTextDocument>(Self::on_did_open)
@@ -172,6 +177,16 @@ impl ServerState {
                         ..SignatureHelpOptions::default()
                     }),
                     inlay_hint_provider: Some(lsp_types::OneOf::Left(true)),
+                    semantic_tokens_provider: Some(
+                        SemanticTokensServerCapabilities::SemanticTokensOptions(
+                            lsp_types::SemanticTokensOptions {
+                                work_done_progress_options: Default::default(),
+                                legend: semantic_tokens::legend(),
+                                range: None,
+                                full: Some(SemanticTokensFullOptions::Bool(true)),
+                            },
+                        ),
+                    ),
                     ..ServerCapabilities::default()
                 },
                 server_info: Some(lsp_types::ServerInfo {
@@ -457,6 +472,38 @@ impl ServerState {
         };
 
         Box::pin(async move { Ok(Some(hints)) })
+    }
+
+    fn on_semantic_tokens_full(
+        state: &mut Self,
+        params: SemanticTokensParams,
+    ) -> futures::future::BoxFuture<
+        'static,
+        Result<Option<SemanticTokensResult>, async_lsp::ResponseError>,
+    > {
+        let uri = params.text_document.uri;
+
+        Self::ensure_typed_hir(state, &uri);
+
+        let tokens = state
+            .store
+            .get(&uri)
+            .and_then(|doc| {
+                let cache = doc.parse_cache.as_ref()?;
+                let index = doc.symbol_index.as_ref()?;
+                Some(semantic_tokens::encode(&semantic_tokens::collect(
+                    &doc.source,
+                    &cache.module,
+                    index,
+                    doc.typed_hir.as_ref().and_then(Option::as_ref),
+                )))
+            })
+            .unwrap_or_else(|| lsp_types::SemanticTokens {
+                result_id: None,
+                data: vec![],
+            });
+
+        Box::pin(async move { Ok(Some(SemanticTokensResult::Tokens(tokens))) })
     }
 
     /// Convert an analysis-layer inlay hint to an LSP inlay hint.
@@ -1212,7 +1259,7 @@ fn char_column_to_utf16(source: &str, line: u32, char_column: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use lsp_types::{TextDocumentIdentifier, TextDocumentPositionParams};
+    use lsp_types::{SemanticTokenType, TextDocumentIdentifier, TextDocumentPositionParams};
 
     use super::*;
     use tlang_defs::DefKind;
@@ -1332,6 +1379,147 @@ mod tests {
         state.store.open(uri.clone(), 1, source.into());
         state.run_diagnostics(&uri, source);
         state
+    }
+
+    fn semantic_token_type_index(token_type: SemanticTokenType) -> u32 {
+        semantic_tokens::legend()
+            .token_types
+            .iter()
+            .position(|candidate| *candidate == token_type)
+            .expect("token type should exist in legend") as u32
+    }
+
+    fn decode_semantic_tokens(tokens: &lsp_types::SemanticTokens) -> Vec<(u32, u32, u32, u32)> {
+        let mut line = 0u32;
+        let mut start = 0u32;
+        let mut decoded = Vec::with_capacity(tokens.data.len());
+
+        for token in &tokens.data {
+            line += token.delta_line;
+            start = if token.delta_line == 0 {
+                start + token.delta_start
+            } else {
+                token.delta_start
+            };
+            decoded.push((line, start, token.length, token.token_type));
+        }
+
+        decoded
+    }
+
+    #[test]
+    fn initialize_advertises_semantic_tokens_full_capability() {
+        let client = async_lsp::ClientSocket::new_closed();
+        let mut state = ServerState {
+            client,
+            store: DocumentStore::new(),
+            target: CompilationTarget::Js,
+            progress_supported: false,
+            next_progress_token: 0,
+            startup_progress_reported: false,
+        };
+
+        let result = futures::executor::block_on(ServerState::on_initialize(
+            &mut state,
+            InitializeParams::default(),
+        ))
+        .expect("initialize should succeed");
+
+        let provider = result
+            .capabilities
+            .semantic_tokens_provider
+            .expect("semantic token capability should be present");
+
+        match provider {
+            SemanticTokensServerCapabilities::SemanticTokensOptions(options) => {
+                assert_eq!(options.full, Some(SemanticTokensFullOptions::Bool(true)));
+                assert!(options.range.is_none());
+                assert!(
+                    options
+                        .legend
+                        .token_types
+                        .contains(&SemanticTokenType::FUNCTION)
+                );
+                assert!(
+                    options
+                        .legend
+                        .token_types
+                        .contains(&SemanticTokenType::METHOD)
+                );
+            }
+            _ => panic!("unexpected semantic token capability variant"),
+        }
+    }
+
+    #[test]
+    fn semantic_tokens_full_returns_method_and_property_tokens() {
+        let mut state = setup_server_with_source(
+            "struct Vector { x: i64 }\nfn Vector.add(self, other: Vector) -> Vector { self.x }\nlet v = Vector { x: 1 };\nv.add(v);",
+        );
+
+        let result = futures::executor::block_on(ServerState::on_semantic_tokens_full(
+            &mut state,
+            SemanticTokensParams {
+                text_document: TextDocumentIdentifier { uri: test_uri() },
+                work_done_progress_params: Default::default(),
+                partial_result_params: Default::default(),
+            },
+        ))
+        .expect("semantic tokens request should succeed")
+        .expect("semantic tokens should be present");
+
+        let SemanticTokensResult::Tokens(tokens) = result else {
+            panic!("expected full semantic token response");
+        };
+        let decoded = decode_semantic_tokens(&tokens);
+
+        assert!(
+            decoded.iter().any(|&(line, start, length, token_type)| {
+                line == 3
+                    && start == 2
+                    && length == 3
+                    && token_type == semantic_token_type_index(SemanticTokenType::METHOD)
+            }),
+            "expected method token for `add`, got: {decoded:?}"
+        );
+        assert!(
+            decoded.iter().any(|&(line, start, length, token_type)| {
+                line == 1
+                    && start == 52
+                    && length == 1
+                    && token_type == semantic_token_type_index(SemanticTokenType::PROPERTY)
+            }),
+            "expected property token for `self.x`, got: {decoded:?}"
+        );
+    }
+
+    #[test]
+    fn semantic_tokens_full_returns_empty_tokens_for_unknown_document() {
+        let client = async_lsp::ClientSocket::new_closed();
+        let mut state = ServerState {
+            client,
+            store: DocumentStore::new(),
+            target: CompilationTarget::Js,
+            progress_supported: false,
+            next_progress_token: 0,
+            startup_progress_reported: false,
+        };
+
+        let result = futures::executor::block_on(ServerState::on_semantic_tokens_full(
+            &mut state,
+            SemanticTokensParams {
+                text_document: TextDocumentIdentifier { uri: test_uri() },
+                work_done_progress_params: Default::default(),
+                partial_result_params: Default::default(),
+            },
+        ))
+        .expect("semantic tokens request should succeed")
+        .expect("semantic tokens should be present");
+
+        let SemanticTokensResult::Tokens(tokens) = result else {
+            panic!("expected full semantic token response");
+        };
+        assert!(tokens.data.is_empty());
     }
 
     #[test]
