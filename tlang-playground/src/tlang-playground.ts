@@ -31,6 +31,7 @@ import {
 import { keyed } from 'lit/directives/keyed.js';
 import { live } from 'lit/directives/live.js';
 import { repeat } from 'lit/directives/repeat.js';
+import { type ReferencesProvider } from 'codemirror-lang-tlang';
 import { mediaQuery } from './decorators/media-query';
 import { floating } from './directives/floating';
 
@@ -382,10 +383,10 @@ export class TlangPlayground extends LitElement {
   private readonly gotoDefinitionProvider = (pos: number) =>
     this.tlang.getDefinitionLocation(pos);
 
-  private readonly referencesProvider = (
-    pos: number,
-    includeDeclaration = true,
-  ) => this.tlang.getReferences(pos, includeDeclaration);
+  private readonly referencesProvider: ReferencesProvider = (
+    pos,
+    includeDeclaration,
+  ) => this.tlang.getReferences(pos, includeDeclaration ?? true) ?? null;
 
   private readonly signatureHelpProvider = (pos: number) =>
     this.tlang.getSignatureHelp(pos);
