@@ -474,21 +474,28 @@ export function tlangSignatureHelp(provider) {
   ];
 }
 
-const setSemanticTokensEffect = StateEffect.define();
+function createSemanticTokensState() {
+  const setSemanticTokensEffect = StateEffect.define();
 
-const semanticTokensField = StateField.define({
-  create: () => Decoration.none,
-  update(decorations, tr) {
-    decorations = decorations.map(tr.changes);
-    for (const effect of tr.effects) {
-      if (effect.is(setSemanticTokensEffect)) {
-        decorations = effect.value;
+  const semanticTokensField = StateField.define({
+    create: () => Decoration.none,
+    update(decorations, tr) {
+      decorations = decorations.map(tr.changes);
+      for (const effect of tr.effects) {
+        if (effect.is(setSemanticTokensEffect)) {
+          decorations = effect.value;
+        }
       }
-    }
-    return decorations;
-  },
-  provide: (field) => EditorView.decorations.from(field),
-});
+      return decorations;
+    },
+    provide: (field) => EditorView.decorations.from(field),
+  });
+
+  return {
+    setSemanticTokensEffect,
+    semanticTokensField,
+  };
+}
 
 /**
  * @param {SemanticToken[]} tokens
@@ -515,6 +522,10 @@ function buildSemanticTokenDecorations(tokens, doc) {
  */
 function normalizeSemanticToken(token, docLength) {
   if (!token) return null;
+  if (typeof token.from !== 'number' || typeof token.to !== 'number') {
+    return null;
+  }
+  if (token.to <= token.from) return null;
 
   const from = Math.max(0, Math.min(token.from, docLength));
   const to = Math.max(from, Math.min(token.to, docLength));
@@ -560,62 +571,87 @@ function sanitizeSemanticTokenPart(value) {
  * @param {number} debounceMs
  */
 function makeSemanticTokenPlugin(provider, debounceMs) {
-  return ViewPlugin.fromClass(
-    class SemanticTokenView {
-      version = 0;
-      timeout = null;
+  const { setSemanticTokensEffect, semanticTokensField } =
+    createSemanticTokensState();
 
-      /**
-       * @param {EditorView} view
-       */
-      constructor(view) {
-        this.view = view;
-        this.schedule();
-      }
-
-      /**
-       * @param {import('@codemirror/view').ViewUpdate} update
-       */
-      update(update) {
-        if (update.docChanged) {
-          this.schedule();
-        }
-      }
-
-      destroy() {
-        if (this.timeout !== null) clearTimeout(this.timeout);
-        this.version++;
-      }
-
-      schedule() {
-        if (this.timeout !== null) clearTimeout(this.timeout);
-        this.timeout = setTimeout(() => {
-          this.timeout = null;
-          void this.run();
-        }, debounceMs);
-      }
-
-      async run() {
-        const version = ++this.version;
-        const code = this.view.state.doc.toString();
-
-        let tokens;
-        try {
-          tokens = await Promise.resolve(provider(code));
-        } catch {
-          return;
+  return {
+    semanticTokensField,
+    plugin: ViewPlugin.fromClass(
+      class SemanticTokenView {
+        /**
+         * @param {EditorView} view
+         */
+        constructor(view) {
+          this.view = view;
+          this.scheduler = new SemanticTokenScheduler({
+            provider,
+            debounceMs,
+            getCode: () => this.view.state.doc.toString(),
+            applyTokens: (tokens) => {
+              this.view.dispatch({
+                effects: setSemanticTokensEffect.of(
+                  buildSemanticTokenDecorations(tokens, this.view.state.doc),
+                ),
+              });
+            },
+          });
+          this.scheduler.schedule();
         }
 
-        if (version !== this.version) return;
+        /**
+         * @param {import('@codemirror/view').ViewUpdate} update
+         */
+        update(update) {
+          if (update.docChanged) {
+            this.scheduler.schedule();
+          }
+        }
 
-        this.view.dispatch({
-          effects: setSemanticTokensEffect.of(
-            buildSemanticTokenDecorations(tokens, this.view.state.doc),
-          ),
-        });
-      }
-    },
-  );
+        destroy() {
+          this.scheduler.destroy();
+        }
+      },
+    ),
+  };
+}
+
+class SemanticTokenScheduler {
+  constructor({ provider, debounceMs, getCode, applyTokens }) {
+    this.provider = provider;
+    this.debounceMs = debounceMs;
+    this.getCode = getCode;
+    this.applyTokens = applyTokens;
+    this.version = 0;
+    this.timeout = null;
+  }
+
+  destroy() {
+    if (this.timeout !== null) clearTimeout(this.timeout);
+    this.version++;
+  }
+
+  schedule() {
+    if (this.timeout !== null) clearTimeout(this.timeout);
+    this.timeout = setTimeout(() => {
+      this.timeout = null;
+      void this.run();
+    }, this.debounceMs);
+  }
+
+  async run() {
+    const version = ++this.version;
+    const code = this.getCode();
+
+    let tokens;
+    try {
+      tokens = await Promise.resolve(this.provider(code));
+    } catch {
+      return;
+    }
+
+    if (version !== this.version) return;
+    this.applyTokens(tokens);
+  }
 }
 
 /**
@@ -645,8 +681,16 @@ export function tlangSemanticTokens(source, config = {}) {
   }
 
   const debounceMs = config.debounceMs ?? 75;
-  return [semanticTokensField, makeSemanticTokenPlugin(source, debounceMs)];
+  const { semanticTokensField, plugin } = makeSemanticTokenPlugin(
+    source,
+    debounceMs,
+  );
+  return [semanticTokensField, plugin];
 }
+
+export const __testing = {
+  SemanticTokenScheduler,
+};
 
 /**
  * @param {number} index

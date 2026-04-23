@@ -498,9 +498,12 @@ impl ServerState {
                     doc.typed_hir.as_ref().and_then(Option::as_ref),
                 )))
             })
-            .map(SemanticTokensResult::Tokens);
+            .unwrap_or_else(|| lsp_types::SemanticTokens {
+                result_id: None,
+                data: vec![],
+            });
 
-        Box::pin(async move { Ok(tokens) })
+        Box::pin(async move { Ok(Some(SemanticTokensResult::Tokens(tokens))) })
     }
 
     /// Convert an analysis-layer inlay hint to an LSP inlay hint.
@@ -1487,6 +1490,35 @@ mod tests {
             }),
             "expected property token for `self.x`, got: {decoded:?}"
         );
+    }
+
+    #[test]
+    fn semantic_tokens_full_returns_empty_tokens_for_unknown_document() {
+        let client = async_lsp::ClientSocket::new_closed();
+        let mut state = ServerState {
+            client,
+            store: DocumentStore::new(),
+            target: CompilationTarget::Js,
+            progress_supported: false,
+            next_progress_token: 0,
+            startup_progress_reported: false,
+        };
+
+        let result = futures::executor::block_on(ServerState::on_semantic_tokens_full(
+            &mut state,
+            SemanticTokensParams {
+                text_document: TextDocumentIdentifier { uri: test_uri() },
+                work_done_progress_params: Default::default(),
+                partial_result_params: Default::default(),
+            },
+        ))
+        .expect("semantic tokens request should succeed")
+        .expect("semantic tokens should be present");
+
+        let SemanticTokensResult::Tokens(tokens) = result else {
+            panic!("expected full semantic token response");
+        };
+        assert!(tokens.data.is_empty());
     }
 
     #[test]

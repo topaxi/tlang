@@ -376,19 +376,30 @@ impl Collector<'_> {
     }
 
     fn visit_use_decl(&mut self, decl: &ast::UseDeclaration) {
-        for ident in &decl.path {
-            self.push(ident.span, TokenKind::Namespace, &[]);
+        for (index, ident) in decl.path.iter().enumerate() {
+            let (kind, modifiers) =
+                self.classify_path_prefix(&decl.path, index, false, ident.span, false);
+            self.push(ident.span, kind, &modifiers);
         }
 
         for item in &decl.items {
+            let mut qualified_item = decl.path.clone();
+            qualified_item.push(item.name);
+            let (item_kind, item_modifiers) = self.classify_path_prefix(
+                &qualified_item,
+                qualified_item.len().saturating_sub(1),
+                false,
+                item.span,
+                true,
+            );
+            self.push(item.name.span, item_kind, &item_modifiers);
+
             if let Some(alias) = &item.alias {
                 self.push(
                     alias.span,
                     TokenKind::Variable,
                     &[TokenModifier::Declaration],
                 );
-            } else {
-                self.push(item.name.span, TokenKind::Namespace, &[]);
             }
         }
     }
@@ -610,27 +621,11 @@ impl Collector<'_> {
             return;
         }
 
-        let last_index = path.segments.len().saturating_sub(1);
-        for segment in path.segments.iter().take(last_index) {
-            self.push(segment.span, TokenKind::Namespace, &[]);
-        }
-
-        let Some(last) = path.segments.last() else {
-            return;
-        };
-
-        if type_context && path.segments.len() == 1 && self.is_active_type_param(last.as_str()) {
-            self.push(last.span, TokenKind::TypeParameter, &[]);
-            return;
-        }
-
-        if let Some((kind, modifiers)) = self.classify_resolved_symbol(last.span) {
-            self.push(last.span, kind, &modifiers);
-            return;
-        }
-
-        if type_context {
-            self.push(last.span, TokenKind::Type, &[]);
+        for (index, segment) in path.segments.iter().enumerate() {
+            let is_last = index + 1 == path.segments.len();
+            let (kind, modifiers) =
+                self.classify_path_prefix(&path.segments, index, type_context, path.span, is_last);
+            self.push(segment.span, kind, &modifiers);
         }
     }
 
@@ -677,6 +672,71 @@ impl Collector<'_> {
             map_def_kind(resolved.def_kind),
             modifiers_for_symbol(&resolved),
         ))
+    }
+
+    fn classify_path_prefix(
+        &self,
+        segments: &[ast::Ident],
+        index: usize,
+        type_context: bool,
+        span: Span,
+        is_last: bool,
+    ) -> (TokenKind, Vec<TokenModifier>) {
+        let ident = &segments[index];
+        if type_context && segments.len() == 1 && self.is_active_type_param(ident.as_str()) {
+            return (TokenKind::TypeParameter, vec![]);
+        }
+
+        if is_last && let Some((kind, modifiers)) = self.classify_resolved_symbol(ident.span) {
+            return (kind, modifiers);
+        }
+
+        let qualified_name = segments
+            .iter()
+            .take(index + 1)
+            .map(ast::Ident::as_str)
+            .collect::<Vec<_>>()
+            .join("::");
+
+        if let Some((kind, modifiers)) = self.classify_qualified_name(&qualified_name, span) {
+            return (kind, modifiers);
+        }
+
+        if is_last {
+            if type_context || starts_with_uppercase(ident.as_str()) {
+                (TokenKind::Type, vec![])
+            } else {
+                (TokenKind::Namespace, vec![])
+            }
+        } else if starts_with_uppercase(ident.as_str()) {
+            (TokenKind::Type, vec![])
+        } else {
+            (TokenKind::Namespace, vec![])
+        }
+    }
+
+    fn classify_qualified_name(
+        &self,
+        qualified_name: &str,
+        span: Span,
+    ) -> Option<(TokenKind, Vec<TokenModifier>)> {
+        let entry = self
+            .index
+            .get_closest_by_name(self.module.id, qualified_name, span)?;
+        let resolved = query::ResolvedSymbol {
+            name: qualified_name.to_string(),
+            qualified_name: entry.name.to_string(),
+            ident_span: span,
+            def_kind: entry.kind,
+            def_span: entry.defined_at,
+            builtin: entry.builtin,
+            type_info: None,
+            node_id: entry.node_id,
+            hir_id: entry.hir_id,
+            signature: None,
+            documentation: None,
+        };
+        Some((map_def_kind(entry.kind), modifiers_for_symbol(&resolved)))
     }
 
     fn push_type_params(&mut self, type_params: &[ast::TypeParam]) {
@@ -765,6 +825,12 @@ fn modifiers_for_symbol(resolved: &query::ResolvedSymbol) -> Vec<TokenModifier> 
         modifiers.push(TokenModifier::DefaultLibrary);
     }
     modifiers
+}
+
+fn starts_with_uppercase(name: &str) -> bool {
+    name.chars()
+        .next()
+        .is_some_and(|ch| ch.is_ascii_uppercase())
 }
 
 fn token_type(kind: TokenKind) -> SemanticTokenType {
@@ -914,6 +980,40 @@ mod tests {
         assert!(
             find_token(&tokens, source, "plus", TokenKind::Variable, 0)
                 .has_modifier(TokenModifier::Declaration)
+        );
+    }
+
+    #[test]
+    fn classifies_use_items_and_qualified_prefixes() {
+        let source = "struct Point { x: i64 }\nfn Point.sum(self) -> i64 { self.x }\nuse Point::sum as plus;\nfn main() { plus }";
+        let tokens = collect_for(source);
+
+        assert_eq!(
+            find_token(&tokens, source, "Point", TokenKind::Struct, 1).kind,
+            TokenKind::Struct
+        );
+        assert_eq!(
+            find_token(&tokens, source, "sum", TokenKind::Method, 1).kind,
+            TokenKind::Method
+        );
+        assert!(
+            find_token(&tokens, source, "plus", TokenKind::Variable, 0)
+                .has_modifier(TokenModifier::Declaration)
+        );
+    }
+
+    #[test]
+    fn classifies_non_final_enum_path_segments() {
+        let source = "enum Option<T> { Some(T), None }\nfn wrap(value) { Option::Some(value) }";
+        let tokens = collect_for(source);
+
+        assert_eq!(
+            find_token(&tokens, source, "Option", TokenKind::Enum, 1).kind,
+            TokenKind::Enum
+        );
+        assert_eq!(
+            find_token(&tokens, source, "Some", TokenKind::EnumMember, 1).kind,
+            TokenKind::EnumMember
         );
     }
 
