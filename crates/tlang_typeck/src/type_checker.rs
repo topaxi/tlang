@@ -1,4 +1,5 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, hash_map::DefaultHasher};
+use std::hash::{Hash, Hasher};
 
 use tlang_ast::node::UnaryOp;
 use tlang_ast::token::Literal;
@@ -2255,12 +2256,34 @@ impl TypeChecker {
     }
 
     fn match_column_tys(scrutinee: &hir::Expr) -> Option<Vec<TyKind>> {
-        match &scrutinee.kind {
-            hir::ExprKind::List(items) => {
-                Some(items.iter().map(|item| item.ty.kind.clone()).collect())
-            }
-            _ => None,
+        if !Self::is_synthetic_match_value(scrutinee) {
+            return None;
         }
+
+        let hir::ExprKind::List(items) = &scrutinee.kind else {
+            return None;
+        };
+
+        Some(items.iter().map(|item| item.ty.kind.clone()).collect())
+    }
+
+    fn is_synthetic_match_value(scrutinee: &hir::Expr) -> bool {
+        if scrutinee.span != tlang_span::Span::default() {
+            return false;
+        }
+
+        let hir::ExprKind::List(items) = &scrutinee.kind else {
+            return false;
+        };
+
+        !items.is_empty()
+            && items.iter().all(|item| {
+                matches!(
+                    &item.kind,
+                    hir::ExprKind::Path(path)
+                        if path.res.binding_kind() == hir::BindingKind::Param
+                )
+            })
     }
 
     fn pattern_vector_for_match(
@@ -4689,14 +4712,14 @@ fn constructors_for_type(
             (PatConstructor::ListEmpty, vec![]),
             (
                 PatConstructor::ListCons,
-                vec![inner.kind.clone(), TyKind::Unknown],
+                vec![inner.kind.clone(), ty.clone()],
             ),
         ]),
         TyKind::Slice(inner) => Some(vec![
             (PatConstructor::ListEmpty, vec![]),
             (
                 PatConstructor::ListCons,
-                vec![inner.kind.clone(), TyKind::Unknown],
+                vec![inner.kind.clone(), ty.clone()],
             ),
         ]),
         TyKind::Path(path, type_args) if path.first_ident().as_str() == "List" => {
@@ -4706,7 +4729,7 @@ fn constructors_for_type(
                 .unwrap_or(TyKind::Unknown);
             Some(vec![
                 (PatConstructor::ListEmpty, vec![]),
-                (PatConstructor::ListCons, vec![item_ty, TyKind::Unknown]),
+                (PatConstructor::ListCons, vec![item_ty, ty.clone()]),
             ])
         }
         TyKind::Path(path, _) => {
@@ -4820,24 +4843,88 @@ fn default_matrix(matrix: &[Vec<PatShape>]) -> Vec<Vec<PatShape>> {
         .collect()
 }
 
+#[allow(clippy::too_many_lines)]
 fn is_useful(
     matrix: &[Vec<PatShape>],
     vector: &[PatShape],
     tys: &[TyKind],
     type_table: &TypeTable,
 ) -> bool {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    struct UsefulnessState {
+        tys: u64,
+        matrix: u64,
+        vector: u64,
+    }
+
+    fn hash_ty_kind(kind: &TyKind, state: &mut impl Hasher) {
+        std::mem::discriminant(kind).hash(state);
+        match kind {
+            TyKind::Unknown | TyKind::Never => {}
+            TyKind::Primitive(prim) => prim.hash(state),
+            TyKind::Fn(params, ret) => {
+                params.len().hash(state);
+                for param in params {
+                    hash_ty_kind(&param.kind, state);
+                }
+                hash_ty_kind(&ret.kind, state);
+            }
+            TyKind::List(inner) | TyKind::Slice(inner) => hash_ty_kind(&inner.kind, state),
+            TyKind::Dict(key, value) => {
+                hash_ty_kind(&key.kind, state);
+                hash_ty_kind(&value.kind, state);
+            }
+            TyKind::Var(id) => id.hash(state),
+            TyKind::Path(path, type_args) => {
+                path.segments.len().hash(state);
+                for segment in &path.segments {
+                    segment.ident.as_str().hash(state);
+                }
+                type_args.len().hash(state);
+                for type_arg in type_args {
+                    hash_ty_kind(&type_arg.kind, state);
+                }
+            }
+            TyKind::Union(types) => {
+                types.len().hash(state);
+                for ty in types {
+                    hash_ty_kind(&ty.kind, state);
+                }
+            }
+        }
+    }
+
+    fn hash_ty_kinds(tys: &[TyKind]) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        tys.len().hash(&mut hasher);
+        for ty in tys {
+            hash_ty_kind(ty, &mut hasher);
+        }
+        hasher.finish()
+    }
+
+    fn hash_patterns<T: Hash>(value: &T) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        hasher.finish()
+    }
+
     fn inner(
         matrix: &[Vec<PatShape>],
         vector: &[PatShape],
         tys: &[TyKind],
         type_table: &TypeTable,
-        seen: &mut HashSet<String>,
+        seen: &mut HashSet<UsefulnessState>,
     ) -> bool {
         if vector.is_empty() {
             return matrix.is_empty();
         }
 
-        let state = format!("{tys:?}|{matrix:?}|{vector:?}");
+        let state = UsefulnessState {
+            tys: hash_ty_kinds(tys),
+            matrix: hash_patterns(&matrix),
+            vector: hash_patterns(&vector),
+        };
         if !seen.insert(state) {
             return false;
         }

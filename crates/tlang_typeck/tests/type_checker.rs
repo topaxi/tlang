@@ -3013,6 +3013,22 @@ fn non_exhaustive_list_match_reports_dedicated_diagnostic() {
 }
 
 #[test]
+fn list_literal_scrutinee_does_not_use_synthetic_multi_column_exhaustiveness() {
+    let errs = common::typecheck_errors(
+        r#"
+        let value = match [1, 2] {
+            [x, y] => x + y,
+        };
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("non-exhaustive match") && e.contains("List<i64>")),
+        "expected list literal match to remain non-exhaustive, got: {errs:?}"
+    );
+}
+
+#[test]
 fn non_exhaustive_numeric_match_reports_dedicated_diagnostic() {
     let errs = common::typecheck_errors(
         r#"
@@ -3041,6 +3057,62 @@ fn non_exhaustive_string_match_reports_dedicated_diagnostic() {
         errs.iter()
             .any(|e| e.contains("non-exhaustive match") && e.contains("String")),
         "expected non-exhaustive string diagnostic, got: {errs:?}"
+    );
+}
+
+#[test]
+fn builtin_list_tail_patterns_are_checked_structurally() {
+    let errs = common::typecheck_errors(
+        r#"
+        enum List {
+            Nil,
+            Cons(i64, List),
+        }
+
+        fn describe(xs: List) -> i64 {
+            match xs {
+                List::Nil => 0,
+                List::Cons(_, List::Nil) => 1,
+            }
+        }
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("non-exhaustive match") && e.contains("List")),
+        "expected structural tail analysis for builtin list constructors, got: {errs:?}"
+    );
+}
+
+#[test]
+fn redundant_builtin_list_tail_arm_is_reported_as_warning() {
+    let (_, diagnostics) = common::typecheck(
+        r#"
+        enum List {
+            Nil,
+            Cons(i64, List),
+        }
+
+        fn describe(xs: List) -> i64 {
+            match xs {
+                List::Nil => 0,
+                List::Cons(_, _) => 1,
+                List::Cons(_, List::Nil) => 2,
+            }
+        }
+        "#,
+    );
+    let warnings = diagnostics
+        .into_iter()
+        .filter(|diagnostic| diagnostic.is_warning())
+        .map(|diagnostic| diagnostic.message().to_string())
+        .collect::<Vec<_>>();
+
+    assert!(
+        warnings
+            .iter()
+            .any(|message| message.contains("unreachable match arm")),
+        "expected structural list-tail redundancy warning, got: {warnings:?}"
     );
 }
 
