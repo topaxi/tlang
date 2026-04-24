@@ -241,7 +241,7 @@ fn resolve_found_node(index: &SymbolIndex, found: find_node::FoundNode) -> Optio
     Some(ResolvedSymbol {
         name: found.name,
         qualified_name: entry.name.to_string(),
-        ident_span: found.span,
+        ident_span: found.ident_span,
         def_kind: entry.kind,
         def_span: entry.defined_at,
         builtin: entry.builtin,
@@ -280,7 +280,7 @@ pub fn find_references(
     let mut references = vec![];
 
     for found in collector.nodes {
-        let span = found.span;
+        let ident_span = found.ident_span;
         let Some(resolved) = resolve_found_node(index, found) else {
             continue;
         };
@@ -289,14 +289,14 @@ pub fn find_references(
             continue;
         }
 
-        let is_declaration = span == resolved.def_span;
+        let is_declaration = ident_span == resolved.def_span;
         if !include_declaration && is_declaration {
             continue;
         }
 
-        if seen.insert((span.start, span.end)) {
+        if seen.insert((ident_span.start, ident_span.end)) {
             references.push(SymbolReference {
-                ident_span: span,
+                ident_span,
                 def_span: resolved.def_span,
                 is_declaration,
             });
@@ -326,7 +326,7 @@ pub fn prepare_rename(
 
     Some(PreparedRename {
         ident_span: symbol.ident_span,
-        placeholder: symbol.name,
+        placeholder: rename_placeholder(&symbol).to_string(),
     })
 }
 
@@ -567,6 +567,10 @@ fn find_import_binding(module: &ast::Module, def_span: Span) -> Option<ImportBin
     })
 }
 
+fn rename_placeholder(symbol: &ResolvedSymbol) -> &str {
+    symbol.name.rsplit("::").next().unwrap_or(&symbol.name)
+}
+
 fn should_include_rename_reference(
     reference: &SymbolReference,
     import_binding: Option<ImportBinding>,
@@ -593,9 +597,14 @@ impl ReferenceNodeCollector {
     }
 
     fn record_ident(&mut self, name: &str, span: Span) {
+        self.record_ident_with_span(name, span, span);
+    }
+
+    fn record_ident_with_span(&mut self, name: &str, span: Span, ident_span: Span) {
         self.nodes.push(find_node::FoundNode {
             name: name.to_string(),
             span,
+            ident_span,
             scope_id: self.current_scope(),
             field_base: None,
             call_arity: self.current_call_arity,
@@ -607,6 +616,7 @@ impl ReferenceNodeCollector {
         self.nodes.push(find_node::FoundNode {
             name: name.to_string(),
             span,
+            ident_span: span,
             scope_id: self.current_scope(),
             field_base: Some(base_name),
             call_arity: self.current_call_arity,
@@ -659,7 +669,11 @@ impl<'ast> Visitor<'ast> for ReferenceNodeCollector {
 
     fn visit_path(&mut self, path: &'ast ast::Path, _ctx: &mut ()) {
         if path.segments.len() > 1 {
-            self.record_ident(&path.to_string(), path.span);
+            let ident_span = path
+                .segments
+                .last()
+                .map_or(path.span, |segment| segment.span);
+            self.record_ident_with_span(&path.to_string(), path.span, ident_span);
         } else if let Some(segment) = path.segments.first() {
             self.record_ident(segment.as_str(), path.span);
         }
@@ -2296,6 +2310,44 @@ mod tests {
                 .map(|edit| (edit.span.start_lc.line, edit.span.start_lc.column))
                 .collect::<Vec<_>>(),
             vec![(0, 15), (1, 38)]
+        );
+    }
+
+    #[test]
+    fn prepare_rename_uses_last_segment_for_qualified_paths() {
+        let source =
+            "struct Point { x: i64 }\nfn Point.sum(self) -> i64 { self.x }\nlet f = Point::sum;";
+
+        let prepared =
+            prepare_test_rename(source, 2, 8).expect("qualified path should be renameable");
+
+        assert_eq!(prepared.placeholder, "sum");
+        assert_eq!(prepared.ident_span.start_lc.line, 2);
+        assert_eq!(prepared.ident_span.start_lc.column, 15);
+        assert_eq!(prepared.ident_span.end_lc.column, 18);
+    }
+
+    #[test]
+    fn rename_updates_only_member_segment_for_qualified_paths() {
+        let source = "struct Point { x: i64 }\nfn Point.sum(self) -> i64 { self.x }\nlet f = Point::sum;\nPoint::sum(Point { x: 1 });";
+        let edits = find_test_rename_edits(source, 2, 8, "total")
+            .expect("qualified path rename should succeed");
+
+        assert_eq!(
+            edits
+                .iter()
+                .map(|edit| (
+                    edit.span.start_lc.line,
+                    edit.span.start_lc.column,
+                    edit.span.end_lc.column,
+                    edit.new_text.as_str()
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                (1, 9, 12, "total"),
+                (2, 15, 18, "total"),
+                (3, 7, 10, "total")
+            ]
         );
     }
 
