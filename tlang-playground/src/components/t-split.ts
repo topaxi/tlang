@@ -1,4 +1,4 @@
-import { css, html, LitElement, TemplateResult } from 'lit';
+import { css, html, LitElement, PropertyValueMap, TemplateResult } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 import { throttleAnimationFrame } from '../utils/debounce';
 
@@ -101,6 +101,15 @@ export class SplitElement extends LitElement implements EventListenerObject {
     secondContainer: string;
     touched: boolean;
   } | null = null;
+
+  override firstUpdated(changedProperties: PropertyValueMap<typeof this>) {
+    super.firstUpdated(changedProperties);
+
+    this.addEventListener('dblclick', this);
+    this.addEventListener('mousedown', this);
+    this.addEventListener('touchstart', this);
+    this.addEventListener('keyup', this);
+  }
 
   reset(): void {
     let event = new SplitEvent('t-split-reset');
@@ -256,6 +265,11 @@ export class SplitElement extends LitElement implements EventListenerObject {
       return;
     }
 
+    const [originalTarget] = e.composedPath();
+    if (originalTarget !== this.handle) {
+      return;
+    }
+
     let event = e as
       | (MouseEvent & { type: 'dblclick' | `mouse${string}` })
       | (KeyboardEvent & { type: `key${string}` })
@@ -344,10 +358,6 @@ export class SplitElement extends LitElement implements EventListenerObject {
         tabindex="0"
         aria-controls="first"
         aria-orientation=${this.direction}
-        @dblclick=${this}
-        @mousedown=${this}
-        @touchstart=${this}
-        @keyup=${this}
       />
       <slot name="second" part="second" role="region"></slot>
     `;
