@@ -270,6 +270,18 @@ impl<'ast> Visitor<'ast> for NodeFinder {
             }
             return;
         }
+        if let node::StmtKind::UseDeclaration(ref decl) = statement.kind {
+            for segment in &decl.path {
+                self.visit_ident(segment, ctx);
+            }
+            for item in &decl.items {
+                self.visit_ident(&item.name, ctx);
+                if let Some(alias) = &item.alias {
+                    self.visit_ident(alias, ctx);
+                }
+            }
+            return;
+        }
         visit::walk_stmt(self, statement, ctx);
     }
 

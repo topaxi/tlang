@@ -7,9 +7,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use tlang_ast::node as ast;
 use tlang_ast::token::{CommentKind, CommentToken, Literal};
 use tlang_ast::visit::{self, Visitor};
+use tlang_ast::{keyword, node as ast};
 use tlang_defs::DefKind;
 use tlang_hir as hir;
 use tlang_span::{HirId, NodeId, Span, TypeVarId};
@@ -87,6 +87,42 @@ pub struct SymbolReference {
     pub def_span: Span,
     /// Whether this occurrence is itself a declaration.
     pub is_declaration: bool,
+}
+
+/// Information returned by prepare-rename style requests.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreparedRename {
+    /// The source span of the identifier being renamed.
+    pub ident_span: Span,
+    /// The current identifier text to prefill in the client UI.
+    pub placeholder: String,
+}
+
+/// A single textual rename edit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenameEdit {
+    /// The source span to replace. Zero-length spans represent insertions.
+    pub span: Span,
+    /// The replacement text for this edit.
+    pub new_text: String,
+}
+
+/// Validation failures for rename requests.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RenameError {
+    InvalidTarget,
+    InvalidNewName(String),
+}
+
+impl std::fmt::Display for RenameError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RenameError::InvalidTarget => {
+                write!(f, "rename is not available at this position")
+            }
+            RenameError::InvalidNewName(message) => f.write_str(message),
+        }
+    }
 }
 
 /// Populate hover-specific type, signature, and documentation details.
@@ -279,6 +315,76 @@ pub fn find_references(
     references
 }
 
+/// Prepare a rename at the given **0-based** `(line, column)`.
+pub fn prepare_rename(
+    module: &ast::Module,
+    index: &SymbolIndex,
+    line: u32,
+    column: u32,
+) -> Option<PreparedRename> {
+    let (symbol, _) = prepare_rename_target(module, index, line, column)?;
+
+    Some(PreparedRename {
+        ident_span: symbol.ident_span,
+        placeholder: symbol.name,
+    })
+}
+
+/// Compute textual edits for a rename at the given **0-based** `(line, column)`.
+pub fn rename(
+    module: &ast::Module,
+    index: &SymbolIndex,
+    line: u32,
+    column: u32,
+    new_name: &str,
+) -> Result<Vec<RenameEdit>, RenameError> {
+    validate_new_name(new_name)?;
+
+    let Some((symbol, import_binding)) = prepare_rename_target(module, index, line, column) else {
+        return Err(RenameError::InvalidTarget);
+    };
+
+    let mut edits = find_references(module, index, line, column, true)
+        .into_iter()
+        .filter(|reference| {
+            !import_binding.is_some_and(|binding| {
+                binding.alias_span.is_none()
+                    && reference.is_declaration
+                    && reference.ident_span == symbol.def_span
+            })
+        })
+        .map(|reference| RenameEdit {
+            span: reference.ident_span,
+            new_text: new_name.to_string(),
+        })
+        .collect::<Vec<_>>();
+
+    if let Some(binding) = import_binding
+        && binding.alias_span.is_none()
+    {
+        edits.push(RenameEdit {
+            span: Span::new(
+                binding.name_span.end,
+                binding.name_span.end,
+                binding.name_span.end_lc,
+                binding.name_span.end_lc,
+            ),
+            new_text: format!(" as {new_name}"),
+        });
+    }
+
+    edits.sort_by_key(|edit| {
+        (
+            edit.span.start,
+            edit.span.end,
+            edit.new_text.is_empty(),
+            edit.new_text.clone(),
+        )
+    });
+
+    Ok(edits)
+}
+
 /// Resolve the inferred type for the value or symbol under the cursor.
 ///
 /// `line` and `column` are editor-style 0-based coordinates.
@@ -374,6 +480,97 @@ fn normalize_reference_kind(kind: DefKind) -> DefKind {
         DefKind::FunctionSelfRef(arity) => DefKind::Function(arity),
         _ => kind,
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ImportBinding {
+    name_span: Span,
+    alias_span: Option<Span>,
+}
+
+fn prepare_rename_target(
+    module: &ast::Module,
+    index: &SymbolIndex,
+    line: u32,
+    column: u32,
+) -> Option<(ResolvedSymbol, Option<ImportBinding>)> {
+    let symbol = resolve_symbol(module, index, line, column)?;
+
+    if symbol.builtin || symbol.temp || !is_renameable_def_kind(symbol.def_kind) {
+        return None;
+    }
+
+    let import_binding = find_import_binding(module, symbol.def_span);
+    if import_binding
+        .is_some_and(|binding| binding.alias_span.is_some() && binding.name_span == symbol.def_span)
+    {
+        return None;
+    }
+
+    Some((symbol, import_binding))
+}
+
+fn is_renameable_def_kind(kind: DefKind) -> bool {
+    matches!(
+        normalize_reference_kind(kind),
+        DefKind::Variable
+            | DefKind::Const
+            | DefKind::Parameter
+            | DefKind::Function(_)
+            | DefKind::StructMethod(_)
+            | DefKind::ProtocolMethod(_)
+            | DefKind::Struct
+            | DefKind::Enum
+            | DefKind::EnumVariant(_)
+            | DefKind::StructField
+    )
+}
+
+fn validate_new_name(new_name: &str) -> Result<(), RenameError> {
+    let mut chars = new_name.chars();
+    let Some(first) = chars.next() else {
+        return Err(RenameError::InvalidNewName(
+            "rename target cannot be empty".into(),
+        ));
+    };
+
+    if (!first.is_ascii_alphabetic() && first != '_')
+        || !chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+    {
+        return Err(RenameError::InvalidNewName(
+            "rename target must be an ASCII identifier".into(),
+        ));
+    }
+
+    if keyword::is_keyword(new_name) {
+        return Err(RenameError::InvalidNewName(format!(
+            "`{new_name}` is a reserved keyword"
+        )));
+    }
+
+    Ok(())
+}
+
+fn find_import_binding(module: &ast::Module, def_span: Span) -> Option<ImportBinding> {
+    module.statements.iter().find_map(|statement| {
+        let ast::StmtKind::UseDeclaration(decl) = &statement.kind else {
+            return None;
+        };
+
+        decl.items.iter().find_map(|item| {
+            let alias_span = item.alias.as_ref().map(|alias| alias.span);
+            let binding_span = alias_span.unwrap_or(item.name.span);
+
+            if binding_span == def_span || item.name.span == def_span {
+                Some(ImportBinding {
+                    name_span: item.name.span,
+                    alias_span,
+                })
+            } else {
+                None
+            }
+        })
+    })
 }
 
 #[derive(Default)]
@@ -1675,6 +1872,28 @@ mod tests {
         find_references(module, &index, line, column, include_declaration)
     }
 
+    fn prepare_test_rename(source: &str, line: u32, column: u32) -> Option<PreparedRename> {
+        let result = crate::analyze(source, |_| {});
+        let module = result.module.as_ref()?;
+        let index = SymbolIndex::from_analyzer(&result.analyzer);
+        prepare_rename(module, &index, line, column)
+    }
+
+    fn find_test_rename_edits(
+        source: &str,
+        line: u32,
+        column: u32,
+        new_name: &str,
+    ) -> Result<Vec<RenameEdit>, RenameError> {
+        let result = crate::analyze(source, |_| {});
+        let module = result
+            .module
+            .as_ref()
+            .expect("source should parse for rename test");
+        let index = SymbolIndex::from_analyzer(&result.analyzer);
+        rename(module, &index, line, column, new_name)
+    }
+
     #[test]
     fn resolve_variable_reference() {
         let resolved = setup_and_resolve("fn f(x) { x }", 0, 10);
@@ -1985,6 +2204,132 @@ mod tests {
                 ))
                 .collect::<Vec<_>>(),
             vec![(0, 3), (0, 41), (1, 0)]
+        );
+    }
+
+    #[test]
+    fn prepare_rename_rejects_builtin_symbols() {
+        let source = "let size = len([1, 2, 3]);";
+        let result = crate::analyze_with_js_symbols(source);
+        let module = result.module.as_ref().expect("source should parse");
+        let index = SymbolIndex::from_analyzer(&result.analyzer);
+
+        assert!(prepare_rename(module, &index, 0, 11).is_none());
+    }
+
+    #[test]
+    fn rename_rejects_invalid_identifier_names() {
+        let source = "fn id(value) { value }\nid(1);";
+
+        assert_eq!(
+            find_test_rename_edits(source, 1, 0, "1value"),
+            Err(RenameError::InvalidNewName(
+                "rename target must be an ASCII identifier".into()
+            ))
+        );
+        assert_eq!(
+            find_test_rename_edits(source, 1, 0, "fn"),
+            Err(RenameError::InvalidNewName(
+                "`fn` is a reserved keyword".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn rename_tracks_shadowed_bindings() {
+        let source = "fn demo(value) {\n  let inner = value;\n  if true; {\n    let value = 2;\n    value\n  }\n  value\n}";
+        let edits = find_test_rename_edits(source, 6, 2, "outer").expect("rename should succeed");
+
+        assert_eq!(
+            edits
+                .iter()
+                .map(|edit| (
+                    edit.span.start_lc.line,
+                    edit.span.start_lc.column,
+                    edit.new_text.as_str()
+                ))
+                .collect::<Vec<_>>(),
+            vec![(0, 8, "outer"), (1, 14, "outer"), (6, 2, "outer")]
+        );
+    }
+
+    #[test]
+    fn rename_updates_multi_clause_functions() {
+        let source = "fn size([]) { 0 }\nfn size([_, ...xs]) { 1 + size(xs) }\nsize([1, 2, 3]);";
+        let edits = find_test_rename_edits(source, 2, 0, "count").expect("rename should succeed");
+
+        assert_eq!(
+            edits
+                .iter()
+                .map(|edit| (edit.span.start_lc.line, edit.span.start_lc.column))
+                .collect::<Vec<_>>(),
+            vec![(0, 3), (1, 3), (1, 26), (2, 0)]
+        );
+    }
+
+    #[test]
+    fn rename_updates_methods_and_fields() {
+        let method_source = "struct Point { x: i64 }\nfn Point.value(self) -> i64 { self.x }\nlet point = Point { x: 1 };\npoint.value();";
+        let method_edits = find_test_rename_edits(method_source, 3, 6, "sum")
+            .expect("method rename should succeed");
+        assert_eq!(
+            method_edits
+                .iter()
+                .map(|edit| (edit.span.start_lc.line, edit.span.start_lc.column))
+                .collect::<Vec<_>>(),
+            vec![(1, 9), (3, 6)]
+        );
+
+        let field_source =
+            "struct Point { x: i64 }\nfn value(point: Point) -> i64 { point.x }\nPoint { x: 1 }.x;";
+        let field_edits =
+            find_test_rename_edits(field_source, 0, 15, "y").expect("field rename should succeed");
+        assert_eq!(
+            field_edits
+                .iter()
+                .map(|edit| (edit.span.start_lc.line, edit.span.start_lc.column))
+                .collect::<Vec<_>>(),
+            vec![(0, 15), (1, 38)]
+        );
+    }
+
+    #[test]
+    fn rename_preserves_import_alias_semantics() {
+        let source = "struct Point { x: i64 }\nfn Point.sum(self) -> i64 { self.x }\nuse Point::sum as plus;\nfn main() { plus() }";
+        let prepared = prepare_test_rename(source, 3, 12).expect("alias should be renameable");
+        assert_eq!(prepared.placeholder, "plus");
+
+        let edits = find_test_rename_edits(source, 3, 12, "total").expect("rename should succeed");
+        assert_eq!(
+            edits
+                .iter()
+                .map(|edit| (
+                    edit.span.start_lc.line,
+                    edit.span.start_lc.column,
+                    edit.new_text.as_str()
+                ))
+                .collect::<Vec<_>>(),
+            vec![(2, 18, "total"), (3, 12, "total")]
+        );
+    }
+
+    #[test]
+    fn rename_converts_bare_import_to_alias_edit() {
+        let source = "struct Point { x: i64 }\nfn Point.sum(self) -> i64 { self.x }\nuse Point::sum;\nfn main() { sum() }";
+        let edits = find_test_rename_edits(source, 3, 12, "total").expect("rename should succeed");
+
+        assert_eq!(
+            edits
+                .iter()
+                .map(|edit| (
+                    edit.span.start_lc.line,
+                    edit.span.start_lc.column,
+                    edit.span.end_lc.line,
+                    edit.span.end_lc.column,
+                    edit.new_text.as_str()
+                ))
+                .collect::<Vec<_>>(),
+            vec![(2, 14, 2, 14, " as total"), (3, 12, 3, 15, "total")]
         );
     }
 

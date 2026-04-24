@@ -98,6 +98,42 @@ impl DeclarationAnalyzer {
             .insert(symbol_info);
     }
 
+    #[inline(always)]
+    fn declare_symbol_without_node_id(
+        &mut self,
+        ctx: &mut SemanticAnalysisContext,
+        name: &str,
+        kind: DefKind,
+        defined_at: Span,
+        scope_start: u32,
+    ) {
+        let id = ctx.symbol_id_allocator.next_id();
+        let symbol_info = Def::new(id, name, kind, defined_at, scope_start);
+
+        debug!("Declaring symbol without node id: {symbol_info:#?}");
+
+        self.current_symbol_table()
+            .write()
+            .unwrap()
+            .insert(symbol_info);
+    }
+
+    fn import_symbol_kind(&self, qualified_name: &str, span: Span) -> DefKind {
+        self.current_symbol_table()
+            .read()
+            .unwrap()
+            .get_closest_by_name(qualified_name, span)
+            .map(|symbol| match symbol.kind {
+                DefKind::Function(_)
+                | DefKind::FunctionSelfRef(_)
+                | DefKind::ProtocolMethod(_)
+                | DefKind::StructMethod(_)
+                | DefKind::EnumVariant(_) => DefKind::Variable,
+                kind => kind,
+            })
+            .unwrap_or(DefKind::Variable)
+    }
+
     fn register_type_const_items(
         &mut self,
         ctx: &mut SemanticAnalysisContext,
@@ -504,6 +540,35 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             StmtKind::ImplBlock(impl_block) => {
                 self.visit_impl_block(impl_block, ctx);
                 return; // Don't walk the statement again
+            }
+            StmtKind::UseDeclaration(decl) => {
+                let scope_start = stmt.span.end_lc.line;
+                let path_prefix = decl
+                    .path
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join("::");
+
+                for item in &decl.items {
+                    let local_ident = item.alias.as_ref().unwrap_or(&item.name);
+                    let qualified_name = if path_prefix.is_empty() {
+                        item.name.to_string()
+                    } else {
+                        format!("{path_prefix}::{}", item.name)
+                    };
+                    let kind = self.import_symbol_kind(&qualified_name, item.span);
+
+                    self.declare_symbol_without_node_id(
+                        ctx,
+                        local_ident.as_str(),
+                        kind,
+                        local_ident.span,
+                        scope_start,
+                    );
+                }
+
+                return; // Imports declare local bindings but have no nested scopes to walk.
             }
             StmtKind::Let(decl) => {
                 self.visit_expr(&decl.expression, ctx);

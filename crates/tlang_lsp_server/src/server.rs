@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ops::ControlFlow;
 use std::panic::AssertUnwindSafe;
 
@@ -9,13 +10,14 @@ use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DidSaveTextDocumentParams, GotoDefinitionParams, GotoDefinitionResponse, HoverParams,
     HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, InlayHint,
-    InlayHintParams, NumberOrString, ParameterInformation, ParameterLabel, ProgressParams,
-    ProgressParamsValue, PublishDiagnosticsParams, ReferenceParams, SemanticTokensFullOptions,
-    SemanticTokensParams, SemanticTokensResult, SemanticTokensServerCapabilities,
-    ServerCapabilities, SignatureHelpOptions, SignatureHelpParams, SignatureInformation,
+    InlayHintParams, NumberOrString, ParameterInformation, ParameterLabel, PrepareRenameResponse,
+    ProgressParams, ProgressParamsValue, PublishDiagnosticsParams, ReferenceParams, RenameOptions,
+    RenameParams, SemanticTokensFullOptions, SemanticTokensParams, SemanticTokensResult,
+    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
+    SignatureHelpParams, SignatureInformation, TextDocumentPositionParams,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions, Url, WorkDoneProgress, WorkDoneProgressBegin,
-    WorkDoneProgressCreateParams, WorkDoneProgressEnd, WorkDoneProgressReport,
+    TextDocumentSyncSaveOptions, TextEdit, Url, WorkDoneProgress, WorkDoneProgressBegin,
+    WorkDoneProgressCreateParams, WorkDoneProgressEnd, WorkDoneProgressReport, WorkspaceEdit,
 };
 use serde::Deserialize;
 use tlang_analysis::CompilationTarget;
@@ -110,6 +112,8 @@ impl ServerState {
             .request::<lsp_types::request::HoverRequest, _>(Self::on_hover)
             .request::<lsp_types::request::GotoDefinition, _>(Self::on_goto_definition)
             .request::<lsp_types::request::References, _>(Self::on_references)
+            .request::<lsp_types::request::PrepareRenameRequest, _>(Self::on_prepare_rename)
+            .request::<lsp_types::request::Rename, _>(Self::on_rename)
             .request::<lsp_types::request::Completion, _>(Self::on_completion)
             .request::<lsp_types::request::SignatureHelpRequest, _>(Self::on_signature_help)
             .request::<lsp_types::request::InlayHintRequest, _>(Self::on_inlay_hint)
@@ -169,6 +173,10 @@ impl ServerState {
                     hover_provider: Some(HoverProviderCapability::Simple(true)),
                     definition_provider: Some(lsp_types::OneOf::Left(true)),
                     references_provider: Some(lsp_types::OneOf::Left(true)),
+                    rename_provider: Some(lsp_types::OneOf::Right(RenameOptions {
+                        prepare_provider: Some(true),
+                        work_done_progress_options: Default::default(),
+                    })),
                     completion_provider: Some(CompletionOptions {
                         trigger_characters: Some(vec![".".into(), ":".into()]),
                         ..CompletionOptions::default()
@@ -424,6 +432,43 @@ impl ServerState {
         let include_declaration = params.context.include_declaration;
         let references = Self::collect_references(state, &uri, pos, include_declaration);
         Box::pin(async move { Ok(references) })
+    }
+
+    fn on_prepare_rename(
+        state: &mut Self,
+        params: TextDocumentPositionParams,
+    ) -> futures::future::BoxFuture<
+        'static,
+        Result<Option<PrepareRenameResponse>, async_lsp::ResponseError>,
+    > {
+        let uri = params.text_document.uri;
+        let pos = params.position;
+        let response = Self::prepare_rename(state, &uri, pos).map(|prepared| {
+            PrepareRenameResponse::RangeWithPlaceholder {
+                range: diagnostics::span_to_range(&prepared.ident_span),
+                placeholder: prepared.placeholder,
+            }
+        });
+
+        Box::pin(async move { Ok(response) })
+    }
+
+    fn on_rename(
+        state: &mut Self,
+        params: RenameParams,
+    ) -> futures::future::BoxFuture<'static, Result<Option<WorkspaceEdit>, async_lsp::ResponseError>>
+    {
+        let uri = params.text_document_position.text_document.uri;
+        let pos = params.text_document_position.position;
+        let new_name = params.new_name;
+
+        let edits = match Self::collect_rename_edits(state, &uri, pos, &new_name) {
+            Ok(edits) => edits,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+
+        let workspace_edit = Some(workspace_edit_for_uri(&uri, edits));
+        Box::pin(async move { Ok(workspace_edit) })
     }
 
     fn on_signature_help(
@@ -879,6 +924,58 @@ impl ServerState {
         )
     }
 
+    fn prepare_rename(
+        state: &Self,
+        uri: &Url,
+        pos: lsp_types::Position,
+    ) -> Option<tlang_analysis::query::PreparedRename> {
+        let doc = state.store.get(uri)?;
+        let cache = doc.parse_cache.as_ref()?;
+        let index = doc.symbol_index.as_ref()?;
+
+        tlang_analysis::query::prepare_rename(&cache.module, index, pos.line, pos.character)
+    }
+
+    fn collect_rename_edits(
+        state: &Self,
+        uri: &Url,
+        pos: lsp_types::Position,
+        new_name: &str,
+    ) -> Result<Vec<TextEdit>, async_lsp::ResponseError> {
+        let Some(doc) = state.store.get(uri) else {
+            return Err(async_lsp::ResponseError::new(
+                async_lsp::ErrorCode::INVALID_PARAMS,
+                "rename is not available for unknown documents",
+            ));
+        };
+        let Some(cache) = doc.parse_cache.as_ref() else {
+            return Err(async_lsp::ResponseError::new(
+                async_lsp::ErrorCode::INVALID_PARAMS,
+                "rename is not available until parsing succeeds",
+            ));
+        };
+        let Some(index) = doc.symbol_index.as_ref() else {
+            return Err(async_lsp::ResponseError::new(
+                async_lsp::ErrorCode::INVALID_PARAMS,
+                "rename is not available until analysis succeeds",
+            ));
+        };
+
+        tlang_analysis::query::rename(&cache.module, index, pos.line, pos.character, new_name)
+            .map(|edits| {
+                edits
+                    .into_iter()
+                    .map(|edit| TextEdit {
+                        range: diagnostics::span_to_range(&edit.span),
+                        new_text: edit.new_text,
+                    })
+                    .collect()
+            })
+            .map_err(|error| {
+                async_lsp::ResponseError::new(async_lsp::ErrorCode::INVALID_PARAMS, error)
+            })
+    }
+
     /// Collect cached diagnostics from a document state (parse + non-parse).
     fn collect_cached_diagnostics(
         state: &crate::document_store::DocumentState,
@@ -1179,6 +1276,14 @@ fn member_to_goto_definition(
         uri: uri.clone(),
         range,
     }))
+}
+
+fn workspace_edit_for_uri(uri: &Url, edits: Vec<TextEdit>) -> WorkspaceEdit {
+    WorkspaceEdit {
+        changes: Some(HashMap::from([(uri.clone(), edits)])),
+        document_changes: None,
+        change_annotations: None,
+    }
 }
 
 /// Extract the identifier immediately before a dot at the given cursor position.
@@ -1491,6 +1596,17 @@ mod tests {
                 );
             }
             _ => panic!("unexpected semantic token capability variant"),
+        }
+
+        let rename = result
+            .capabilities
+            .rename_provider
+            .expect("rename capability should be present");
+        match rename {
+            lsp_types::OneOf::Right(options) => {
+                assert_eq!(options.prepare_provider, Some(true));
+            }
+            _ => panic!("unexpected rename capability variant"),
         }
     }
 
@@ -1937,6 +2053,114 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![(3, 8), (4, 4)]
         );
+    }
+
+    #[test]
+    fn prepare_rename_returns_range_and_placeholder() {
+        let mut state = setup_server_with_source("fn id(value) { value }\nid(1);");
+        let response = futures::executor::block_on(ServerState::on_prepare_rename(
+            &mut state,
+            TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: test_uri() },
+                position: lsp_types::Position {
+                    line: 1,
+                    character: 0,
+                },
+            },
+        ))
+        .expect("prepare rename should succeed")
+        .expect("prepare rename should return a range");
+
+        match response {
+            PrepareRenameResponse::RangeWithPlaceholder { range, placeholder } => {
+                assert_eq!(placeholder, "id");
+                assert_eq!(range.start.line, 1);
+                assert_eq!(range.start.character, 0);
+                assert_eq!(range.end.character, 2);
+            }
+            _ => panic!("expected prepare-rename placeholder response"),
+        }
+    }
+
+    #[test]
+    fn prepare_rename_rejects_builtin_targets() {
+        let mut state = setup_server_with_source("let size = len([1, 2, 3]);");
+        let response = futures::executor::block_on(ServerState::on_prepare_rename(
+            &mut state,
+            TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: test_uri() },
+                position: lsp_types::Position {
+                    line: 0,
+                    character: 11,
+                },
+            },
+        ))
+        .expect("prepare rename should succeed");
+
+        assert!(response.is_none());
+    }
+
+    #[test]
+    fn rename_returns_workspace_edit_for_import_alias() {
+        let source = "struct Point { x: i64 }\nfn Point.sum(self) -> i64 { self.x }\nuse Point::sum as plus;\nfn main() { plus() }";
+        let mut state = setup_server_with_source(source);
+        let edit = futures::executor::block_on(ServerState::on_rename(
+            &mut state,
+            RenameParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: test_uri() },
+                    position: lsp_types::Position {
+                        line: 3,
+                        character: 12,
+                    },
+                },
+                new_name: "total".into(),
+                work_done_progress_params: Default::default(),
+            },
+        ))
+        .expect("rename should succeed")
+        .expect("rename should produce a workspace edit");
+
+        let changes = edit
+            .changes
+            .expect("workspace edit should use simple changes");
+        let edits = changes
+            .get(&test_uri())
+            .expect("edits should target the current document");
+        assert_eq!(
+            edits
+                .iter()
+                .map(|edit| (
+                    edit.range.start.line,
+                    edit.range.start.character,
+                    edit.new_text.as_str()
+                ))
+                .collect::<Vec<_>>(),
+            vec![(2, 18, "total"), (3, 12, "total")]
+        );
+    }
+
+    #[test]
+    fn rename_rejects_invalid_new_name() {
+        let mut state = setup_server_with_source("fn id(value) { value }\nid(1);");
+        let err = futures::executor::block_on(ServerState::on_rename(
+            &mut state,
+            RenameParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: test_uri() },
+                    position: lsp_types::Position {
+                        line: 1,
+                        character: 0,
+                    },
+                },
+                new_name: "fn".into(),
+                work_done_progress_params: Default::default(),
+            },
+        ))
+        .expect_err("rename should reject invalid identifiers");
+
+        assert_eq!(err.code, async_lsp::ErrorCode::INVALID_PARAMS);
+        assert!(err.message.contains("reserved keyword"));
     }
 
     #[test]
