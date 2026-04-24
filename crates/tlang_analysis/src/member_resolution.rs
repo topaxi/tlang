@@ -737,22 +737,81 @@ fn find_lowered_protocol_dispatch_in_stmt<'a>(
     }
 }
 
+type LoweredProtocolDispatch<'a> = (&'a hir::Expr, &'a tlang_ast::node::Ident, TyKind);
+
+fn source_has_receiver_dot(source: &str, member_span: &Span) -> bool {
+    source.as_bytes()[..member_span.start as usize]
+        .iter()
+        .rev()
+        .copied()
+        .find(|byte| !matches!(*byte, b' ' | b'\t' | b'\n' | b'\r'))
+        == Some(b'.')
+}
+
+fn find_lowered_protocol_dispatch_in_exprs<'a, I>(
+    source: &str,
+    exprs: I,
+    offset: u32,
+) -> Option<LoweredProtocolDispatch<'a>>
+where
+    I: IntoIterator<Item = &'a hir::Expr>,
+{
+    exprs
+        .into_iter()
+        .find_map(|expr| find_lowered_protocol_dispatch_in_expr(source, expr, offset))
+}
+
+fn find_lowered_protocol_dispatch_in_match_arms<'a>(
+    source: &str,
+    arms: &'a [hir::MatchArm],
+    offset: u32,
+) -> Option<LoweredProtocolDispatch<'a>> {
+    for arm in arms {
+        if let Some(guard) = &arm.guard
+            && let Some(found) = find_lowered_protocol_dispatch_in_expr(source, guard, offset)
+        {
+            return Some(found);
+        }
+        if let Some(found) = find_lowered_protocol_dispatch_in_block(source, &arm.block, offset) {
+            return Some(found);
+        }
+    }
+
+    None
+}
+
+fn find_lowered_protocol_dispatch_in_else_clauses<'a>(
+    source: &str,
+    else_clauses: &'a [hir::ElseClause],
+    offset: u32,
+) -> Option<LoweredProtocolDispatch<'a>> {
+    for clause in else_clauses {
+        if let Some(condition) = &clause.condition
+            && let Some(found) = find_lowered_protocol_dispatch_in_expr(source, condition, offset)
+        {
+            return Some(found);
+        }
+        if let Some(found) =
+            find_lowered_protocol_dispatch_in_block(source, &clause.consequence, offset)
+        {
+            return Some(found);
+        }
+    }
+
+    None
+}
+
 fn find_lowered_protocol_dispatch_in_expr<'a>(
     source: &str,
     expr: &'a hir::Expr,
     offset: u32,
-) -> Option<(&'a hir::Expr, &'a tlang_ast::node::Ident, TyKind)> {
+) -> Option<LoweredProtocolDispatch<'a>> {
     if let hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) = &expr.kind
         && let hir::ExprKind::Path(path) = &call.callee.kind
         && let Some(member) = path.segments.last().map(|segment| &segment.ident)
         && path.segments.len() >= 2
         && span_contains_offset(&member.span, offset)
-        && source.as_bytes()[..member.span.start as usize]
-            .iter()
-            .rev()
-            .skip_while(|&&b| b == b' ' || b == b'\t' || b == b'\n' || b == b'\r')
-            .next()
-            == Some(&b'.')
+        && source_has_receiver_dot(source, &member.span)
         && let Some(receiver) = call.arguments.first()
     {
         return Some((receiver, member, receiver.ty.kind.clone()));
@@ -760,95 +819,45 @@ fn find_lowered_protocol_dispatch_in_expr<'a>(
 
     match &expr.kind {
         hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
-            if let Some(found) =
-                find_lowered_protocol_dispatch_in_expr(source, &call.callee, offset)
-            {
-                return Some(found);
-            }
-            for arg in &call.arguments {
-                if let Some(found) = find_lowered_protocol_dispatch_in_expr(source, arg, offset) {
-                    return Some(found);
-                }
-            }
+            find_lowered_protocol_dispatch_in_expr(source, &call.callee, offset).or_else(|| {
+                find_lowered_protocol_dispatch_in_exprs(source, call.arguments.iter(), offset)
+            })
         }
         hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
-            return find_lowered_protocol_dispatch_in_block(source, block, offset);
+            find_lowered_protocol_dispatch_in_block(source, block, offset)
         }
         hir::ExprKind::FieldAccess(base, _)
         | hir::ExprKind::Unary(_, base)
         | hir::ExprKind::Cast(base, _)
         | hir::ExprKind::TryCast(base, _)
         | hir::ExprKind::Implements(base, _) => {
-            return find_lowered_protocol_dispatch_in_expr(source, base, offset);
+            find_lowered_protocol_dispatch_in_expr(source, base, offset)
         }
         hir::ExprKind::Let(_, value) => {
-            return find_lowered_protocol_dispatch_in_expr(source, value, offset);
+            find_lowered_protocol_dispatch_in_expr(source, value, offset)
         }
         hir::ExprKind::IndexAccess(base, index) => {
-            if let Some(found) = find_lowered_protocol_dispatch_in_expr(source, base, offset) {
-                return Some(found);
-            }
-            if let Some(found) = find_lowered_protocol_dispatch_in_expr(source, index, offset) {
-                return Some(found);
-            }
+            find_lowered_protocol_dispatch_in_exprs(source, [base.as_ref(), index.as_ref()], offset)
         }
         hir::ExprKind::Binary(_, lhs, rhs) => {
-            if let Some(found) = find_lowered_protocol_dispatch_in_expr(source, lhs, offset) {
-                return Some(found);
-            }
-            if let Some(found) = find_lowered_protocol_dispatch_in_expr(source, rhs, offset) {
-                return Some(found);
-            }
+            find_lowered_protocol_dispatch_in_exprs(source, [lhs.as_ref(), rhs.as_ref()], offset)
         }
         hir::ExprKind::IfElse(condition, then_block, else_clauses) => {
-            if let Some(found) = find_lowered_protocol_dispatch_in_expr(source, condition, offset) {
-                return Some(found);
-            }
-            if let Some(found) = find_lowered_protocol_dispatch_in_block(source, then_block, offset)
-            {
-                return Some(found);
-            }
-            for clause in else_clauses {
-                if let Some(condition) = &clause.condition
-                    && let Some(found) =
-                        find_lowered_protocol_dispatch_in_expr(source, condition, offset)
-                {
-                    return Some(found);
-                }
-                if let Some(found) =
-                    find_lowered_protocol_dispatch_in_block(source, &clause.consequence, offset)
-                {
-                    return Some(found);
-                }
-            }
+            find_lowered_protocol_dispatch_in_expr(source, condition, offset)
+                .or_else(|| find_lowered_protocol_dispatch_in_block(source, then_block, offset))
+                .or_else(|| {
+                    find_lowered_protocol_dispatch_in_else_clauses(source, else_clauses, offset)
+                })
         }
         hir::ExprKind::FunctionExpression(decl) => {
-            return find_lowered_protocol_dispatch_in_block(source, &decl.body, offset);
+            find_lowered_protocol_dispatch_in_block(source, &decl.body, offset)
         }
         hir::ExprKind::Match(scrutinee, arms, _) => {
-            if let Some(found) = find_lowered_protocol_dispatch_in_expr(source, scrutinee, offset) {
-                return Some(found);
-            }
-            for arm in arms {
-                if let Some(guard) = &arm.guard
-                    && let Some(found) =
-                        find_lowered_protocol_dispatch_in_expr(source, guard, offset)
-                {
-                    return Some(found);
-                }
-                if let Some(found) =
-                    find_lowered_protocol_dispatch_in_block(source, &arm.block, offset)
-                {
-                    return Some(found);
-                }
-            }
+            find_lowered_protocol_dispatch_in_expr(source, scrutinee, offset)
+                .or_else(|| find_lowered_protocol_dispatch_in_match_arms(source, arms, offset))
         }
         hir::ExprKind::List(items) => {
-            for item in items {
-                if let Some(found) = find_lowered_protocol_dispatch_in_expr(source, item, offset) {
-                    return Some(found);
-                }
-            }
+            find_lowered_protocol_dispatch_in_exprs(source, items.iter(), offset)
         }
         hir::ExprKind::Dict(entries) => {
             for (key, value) in entries {
@@ -859,39 +868,25 @@ fn find_lowered_protocol_dispatch_in_expr<'a>(
                     return Some(found);
                 }
             }
+
+            None
         }
         hir::ExprKind::TaggedString { tag, exprs, .. } => {
-            if let Some(found) = find_lowered_protocol_dispatch_in_expr(source, tag, offset) {
-                return Some(found);
-            }
-            for item in exprs {
-                if let Some(found) = find_lowered_protocol_dispatch_in_expr(source, item, offset) {
-                    return Some(found);
-                }
-            }
+            find_lowered_protocol_dispatch_in_expr(source, tag, offset)
+                .or_else(|| find_lowered_protocol_dispatch_in_exprs(source, exprs.iter(), offset))
         }
         hir::ExprKind::Range(range) => {
-            if let Some(found) =
-                find_lowered_protocol_dispatch_in_expr(source, &range.start, offset)
-            {
-                return Some(found);
-            }
-            if let Some(found) = find_lowered_protocol_dispatch_in_expr(source, &range.end, offset)
-            {
-                return Some(found);
-            }
+            find_lowered_protocol_dispatch_in_exprs(source, [&range.start, &range.end], offset)
         }
         hir::ExprKind::Literal(_)
         | hir::ExprKind::Path(_)
         | hir::ExprKind::Continue
         | hir::ExprKind::Break(None)
-        | hir::ExprKind::Wildcard => {}
+        | hir::ExprKind::Wildcard => None,
         hir::ExprKind::Break(Some(value)) => {
-            return find_lowered_protocol_dispatch_in_expr(source, value, offset);
+            find_lowered_protocol_dispatch_in_expr(source, value, offset)
         }
     }
-
-    None
 }
 
 // ── Receiver type resolution for dot-completion ────────────────────────

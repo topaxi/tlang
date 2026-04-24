@@ -3862,9 +3862,7 @@ fn infer_match_lowered_param_ty(
             let mut inferred: Option<TyKind> = None;
 
             for arm in arms {
-                let Some(column_pat) = match_lowered_param_pat(&arm.pat, index, arity) else {
-                    return None;
-                };
+                let column_pat = match_lowered_param_pat(&arm.pat, index, arity)?;
                 let Some(candidate) = infer_match_lowered_pat_ty(column_pat, type_table) else {
                     continue;
                 };

@@ -1064,9 +1064,7 @@ fn infer_match_lowered_param_hint_ty(
         return None;
     }
 
-    let Some(body_expr) = decl.body.expr.as_ref() else {
-        return None;
-    };
+    let body_expr = decl.body.expr.as_ref()?;
     let hir::ExprKind::Match(_, arms, _) = &body_expr.kind else {
         return None;
     };
@@ -1076,9 +1074,7 @@ fn infer_match_lowered_param_hint_ty(
     let mut saw_constraining_arm = false;
 
     for arm in arms {
-        let Some(column_pat) = match_lowered_param_pat(&arm.pat, index, arity) else {
-            return None;
-        };
+        let column_pat = match_lowered_param_pat(&arm.pat, index, arity)?;
         let Some(candidate) = infer_match_lowered_pat_hint_ty(column_pat, type_table) else {
             continue;
         };
