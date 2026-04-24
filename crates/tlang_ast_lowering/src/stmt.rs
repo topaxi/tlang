@@ -5,6 +5,7 @@ use tlang_ast as ast;
 use tlang_ast::node::{ConstDeclaration, FunctionDeclaration, Ident, LetDeclaration};
 use tlang_defs::DefKind;
 use tlang_hir as hir;
+use tlang_span::{NodeId, Span};
 
 use crate::{LoweringContext, ProtocolDispatchContext};
 
@@ -47,6 +48,10 @@ fn same_ast_ty_shape(lhs: &ast::node::Ty, rhs: &ast::node::Ty) -> bool {
         }
         _ => false,
     }
+}
+
+fn is_synthetic_inferred_ast_ty(ty: &ast::node::Ty) -> bool {
+    ty.id == NodeId::new(1) && ty.span == Span::default()
 }
 
 impl LoweringContext {
@@ -446,7 +451,7 @@ impl LoweringContext {
     fn lower_protocol_method_signature(
         &mut self,
         method: &ast::node::ProtocolMethodSignature,
-        method_dispatch_map: &HashMap<String, Ident>,
+        method_dispatch_map: &HashMap<String, crate::ProtocolDispatchTarget>,
     ) -> hir::ProtocolMethodSignature {
         let type_params = self.lower_type_params(&method.type_params);
         let has_body = method.body.is_some();
@@ -779,7 +784,10 @@ impl LoweringContext {
                 } else {
                     hir::Ty::default()
                 };
-                let has_type_annotation = !matches!(type_annotation.kind, hir::TyKind::Unknown);
+                let has_type_annotation = type_annotations
+                    .iter()
+                    .flatten()
+                    .any(|annotation| !is_synthetic_inferred_ast_ty(annotation));
 
                 hir::FunctionParameter {
                     hir_id: self.unique_id(),
@@ -920,9 +928,39 @@ impl LoweringContext {
             let fn_name_str = this.fn_name_or_error(&decls[0]);
             this.define_function_symbols(hir_id, &fn_name_str, &decls[0], &params);
 
+            let dispatch_type_params = owner_type_params
+                .iter()
+                .chain(type_params.iter())
+                .cloned()
+                .collect::<Vec<_>>();
+            let mut generic_dispatch_ctx = crate::GenericProtocolDispatchContext::default();
+            let mut generic_dispatch_ctx_by_name = HashMap::new();
+            for decl in decls {
+                generic_dispatch_ctx.extend(
+                    this.build_generic_protocol_dispatch_context_from_params(
+                        &decl.parameters,
+                        &dispatch_type_params,
+                    ),
+                );
+                generic_dispatch_ctx_by_name.extend(
+                    this.build_generic_protocol_dispatch_context_by_name_from_params(
+                        &decl.parameters,
+                        &dispatch_type_params,
+                    ),
+                );
+            }
+            let saved_generic_ctx = this.generic_protocol_dispatch_ctx.take();
+            let saved_generic_ctx_by_name = this.generic_protocol_dispatch_ctx_by_name.take();
+            this.generic_protocol_dispatch_ctx =
+                (!generic_dispatch_ctx.is_empty()).then_some(generic_dispatch_ctx);
+            this.generic_protocol_dispatch_ctx_by_name =
+                (!generic_dispatch_ctx_by_name.is_empty()).then_some(generic_dispatch_ctx_by_name);
+
             let match_value = this.create_match_value(&params, span);
 
             let match_arms = this.create_match_arms(decls, leading_comments);
+            this.generic_protocol_dispatch_ctx = saved_generic_ctx;
+            this.generic_protocol_dispatch_ctx_by_name = saved_generic_ctx_by_name;
 
             // Inherit the return type from the first clause that has an
             // explicit annotation.  Must happen before `pop_type_param_scope`

@@ -10,7 +10,7 @@ mod type_table;
 mod typing_context;
 pub mod unification;
 
-pub use type_checker::TypeChecker;
+pub use type_checker::{TypeChecker, match_lowered_param_pat};
 pub use type_error::TypeError;
 pub use type_table::{
     EnumInfo, ImplInfo, ProtocolInfo, ProtocolMethodInfo, StructInfo, TypeInfo, TypeTable,

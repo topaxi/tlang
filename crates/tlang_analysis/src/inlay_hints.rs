@@ -14,10 +14,12 @@
 
 use std::collections::{HashMap, HashSet};
 
+use tlang_ast::token::Literal;
 use tlang_hir as hir;
 use tlang_hir::{PrimTy, TyKind};
 use tlang_span::{HirId, LineColumn, Span, TypeVarId};
 use tlang_typeck::TypeTable;
+use tlang_typeck::match_lowered_param_pat;
 
 // Re-export from the dedicated typed_hir module so existing consumers
 // (e.g. `use crate::inlay_hints::TypedHir`) keep working.
@@ -966,12 +968,20 @@ fn collect_fn_decl_definition_types(
             let params: Vec<String> = decl
                 .parameters
                 .iter()
-                .map(|param| {
+                .enumerate()
+                .map(|(index, param)| {
                     let param_ty = preferred_decl_hint_ty(
                         &param.type_annotation.kind,
                         type_table.get(&param.hir_id).map(|info| &info.ty.kind),
                     );
-                    format_ty_kind(param_ty, &type_var_names)
+                    if !param.has_type_annotation && matches!(param_ty, TyKind::Unknown) {
+                        infer_match_lowered_param_hint_ty(decl, type_table, index).map_or_else(
+                            || format_ty_kind(param_ty, &type_var_names),
+                            |inferred| format_ty_kind(&inferred, &type_var_names),
+                        )
+                    } else {
+                        format_ty_kind(param_ty, &type_var_names)
+                    }
                 })
                 .collect();
             let ret = preferred_decl_hint_ty(
@@ -1043,6 +1053,64 @@ fn collect_fn_decl_definition_types(
     }
 
     collect_block_definition_types(&decl.body, type_table, &type_var_names, out);
+}
+
+fn infer_match_lowered_param_hint_ty(
+    decl: &hir::FunctionDeclaration,
+    type_table: &TypeTable,
+    index: usize,
+) -> Option<TyKind> {
+    if !decl.is_match_lowered {
+        return None;
+    }
+
+    let body_expr = decl.body.expr.as_ref()?;
+    let hir::ExprKind::Match(_, arms, _) = &body_expr.kind else {
+        return None;
+    };
+
+    let arity = decl.parameters.len();
+    let mut inferred: Option<TyKind> = None;
+    let mut saw_constraining_arm = false;
+
+    for arm in arms {
+        let column_pat = match_lowered_param_pat(&arm.pat, index, arity)?;
+        let Some(candidate) = infer_match_lowered_pat_hint_ty(column_pat, type_table) else {
+            continue;
+        };
+        saw_constraining_arm = true;
+        if let Some(existing) = &inferred {
+            if *existing != candidate {
+                return None;
+            }
+        } else {
+            inferred = Some(candidate);
+        }
+    }
+
+    saw_constraining_arm.then_some(inferred).flatten()
+}
+
+fn infer_match_lowered_pat_hint_ty(pat: &hir::Pat, type_table: &TypeTable) -> Option<TyKind> {
+    match &pat.kind {
+        hir::PatKind::Identifier(..) | hir::PatKind::Wildcard | hir::PatKind::Rest(_) => None,
+        hir::PatKind::Literal(lit) => Some(match lit.as_ref() {
+            Literal::Integer(_) | Literal::UnsignedInteger(_) => TyKind::Primitive(PrimTy::I64),
+            Literal::Float(_) => TyKind::Primitive(PrimTy::F64),
+            Literal::Boolean(_) => TyKind::Primitive(PrimTy::Bool),
+            Literal::String(_) => TyKind::Primitive(PrimTy::String),
+            Literal::Char(_) => TyKind::Primitive(PrimTy::Char),
+            Literal::None => TyKind::Primitive(PrimTy::Nil),
+        }),
+        hir::PatKind::List(_) => Some(TyKind::List(Box::new(hir::Ty::unknown()))),
+        hir::PatKind::Enum(path, _) => type_table.get(&path.res.hir_id()?).map(|info| match &info
+            .ty
+            .kind
+        {
+            TyKind::Fn(_, ret) => ret.kind.clone(),
+            kind => kind.clone(),
+        }),
+    }
 }
 
 fn check_pat_for_type(

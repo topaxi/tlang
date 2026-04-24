@@ -83,13 +83,17 @@ pub fn resolve_member_at_position(
     utf16_col: u32,
 ) -> Option<ResolvedMember> {
     let offset = utf16_line_column_to_byte_offset(source, line, utf16_col);
-    let (_base, ident, base_ty) = find_field_access_at_offset(&typed_hir.module.block, offset)?;
-
-    let type_name = builtin_methods::type_name_from_kind(&base_ty)?;
+    let (_base, ident, base_ty) = find_field_access_at_offset(&typed_hir.module.block, offset)
+        .or_else(|| {
+            find_lowered_protocol_dispatch_at_offset(source, &typed_hir.module.block, offset)
+        })?;
     let member_name = ident.as_str();
+    let type_name = builtin_methods::type_name_from_kind(&base_ty);
 
     // 1. Try builtin methods first.
-    if let Some(sig_ty) = builtin_methods::lookup(type_name, member_name) {
+    if let Some(type_name) = type_name.as_ref()
+        && let Some(sig_ty) = builtin_methods::lookup(type_name, member_name)
+    {
         let sig_ty = builtin_methods::substitute_receiver_type_vars(&base_ty, &sig_ty);
         let return_ty = extract_return_ty(&sig_ty);
         let signature = signature_from_builtin(type_name, member_name, &sig_ty);
@@ -104,8 +108,28 @@ pub fn resolve_member_at_position(
         });
     }
 
-    // 2. Try user-defined methods from protocol impls.
-    if let Some(info) = resolve_protocol_method(&typed_hir.type_table, type_name, member_name) {
+    // 2. Try methods from protocol bounds on a generic receiver.
+    if let Some(info) = resolve_bound_protocol_method(
+        &typed_hir.module.block,
+        &typed_hir.type_table,
+        &base_ty,
+        member_name,
+    ) {
+        return Some(ResolvedMember {
+            name: member_name.to_string(),
+            receiver_ty: base_ty,
+            kind: MemberKind::Method,
+            signature: Some(info.0),
+            return_ty: info.1,
+            def_span: info.2,
+            builtin: false,
+        });
+    }
+
+    // 3. Try user-defined methods from protocol impls.
+    if let Some(type_name) = type_name.as_ref()
+        && let Some(info) = resolve_protocol_method(&typed_hir.type_table, type_name, member_name)
+    {
         return Some(ResolvedMember {
             name: member_name.to_string(),
             receiver_ty: base_ty,
@@ -117,8 +141,10 @@ pub fn resolve_member_at_position(
         });
     }
 
-    // 3. Try builtin fields.
-    if let Some(field_ty) = builtin_fields::lookup(type_name, member_name) {
+    // 4. Try builtin fields.
+    if let Some(type_name) = type_name.as_ref()
+        && let Some(field_ty) = builtin_fields::lookup(type_name, member_name)
+    {
         return Some(ResolvedMember {
             name: member_name.to_string(),
             receiver_ty: base_ty,
@@ -130,8 +156,10 @@ pub fn resolve_member_at_position(
         });
     }
 
-    // 4. Try user-defined methods/fields from the HIR (struct methods, etc.).
-    if let Some(info) = resolve_hir_member(&typed_hir.module.block, type_name, member_name) {
+    // 5. Try user-defined methods/fields from the HIR (struct methods, etc.).
+    if let Some(type_name) = type_name.as_ref()
+        && let Some(info) = resolve_hir_member(&typed_hir.module.block, type_name, member_name)
+    {
         return Some(ResolvedMember {
             name: member_name.to_string(),
             receiver_ty: base_ty,
@@ -158,13 +186,13 @@ pub fn complete_members_at_position(
     line: u32,
     utf16_col: u32,
 ) -> Vec<MemberCandidate> {
-    let type_name = receiver_type_before_dot(source, typed_hir, line, utf16_col);
-    let type_name = match type_name {
+    let receiver_ty = receiver_type_before_dot(source, typed_hir, line, utf16_col);
+    let receiver_ty = match receiver_ty {
         Some(t) => t,
         None => return vec![],
     };
 
-    complete_members_for_type(typed_hir, symbol_index, &type_name)
+    complete_members_for_ty(typed_hir, symbol_index, &receiver_ty)
 }
 
 /// List all member candidates for a given type name.
@@ -172,6 +200,37 @@ pub fn complete_members_at_position(
 /// This is a lower-level helper that can be called when the type name is
 /// already known (e.g. from `type_at_definition`).
 pub fn complete_members_for_type(
+    typed_hir: &TypedHir,
+    symbol_index: Option<&SymbolIndex>,
+    type_name: &str,
+) -> Vec<MemberCandidate> {
+    complete_members_for_concrete_type(typed_hir, symbol_index, type_name)
+}
+
+fn complete_members_for_ty(
+    typed_hir: &TypedHir,
+    symbol_index: Option<&SymbolIndex>,
+    ty: &TyKind,
+) -> Vec<MemberCandidate> {
+    if let TyKind::Var(type_var_id) = ty {
+        let candidates = complete_bound_protocol_methods(
+            &typed_hir.module.block,
+            &typed_hir.type_table,
+            *type_var_id,
+        );
+        if !candidates.is_empty() {
+            return candidates;
+        }
+    }
+
+    let Some(type_name) = type_name_for_ty(ty) else {
+        return vec![];
+    };
+
+    complete_members_for_concrete_type(typed_hir, symbol_index, &type_name)
+}
+
+fn complete_members_for_concrete_type(
     typed_hir: &TypedHir,
     symbol_index: Option<&SymbolIndex>,
     type_name: &str,
@@ -445,6 +504,14 @@ fn find_field_access_at_offset(
     find_field_access_in_block(block, offset)
 }
 
+fn find_lowered_protocol_dispatch_at_offset<'a>(
+    source: &str,
+    block: &'a hir::Block,
+    offset: u32,
+) -> Option<(&'a hir::Expr, &'a tlang_ast::node::Ident, TyKind)> {
+    find_lowered_protocol_dispatch_in_block(source, block, offset)
+}
+
 fn find_field_access_in_block(
     block: &hir::Block,
     offset: u32,
@@ -628,6 +695,200 @@ fn find_field_access_in_expr(
     None
 }
 
+fn find_lowered_protocol_dispatch_in_block<'a>(
+    source: &str,
+    block: &'a hir::Block,
+    offset: u32,
+) -> Option<(&'a hir::Expr, &'a tlang_ast::node::Ident, TyKind)> {
+    for stmt in &block.stmts {
+        if let Some(found) = find_lowered_protocol_dispatch_in_stmt(source, stmt, offset) {
+            return Some(found);
+        }
+    }
+    block
+        .expr
+        .as_ref()
+        .and_then(|expr| find_lowered_protocol_dispatch_in_expr(source, expr, offset))
+}
+
+fn find_lowered_protocol_dispatch_in_stmt<'a>(
+    source: &str,
+    stmt: &'a hir::Stmt,
+    offset: u32,
+) -> Option<(&'a hir::Expr, &'a tlang_ast::node::Ident, TyKind)> {
+    match &stmt.kind {
+        hir::StmtKind::Expr(expr) | hir::StmtKind::Return(Some(expr)) => {
+            find_lowered_protocol_dispatch_in_expr(source, expr, offset)
+        }
+        hir::StmtKind::Let(_, init, _) | hir::StmtKind::Const(_, _, init, _) => {
+            find_lowered_protocol_dispatch_in_expr(source, init, offset)
+        }
+        hir::StmtKind::FunctionDeclaration(decl) => {
+            find_lowered_protocol_dispatch_in_block(source, &decl.body, offset)
+        }
+        hir::StmtKind::ImplBlock(impl_block) => impl_block.methods.iter().find_map(|method| {
+            find_lowered_protocol_dispatch_in_block(source, &method.body, offset)
+        }),
+        hir::StmtKind::DynFunctionDeclaration(_)
+        | hir::StmtKind::Return(None)
+        | hir::StmtKind::StructDeclaration(_)
+        | hir::StmtKind::EnumDeclaration(_)
+        | hir::StmtKind::ProtocolDeclaration(_) => None,
+    }
+}
+
+type LoweredProtocolDispatch<'a> = (&'a hir::Expr, &'a tlang_ast::node::Ident, TyKind);
+
+fn source_has_receiver_dot(source: &str, member_span: &Span) -> bool {
+    source.as_bytes()[..member_span.start as usize]
+        .iter()
+        .rev()
+        .copied()
+        .find(|byte| !matches!(*byte, b' ' | b'\t' | b'\n' | b'\r'))
+        == Some(b'.')
+}
+
+fn find_lowered_protocol_dispatch_in_exprs<'a, I>(
+    source: &str,
+    exprs: I,
+    offset: u32,
+) -> Option<LoweredProtocolDispatch<'a>>
+where
+    I: IntoIterator<Item = &'a hir::Expr>,
+{
+    exprs
+        .into_iter()
+        .find_map(|expr| find_lowered_protocol_dispatch_in_expr(source, expr, offset))
+}
+
+fn find_lowered_protocol_dispatch_in_match_arms<'a>(
+    source: &str,
+    arms: &'a [hir::MatchArm],
+    offset: u32,
+) -> Option<LoweredProtocolDispatch<'a>> {
+    for arm in arms {
+        if let Some(guard) = &arm.guard
+            && let Some(found) = find_lowered_protocol_dispatch_in_expr(source, guard, offset)
+        {
+            return Some(found);
+        }
+        if let Some(found) = find_lowered_protocol_dispatch_in_block(source, &arm.block, offset) {
+            return Some(found);
+        }
+    }
+
+    None
+}
+
+fn find_lowered_protocol_dispatch_in_else_clauses<'a>(
+    source: &str,
+    else_clauses: &'a [hir::ElseClause],
+    offset: u32,
+) -> Option<LoweredProtocolDispatch<'a>> {
+    for clause in else_clauses {
+        if let Some(condition) = &clause.condition
+            && let Some(found) = find_lowered_protocol_dispatch_in_expr(source, condition, offset)
+        {
+            return Some(found);
+        }
+        if let Some(found) =
+            find_lowered_protocol_dispatch_in_block(source, &clause.consequence, offset)
+        {
+            return Some(found);
+        }
+    }
+
+    None
+}
+
+fn find_lowered_protocol_dispatch_in_expr<'a>(
+    source: &str,
+    expr: &'a hir::Expr,
+    offset: u32,
+) -> Option<LoweredProtocolDispatch<'a>> {
+    if let hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) = &expr.kind
+        && let hir::ExprKind::Path(path) = &call.callee.kind
+        && let Some(member) = path.segments.last().map(|segment| &segment.ident)
+        && path.segments.len() >= 2
+        && span_contains_offset(&member.span, offset)
+        && source_has_receiver_dot(source, &member.span)
+        && let Some(receiver) = call.arguments.first()
+    {
+        return Some((receiver, member, receiver.ty.kind.clone()));
+    }
+
+    match &expr.kind {
+        hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
+            find_lowered_protocol_dispatch_in_expr(source, &call.callee, offset).or_else(|| {
+                find_lowered_protocol_dispatch_in_exprs(source, call.arguments.iter(), offset)
+            })
+        }
+        hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
+            find_lowered_protocol_dispatch_in_block(source, block, offset)
+        }
+        hir::ExprKind::FieldAccess(base, _)
+        | hir::ExprKind::Unary(_, base)
+        | hir::ExprKind::Cast(base, _)
+        | hir::ExprKind::TryCast(base, _)
+        | hir::ExprKind::Implements(base, _) => {
+            find_lowered_protocol_dispatch_in_expr(source, base, offset)
+        }
+        hir::ExprKind::Let(_, value) => {
+            find_lowered_protocol_dispatch_in_expr(source, value, offset)
+        }
+        hir::ExprKind::IndexAccess(base, index) => {
+            find_lowered_protocol_dispatch_in_exprs(source, [base.as_ref(), index.as_ref()], offset)
+        }
+        hir::ExprKind::Binary(_, lhs, rhs) => {
+            find_lowered_protocol_dispatch_in_exprs(source, [lhs.as_ref(), rhs.as_ref()], offset)
+        }
+        hir::ExprKind::IfElse(condition, then_block, else_clauses) => {
+            find_lowered_protocol_dispatch_in_expr(source, condition, offset)
+                .or_else(|| find_lowered_protocol_dispatch_in_block(source, then_block, offset))
+                .or_else(|| {
+                    find_lowered_protocol_dispatch_in_else_clauses(source, else_clauses, offset)
+                })
+        }
+        hir::ExprKind::FunctionExpression(decl) => {
+            find_lowered_protocol_dispatch_in_block(source, &decl.body, offset)
+        }
+        hir::ExprKind::Match(scrutinee, arms, _) => {
+            find_lowered_protocol_dispatch_in_expr(source, scrutinee, offset)
+                .or_else(|| find_lowered_protocol_dispatch_in_match_arms(source, arms, offset))
+        }
+        hir::ExprKind::List(items) => {
+            find_lowered_protocol_dispatch_in_exprs(source, items.iter(), offset)
+        }
+        hir::ExprKind::Dict(entries) => {
+            for (key, value) in entries {
+                if let Some(found) = find_lowered_protocol_dispatch_in_expr(source, key, offset) {
+                    return Some(found);
+                }
+                if let Some(found) = find_lowered_protocol_dispatch_in_expr(source, value, offset) {
+                    return Some(found);
+                }
+            }
+
+            None
+        }
+        hir::ExprKind::TaggedString { tag, exprs, .. } => {
+            find_lowered_protocol_dispatch_in_expr(source, tag, offset)
+                .or_else(|| find_lowered_protocol_dispatch_in_exprs(source, exprs.iter(), offset))
+        }
+        hir::ExprKind::Range(range) => {
+            find_lowered_protocol_dispatch_in_exprs(source, [&range.start, &range.end], offset)
+        }
+        hir::ExprKind::Literal(_)
+        | hir::ExprKind::Path(_)
+        | hir::ExprKind::Continue
+        | hir::ExprKind::Break(None)
+        | hir::ExprKind::Wildcard => None,
+        hir::ExprKind::Break(Some(value)) => {
+            find_lowered_protocol_dispatch_in_expr(source, value, offset)
+        }
+    }
+}
+
 // ── Receiver type resolution for dot-completion ────────────────────────
 
 /// Determine the receiver type for dot-completion at a position.
@@ -640,7 +901,7 @@ fn receiver_type_before_dot(
     typed_hir: &TypedHir,
     line: u32,
     utf16_col: u32,
-) -> Option<String> {
+) -> Option<TyKind> {
     // The cursor is right after the dot — the dot is at col-1 and the
     // receiver ends before that.  We scan for the receiver in the typed
     // HIR by finding the expression at the dot position.
@@ -660,10 +921,10 @@ fn receiver_type_before_dot(
     if let Some(expr) = find_hir_expr_at_position(&typed_hir.module.block, dot_offset) {
         // If we landed on a FieldAccess, use the base type.
         if let hir::ExprKind::FieldAccess(base, _) = &expr.kind {
-            return type_name_for_ty(&base.ty.kind);
+            return Some(base.ty.kind.clone());
         }
         // Otherwise the expression itself might be the receiver.
-        return type_name_for_ty(&expr.ty.kind);
+        return Some(expr.ty.kind.clone());
     }
 
     None
@@ -762,6 +1023,252 @@ fn resolve_protocol_method(
     };
 
     Some((signature, Some(method.return_ty.kind.clone())))
+}
+
+fn resolve_bound_protocol_method(
+    block: &hir::Block,
+    type_table: &tlang_typeck::TypeTable,
+    receiver_ty: &TyKind,
+    method_name: &str,
+) -> Option<(SignatureInformation, Option<TyKind>, Option<Span>)> {
+    let TyKind::Var(type_var_id) = receiver_ty else {
+        return None;
+    };
+
+    let bounds = type_table.get_type_param_bounds(*type_var_id)?;
+
+    // Build a work-list that includes all transitively reachable constraint
+    // protocols so that, e.g., a `T: Ord` bound also exposes `Eq`/`PartialEq`
+    // methods that `Ord` inherits.
+    let mut pending: Vec<(
+        &tlang_typeck::ProtocolInfo,
+        std::collections::HashMap<tlang_span::TypeVarId, TyKind>,
+    )> = Vec::new();
+    for bound in bounds {
+        if let Some((protocol, type_args)) = type_table.resolve_protocol_bound(bound) {
+            let mut bindings = std::collections::HashMap::new();
+            for (proto_type_param, type_arg) in protocol.type_param_var_ids.iter().zip(type_args) {
+                bindings.insert(*proto_type_param, type_arg.kind.clone());
+            }
+            pending.push((protocol, bindings));
+        }
+    }
+
+    let mut visited_protocols = std::collections::HashSet::new();
+    while let Some((protocol, type_bindings)) = pending.pop() {
+        if !visited_protocols.insert(protocol.hir_id) {
+            continue;
+        }
+
+        // Enqueue transitively-reachable constraint protocols.
+        for constraint_name in &protocol.constraints {
+            if let Some(constraint_protocol) = type_table.get_protocol_info(constraint_name) {
+                pending.push((constraint_protocol, type_bindings.clone()));
+            }
+        }
+
+        let protocol_name = protocol.name.to_string();
+        let Some(method) = protocol
+            .methods
+            .iter()
+            .find(|candidate| candidate.name.as_str() == method_name)
+        else {
+            continue;
+        };
+
+        let params: Vec<String> = method
+            .param_tys
+            .iter()
+            .skip(1)
+            .map(|ty| substitute_type_vars(&ty.kind, &type_bindings).to_string())
+            .collect();
+        let return_ty = substitute_type_vars(&method.return_ty.kind, &type_bindings);
+        let signature = SignatureInformation {
+            label: format!(
+                "{protocol_name}.{method_name}({}) -> {return_ty}",
+                params.join(", ")
+            ),
+            parameters: params
+                .into_iter()
+                .map(|label| ParameterInformation { label })
+                .collect(),
+        };
+
+        return Some((
+            signature,
+            Some(return_ty),
+            find_protocol_method_span(block, protocol.hir_id, &protocol_name, method_name),
+        ));
+    }
+
+    None
+}
+
+fn complete_bound_protocol_methods(
+    block: &hir::Block,
+    type_table: &tlang_typeck::TypeTable,
+    type_var_id: tlang_span::TypeVarId,
+) -> Vec<MemberCandidate> {
+    let Some(bounds) = type_table.get_type_param_bounds(type_var_id) else {
+        return vec![];
+    };
+
+    // Build a work-list seeded with all direct bounds, then expand into
+    // transitively-reachable constraint protocols so completions include
+    // inherited methods (e.g. `Eq`/`PartialEq` for a `T: Ord` bound).
+    let mut pending: Vec<(
+        &tlang_typeck::ProtocolInfo,
+        std::collections::HashMap<tlang_span::TypeVarId, TyKind>,
+    )> = Vec::new();
+    for bound in bounds {
+        if let Some((protocol, type_args)) = type_table.resolve_protocol_bound(bound) {
+            let mut bindings = std::collections::HashMap::new();
+            for (proto_type_param, type_arg) in protocol.type_param_var_ids.iter().zip(type_args) {
+                bindings.insert(*proto_type_param, type_arg.kind.clone());
+            }
+            pending.push((protocol, bindings));
+        }
+    }
+
+    let mut visited_protocols = std::collections::HashSet::new();
+    let mut seen = std::collections::HashSet::new();
+    let mut candidates = Vec::new();
+
+    while let Some((protocol, type_bindings)) = pending.pop() {
+        if !visited_protocols.insert(protocol.hir_id) {
+            continue;
+        }
+
+        // Enqueue transitively-reachable constraint protocols.
+        for constraint_name in &protocol.constraints {
+            if let Some(constraint_protocol) = type_table.get_protocol_info(constraint_name) {
+                pending.push((constraint_protocol, type_bindings.clone()));
+            }
+        }
+
+        let protocol_name = protocol.name.to_string();
+
+        for method in &protocol.methods {
+            let name = method.name.to_string();
+            if !seen.insert(name.clone()) {
+                continue;
+            }
+
+            let params: Vec<String> = method
+                .param_tys
+                .iter()
+                .skip(1)
+                .map(|ty| substitute_type_vars(&ty.kind, &type_bindings).to_string())
+                .collect();
+            let return_ty = substitute_type_vars(&method.return_ty.kind, &type_bindings);
+            let signature = SignatureInformation {
+                label: format!(
+                    "{protocol_name}.{name}({}) -> {return_ty}",
+                    params.join(", ")
+                ),
+                parameters: params
+                    .into_iter()
+                    .map(|label| ParameterInformation { label })
+                    .collect(),
+            };
+
+            candidates.push(MemberCandidate {
+                name,
+                kind: MemberKind::Method,
+                signature: Some(signature),
+                return_ty: Some(return_ty),
+                def_span: find_protocol_method_span(
+                    block,
+                    protocol.hir_id,
+                    &protocol_name,
+                    method.name.as_str(),
+                ),
+                builtin: false,
+            });
+        }
+    }
+
+    candidates
+}
+
+fn find_protocol_method_span(
+    block: &hir::Block,
+    protocol_hir_id: Option<tlang_span::HirId>,
+    protocol_name: &str,
+    method_name: &str,
+) -> Option<Span> {
+    block.stmts.iter().find_map(|stmt| match &stmt.kind {
+        hir::StmtKind::ProtocolDeclaration(decl)
+            if protocol_hir_id.is_some_and(|hir_id| decl.hir_id == hir_id)
+                || decl.name.as_str() == protocol_name =>
+        {
+            decl.methods
+                .iter()
+                .find(|method| method.name.as_str() == method_name)
+                .map(|method| method.name.span)
+        }
+        _ => None,
+    })
+}
+
+fn substitute_type_vars(
+    ty: &TyKind,
+    bindings: &std::collections::HashMap<tlang_span::TypeVarId, TyKind>,
+) -> TyKind {
+    match ty {
+        TyKind::Var(id) => bindings.get(id).cloned().unwrap_or_else(|| ty.clone()),
+        TyKind::Fn(params, ret) => TyKind::Fn(
+            params
+                .iter()
+                .map(|param| tlang_hir::Ty {
+                    kind: substitute_type_vars(&param.kind, bindings),
+                    ..param.clone()
+                })
+                .collect(),
+            Box::new(tlang_hir::Ty {
+                kind: substitute_type_vars(&ret.kind, bindings),
+                ..ret.as_ref().clone()
+            }),
+        ),
+        TyKind::List(inner) => TyKind::List(Box::new(tlang_hir::Ty {
+            kind: substitute_type_vars(&inner.kind, bindings),
+            ..inner.as_ref().clone()
+        })),
+        TyKind::Slice(inner) => TyKind::Slice(Box::new(tlang_hir::Ty {
+            kind: substitute_type_vars(&inner.kind, bindings),
+            ..inner.as_ref().clone()
+        })),
+        TyKind::Dict(key, value) => TyKind::Dict(
+            Box::new(tlang_hir::Ty {
+                kind: substitute_type_vars(&key.kind, bindings),
+                ..key.as_ref().clone()
+            }),
+            Box::new(tlang_hir::Ty {
+                kind: substitute_type_vars(&value.kind, bindings),
+                ..value.as_ref().clone()
+            }),
+        ),
+        TyKind::Path(path, type_args) => TyKind::Path(
+            path.clone(),
+            type_args
+                .iter()
+                .map(|type_arg| tlang_hir::Ty {
+                    kind: substitute_type_vars(&type_arg.kind, bindings),
+                    ..type_arg.clone()
+                })
+                .collect(),
+        ),
+        TyKind::Union(types) => TyKind::Union(
+            types
+                .iter()
+                .map(|ty| tlang_hir::Ty {
+                    kind: substitute_type_vars(&ty.kind, bindings),
+                    ..ty.clone()
+                })
+                .collect(),
+        ),
+        _ => ty.clone(),
+    }
 }
 
 /// Resolve a member from user-defined declarations in the HIR.
@@ -928,6 +1435,28 @@ mod tests {
                 result.all_diagnostics()
             )
         })
+    }
+
+    #[test]
+    fn completions_include_protocol_methods_for_constrained_type_vars() {
+        let hir = typed_hir("fn print<T: Display>(value: T) { value }");
+        let decl = match &hir.module.block.stmts[0].kind {
+            hir::StmtKind::FunctionDeclaration(decl) => decl,
+            other => panic!("expected FunctionDeclaration, got {other:?}"),
+        };
+        let type_var_id = match decl.parameters[0].type_annotation.kind {
+            TyKind::Var(id) => id,
+            ref other => panic!("expected constrained type variable, got {other:?}"),
+        };
+
+        let candidates =
+            complete_bound_protocol_methods(&hir.module.block, &hir.type_table, type_var_id);
+        assert!(
+            candidates
+                .iter()
+                .any(|candidate| candidate.name == "to_string"),
+            "expected Display-bound completions to include to_string, got: {candidates:?}"
+        );
     }
 
     // ── find_hir_expr_at_position ──────────────────────────────────────

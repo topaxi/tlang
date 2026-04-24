@@ -21,28 +21,75 @@ use tlang_span::{HirId, HirIdAllocator, NodeId, Span, TypeVarId, TypeVarIdAlloca
 /// The dispatch map includes methods from the protocol itself **and** from all
 /// transitively-reachable constraint protocols, so that default bodies can freely
 /// call `self.eq(other)` when the protocol is `Ord : Eq`, for example.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ProtocolDispatchTarget {
+    pub(crate) ident: Ident,
+    pub(crate) protocol_hir_id: Option<HirId>,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct ProtocolDispatchContext {
     /// Maps method name → the `Ident` of the protocol that declares that method.
     /// Includes the current protocol's own methods and all transitively-inherited
     /// constraint protocol methods (nearest/direct protocol wins on conflict).
-    pub(crate) method_dispatch_map: HashMap<String, Ident>,
+    pub(crate) method_dispatch_map: HashMap<String, ProtocolDispatchTarget>,
     /// The `NodeId` of the `self` parameter's pattern node in the current default
     /// method.  Stored here so that later passes can cross-check the identity of the
     /// `self` receiver without relying on string comparison alone.
     pub(crate) self_param_node_id: NodeId,
 }
 
+/// Active method-dispatch maps for generic function parameters constrained by
+/// one or more protocols.
+///
+/// Each entry maps a parameter-pattern `NodeId` to the protocol-method dispatch
+/// table that should be used for calls like `value.method(args...)`.
+pub(crate) type GenericProtocolDispatchContext =
+    HashMap<NodeId, HashMap<String, ProtocolDispatchTarget>>;
+
 /// Pre-scanned information about a protocol declaration, used to build
 /// `ProtocolDispatchContext` dispatch maps that include constraint methods.
 #[derive(Debug, Clone)]
 pub(crate) struct ProtocolRegistryEntry {
+    pub(crate) hir_id: HirId,
     /// The protocol's name identifier.
     pub(crate) ident: Ident,
     /// Names of methods directly declared in this protocol.
     pub(crate) methods: Vec<String>,
     /// Names of direct constraint protocols (e.g. `["Eq"]` for `Ord : Eq`).
     pub(crate) constraints: Vec<String>,
+}
+
+const BUILTIN_PROTOCOL_HIR_ID_BASE: usize = 900_000_000;
+
+/// Builtin protocols with stable explicit `HirId` offsets.
+///
+/// The offset in each tuple is fixed and must match the corresponding entry in
+/// `tlang_typeck::builtin_protocols` (which uses the same base + same position
+/// order).  Using explicit offsets (instead of deriving them from position via
+/// `enumerate`) ensures that inserting or reordering entries in this list never
+/// silently shifts the identity of other protocols.
+const BUILTIN_PROTOCOLS: &[(usize, &str, &[&str])] = &[
+    (1, "Truthy", &["truthy"]),
+    (2, "Functor", &["map"]),
+    (3, "Accepts", &["accepts"]),
+    (4, "Iterable", &["iter"]),
+    (5, "Iterator", &["next"]),
+    (6, "Display", &["to_string"]),
+    (7, "Into", &["into"]),
+    (8, "TryInto", &["try_into"]),
+];
+
+fn builtin_protocol_registry_entries() -> Vec<ProtocolRegistryEntry> {
+    BUILTIN_PROTOCOLS
+        .iter()
+        .map(|(offset, name, methods)| ProtocolRegistryEntry {
+            hir_id: HirId::new(BUILTIN_PROTOCOL_HIR_ID_BASE + offset),
+            ident: Ident::new(name, Span::default()),
+            methods: methods.iter().map(|method| (*method).to_string()).collect(),
+            constraints: Vec::new(),
+        })
+        .collect()
 }
 
 /// Errors that can occur during AST-to-HIR lowering.
@@ -129,11 +176,21 @@ pub struct LoweringContext {
     /// Active protocol self-dispatch context, set while lowering a protocol
     /// default method body.  `None` outside of such bodies.
     pub(crate) protocol_dispatch_ctx: Option<ProtocolDispatchContext>,
+    /// Active constrained-generic dispatch context, set while lowering a
+    /// generic function body. `None` when no parameter uses protocol bounds.
+    pub(crate) generic_protocol_dispatch_ctx: Option<GenericProtocolDispatchContext>,
+    /// Name-based fallback for constrained-generic dispatch when semantic
+    /// resolution has not yet attached parameter `NodeId`s to identifier paths.
+    pub(crate) generic_protocol_dispatch_ctx_by_name:
+        Option<HashMap<String, HashMap<String, ProtocolDispatchTarget>>>,
     /// Pre-scanned registry of all protocol declarations in the module being
     /// lowered.  Populated by `lower_module` before any statement is lowered,
     /// so that `lower_protocol_decl` can look up constraint protocols' method
     /// lists when building a `ProtocolDispatchContext`.
     protocol_registry: HashMap<String, ProtocolRegistryEntry>,
+    /// Protocol registry keyed by lowered declaration `HirId` for lookups that
+    /// already carry resolved protocol identities.
+    protocol_registry_by_hir_id: HashMap<HirId, ProtocolRegistryEntry>,
     /// HirIds of `CallExpression` nodes that were desugared from the `|>`
     /// pipeline operator.  Collected during lowering and forwarded to
     /// [`hir::LowerResultMeta`] so that downstream passes can identify
@@ -162,7 +219,10 @@ impl LoweringContext {
             current_symbol_table: root_symbol_table,
             errors: Vec::new(),
             protocol_dispatch_ctx: None,
+            generic_protocol_dispatch_ctx: None,
+            generic_protocol_dispatch_ctx_by_name: None,
             protocol_registry: HashMap::default(),
+            protocol_registry_by_hir_id: HashMap::default(),
             pipeline_call_ids: HashSet::default(),
             type_var_id_allocator: TypeVarIdAllocator::new(1),
             type_param_scopes: Vec::new(),
@@ -386,18 +446,29 @@ impl LoweringContext {
             module.statements.len()
         );
 
+        for entry in builtin_protocol_registry_entries() {
+            self.protocol_registry
+                .entry(entry.ident.to_string())
+                .or_insert_with(|| entry.clone());
+            self.protocol_registry_by_hir_id
+                .entry(entry.hir_id)
+                .or_insert(entry);
+        }
+
         // Pre-scan all protocol declarations so that `lower_protocol_decl` can
         // look up constraint protocol methods when building dispatch contexts.
         for stmt in &module.statements {
             if let ast::node::StmtKind::ProtocolDeclaration(decl) = &stmt.kind {
-                self.protocol_registry.insert(
-                    decl.name.to_string(),
-                    ProtocolRegistryEntry {
-                        ident: decl.name,
-                        methods: decl.methods.iter().map(|m| m.name.to_string()).collect(),
-                        constraints: decl.constraints.iter().map(|c| c.to_string()).collect(),
-                    },
-                );
+                let hir_id = self.lower_node_id(stmt.id);
+                let entry = ProtocolRegistryEntry {
+                    hir_id,
+                    ident: decl.name,
+                    methods: decl.methods.iter().map(|m| m.name.to_string()).collect(),
+                    constraints: decl.constraints.iter().map(|c| c.to_string()).collect(),
+                };
+                self.protocol_registry
+                    .insert(decl.name.to_string(), entry.clone());
+                self.protocol_registry_by_hir_id.insert(hir_id, entry);
             }
         }
 
@@ -432,12 +503,21 @@ impl LoweringContext {
         current_protocol_ident: Ident,
         current_protocol_methods: &[String],
         constraints: &[String],
-    ) -> HashMap<String, Ident> {
-        let mut map: HashMap<String, Ident> = HashMap::new();
+    ) -> HashMap<String, ProtocolDispatchTarget> {
+        let mut map: HashMap<String, ProtocolDispatchTarget> = HashMap::new();
 
         // Current protocol's own methods (highest priority).
         for method_name in current_protocol_methods {
-            map.insert(method_name.clone(), current_protocol_ident);
+            map.insert(
+                method_name.clone(),
+                ProtocolDispatchTarget {
+                    ident: current_protocol_ident,
+                    protocol_hir_id: self
+                        .protocol_registry
+                        .get(current_protocol_ident.as_str())
+                        .map(|entry| entry.hir_id),
+                },
+            );
         }
 
         // Transitively add constraint protocol methods using FIFO traversal so
@@ -454,11 +534,92 @@ impl LoweringContext {
             if let Some(entry) = self.protocol_registry.get(&constraint_name) {
                 for method_name in &entry.methods {
                     // or_insert: current protocol and earlier constraints win.
-                    map.entry(method_name.clone()).or_insert(entry.ident);
+                    map.entry(method_name.clone())
+                        .or_insert(ProtocolDispatchTarget {
+                            ident: entry.ident,
+                            protocol_hir_id: Some(entry.hir_id),
+                        });
                 }
                 // Queue this constraint's own constraints for transitive lookup.
                 for nested in &entry.constraints {
                     to_visit.push_back(nested.clone());
+                }
+            }
+        }
+
+        map
+    }
+
+    /// Builds a method-dispatch map for a set of protocol bounds.
+    ///
+    /// Direct bounds are visited in source order, then each protocol's
+    /// transitive constraints are traversed breadth-first. The first protocol
+    /// that defines a given method wins.
+    pub(crate) fn build_bound_protocol_dispatch_map(
+        &self,
+        bounds: &[hir::Ty],
+    ) -> HashMap<String, ProtocolDispatchTarget> {
+        let mut map = HashMap::new();
+        let mut to_visit: VecDeque<(Option<HirId>, String)> = bounds
+            .iter()
+            .filter_map(|bound| match &bound.kind {
+                hir::TyKind::Path(path, _) => {
+                    Some((path.res.hir_id().or(bound.res), path.join("::")))
+                }
+                _ => None,
+            })
+            .collect();
+        let mut visited = HashSet::new();
+
+        while let Some((protocol_hir_id, protocol_name)) = to_visit.pop_front() {
+            if !visited.insert(
+                protocol_hir_id.map_or_else(|| protocol_name.clone(), |hir_id| hir_id.to_string()),
+            ) {
+                continue;
+            }
+
+            if let Some(entry) = protocol_hir_id
+                .and_then(|hir_id| self.protocol_registry_by_hir_id.get(&hir_id))
+                .or_else(|| self.protocol_registry.get(&protocol_name))
+            {
+                for method_name in &entry.methods {
+                    map.entry(method_name.clone())
+                        .or_insert(ProtocolDispatchTarget {
+                            ident: entry.ident,
+                            protocol_hir_id: Some(entry.hir_id),
+                        });
+                }
+                for nested in &entry.constraints {
+                    to_visit.push_back((None, nested.clone()));
+                }
+                continue;
+            }
+
+            let prefix = format!("{protocol_name}::");
+            for scope in self.symbol_tables.values() {
+                let Ok(symbols) = scope.read() else {
+                    continue;
+                };
+
+                for symbol in symbols.get_all_local_symbols() {
+                    if !matches!(symbol.kind, DefKind::ProtocolMethod(_))
+                        || !symbol.name.starts_with(prefix.as_str())
+                    {
+                        continue;
+                    }
+
+                    let Some(method_name) = symbol.name.strip_prefix(prefix.as_str()) else {
+                        continue;
+                    };
+                    if method_name.is_empty() {
+                        continue;
+                    }
+
+                    map.entry(method_name.to_string())
+                        .or_insert(ProtocolDispatchTarget {
+                            ident: Ident::new(&protocol_name, Span::default()),
+                            protocol_hir_id: None,
+                        });
                 }
             }
         }
@@ -564,7 +725,29 @@ impl LoweringContext {
                 .map(|param| this.lower_fn_param(param))
                 .collect::<Vec<_>>();
             this.seed_dot_method_receiver_type(&name, &owner_type_params, &mut parameters);
+            let dispatch_type_params = owner_type_params
+                .iter()
+                .chain(type_params.iter())
+                .cloned()
+                .collect::<Vec<_>>();
+            let generic_dispatch_ctx = this.build_generic_protocol_dispatch_context_from_params(
+                &decl.parameters,
+                &dispatch_type_params,
+            );
+            let generic_dispatch_ctx_by_name = this
+                .build_generic_protocol_dispatch_context_by_name_from_params(
+                    &decl.parameters,
+                    &dispatch_type_params,
+                );
+            let saved_generic_ctx = this.generic_protocol_dispatch_ctx.take();
+            let saved_generic_ctx_by_name = this.generic_protocol_dispatch_ctx_by_name.take();
+            this.generic_protocol_dispatch_ctx =
+                (!generic_dispatch_ctx.is_empty()).then_some(generic_dispatch_ctx);
+            this.generic_protocol_dispatch_ctx_by_name =
+                (!generic_dispatch_ctx_by_name.is_empty()).then_some(generic_dispatch_ctx_by_name);
             let body = this.lower_block_in_current_scope(&decl.body);
+            this.generic_protocol_dispatch_ctx = saved_generic_ctx;
+            this.generic_protocol_dispatch_ctx_by_name = saved_generic_ctx_by_name;
             let return_type = this.lower_ty(decl.return_type_annotation.as_ref());
 
             this.pop_type_param_scope();
@@ -743,6 +926,67 @@ impl LoweringContext {
         hir_params
     }
 
+    fn build_generic_protocol_dispatch_context_from_params(
+        &mut self,
+        ast_parameters: &[ast::node::FunctionParameter],
+        type_params: &[hir::TypeParam],
+    ) -> GenericProtocolDispatchContext {
+        let dispatch_by_type_var: HashMap<_, _> = type_params
+            .iter()
+            .filter_map(|type_param| {
+                let dispatch_map = self.build_bound_protocol_dispatch_map(&type_param.bounds);
+                (!dispatch_map.is_empty()).then_some((type_param.type_var_id, dispatch_map))
+            })
+            .collect();
+
+        ast_parameters
+            .iter()
+            .filter_map(|param| {
+                let lowered_ty = self.lower_ty(param.type_annotation.as_ref());
+                let hir::TyKind::Var(type_var_id) = lowered_ty.kind else {
+                    return None;
+                };
+
+                dispatch_by_type_var
+                    .get(&type_var_id)
+                    .cloned()
+                    .map(|dispatch_map| (param.pattern.id, dispatch_map))
+            })
+            .collect()
+    }
+
+    fn build_generic_protocol_dispatch_context_by_name_from_params(
+        &mut self,
+        ast_parameters: &[ast::node::FunctionParameter],
+        type_params: &[hir::TypeParam],
+    ) -> HashMap<String, HashMap<String, ProtocolDispatchTarget>> {
+        let dispatch_by_type_var: HashMap<_, _> = type_params
+            .iter()
+            .filter_map(|type_param| {
+                let dispatch_map = self.build_bound_protocol_dispatch_map(&type_param.bounds);
+                (!dispatch_map.is_empty()).then_some((type_param.type_var_id, dispatch_map))
+            })
+            .collect();
+
+        ast_parameters
+            .iter()
+            .filter_map(|param| {
+                let ast::node::PatKind::Identifier(ident) = &param.pattern.kind else {
+                    return None;
+                };
+                let lowered_ty = self.lower_ty(param.type_annotation.as_ref());
+                let hir::TyKind::Var(type_var_id) = lowered_ty.kind else {
+                    return None;
+                };
+
+                dispatch_by_type_var
+                    .get(&type_var_id)
+                    .cloned()
+                    .map(|dispatch_map| (ident.to_string(), dispatch_map))
+            })
+            .collect()
+    }
+
     /// Pop the most recently pushed type parameter scope. Must be called after
     /// lowering the body that was covered by the corresponding
     /// [`lower_type_params`] call.
@@ -862,8 +1106,12 @@ impl LoweringContext {
                 return hir::TyKind::Var(type_var_id);
             }
         }
+        let mut lowered_path = self.lower_path(path);
+        if let ast::node::Res::Def(node_id) = path.res {
+            lowered_path.res.set_hir_id(self.lower_node_id(node_id));
+        }
         hir::TyKind::Path(
-            self.lower_path(path),
+            lowered_path,
             params
                 .iter()
                 .map(|param| self.lower_ty(Some(param)))

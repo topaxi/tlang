@@ -6,7 +6,7 @@
 //! runtime (`tlang_memory`).
 
 use tlang_ast::node::Ident;
-use tlang_span::Span;
+use tlang_span::{HirId, Span};
 
 use crate::type_table::{AssociatedTypeInfo, ProtocolInfo, ProtocolMethodInfo};
 
@@ -112,6 +112,8 @@ static BUILTIN_PROTOCOLS: &[BuiltinProtocol] = &[
     },
 ];
 
+const BUILTIN_PROTOCOL_HIR_ID_BASE: usize = 900_000_000;
+
 fn ident(name: &str) -> Ident {
     Ident::new(name, Span::default())
 }
@@ -119,6 +121,14 @@ fn ident(name: &str) -> Ident {
 /// Returns `true` if `name` is a builtin native protocol.
 pub fn is_builtin_protocol(name: &str) -> bool {
     BUILTIN_PROTOCOLS.iter().any(|p| p.name == name)
+}
+
+/// Returns the stable synthetic `HirId` assigned to a builtin protocol.
+pub fn builtin_hir_id(name: &str) -> Option<HirId> {
+    BUILTIN_PROTOCOLS
+        .iter()
+        .position(|protocol| protocol.name == name)
+        .map(|index| HirId::new(BUILTIN_PROTOCOL_HIR_ID_BASE + index + 1))
 }
 
 /// Return [`ProtocolInfo`] entries for all builtin native protocols.
@@ -214,6 +224,7 @@ fn to_protocol_info(p: &BuiltinProtocol) -> ProtocolInfo {
         .collect();
 
     ProtocolInfo {
+        hir_id: builtin_hir_id(p.name),
         name: ident(p.name),
         type_param_var_ids: Vec::new(),
         methods,

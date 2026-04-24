@@ -93,6 +93,24 @@ impl JsHirOptimizer {
         Self(HirOptGroup::new("root", passes))
     }
 
+    pub fn pre_typecheck() -> Self {
+        Self::new(vec![
+            Box::new(hir_opt::tail_call_validation::TailPositionAnalysis::default()),
+            Box::new(hir_opt::symbol_resolution::SymbolResolution::default()),
+            Box::new(TailCallSelfReferenceValidation::default()),
+        ])
+    }
+
+    pub fn post_typecheck() -> Self {
+        Self::new(vec![
+            Box::new(JsAnfTransform::default()),
+            Box::new(JsAnfReturnOpt::default()),
+            Box::new(BooleanReturnSimplification::default()),
+            Box::new(hir_opt::constant_folding::ConstantFolding::default()),
+            Box::new(hir_opt::dead_code_elimination::DeadCodeElimination::default()),
+        ])
+    }
+
     pub fn add_pass(&mut self, pass: Box<dyn HirPass>) {
         self.0.add_pass(pass);
     }

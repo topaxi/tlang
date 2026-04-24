@@ -113,7 +113,7 @@ fn compile_to_hir(
     let mut ctx = meta.into();
 
     let mut optimizer = if matches!(target, CompileTargetArg::Js) {
-        CompileTargetHirOptimizer::JavaScript(JsHirOptimizer::default())
+        CompileTargetHirOptimizer::JavaScript(JsHirOptimizer::pre_typecheck())
     } else {
         CompileTargetHirOptimizer::Interpreter(HirOptimizer::default())
     };
@@ -143,6 +143,14 @@ fn compile_to_hir(
     if let Err(err) = exhaustive_enum.optimize_hir(&mut module, &mut ctx) {
         eprint!("{}", render_ice(&err));
         std::process::exit(1);
+    }
+
+    if matches!(target, CompileTargetArg::Js) {
+        let mut js_post_optimizer = JsHirOptimizer::post_typecheck();
+        if let Err(err) = js_post_optimizer.optimize_hir(&mut module, &mut ctx) {
+            eprint!("{}", render_ice(&err));
+            std::process::exit(1);
+        }
     }
 
     Ok(module)
