@@ -346,13 +346,7 @@ pub fn rename(
 
     let mut edits = find_references(module, index, line, column, true)
         .into_iter()
-        .filter(|reference| {
-            !import_binding.is_some_and(|binding| {
-                binding.alias_span.is_none()
-                    && reference.is_declaration
-                    && reference.ident_span == symbol.def_span
-            })
-        })
+        .filter(|reference| should_include_rename_reference(reference, import_binding, &symbol))
         .map(|reference| RenameEdit {
             span: reference.ident_span,
             new_text: new_name.to_string(),
@@ -570,6 +564,18 @@ fn find_import_binding(module: &ast::Module, def_span: Span) -> Option<ImportBin
                 None
             }
         })
+    })
+}
+
+fn should_include_rename_reference(
+    reference: &SymbolReference,
+    import_binding: Option<ImportBinding>,
+    symbol: &ResolvedSymbol,
+) -> bool {
+    import_binding.is_none_or(|binding| {
+        binding.alias_span.is_some()
+            || !reference.is_declaration
+            || reference.ident_span != symbol.def_span
     })
 }
 

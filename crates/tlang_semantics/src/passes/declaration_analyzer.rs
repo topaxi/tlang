@@ -99,7 +99,7 @@ impl DeclarationAnalyzer {
     }
 
     #[inline(always)]
-    fn declare_symbol_without_node_id(
+    fn declare_untracked_symbol(
         &mut self,
         ctx: &mut SemanticAnalysisContext,
         name: &str,
@@ -110,7 +110,7 @@ impl DeclarationAnalyzer {
         let id = ctx.symbol_id_allocator.next_id();
         let symbol_info = Def::new(id, name, kind, defined_at, scope_start);
 
-        debug!("Declaring symbol without node id: {symbol_info:#?}");
+        debug!("Declaring untracked symbol: {symbol_info:#?}");
 
         self.current_symbol_table()
             .write()
@@ -559,7 +559,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     };
                     let kind = self.import_symbol_kind(&qualified_name, item.span);
 
-                    self.declare_symbol_without_node_id(
+                    self.declare_untracked_symbol(
                         ctx,
                         local_ident.as_str(),
                         kind,

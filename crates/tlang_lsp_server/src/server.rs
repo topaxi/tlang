@@ -1282,7 +1282,9 @@ fn member_to_goto_definition(
 ///
 /// This helper is appropriate for rename responses in the current server
 /// because every edit targets one open document and does not need versioned
-/// `document_changes` entries or change annotations.
+/// `document_changes` entries or change annotations. If rename later grows
+/// into a multi-file/workspace-aware feature, replace this helper with a
+/// builder that can emit `document_changes` across all affected URIs.
 fn workspace_edit_for_uri(uri: &Url, edits: Vec<TextEdit>) -> WorkspaceEdit {
     WorkspaceEdit {
         changes: Some(HashMap::from([(uri.clone(), edits)])),
