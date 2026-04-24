@@ -373,13 +373,13 @@ pub fn rename(
         });
     }
 
-    edits.sort_by_key(|edit| {
-        (
-            edit.span.start,
-            edit.span.end,
-            edit.new_text.is_empty(),
-            edit.new_text.clone(),
-        )
+    edits.sort_by(|lhs, rhs| {
+        lhs.span
+            .start
+            .cmp(&rhs.span.start)
+            .then_with(|| lhs.span.end.cmp(&rhs.span.end))
+            .then_with(|| lhs.new_text.is_empty().cmp(&rhs.new_text.is_empty()))
+            .then_with(|| lhs.new_text.cmp(&rhs.new_text))
     });
 
     Ok(edits)

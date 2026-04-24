@@ -1278,6 +1278,11 @@ fn member_to_goto_definition(
     }))
 }
 
+/// Build a simple `WorkspaceEdit` for a single document using `changes`.
+///
+/// This helper is appropriate for rename responses in the current server
+/// because every edit targets one open document and does not need versioned
+/// `document_changes` entries or change annotations.
 fn workspace_edit_for_uri(uri: &Url, edits: Vec<TextEdit>) -> WorkspaceEdit {
     WorkspaceEdit {
         changes: Some(HashMap::from([(uri.clone(), edits)])),
