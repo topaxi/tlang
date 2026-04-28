@@ -1856,6 +1856,29 @@ mod tests {
     }
 
     #[test]
+    fn hover_text_self_in_impl_block() {
+        // Hovering over `self` used in an impl block method body should show the target type.
+        let source = r#"enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+impl Iterable<isize> for Tree {
+    fn iter(self) {
+        Iterable::iter([])
+    }
+}
+"#;
+        // Hover over `self` in `fn iter(self)` at line 6, col 12.
+        let resolved = setup_and_resolve_hover(source, 6, 12).unwrap();
+        assert_eq!(
+            resolved.hover_text(),
+            "(parameter) self: Tree",
+            "self in impl block method should show target type"
+        );
+    }
+
+    #[test]
     fn goto_definition_span_for_parameter() {
         let resolved = setup_and_resolve("fn f(x) { x }", 0, 10).unwrap();
         // Definition span should point to the parameter declaration, not the reference.

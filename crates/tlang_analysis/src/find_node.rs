@@ -361,6 +361,17 @@ impl<'ast> Visitor<'ast> for NodeFinder {
         self.visit_ty(annotation, ctx);
     }
 
+    fn visit_fn_param(&mut self, parameter: &'ast node::FunctionParameter, ctx: &mut ()) {
+        // The standard walk_pat for `PatKind::_Self` is a no-op, so the `self`
+        // keyword never gets recorded.  Handle it explicitly so that hover and
+        // goto-definition work for `self` in method parameter lists.
+        if matches!(parameter.pattern.kind, node::PatKind::_Self) {
+            self.record_ident("self", &parameter.pattern.span);
+        } else {
+            visit::walk_fn_param(self, parameter, ctx);
+        }
+    }
+
     fn visit_fn_decl(&mut self, declaration: &'ast node::FunctionDeclaration, ctx: &mut ()) {
         // Walk the declaration using the standard walk which handles
         // enter_scope / leave_scope for the function body.

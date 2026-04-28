@@ -15,15 +15,3 @@ warning: Unused protocol `Farewell`, if this is intentional, prefix the name wit
 6 │ │   fn farewell(self)
 7 │ │ }
   │ ╰─^
-
-warning: Unused function `Greet::greet/1`
-   ┌─ [WORKSPACE_ROOT]/tests/protocols/implements_operator.tlang:15:3
-   │
-15 │   fn greet(Animal::Dog(name)) { "Woof! I'm " + name }
-   │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: Unused function `Greet::greet/1`
-   ┌─ [WORKSPACE_ROOT]/tests/protocols/implements_operator.tlang:16:3
-   │
-16 │   fn greet(Animal::Cat(name)) { "Meow! I'm " + name }
-   │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

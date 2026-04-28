@@ -1833,6 +1833,59 @@ fn filter<T>([_, ...xs]: List<T>, f: fn(T) -> bool) -> List<T> { rec filter(xs, 
     }
 
     #[test]
+    fn type_at_definition_self_parameter_in_impl_block() {
+        // `self` in an impl block method should be typed as the target type.
+        let source = r#"enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+impl Iterable<isize> for Tree {
+    fn iter(self) {
+        Iterable::iter([])
+    }
+}
+"#;
+        let typed_hir = typed_hir_for(source);
+        // `self` parameter is at line 6, col 12 (0-based)
+        let ty = type_at_definition(&typed_hir, 6, 12);
+        assert_eq!(
+            ty.as_deref(),
+            Some("Tree"),
+            "self parameter in impl block method should be typed as Tree"
+        );
+    }
+
+    #[test]
+    fn type_at_definition_self_in_impl_block_body() {
+        // `self` used in the body of an impl block method should resolve to the target type.
+        let source = r#"enum Tree {
+    Empty,
+    Node { value: isize, left: Tree, right: Tree },
+}
+
+fn Tree.to_list(Tree::Empty) { [] }
+fn Tree.to_list(Tree::Node { value, left, right }) { [...left, value, ...right] }
+
+impl Iterable<isize> for Tree {
+    fn iter(self) {
+        Iterable::iter(self.to_list())
+    }
+}
+"#;
+        let typed_hir = typed_hir_for(source);
+        // `self` in `self.to_list()` body expression is at line 10, col 23 (0-based)
+        // Line 10: `        Iterable::iter(self.to_list())`
+        //                               ^ col 23 is 's' of 'self'
+        let ty = type_at_definition(&typed_hir, 10, 23);
+        assert_eq!(
+            ty.as_deref(),
+            Some("Tree"),
+            "self in impl block method body should resolve to Tree"
+        );
+    }
+
+    #[test]
     fn generic_call_return_type_instantiation() {
         // map<T,U>(List<T>, fn(T)->U) -> List<U> called with List<i64>
         // and fn(x) { x ** 2 } should produce List<i64>.

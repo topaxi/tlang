@@ -686,7 +686,10 @@ impl DeclarationAnalyzer {
                     ctx,
                     pattern.id,
                     kw::_Self,
-                    DefKind::Variable,
+                    self.symbol_type_context
+                        .last()
+                        .copied()
+                        .unwrap_or(DefKind::Variable),
                     pattern.span,
                     scope_start,
                 );

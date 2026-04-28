@@ -75,6 +75,24 @@ impl UnusedSymbolDetector {
         self.mark_symbol_as_used_by_name(&qualified, ctx);
     }
 
+    /// Mark a protocol dispatch symbol `Protocol::method` as used.
+    ///
+    /// Protocol default-method bodies call sibling methods via
+    /// `self.method(args)`, which the HIR lowering rewrites to explicit
+    /// `Protocol::method(self, args)` path calls.  Those path calls are not
+    /// field accesses, so `process_field_access` does not fire for them;
+    /// instead, this helper is called when such a path is seen as a callee.
+    fn mark_protocol_method_as_used(
+        &self,
+        protocol_name: &str,
+        method_name: &str,
+        arity: usize,
+        ctx: &mut HirOptContext,
+    ) {
+        let qualified = format!("{protocol_name}::{method_name}");
+        self.mark_symbol_as_used_by_name_and_arity(&qualified, arity, ctx);
+    }
+
     /// Mark a dot-method symbol `TypeName.method` and its `::` alias
     /// `TypeName::method` as used in the current scope's symbol table.
     fn mark_method_as_used(
@@ -222,7 +240,10 @@ impl UnusedSymbolDetector {
 /// Returns `true` if the symbol is one of the type-dependent categories that
 /// the AST-level `VariableUsageValidator` suppresses.
 fn is_type_dependent_symbol(symbol: &tlang_defs::Def) -> bool {
-    matches!(symbol.kind, DefKind::StructField | DefKind::StructMethod(_))
+    matches!(
+        symbol.kind,
+        DefKind::StructField | DefKind::StructMethod(_) | DefKind::ProtocolMethod(_)
+    )
 }
 
 /// Returns `true` if the symbol's effective local/member name starts with `_`.
@@ -276,6 +297,27 @@ impl<'hir> hir::Visitor<'hir> for UnusedSymbolDetector {
                     // Arity = number of arguments + 1 for `self`.
                     let arity = call.arguments.len() + 1;
                     self.process_field_access(base, &field_name, true, arity, ctx);
+                } else if let hir::ExprKind::Path(path) = &call.callee.kind
+                    && path.segments.len() >= 2
+                {
+                    // Protocol dispatch call: `Protocol::method(self, args…)`.
+                    //
+                    // HIR lowering rewrites `self.method(args)` inside protocol
+                    // default bodies to `Protocol::method(self, args)`.  The
+                    // callee is a plain path with ≥ 2 segments; look it up by
+                    // the reconstructed qualified name so the symbol is marked
+                    // used even though no field-access is present.
+                    let protocol_name = path.segments[..path.segments.len() - 1]
+                        .iter()
+                        .map(|s| s.ident.as_str())
+                        .collect::<Vec<_>>()
+                        .join("::");
+                    // Strip any arity suffix (`method/2` → `method`).
+                    let raw_method = path.last_ident().as_str();
+                    let method_name = raw_method.split('/').next().unwrap_or(raw_method);
+                    let arity = call.arguments.len();
+                    self.mark_protocol_method_as_used(&protocol_name, method_name, arity, ctx);
+                    self.visit_expr(&mut call.callee, ctx);
                 } else {
                     self.visit_expr(&mut call.callee, ctx);
                 }

@@ -77,6 +77,12 @@ impl VariableUsageValidator {
             // stage (no type information available). Tracked by
             // `UnusedSymbolDetector` in the post-type-check HIR pass.
             .filter(|symbol| !matches!(symbol.kind, DefKind::StructField))
+            // ProtocolMethod symbols (both default implementations and impl-block
+            // overrides) are called via `self.method()` in protocol default bodies,
+            // which the HIR lowering rewrites to explicit `Protocol::method(self, …)`
+            // path calls.  Usage can only be tracked after lowering, so defer to
+            // `UnusedSymbolDetector` in the post-type-check HIR pass.
+            .filter(|symbol| !matches!(symbol.kind, DefKind::ProtocolMethod(_)))
             .collect::<Vec<_>>();
 
         for unused_symbol in &unused_symbols {
