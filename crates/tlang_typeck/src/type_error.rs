@@ -124,6 +124,23 @@ pub enum TypeError {
     NonBooleanGuard { actual: String, span: Span },
     /// A match does not cover all values of the scrutinee type.
     NonExhaustiveMatch { scrutinee: String, span: Span },
+    /// A parameter type in a protocol impl method does not match the protocol signature.
+    ImplMethodParamTypeMismatch {
+        method: String,
+        protocol: String,
+        param_index: usize,
+        expected: String,
+        actual: String,
+        span: Span,
+    },
+    /// The return type of a protocol impl method does not match the protocol signature.
+    ImplMethodReturnTypeMismatch {
+        method: String,
+        protocol: String,
+        expected: String,
+        actual: String,
+        span: Span,
+    },
 }
 
 impl TypeError {
@@ -150,7 +167,9 @@ impl TypeError {
             | TypeError::InfiniteType { span, .. }
             | TypeError::PatternTypeMismatch { span, .. }
             | TypeError::NonBooleanGuard { span, .. }
-            | TypeError::NonExhaustiveMatch { span, .. } => *span,
+            | TypeError::NonExhaustiveMatch { span, .. }
+            | TypeError::ImplMethodParamTypeMismatch { span, .. }
+            | TypeError::ImplMethodReturnTypeMismatch { span, .. } => *span,
         }
     }
 
@@ -277,6 +296,31 @@ impl TypeError {
             }
             TypeError::NonExhaustiveMatch { scrutinee, .. } => {
                 format!("non-exhaustive match: missing cases for `{scrutinee}`")
+            }
+            TypeError::ImplMethodParamTypeMismatch {
+                method,
+                protocol,
+                param_index,
+                expected,
+                actual,
+                ..
+            } => {
+                format!(
+                    "type mismatch for parameter {param_index} of `{protocol}::{method}`: \
+                     expected `{expected}`, found `{actual}`"
+                )
+            }
+            TypeError::ImplMethodReturnTypeMismatch {
+                method,
+                protocol,
+                expected,
+                actual,
+                ..
+            } => {
+                format!(
+                    "return type mismatch for `{protocol}::{method}`: \
+                     expected `{expected}`, found `{actual}`"
+                )
             }
         }
     }

@@ -2935,6 +2935,83 @@ impl TypeChecker {
                     });
                 }
             }
+
+            // Validate method signature types against the protocol definition.
+            //
+            // We only compare when the impl side carries an explicit annotation
+            // (`has_type_annotation` / `has_return_type`).  On the protocol side,
+            // `Unknown` and type variables (`Var`) mean "unconstrained" and are
+            // skipped; concrete types are checked with `ty_kinds_assignable`.
+            for impl_method in &impl_block.methods {
+                let method_name_full = impl_method.name();
+                let method_name = method_name_full
+                    .rsplit("::")
+                    .next()
+                    .unwrap_or(&method_name_full);
+
+                let Some(proto_method) = proto_info
+                    .methods
+                    .iter()
+                    .find(|m| m.name.as_str() == method_name)
+                else {
+                    continue;
+                };
+
+                let param_count = proto_method
+                    .param_tys
+                    .len()
+                    .min(impl_method.parameters.len());
+
+                for i in 0..param_count {
+                    let impl_param = &impl_method.parameters[i];
+
+                    // Self type is always the implementing type — skip.
+                    if impl_param.name.as_str() == "self" {
+                        continue;
+                    }
+
+                    if !impl_param.has_type_annotation {
+                        continue;
+                    }
+
+                    let proto_ty = &proto_method.param_tys[i];
+
+                    // Unknown and type variables on the protocol side are unconstrained.
+                    if matches!(proto_ty.kind, hir::TyKind::Unknown | hir::TyKind::Var(_)) {
+                        continue;
+                    }
+
+                    if !ty_kinds_assignable(&proto_ty.kind, &impl_param.type_annotation.kind) {
+                        self.errors.push(TypeError::ImplMethodParamTypeMismatch {
+                            method: method_name.to_string(),
+                            protocol: protocol_name.clone(),
+                            param_index: i + 1,
+                            expected: proto_ty.kind.to_string(),
+                            actual: impl_param.type_annotation.kind.to_string(),
+                            span: impl_param.span,
+                        });
+                    }
+                }
+
+                if impl_method.has_return_type
+                    && !matches!(
+                        proto_method.return_ty.kind,
+                        hir::TyKind::Unknown | hir::TyKind::Var(_)
+                    )
+                    && !ty_kinds_assignable(
+                        &proto_method.return_ty.kind,
+                        &impl_method.return_type.kind,
+                    )
+                {
+                    self.errors.push(TypeError::ImplMethodReturnTypeMismatch {
+                        method: method_name.to_string(),
+                        protocol: protocol_name.clone(),
+                        expected: proto_method.return_ty.kind.to_string(),
+                        actual: impl_method.return_type.kind.to_string(),
+                        span: impl_method.span,
+                    });
+                }
+            }
         }
 
         // Type-check the impl methods.

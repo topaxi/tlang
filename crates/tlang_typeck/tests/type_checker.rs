@@ -1478,6 +1478,95 @@ fn empty_impl_for_constraint_protocol_with_no_methods_ok() {
     );
 }
 
+// ── Protocol impl method type signature validation ───────────────────────
+
+#[test]
+fn impl_method_param_type_mismatch_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        protocol Hash {
+            fn hash(self, seed: i64) -> i64
+        }
+        struct Key {}
+        impl Hash for Key {
+            fn hash(self, seed: bool) -> i64 { 0 }
+        }
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("type mismatch for parameter 2 of `Hash::hash`")),
+        "expected param type mismatch error, got: {errs:?}"
+    );
+}
+
+#[test]
+fn impl_method_return_type_mismatch_error() {
+    let errs = common::typecheck_errors(
+        r#"
+        protocol Stringify {
+            fn to_string(self) -> String
+        }
+        struct Num {}
+        impl Stringify for Num {
+            fn to_string(self) -> i64 { 0 }
+        }
+        "#,
+    );
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("return type mismatch for `Stringify::to_string`")),
+        "expected return type mismatch error, got: {errs:?}"
+    );
+}
+
+#[test]
+fn impl_method_matching_types_ok() {
+    common::typecheck_ok(
+        r#"
+        protocol Hash {
+            fn hash(self, seed: i64) -> i64
+        }
+        struct Key {}
+        impl Hash for Key {
+            fn hash(self, seed: i64) -> i64 { seed }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn impl_method_omitted_annotation_ok() {
+    // The impl omits the type annotation on a typed protocol param — allowed.
+    common::typecheck_ok(
+        r#"
+        protocol Hash {
+            fn hash(self, seed: i64) -> i64
+        }
+        struct Key {}
+        impl Hash for Key {
+            fn hash(self, seed) -> i64 { 0 }
+        }
+        "#,
+    );
+}
+
+#[test]
+fn impl_method_generic_protocol_type_param_ok() {
+    // `T` is a type param of the generic protocol — comparison is skipped.
+    common::typecheck_ok(
+        r#"
+        protocol From<T> {
+            fn from(value: T)
+        }
+        struct Wrapper {}
+        impl From<i64> for Wrapper {
+            fn from(value: i64) { 0 }
+        }
+        "#,
+    );
+}
+
 // ── Associated types ────────────────────────────────────────────────────
 
 #[test]
