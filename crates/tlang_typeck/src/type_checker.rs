@@ -64,6 +64,13 @@ pub struct TypeChecker {
     /// Local inference errors are deferred until the surrounding body finishes
     /// any recheck cycle so provisional-return retries do not discard them.
     pending_local_inference_errors: Vec<LocalInferenceError>,
+    /// One-shot type-table override queued by `queue_impl_self_seed` for the
+    /// `self` parameter of the next impl method to be checked.  Consumed
+    /// immediately after the parameter types are inserted into the type table
+    /// inside `typecheck_function_decl`, so the function *signature* (used for
+    /// fallback call resolution) retains `Unknown` for the receiver while the
+    /// parameter's *type-table entry* gets the concrete target type.
+    pending_impl_self_seed: Option<(tlang_span::HirId, Ty)>,
 }
 
 impl TypeChecker {
@@ -2932,9 +2939,50 @@ impl TypeChecker {
 
         // Type-check the impl methods.
         for decl in &mut impl_block.methods {
+            self.queue_impl_self_seed(
+                decl,
+                &impl_block.target_type,
+                &impl_block.target_type_arguments,
+            );
             self.typecheck_function_decl(decl);
         }
     }
+
+    /// Queue a type-table override for the `self` parameter of an impl method.
+    ///
+    /// Unlike dot-methods (`fn Tree.method(self)`) whose receiver type is read
+    /// from the function name by `seed_dot_method_receiver_type`, impl block
+    /// methods have a qualified name like `Iterable::iter` and need the target
+    /// type injected from the impl block context.
+    ///
+    /// The seed is stored in `pending_impl_self_seed` and consumed inside
+    /// `typecheck_function_decl` **after** `register_function_signature` has
+    /// already run.  This keeps the registered `(Unknown) -> ?` signature
+    /// intact (so that protocol-dispatch fallback inside the method body does
+    /// not see a concrete receiver type and emit false mismatches), while still
+    /// giving the type-table entry for the `self` parameter the concrete target
+    /// type (so LSP hover/completions and `UnusedSymbolDetector` work).
+    fn queue_impl_self_seed(
+        &mut self,
+        decl: &hir::FunctionDeclaration,
+        target_type: &hir::Path,
+        target_type_args: &[hir::Ty],
+    ) {
+        let Some(self_param) = decl.parameters.iter().find(|p| p.name.as_str() == "self") else {
+            return;
+        };
+        if !matches!(self_param.type_annotation.kind, TyKind::Unknown) {
+            return;
+        }
+        self.pending_impl_self_seed = Some((
+            self_param.hir_id,
+            Ty {
+                kind: TyKind::Path(target_type.clone(), target_type_args.to_vec()),
+                ..Ty::default()
+            },
+        ));
+    }
+
     fn resolve_field_type(
         &self,
         base_ty_kind: &TyKind,
@@ -3769,6 +3817,16 @@ impl TypeChecker {
                     ty: param.type_annotation.clone(),
                 },
             );
+        }
+
+        // Apply any pending impl-method self-parameter seed.  This overrides the
+        // `Unknown` entry inserted above with the concrete target type so that
+        // LSP hover, completions, and `UnusedSymbolDetector` can resolve `self`
+        // inside the method body.  The override happens *after* the function
+        // signature was registered (still with `Unknown`), so the signature
+        // visible to protocol-dispatch fallback resolution is unaffected.
+        if let Some((hir_id, ty)) = self.pending_impl_self_seed.take() {
+            self.type_table.insert(hir_id, TypeInfo { ty });
         }
 
         self.return_type_stack.push(decl.return_type.kind.clone());
