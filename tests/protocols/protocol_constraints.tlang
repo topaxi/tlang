@@ -11,17 +11,17 @@ protocol Ord : Eq {
 struct Point { x: isize, y: isize }
 
 impl PartialEq for Point {
-  fn eq(a, b) {
-    a.x == b.x && a.y == b.y
+  fn eq(self, other) {
+    self.x == other.x && self.y == other.y
   }
 }
 
 impl Eq for Point {}
 
 impl Ord for Point {
-  fn cmp(a, b) {
-    if a.x < b.x { -1 }
-    else if a.x > b.x { 1 }
+  fn cmp(self, other) {
+    if self.x < other.x { -1 }
+    else if self.x > other.x { 1 }
     else { 0 }
   }
 }

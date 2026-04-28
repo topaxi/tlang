@@ -57,16 +57,16 @@ struct Article {
 }
 
 impl Eq for Article {
-  fn equals(a, b) { a.id == b.id }
+  fn equals(self, other) { self.id == other.id }
 }
 
 // Articles are ranked primarily by score, then by views as a tie-breaker.
 impl Comparable for Article {
-  fn compare(a, b) {
-    if a.score < b.score { -1 }
-    else if a.score > b.score { 1 }
-    else if a.views < b.views { -1 }
-    else if a.views > b.views { 1 }
+  fn compare(self, other) {
+    if self.score < other.score { -1 }
+    else if self.score > other.score { 1 }
+    else if self.views < other.views { -1 }
+    else if self.views > other.views { 1 }
     else { 0 }
   }
 }
@@ -96,7 +96,7 @@ fn sort_by([pivot, ...rest], cmp) {
   [...sort_by(smaller, cmp), pivot, ...sort_by(greater, cmp)]
 }
 
-fn article_summary(a) {
+fn article_summary(a: Article) {
   f"[{a.score}★  {a.views} views]  {a.title}  (by {a.author})"
 }
 

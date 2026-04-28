@@ -5,7 +5,7 @@ protocol Area {
 struct Rect { width: isize, height: isize }
 
 impl Area for Rect {
-  fn area(r) { r.width * r.height }
+  fn area(self) { self.width * self.height }
 }
 
 let r = Rect { width: 5, height: 3 };

@@ -23,15 +23,15 @@ protocol Ord : Eq {
 struct Value { n: isize }
 
 impl PartialEq for Value {
-  fn eq(a, b) { a.n == b.n }
+  fn eq(self, other) { self.n == other.n }
 }
 
 impl Eq for Value {}
 
 impl Ord for Value {
-  fn cmp(a, b) {
-    if a.n < b.n { -1 }
-    else if a.n > b.n { 1 }
+  fn cmp(self, other) {
+    if self.n < other.n { -1 }
+    else if self.n > other.n { 1 }
     else { 0 }
   }
 }

@@ -1380,11 +1380,11 @@ fn impl_block_constraints_satisfied_ok() {
         }
         struct Point { x: isize, y: isize }
         impl PartialEq for Point {
-            fn eq(a, b) { a.x == b.x && a.y == b.y }
+            fn eq(self, other) { self.x == other.x && self.y == other.y }
         }
         impl Eq for Point {}
         impl Ord for Point {
-            fn cmp(a, b) { 0 }
+            fn cmp(self, other) { 0 }
         }
         "#,
     );
@@ -1471,7 +1471,7 @@ fn empty_impl_for_constraint_protocol_with_no_methods_ok() {
         protocol Eq : PartialEq {}
         struct Point { x: isize, y: isize }
         impl PartialEq for Point {
-            fn eq(a, b) { true }
+            fn eq(self, other) { true }
         }
         impl Eq for Point {}
         "#,

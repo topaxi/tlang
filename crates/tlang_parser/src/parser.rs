@@ -1861,6 +1861,7 @@ impl<'src> Parser<'src> {
                 | TokenKind::LessThan
                 | TokenKind::PathSeparator
                 | TokenKind::Keyword(Keyword::Fn)
+                | TokenKind::Keyword(Keyword::SelfUpper)
         )
     }
 
@@ -1868,6 +1869,20 @@ impl<'src> Parser<'src> {
         // Function type annotation: `fn(name: Type, …) -> RetType`
         if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Fn)) {
             return self.parse_function_type_annotation();
+        }
+
+        // `Self` as a type refers to the implementing type in protocol contexts.
+        if matches!(
+            self.current_token_kind(),
+            TokenKind::Keyword(Keyword::SelfUpper)
+        ) {
+            let span = self.create_span_from_current_token();
+            self.advance();
+            return Ty::new(
+                self.unique_id(),
+                Path::from_ident(Ident::new(kw::SelfUpper, span)),
+            )
+            .with_span(span);
         }
 
         expect_token_matches!(self, "type annotation", TokenKind::Identifier);
