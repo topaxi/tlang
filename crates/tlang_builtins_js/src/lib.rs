@@ -72,7 +72,7 @@ impl JsBuiltin {
 /// - Use [`JsBuiltin::mapped`] when the JS name differs from the tlang name.
 /// - Use [`JsBuiltin::semantic`] when no JS renaming is needed.
 /// - Use [`JsBuiltin::glue`] for JS-only aliases with no semantic symbol.
-pub static BUILTINS: &[JsBuiltin] = &[
+static BUILTINS: &[JsBuiltin] = &[
     // ── Option / Result ────────────────────────────────────────────────────
     JsBuiltin::semantic("Option", DefKind::Enum),
     JsBuiltin::semantic("Result", DefKind::Enum),
@@ -324,7 +324,7 @@ pub fn lookup(tlang_name: &str) -> Option<&'static str> {
 ///
 /// Only types whose JavaScript constructor name *differs* from the tlang type
 /// name need to be listed here.
-pub static BUILTIN_TYPE_JS_CONSTRUCTORS: &[(&str, &str)] = &[
+static BUILTIN_TYPE_JS_CONSTRUCTORS: &[(&str, &str)] = &[
     // tlang `List` → JavaScript's native `Array` constructor.
     ("List", "Array"),
 ];

@@ -211,7 +211,7 @@ mod tests {
     /// without a matching entry in `tlang_builtins_vm`.
     #[test]
     fn static_symbol_list_covers_all_inventory_symbols() {
-        let static_names: std::collections::HashSet<&str> = tlang_builtins_vm::SYMBOLS
+        let static_names: std::collections::HashSet<&str> = tlang_builtins_vm::symbols()
             .iter()
             .map(|(name, _)| *name)
             .collect();

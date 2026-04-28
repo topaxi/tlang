@@ -21,7 +21,7 @@ use tlang_defs::DefKind;
 /// Each entry is a `(tlang_name, DefKind)` pair.  The list is the single
 /// authoritative static source used by the LSP server and other tooling to
 /// resolve interpreter-backend symbols without pulling in the full VM crate.
-pub static SYMBOLS: &[(&str, DefKind)] = &[
+static SYMBOLS: &[(&str, DefKind)] = &[
     // ── Option ────────────────────────────────────────────────────────────────
     ("Option", DefKind::Enum),
     ("Option::Some", DefKind::Function(1)),

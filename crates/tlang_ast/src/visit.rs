@@ -9,6 +9,7 @@ pub trait Visitor<'ast>: Sized {
     fn enter_scope(&mut self, node_id: NodeId, ctx: &mut Self::Context) {}
     #[allow(unused_variables)]
     fn leave_scope(&mut self, node_id: NodeId, ctx: &mut Self::Context) {}
+
     fn visit_module(&mut self, module: &'ast node::Module, ctx: &mut Self::Context) {
         walk_module(self, module, ctx);
     }
