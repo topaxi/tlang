@@ -429,6 +429,21 @@ struct TestSignatureInformation {
     label: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TestPreparedRename {
+    from: u32,
+    to: u32,
+    placeholder: String,
+}
+
+#[derive(Deserialize)]
+struct TestRenameEdit {
+    from: u32,
+    to: u32,
+    insert: String,
+}
+
 #[wasm_bindgen_test]
 fn get_signature_help_returns_function_signature() -> Result<(), JsError> {
     let source = "fn add(a: i64, b: i64) -> i64 { a + b }\nlet _ = add(1, 2);";
@@ -453,6 +468,44 @@ fn get_type_at_position_returns_symbol_type() -> Result<(), JsError> {
     let ty: String = serde_wasm_bindgen::from_value(value).unwrap();
 
     assert_eq!(ty, "i64");
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn prepare_rename_returns_placeholder() -> Result<(), JsError> {
+    let source = "fn id(value) { value }\nid(1);";
+    let mut tlang = Tlang::new(source.to_string(), Runner::JavaScript);
+    tlang.analyze();
+    let cursor = source.rfind("id(").unwrap() as u32;
+    let value = tlang.prepare_rename(cursor)?;
+    let prepared: TestPreparedRename = serde_wasm_bindgen::from_value(value).unwrap();
+
+    assert_eq!(prepared.placeholder, "id");
+    assert_eq!(prepared.from, cursor);
+    assert_eq!(prepared.to, cursor + 2);
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn get_rename_edits_preserves_import_aliases() -> Result<(), JsError> {
+    let source = "struct Point { x: i64 }\nfn Point.sum(self) -> i64 { self.x }\nuse Point::sum as plus;\nfn main() { plus() }";
+    let mut tlang = Tlang::new(source.to_string(), Runner::JavaScript);
+    tlang.analyze();
+    let cursor = source.rfind("plus()").unwrap() as u32;
+    let alias_decl = source.find("plus;\n").unwrap() as u32;
+    let value = tlang.get_rename_edits(cursor, "total")?;
+    let edits: Vec<TestRenameEdit> = serde_wasm_bindgen::from_value(value).unwrap();
+
+    assert_eq!(
+        edits
+            .iter()
+            .map(|edit| (edit.from, edit.to, edit.insert.as_str()))
+            .collect::<Vec<_>>(),
+        vec![
+            (alias_decl, alias_decl + 4, "total"),
+            (cursor, cursor + 4, "total")
+        ]
+    );
     Ok(())
 }
 

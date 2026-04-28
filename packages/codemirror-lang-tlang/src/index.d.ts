@@ -14,6 +14,18 @@ export interface DefinitionLocation {
   to: number;
 }
 
+export interface PreparedRename {
+  from: number;
+  to: number;
+  placeholder: string;
+}
+
+export interface RenameEdit {
+  from: number;
+  to: number;
+  insert: string;
+}
+
 export interface SignatureParameterInformation {
   label: string;
 }
@@ -38,6 +50,16 @@ export interface SemanticToken {
 
 export type HoverProvider = (pos: number) => HoverInfo | null;
 export type GotoDefinitionProvider = (pos: number) => DefinitionLocation | null;
+export type PrepareRenameProvider = (
+  pos: number,
+) => PreparedRename | null | Promise<PreparedRename | null>;
+export type RenameProvider = (
+  pos: number,
+  newName: string,
+) => RenameEdit[] | null | Promise<RenameEdit[] | null>;
+export type RenamePrompt = (
+  context: PreparedRename,
+) => string | null | Promise<string | null>;
 export type SignatureHelpProvider = (
   pos: number,
 ) => SignatureHelp | null | Promise<SignatureHelp | null>;
@@ -46,6 +68,15 @@ export type SemanticTokenProvider = (
 ) => SemanticToken[] | Promise<SemanticToken[]>;
 
 export function tlangSignatureHelp(provider: SignatureHelpProvider): Extension;
+export function tlangRename(
+  view: import('@codemirror/view').EditorView,
+  options: {
+    prepareRename: PrepareRenameProvider;
+    rename: RenameProvider;
+    requestName: RenamePrompt;
+    pos?: number;
+  },
+): Promise<boolean>;
 export function tlangSemanticTokens(
   source: SemanticToken[] | SemanticTokenProvider,
   config?: { debounceMs?: number },

@@ -14,8 +14,12 @@ use tlang_span::{LineColumn, NodeId, Span};
 pub struct FoundNode {
     /// The name of the identifier under the cursor.
     pub name: String,
-    /// The span of the identifier under the cursor.
+    /// The span used for lookup and scope-sensitive resolution.
     pub span: Span,
+    /// The concrete identifier segment span that should be highlighted or
+    /// edited. For qualified paths this is typically the last segment (e.g.
+    /// `new` in `Vector::new`).
+    pub ident_span: Span,
     /// The innermost scope [`NodeId`] that contains the cursor position.
     /// Use this to look up the symbol in the semantic analyzer's symbol tables.
     pub scope_id: NodeId,
@@ -88,15 +92,20 @@ impl NodeFinder {
 
     fn record_ident(&mut self, name: &str, span: &Span) {
         if self.contains_position(span) {
-            self.result = Some(FoundNode {
-                name: name.to_string(),
-                span: *span,
-                scope_id: self.current_scope(),
-                field_base: None,
-                call_arity: self.current_call_arity,
-                is_declaration_name: self.in_declaration_name_context,
-            });
+            self.record_ident_with_span(name, span, span);
         }
+    }
+
+    fn record_ident_with_span(&mut self, name: &str, lookup_span: &Span, ident_span: &Span) {
+        self.result = Some(FoundNode {
+            name: name.to_string(),
+            span: *lookup_span,
+            ident_span: *ident_span,
+            scope_id: self.current_scope(),
+            field_base: None,
+            call_arity: self.current_call_arity,
+            is_declaration_name: self.in_declaration_name_context,
+        });
     }
 
     fn record_field_ident(&mut self, name: &str, span: &Span, base_name: String) {
@@ -104,6 +113,7 @@ impl NodeFinder {
             self.result = Some(FoundNode {
                 name: name.to_string(),
                 span: *span,
+                ident_span: *span,
                 scope_id: self.current_scope(),
                 field_base: Some(base_name),
                 call_arity: self.current_call_arity,
@@ -163,10 +173,23 @@ impl<'ast> Visitor<'ast> for NodeFinder {
             // Check each segment's span individually so the cursor position
             // correctly selects the full qualified name only when hovering on
             // one of its segments.
-            for seg in &path.segments {
-                if self.contains_position(&seg.span) {
-                    self.record_ident(&path.to_string(), &path.span);
-                    return;
+            if let Some(last_segment) = path.segments.last() {
+                for seg in &path.segments {
+                    if self.contains_position(&seg.span) {
+                        self.record_ident_with_span(
+                            &path.to_string(),
+                            &path.span,
+                            &last_segment.span,
+                        );
+                        return;
+                    }
+                }
+            } else {
+                for seg in &path.segments {
+                    if self.contains_position(&seg.span) {
+                        self.record_ident(&path.to_string(), &path.span);
+                        return;
+                    }
                 }
             }
         } else {
@@ -267,6 +290,18 @@ impl<'ast> Visitor<'ast> for NodeFinder {
             }
             for decl in &impl_block.methods {
                 self.visit_fn_decl(decl, ctx);
+            }
+            return;
+        }
+        if let node::StmtKind::UseDeclaration(ref decl) = statement.kind {
+            for segment in &decl.path {
+                self.visit_ident(segment, ctx);
+            }
+            for item in &decl.items {
+                self.visit_ident(&item.name, ctx);
+                if let Some(alias) = &item.alias {
+                    self.visit_ident(alias, ctx);
+                }
             }
             return;
         }
@@ -490,6 +525,10 @@ mod tests {
             on_sqrt.is_some() && on_sqrt.unwrap().1 == "math::sqrt",
             "hovering on `sqrt` should resolve to `math::sqrt`.\nAll: {found_cols:?}"
         );
+
+        let found = parse_and_find(source, 0, 6).expect("should find `math::sqrt`");
+        assert_eq!(found.ident_span.start_lc.column, 6);
+        assert_eq!(found.ident_span.end_lc.column, 10);
     }
 
     #[test]

@@ -221,6 +221,31 @@ pub struct CodemirrorReferenceLocation {
     pub is_declaration: bool,
 }
 
+/// Prepare-rename information formatted for CodeMirror 6 consumers.
+#[derive(Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi)]
+#[serde(rename_all = "camelCase")]
+pub struct CodemirrorPreparedRename {
+    /// UTF-16 code unit offset of the start of the rename target.
+    pub from: u32,
+    /// UTF-16 code unit offset of the end of the rename target.
+    pub to: u32,
+    /// The current identifier text to prefill in rename UI.
+    pub placeholder: String,
+}
+
+/// A textual rename edit formatted for CodeMirror 6 change specs.
+#[derive(Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi)]
+pub struct CodemirrorRenameEdit {
+    /// UTF-16 code unit offset of the start of the edit.
+    pub from: u32,
+    /// UTF-16 code unit offset of the end of the edit.
+    pub to: u32,
+    /// Replacement text for the edit.
+    pub insert: String,
+}
+
 /// An inlay hint formatted for CodeMirror 6.
 ///
 /// The `position` is a UTF-16 code unit offset matching JavaScript string
