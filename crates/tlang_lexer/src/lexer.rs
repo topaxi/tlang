@@ -1,8 +1,8 @@
 use tlang_ast::{
-    intern::intern,
     keyword::{Keyword, is_keyword},
     token::{Literal, TaggedStringPart, Token, TokenKind},
 };
+use tlang_intern::intern;
 use tlang_span::{LineColumn, Span};
 
 #[derive(Debug, Clone)]

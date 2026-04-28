@@ -1,4 +1,4 @@
-use tlang_ast::{intern::get as intern_get, node::Module, token::Literal, visit::Visitor};
+use tlang_ast::{node::Module, token::Literal, visit::Visitor};
 use tlang_span::Span;
 
 use crate::{analyzer::SemanticAnalysisContext, analyzer::SemanticAnalysisPass, diagnostic};
@@ -116,7 +116,7 @@ impl<'ast> Visitor<'ast> for StringLiteralValidator {
 
         match literal {
             Literal::String(id) | Literal::Char(id) => {
-                self.validate_escape_sequences(intern_get(*id), span, ctx);
+                self.validate_escape_sequences(tlang_intern::get(*id), span, ctx);
             }
             _ => {}
         }

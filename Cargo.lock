@@ -2536,6 +2536,7 @@ dependencies = [
  "tlang_ast",
  "tlang_defs",
  "tlang_diagnostics",
+ "tlang_intern",
  "tlang_parser",
  "tlang_span",
 ]

@@ -1,10 +1,8 @@
-pub mod intern;
 pub mod keyword;
 pub(crate) mod macros;
 pub mod node;
 pub mod token;
 pub mod visit;
 pub mod visit_mut;
-pub use intern::{Symbol, get as intern_get, intern};
 pub use visit::Visitor;
 pub use visit_mut::VisitorMut;

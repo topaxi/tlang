@@ -9,9 +9,10 @@ serde = ["dep:serde", "tlang_defs/serde", "tlang_diagnostics/serde"]
 
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
-tlang_diagnostics = { path = "../tlang_diagnostics" }
-tlang_span = { path = "../tlang_span" }
 tlang_defs = { path = "../tlang_defs" }
+tlang_diagnostics = { path = "../tlang_diagnostics" }
+tlang_intern = { path = "../tlang_intern" }
+tlang_span = { path = "../tlang_span" }
 regex-syntax = "0.8"
 serde = { workspace = true, optional = true }
 log = { workspace = true }

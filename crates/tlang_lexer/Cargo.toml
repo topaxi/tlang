@@ -5,10 +5,10 @@ edition.workspace = true
 
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
+tlang_intern = { path = "../tlang_intern" }
 tlang_span = { path = "../tlang_span" }
 
 [dev-dependencies]
-tlang_intern = { path = "../tlang_intern" }
 pretty_assertions = { workspace = true }
 
 [lints]
