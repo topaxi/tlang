@@ -37,10 +37,10 @@
     "globals": "^17.5.0",
     "postcss-lit": "^1.4.1",
     "prettier": "^3.8.3",
-    "stylelint": "^17.8.0",
+    "stylelint": "^17.9.1",
     "stylelint-config-standard": "^40.0.0",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.58.2"
+    "typescript-eslint": "^8.59.1"
   },
   "packageManager": "npm@11.4.2",
   "engines": {
