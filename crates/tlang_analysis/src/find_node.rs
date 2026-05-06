@@ -164,38 +164,22 @@ impl<'ast> Visitor<'ast> for NodeFinder {
     }
 
     fn visit_path(&mut self, path: &'ast node::Path, _ctx: &mut ()) {
-        if path.segments.len() > 1 {
-            // Multi-segment paths (e.g. "Vector::new", "math::sqrt") are
-            // registered as qualified names in the symbol table.  Walking
-            // individual segments would overwrite the result with a bare
-            // segment name like "new" that can't be resolved.
-            //
-            // Check each segment's span individually so the cursor position
-            // correctly selects the full qualified name only when hovering on
-            // one of its segments.
-            if let Some(last_segment) = path.segments.last() {
-                for seg in &path.segments {
-                    if self.contains_position(&seg.span) {
-                        self.record_ident_with_span(
-                            &path.to_string(),
-                            &path.span,
-                            &last_segment.span,
-                        );
-                        return;
-                    }
-                }
-            } else {
-                for seg in &path.segments {
-                    if self.contains_position(&seg.span) {
-                        self.record_ident(&path.to_string(), &path.span);
-                        return;
-                    }
-                }
-            }
-        } else {
-            // Single-segment paths: the full path name equals the segment
-            // name, so no ambiguity.
+        if path.segments.len() == 1 {
             self.record_ident(&path.to_string(), &path.span);
+            return;
+        }
+
+        // Multi-segment paths (e.g. `Vector::new`, `Expense::Food`) — the
+        // cursor's segment determines what the user is targeting.  Clicking on
+        // `Expense` should resolve to the enum, while clicking on `Food`
+        // should resolve to the variant `Expense::Food`.  Record the path
+        // joined up to and including the segment under the cursor.
+        for (i, seg) in path.segments.iter().enumerate() {
+            if self.contains_position(&seg.span) {
+                let name = path_prefix(&path.segments, i);
+                self.record_ident_with_span(&name, &path.span, &seg.span);
+                return;
+            }
         }
     }
 
@@ -210,6 +194,24 @@ impl<'ast> Visitor<'ast> for NodeFinder {
         for node::StructField { name, ty, .. } in &decl.fields {
             self.with_declaration_name_context(|s| s.visit_ident(name, &mut ()));
             self.visit_ty(ty, ctx);
+        }
+        for const_decl in &decl.consts {
+            self.visit_ident(&const_decl.name, ctx);
+            self.visit_expr(&const_decl.expression, ctx);
+        }
+    }
+
+    fn visit_enum_decl(&mut self, decl: &'ast node::EnumDeclaration, ctx: &mut ()) {
+        // The enum name itself is just a normal identifier.
+        self.visit_ident(&decl.name, ctx);
+        // Variant names are declaration-name context so the cursor on a bare
+        // variant in its declaration falls back to `Enum::Variant` lookup.
+        for variant in &decl.variants {
+            self.with_declaration_name_context(|s| s.visit_ident(&variant.name, &mut ()));
+            for node::StructField { name, ty, .. } in &variant.parameters {
+                self.with_declaration_name_context(|s| s.visit_ident(name, &mut ()));
+                self.visit_ty(ty, ctx);
+            }
         }
         for const_decl in &decl.consts {
             self.visit_ident(&const_decl.name, ctx);
@@ -425,6 +427,16 @@ impl<'ast> Visitor<'ast> for NodeFinder {
     }
 }
 
+/// Join the first `last_index + 1` segments of `segments` with `::`.
+/// Used to compute the qualified prefix of a path up to the cursor.
+fn path_prefix(segments: &[tlang_ast::node::Ident], last_index: usize) -> String {
+    segments[..=last_index]
+        .iter()
+        .map(|seg| seg.as_str())
+        .collect::<Vec<_>>()
+        .join("::")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -525,8 +537,9 @@ mod tests {
 
     #[test]
     fn find_second_segment_of_multi_segment_path() {
-        // Hovering over `sqrt` in `math::sqrt(x)` should resolve to
-        // `math::sqrt`, not return no result.
+        // Hovering over a segment in `math::sqrt(x)` should resolve to the
+        // path up to and including that segment: `math` → `math`,
+        // `sqrt` → `math::sqrt`.
         let source = "math::sqrt(4);";
 
         // `math` is at cols 0..4, `::` at 4..6, `sqrt` at cols 6..10
@@ -534,23 +547,27 @@ mod tests {
             .filter_map(|col| parse_and_find(source, 0, col).map(|f| (col, f.name)))
             .collect();
 
-        // Hovering on `math` (col 0..4) should yield `math::sqrt`
+        // Hovering on `math` (col 0..4) should yield `math`
         let on_math = found_cols.iter().find(|(col, _)| *col == 0);
         assert!(
-            on_math.is_some() && on_math.unwrap().1 == "math::sqrt",
-            "hovering on `math` should resolve to `math::sqrt`.\nAll: {found_cols:?}"
+            on_math.is_some() && on_math.unwrap().1 == "math",
+            "hovering on `math` should resolve to `math`.\nAll: {found_cols:?}"
         );
 
-        // Hovering on `sqrt` (col 6..10) should also yield `math::sqrt`
+        // Hovering on `sqrt` (col 6..10) should yield `math::sqrt`
         let on_sqrt = found_cols.iter().find(|(col, _)| *col == 6);
         assert!(
             on_sqrt.is_some() && on_sqrt.unwrap().1 == "math::sqrt",
             "hovering on `sqrt` should resolve to `math::sqrt`.\nAll: {found_cols:?}"
         );
 
-        let found = parse_and_find(source, 0, 6).expect("should find `math::sqrt`");
-        assert_eq!(found.ident_span.start_lc.column, 6);
-        assert_eq!(found.ident_span.end_lc.column, 10);
+        let found_on_math = parse_and_find(source, 0, 0).expect("should find `math`");
+        assert_eq!(found_on_math.ident_span.start_lc.column, 0);
+        assert_eq!(found_on_math.ident_span.end_lc.column, 4);
+
+        let found_on_sqrt = parse_and_find(source, 0, 6).expect("should find `math::sqrt`");
+        assert_eq!(found_on_sqrt.ident_span.start_lc.column, 6);
+        assert_eq!(found_on_sqrt.ident_span.end_lc.column, 10);
     }
 
     #[test]

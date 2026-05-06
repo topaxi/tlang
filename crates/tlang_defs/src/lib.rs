@@ -49,11 +49,12 @@ impl DefKind {
     }
 
     /// Returns `true` for kinds that represent members of a type — methods,
-    /// associated functions, and struct fields.  This is used in the analysis
-    /// layer to filter symbols when resolving dot-expressions or producing
-    /// member completions for a given type.
+    /// associated functions, struct fields, and enum variants.  This is used
+    /// in the analysis layer to filter symbols when resolving dot-expressions
+    /// or producing member completions for a given type.
     pub fn is_type_member(self) -> bool {
-        self.arity().is_some() || self == DefKind::StructField
+        self.arity().is_some()
+            || matches!(self, DefKind::StructField | DefKind::EnumVariant(_))
     }
 }
 

@@ -668,14 +668,26 @@ impl<'ast> Visitor<'ast> for ReferenceNodeCollector {
     }
 
     fn visit_path(&mut self, path: &'ast ast::Path, _ctx: &mut ()) {
-        if path.segments.len() > 1 {
-            let ident_span = path
-                .segments
-                .last()
-                .map_or(path.span, |segment| segment.span);
-            self.record_ident_with_span(&path.to_string(), path.span, ident_span);
-        } else if let Some(segment) = path.segments.first() {
-            self.record_ident(segment.as_str(), path.span);
+        if path.segments.len() == 1 {
+            if let Some(segment) = path.segments.first() {
+                self.record_ident(segment.as_str(), path.span);
+            }
+            return;
+        }
+
+        // Multi-segment paths reference one symbol per segment-prefix.
+        // For `Expense::Food`, the `Expense` segment refers to the enum and
+        // the `Food` segment refers to the variant `Expense::Food`.  Emit
+        // one entry per segment so each can be matched independently when
+        // searching for references.
+        let segments = &path.segments;
+        for (i, seg) in segments.iter().enumerate() {
+            let name = segments[..=i]
+                .iter()
+                .map(|segment| segment.as_str())
+                .collect::<Vec<_>>()
+                .join("::");
+            self.record_ident_with_span(&name, path.span, seg.span);
         }
     }
 
@@ -684,6 +696,21 @@ impl<'ast> Visitor<'ast> for ReferenceNodeCollector {
         for ast::StructField { name, ty, .. } in &decl.fields {
             self.with_declaration_name_context(|this| this.visit_ident(name, &mut ()));
             self.visit_ty(ty, ctx);
+        }
+        for const_decl in &decl.consts {
+            self.visit_ident(&const_decl.name, ctx);
+            self.visit_expr(&const_decl.expression, ctx);
+        }
+    }
+
+    fn visit_enum_decl(&mut self, decl: &'ast ast::EnumDeclaration, ctx: &mut ()) {
+        self.visit_ident(&decl.name, ctx);
+        for variant in &decl.variants {
+            self.with_declaration_name_context(|this| this.visit_ident(&variant.name, &mut ()));
+            for ast::StructField { name, ty, .. } in &variant.parameters {
+                self.with_declaration_name_context(|this| this.visit_ident(name, &mut ()));
+                self.visit_ty(ty, ctx);
+            }
         }
         for const_decl in &decl.consts {
             self.visit_ident(&const_decl.name, ctx);
@@ -2318,8 +2345,9 @@ mod tests {
         let source =
             "struct Point { x: i64 }\nfn Point.sum(self) -> i64 { self.x }\nlet f = Point::sum;";
 
+        // Cursor on `sum` (col 15) targets the method `Point::sum`.
         let prepared =
-            prepare_test_rename(source, 2, 8).expect("qualified path should be renameable");
+            prepare_test_rename(source, 2, 15).expect("qualified path should be renameable");
 
         assert_eq!(prepared.placeholder, "sum");
         assert_eq!(prepared.ident_span.start_lc.line, 2);
@@ -2330,7 +2358,8 @@ mod tests {
     #[test]
     fn rename_updates_only_member_segment_for_qualified_paths() {
         let source = "struct Point { x: i64 }\nfn Point.sum(self) -> i64 { self.x }\nlet f = Point::sum;\nPoint::sum(Point { x: 1 });";
-        let edits = find_test_rename_edits(source, 2, 8, "total")
+        // Cursor on `sum` (col 15) targets the method `Point::sum`.
+        let edits = find_test_rename_edits(source, 2, 15, "total")
             .expect("qualified path rename should succeed");
 
         assert_eq!(
@@ -2348,6 +2377,229 @@ mod tests {
                 (2, 15, 18, "total"),
                 (3, 7, 10, "total")
             ]
+        );
+    }
+
+    #[test]
+    fn rename_struct_segment_in_qualified_path() {
+        let source = "struct Point { x: i64 }\nfn Point.sum(self) -> i64 { self.x }\nlet f = Point::sum;\nPoint::sum(Point { x: 1 });";
+        // Cursor on `Point` (col 8) targets the struct `Point`, not `Point::sum`.
+        let edits = find_test_rename_edits(source, 2, 8, "Coord")
+            .expect("struct prefix rename should succeed");
+
+        let positions: Vec<(u32, u32, u32, &str)> = edits
+            .iter()
+            .map(|edit| {
+                (
+                    edit.span.start_lc.line,
+                    edit.span.start_lc.column,
+                    edit.span.end_lc.column,
+                    edit.new_text.as_str(),
+                )
+            })
+            .collect();
+
+        // Should rename: `struct Point` decl, `Point` in `fn Point.sum`,
+        // `Point` in `Point::sum`, and `Point` in `Point { x: 1 }`.
+        // (`sum` in `let f = Point::sum`, `Point::sum(...)` etc. stays put.)
+        assert!(
+            positions.contains(&(0, 7, 12, "Coord")),
+            "should rename `Point` in `struct Point`. All edits: {positions:?}"
+        );
+        assert!(
+            positions.contains(&(1, 3, 8, "Coord")),
+            "should rename `Point` in `fn Point.sum`. All edits: {positions:?}"
+        );
+        assert!(
+            positions.contains(&(2, 8, 13, "Coord")),
+            "should rename `Point` in `let f = Point::sum`. All edits: {positions:?}"
+        );
+        assert!(
+            positions.contains(&(3, 0, 5, "Coord")),
+            "should rename `Point` in `Point::sum(...)`. All edits: {positions:?}"
+        );
+    }
+
+    #[test]
+    fn rename_enum_renames_qualified_variant_prefixes() {
+        let source = "enum Color { Red, Green }\nfn handle(Color::Red) { 1 }\nfn handle(Color::Green) { 2 }\nlet c = Color::Red;";
+        // Cursor on `Color` in `enum Color` (col 5) targets the enum.
+        let edits = find_test_rename_edits(source, 0, 5, "Hue")
+            .expect("enum rename should succeed");
+
+        let positions: Vec<(u32, u32, u32, &str)> = edits
+            .iter()
+            .map(|edit| {
+                (
+                    edit.span.start_lc.line,
+                    edit.span.start_lc.column,
+                    edit.span.end_lc.column,
+                    edit.new_text.as_str(),
+                )
+            })
+            .collect();
+
+        // The enum decl name and every `Color::` qualifier should be renamed,
+        // but the `Red`/`Green` variant segments should be left alone.
+        assert!(
+            positions.contains(&(0, 5, 10, "Hue")),
+            "should rename `Color` in declaration. All edits: {positions:?}"
+        );
+        assert!(
+            positions.contains(&(1, 10, 15, "Hue")),
+            "should rename `Color` in `fn handle(Color::Red)`. All edits: {positions:?}"
+        );
+        assert!(
+            positions.contains(&(2, 10, 15, "Hue")),
+            "should rename `Color` in `fn handle(Color::Green)`. All edits: {positions:?}"
+        );
+        assert!(
+            positions.contains(&(3, 8, 13, "Hue")),
+            "should rename `Color` in `let c = Color::Red`. All edits: {positions:?}"
+        );
+        // Variant segments should not be touched.
+        for (line, start_col, end_col, _) in &positions {
+            let span_text = &source.lines().nth(*line as usize).unwrap_or("")
+                [*start_col as usize..*end_col as usize];
+            assert_ne!(
+                span_text, "Red",
+                "variant `Red` should not be renamed when renaming the enum"
+            );
+            assert_ne!(
+                span_text, "Green",
+                "variant `Green` should not be renamed when renaming the enum"
+            );
+        }
+    }
+
+    #[test]
+    fn rename_variant_from_declaration() {
+        let source = "enum Color { Red, Green }\nfn handle(Color::Red) { 1 }\nfn handle(Color::Green) { 2 }\nlet c = Color::Red;";
+        // Cursor on `Red` in the enum declaration (col 13).
+        let prepared = prepare_test_rename(source, 0, 13)
+            .expect("variant declaration should be renameable");
+        assert_eq!(prepared.placeholder, "Red");
+
+        let edits =
+            find_test_rename_edits(source, 0, 13, "Crimson").expect("variant rename should succeed");
+
+        let positions: Vec<(u32, u32, u32, &str)> = edits
+            .iter()
+            .map(|edit| {
+                (
+                    edit.span.start_lc.line,
+                    edit.span.start_lc.column,
+                    edit.span.end_lc.column,
+                    edit.new_text.as_str(),
+                )
+            })
+            .collect();
+
+        // The variant decl and every `::Red` reference should be renamed.
+        assert!(
+            positions.contains(&(0, 13, 16, "Crimson")),
+            "should rename `Red` in declaration. All edits: {positions:?}"
+        );
+        assert!(
+            positions.contains(&(1, 17, 20, "Crimson")),
+            "should rename `Red` in `fn handle(Color::Red)`. All edits: {positions:?}"
+        );
+        assert!(
+            positions.contains(&(3, 15, 18, "Crimson")),
+            "should rename `Red` in `let c = Color::Red`. All edits: {positions:?}"
+        );
+        // `Green` references should not change.
+        for (_, _, _, new_text) in &positions {
+            assert_eq!(*new_text, "Crimson");
+        }
+        assert_eq!(positions.len(), 3, "expected 3 edits, got {positions:?}");
+    }
+
+    #[test]
+    fn rename_enum_covers_method_decls_patterns_and_types() {
+        // Exercises the renaming patterns from `examples/expense_tracker.tlang`:
+        // a method declaration on the enum, a pattern match on a variant, a
+        // type annotation, and an impl block.
+        let source = "enum Expense {\n    Food(i64),\n}\nfn Expense.amount(Expense::Food(a)) { a }\nimpl Display for Expense {}\nfn run(es: List<Expense>) { 1 }";
+
+        // Cursor on the enum name in its declaration (line 0, col 5).
+        let edits = find_test_rename_edits(source, 0, 5, "Cost")
+            .expect("enum rename should succeed");
+
+        let positions: Vec<(u32, u32, u32, &str)> = edits
+            .iter()
+            .map(|edit| {
+                (
+                    edit.span.start_lc.line,
+                    edit.span.start_lc.column,
+                    edit.span.end_lc.column,
+                    edit.new_text.as_str(),
+                )
+            })
+            .collect();
+
+        // declaration
+        assert!(
+            positions.contains(&(0, 5, 12, "Cost")),
+            "should rename enum decl. All edits: {positions:?}"
+        );
+        // `fn Expense.amount(...)` — `Expense` base of field expression
+        assert!(
+            positions.iter().any(|(line, start, _, _)| *line == 3 && *start == 3),
+            "should rename `Expense` in `fn Expense.amount`. All edits: {positions:?}"
+        );
+        // `Expense::Food(a)` pattern — `Expense` segment
+        assert!(
+            positions.iter().any(|(line, start, _, _)| *line == 3 && *start == 18),
+            "should rename `Expense` in `Expense::Food(a)`. All edits: {positions:?}"
+        );
+        // `impl Display for Expense {}` — target type
+        assert!(
+            positions.iter().any(|(line, _, _, _)| *line == 4),
+            "should rename `Expense` in impl block. All edits: {positions:?}"
+        );
+        // `List<Expense>` — type parameter
+        assert!(
+            positions.iter().any(|(line, _, _, _)| *line == 5),
+            "should rename `Expense` in `List<Expense>`. All edits: {positions:?}"
+        );
+    }
+
+    #[test]
+    fn rename_variant_from_usage_site() {
+        let source = "enum Color { Red, Green }\nfn handle(Color::Red) { 1 }\nlet c = Color::Red;";
+        // Cursor on `Red` in `let c = Color::Red;` (col 15).
+        let prepared = prepare_test_rename(source, 2, 15)
+            .expect("variant usage should be renameable");
+        assert_eq!(prepared.placeholder, "Red");
+
+        let edits = find_test_rename_edits(source, 2, 15, "Crimson")
+            .expect("variant rename should succeed");
+
+        let positions: Vec<(u32, u32, u32, &str)> = edits
+            .iter()
+            .map(|edit| {
+                (
+                    edit.span.start_lc.line,
+                    edit.span.start_lc.column,
+                    edit.span.end_lc.column,
+                    edit.new_text.as_str(),
+                )
+            })
+            .collect();
+
+        // Decl + every `::Red` reference should be renamed.
+        assert!(
+            positions.contains(&(0, 13, 16, "Crimson")),
+            "should rename `Red` in declaration. All edits: {positions:?}"
+        );
+        assert!(
+            positions.contains(&(1, 17, 20, "Crimson")),
+            "should rename `Red` in `fn handle(Color::Red)`. All edits: {positions:?}"
+        );
+        assert!(
+            positions.contains(&(2, 15, 18, "Crimson")),
+            "should rename `Red` in `let c = Color::Red`. All edits: {positions:?}"
         );
     }
 
@@ -2408,12 +2660,19 @@ mod tests {
     #[test]
     fn resolve_multi_segment_path_vector_new() {
         // `Vector::new` should resolve as a qualified name.
-        // tlang uses `fn Vector::new(...)` syntax for static methods
+        // tlang uses `fn Vector::new(...)` syntax for static methods.
         let source = "struct Vector { x: i64 }\nfn Vector::new(x: i64) -> Vector { Vector { x } }\nlet v = Vector::new(1);";
-        // Hover on `Vector` part of `Vector::new` at line 2, col 8 (0-based)
-        let resolved = setup_and_resolve(source, 2, 8);
-        assert!(resolved.is_some(), "should resolve Vector::new");
-        assert_eq!(resolved.unwrap().name, "Vector::new");
+
+        // Hover on `Vector` segment at line 2, col 8 — resolves to the struct.
+        let resolved_on_vector =
+            setup_and_resolve(source, 2, 8).expect("should resolve `Vector` to the struct");
+        assert_eq!(resolved_on_vector.name, "Vector");
+        assert_eq!(resolved_on_vector.def_kind, DefKind::Struct);
+
+        // Hover on `new` segment at line 2, col 16 — resolves to the method.
+        let resolved_on_new =
+            setup_and_resolve(source, 2, 16).expect("should resolve `Vector::new` to the method");
+        assert_eq!(resolved_on_new.name, "Vector::new");
     }
 
     #[test]
