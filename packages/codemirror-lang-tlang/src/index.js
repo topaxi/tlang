@@ -173,8 +173,23 @@ export const tlangCompletion = tlangLanguage.data.of({
  *   to: number,
  * }} DefinitionLocation
  *
+ * @typedef {{
+ *   from: number,
+ *   to: number,
+ *   placeholder: string,
+ * }} PreparedRename
+ *
+ * @typedef {{
+ *   from: number,
+ *   to: number,
+ *   insert: string,
+ * }} RenameEdit
+ *
  * @typedef {(pos: number) => HoverInfo | null} HoverProvider
  * @typedef {(pos: number) => DefinitionLocation | null} GotoDefinitionProvider
+ * @typedef {(pos: number) => PreparedRename | null | Promise<PreparedRename | null>} PrepareRenameProvider
+ * @typedef {(pos: number, newName: string) => RenameEdit[] | null | Promise<RenameEdit[] | null>} RenameProvider
+ * @typedef {(context: PreparedRename) => string | null | Promise<string | null>} RenamePrompt
  *
  * @typedef {{
  *   label: string,
@@ -652,6 +667,35 @@ class SemanticTokenScheduler {
     if (version !== this.version) return;
     this.applyTokens(tokens);
   }
+}
+
+/**
+ * Run a rename through external prepare/rename providers and apply the edits.
+ *
+ * The host supplies UI via `requestName`, while this helper handles the
+ * CodeMirror-side edit application.
+ *
+ * @param {EditorView} view
+ * @param {{
+ *   prepareRename: PrepareRenameProvider,
+ *   rename: RenameProvider,
+ *   requestName: RenamePrompt,
+ *   pos?: number,
+ * }} options
+ */
+export async function tlangRename(view, options) {
+  const pos = options.pos ?? view.state.selection.main.head;
+  const prepared = await options.prepareRename(pos);
+  if (!prepared) return false;
+
+  const nextName = await options.requestName(prepared);
+  if (!nextName || nextName === prepared.placeholder) return false;
+
+  const edits = await options.rename(pos, nextName);
+  if (!edits?.length) return false;
+
+  view.dispatch({ changes: edits });
+  return true;
 }
 
 /**

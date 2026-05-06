@@ -26,7 +26,8 @@ use wasm_bindgen::prelude::*;
 use crate::codemirror;
 use crate::codemirror::{
     CodemirrorDefinitionLocation, CodemirrorHoverInfo, CodemirrorParameterInformation,
-    CodemirrorReferenceLocation, CodemirrorSignatureHelp, CodemirrorSignatureInformation,
+    CodemirrorPreparedRename, CodemirrorReferenceLocation, CodemirrorRenameEdit,
+    CodemirrorSignatureHelp, CodemirrorSignatureInformation,
 };
 use crate::ts_types::{JsDiagnostic, JsParseIssue};
 
@@ -459,6 +460,69 @@ impl Tlang {
                 .collect();
 
         Ok(serde_wasm_bindgen::to_value(&references)?.unchecked_into())
+    }
+
+    /// Prepare a rename for the symbol at the given UTF-16 position.
+    #[wasm_bindgen(js_name = "prepareRename")]
+    pub fn prepare_rename(&self, pos: u32) -> Result<JsValue, serde_wasm_bindgen::Error> {
+        let ast = match self.ast() {
+            Some(ast) => ast,
+            None => return Ok(JsValue::NULL),
+        };
+        let index = match &self.build.symbol_index {
+            Some(idx) => idx,
+            None => return Ok(JsValue::NULL),
+        };
+
+        let byte_pos = codemirror::utf16_to_byte_offset(&self.source, pos);
+        let (line, column) = codemirror::byte_offset_to_line_column(&self.source, byte_pos);
+
+        let Some(prepared) = tlang_analysis::query::prepare_rename(ast, index, line, column) else {
+            return Ok(JsValue::NULL);
+        };
+
+        let info = CodemirrorPreparedRename {
+            from: codemirror::byte_offset_to_utf16(&self.source, prepared.ident_span.start),
+            to: codemirror::byte_offset_to_utf16(&self.source, prepared.ident_span.end),
+            placeholder: prepared.placeholder,
+        };
+
+        serde_wasm_bindgen::to_value(&info)
+    }
+
+    /// Get textual rename edits for the symbol at the given UTF-16 position.
+    #[wasm_bindgen(js_name = "getRenameEdits")]
+    pub fn get_rename_edits(
+        &self,
+        pos: u32,
+        new_name: &str,
+    ) -> Result<JsValue, serde_wasm_bindgen::Error> {
+        let ast = match self.ast() {
+            Some(ast) => ast,
+            None => return Ok(JsValue::NULL),
+        };
+        let index = match &self.build.symbol_index {
+            Some(idx) => idx,
+            None => return Ok(JsValue::NULL),
+        };
+
+        let byte_pos = codemirror::utf16_to_byte_offset(&self.source, pos);
+        let (line, column) = codemirror::byte_offset_to_line_column(&self.source, byte_pos);
+
+        let Ok(edits) = tlang_analysis::query::rename(ast, index, line, column, new_name) else {
+            return Ok(JsValue::NULL);
+        };
+
+        let edits = edits
+            .into_iter()
+            .map(|edit| CodemirrorRenameEdit {
+                from: codemirror::byte_offset_to_utf16(&self.source, edit.span.start),
+                to: codemirror::byte_offset_to_utf16(&self.source, edit.span.end),
+                insert: edit.new_text,
+            })
+            .collect::<Vec<_>>();
+
+        serde_wasm_bindgen::to_value(&edits)
     }
 
     /// Get signature help for the call at the given UTF-16 position.
