@@ -552,6 +552,23 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
 
                 for item in &decl.items {
                     let local_ident = item.alias.as_ref().unwrap_or(&item.name);
+
+                    // The modules system pre-registers cross-module imports as
+                    // builtin symbols on the root scope before semantic analysis.
+                    // Adding a second untracked Def here would shadow that
+                    // resolved binding and break codegen, so skip when the import
+                    // is already in scope as a builtin.
+                    if self
+                        .current_symbol_table()
+                        .read()
+                        .unwrap()
+                        .get_by_name(local_ident.as_str())
+                        .iter()
+                        .any(Def::is_builtin)
+                    {
+                        continue;
+                    }
+
                     let qualified_name = if path_prefix.is_empty() {
                         item.name.to_string()
                     } else {
