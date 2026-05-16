@@ -18,6 +18,6 @@
     "vitest": "^4.1.4"
   },
   "dependencies": {
-    "@lezer/lr": "^1.4.8"
+    "@lezer/lr": "^1.4.10"
   }
 }
