@@ -37,7 +37,7 @@ ctor = { workspace = true }
 env_logger = { workspace = true }
 indoc = { workspace = true }
 pretty_assertions = { workspace = true }
-criterion = "0.5"
+criterion = "0.8"
 
 [lints]
 workspace = true
